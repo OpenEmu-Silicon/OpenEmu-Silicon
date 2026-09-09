@@ -74,6 +74,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierGB:        "Nintendo - Game Boy",
         OESystemIdentifierColecoVision: "Coleco - ColecoVision",
         OESystemIdentifierPSX:       "Sony - PlayStation",
+        OESystemIdentifierLynx:      "Atari - Lynx",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -128,6 +129,11 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         var lookupMD5 = md5
         if Self.redumpSystems.contains(systemIdentifier), let romURL,
            let recomputed = dataTrackMD5(forCueURL: romURL) {
+            lookupMD5 = recomputed
+        }
+        // Lynx .lnx dumps prepend a 64-byte header; the no-intro DAT indexes the headerless image.
+        if systemIdentifier == OESystemIdentifierLynx, let romURL,
+           let recomputed = headerlessLynxMD5(forROMURL: romURL) {
             lookupMD5 = recomputed
         }
 
@@ -620,6 +626,25 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 remaining = r - data.count
                 if remaining! <= 0 { break }
             }
+        }
+
+        return md5.finalize().map { String(format: "%02X", $0) }.joined()
+    }
+
+    /// Atari Lynx `.lnx` dumps prepend a 64-byte header ("LYNX" magic); the no-intro DAT
+    /// indexes the headerless image, so recompute the MD5 over the data past the header.
+    /// Returns nil when the file has no header (its MD5 already matches the DAT).
+    private func headerlessLynxMD5(forROMURL romURL: URL) -> String? {
+        guard let file = try? FileHandle(forReadingFrom: romURL) else { return nil }
+        defer { try? file.close() }
+
+        guard let magic = try? file.read(upToCount: 4), magic == Data("LYNX".utf8) else { return nil }
+        do { try file.seek(toOffset: 64) } catch { return nil }
+
+        var md5 = Insecure.MD5()
+        let bufferSize = 1024 * 1024
+        while let data = try? file.read(upToCount: bufferSize), !data.isEmpty {
+            md5.update(data: data)
         }
 
         return md5.finalize().map { String(format: "%02X", $0) }.joined()
