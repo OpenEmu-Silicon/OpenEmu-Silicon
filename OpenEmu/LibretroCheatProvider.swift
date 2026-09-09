@@ -75,11 +75,13 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierColecoVision: "Coleco - ColecoVision",
         OESystemIdentifierPSX:       "Sony - PlayStation",
         OESystemIdentifierLynx:      "Atari - Lynx",
+        OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
     private let systemFallbacks: [String: [String]] = [
         OESystemIdentifierGB: ["Nintendo - Game Boy", "Nintendo - Game Boy Color"],
+        OESystemIdentifierNGP: ["SNK - Neo Geo Pocket", "SNK - Neo Geo Pocket Color"],
     ]
 
     // In-memory cache: systemIdentifier → [key → (gameName, libretroSystem)]
