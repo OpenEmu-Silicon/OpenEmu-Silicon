@@ -59,7 +59,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private static let chtBaseURL = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
 
     // Disc-based systems use redump DATs instead of no-intro
-    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD]
+    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD, OESystemIdentifierSaturn]
 
     // OpenEmu system ID → Libretro directory/DAT name
     private let systemMap: [String: String] = [
@@ -82,6 +82,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
         OESystemIdentifierPCE:       "NEC - PC Engine - TurboGrafx 16",
         OESystemIdentifierPCECD:     "NEC - PC Engine CD - TurboGrafx-CD",
+        OESystemIdentifierSaturn:    "Sega - Saturn",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -169,7 +170,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         var allCheats: [LibretroCachedCheat] = []
         var sources: [LibretroCachedSource] = []
 
-        let useRegionFallback = systemIdentifier == OESystemIdentifierPSX
+        let useRegionFallback = systemIdentifier == OESystemIdentifierPSX || systemIdentifier == OESystemIdentifierSaturn
         var gameNames: [String] = []
         if let name = lookup?.name {
             gameNames.append(name)
@@ -404,6 +405,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             var cleaned = code.replacingOccurrences(of: " ", with: "")
                               .replacingOccurrences(of: ";", with: "+")
             cleaned = normalizeCode(cleaned, systemIdentifier: systemIdentifier)
+            // Saturn: reject anything that isn't a plain word/byte write (also catches Master Codes
+            // and the RetroArch/Format-B entries this system doesn't support yet).
+            if systemIdentifier == OESystemIdentifierSaturn,
+               !cleaned.split(separator: "+").allSatisfy({ CheatCodeValidator.isSaturnActionReplayCode(String($0)) }) {
+                continue
+            }
             guard !seenCodes.contains(cleaned) else { continue }
             seenCodes.insert(cleaned)
             cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned, rawCode: rawCode))
@@ -466,6 +473,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             return normalizeGameGearCode(code)
         case OESystemIdentifierPSX:
             return normalizePSXCode(code)
+        case OESystemIdentifierSaturn:
+            return normalizeSaturnCode(code)
         default:
             return code
         }
@@ -517,6 +526,30 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             else {
                 return code
             }
+        }
+        return codes.joined(separator: "+")
+    }
+
+    /// Saturn GameShark/Action Replay: 8-hex address (type nibble + 24-bit address) + '+' + 4-hex
+    /// value, chained with '+' for multi-part patches. Concatenates each pair into a contiguous
+    /// 12-hex code, matching the native `TAAAAAAA` + `VVVV` shape `MednafenGameCore`'s `ss` branch
+    /// expects (its own space is stripped before parsing there).
+    private func normalizeSaturnCode(_ code: String) -> String {
+        let parts = code.split(separator: "+").map { String($0) }
+        guard parts.count >= 2, parts.count.isMultiple(of: 2) else { return code }
+
+        var codes: [String] = []
+        var i = 0
+        while i < parts.count {
+            var addr = parts[i]
+            let val = parts[i + 1]
+            // Some entries drop the address's leading zero (e.g. "160CE42" for "0160CE42").
+            if addr.count == 7, addr.allSatisfy(\.isHexDigit) { addr = "0" + addr }
+            guard addr.count == 8, addr.allSatisfy(\.isHexDigit), val.count == 4, val.allSatisfy(\.isHexDigit) else {
+                return code
+            }
+            codes.append("\(addr)\(val)")
+            i += 2
         }
         return codes.joined(separator: "+")
     }

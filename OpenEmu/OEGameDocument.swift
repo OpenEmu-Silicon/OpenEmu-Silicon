@@ -1900,6 +1900,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isPCECode(String($0)) }
                 }
             )
+        case OESystemIdentifierSaturn:
+            return CheatFormat(
+                placeholder: NSLocalizedString("12 hex chars per code, e.g. 16073358 0003. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Saturn"),
+                validationHint: NSLocalizedString("Saturn Action Replay codes must be 12 hex characters (8-char address + 4-char value), e.g. 16073358 0003. The first hex digit must be 1 (word write) or 3 (byte write).", comment: "Add Cheat validation hint, Saturn"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isSaturnActionReplayCode(String($0)) }
+                }
+            )
         default:
             return defaultCheatFormat
         }

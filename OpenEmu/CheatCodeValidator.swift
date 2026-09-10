@@ -69,6 +69,10 @@ enum CheatCodeValidator {
             // Mednafen: 12 hex (PSX GameShark) or raw address:value
             return isPSXGameSharkCode(code) || isRawAddressValue(code)
 
+        case OESystemIdentifierSaturn:
+            // Mednafen (ss module): 12 hex, type nibble 1 (word) or 3 (byte) only
+            return isSaturnActionReplayCode(code)
+
         case OESystemIdentifierGBA:
             // mGBA: 12 hex (CodeBreaker), 16 hex (GameShark/PAR v3), or VBA (address:value)
             return isGBACode(code)
@@ -171,6 +175,13 @@ enum CheatCodeValidator {
     /// PSX GameShark: exactly 12 hex characters (type byte + 24-bit address + 16-bit value)
     static func isPSXGameSharkCode(_ code: String) -> Bool {
         return code.count == 12 && code.allSatisfy(\.isHexDigit)
+    }
+
+    /// Saturn GameShark/Action Replay: 12 hex characters, type nibble 1 (word write) or 3 (byte
+    /// write) only — the only two operations Mednafen's `ss` cheat branch actually applies.
+    static func isSaturnActionReplayCode(_ code: String) -> Bool {
+        guard code.count == 12, code.allSatisfy(\.isHexDigit), let typeNibble = code.first else { return false }
+        return typeNibble == "1" || typeNibble == "3"
     }
 
     /// GBA code: 12 hex (CodeBreaker), 16 hex (GameShark/PAR v3), or VBA (8hex:value)
