@@ -76,6 +76,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierPSX:       "Sony - PlayStation",
         OESystemIdentifierLynx:      "Atari - Lynx",
         OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
+        OESystemIdentifierPCE:       "NEC - PC Engine - TurboGrafx 16",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -347,8 +348,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
             // If code is empty, try to synthesize from address + value (Format B)
             // TODO: handle big_endian and memory_search_size for multi-byte systems
-            // TODO: filter by cheat_type — only type 1 (set to value) is usable; types 2-7 need RetroArch's RAM engine
-            if code.isEmpty, let addrStr = fields["address"], let valStr = fields["value"],
+            // Only cheat_type "1" (Set To Value) is a plain memory patch we can express as ADDRESS:VALUE.
+            // Other types (e.g. "0", used by rumble-on-match entries with populated rumble_* fields) are
+            // conditional/behavioral cheats RetroArch's RAM engine handles specially, not simple patches.
+            let cheatType = fields["cheat_type"]
+            let isPlainSetToValue = cheatType == nil || cheatType == "1"
+            if code.isEmpty, isPlainSetToValue, let addrStr = fields["address"], let valStr = fields["value"],
                let addr = UInt32(addrStr), let val = UInt32(valStr) {
                 // Pad the address to the width the per-system raw ADDRESS:VALUE validator expects.
                 let addressHexChars = Self.formatBAddressHexChars(for: systemIdentifier)

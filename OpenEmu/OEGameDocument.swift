@@ -1888,6 +1888,18 @@ final class OEGameDocument: NSDocument {
                     }
                 }
             )
+        case OESystemIdentifierPCE:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Physical (F82DBA:02) or linear (1F0083:02) address. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, PC Engine"),
+                validationHint: NSLocalizedString("PC Engine codes must be a 6 hex digit address plus a 2 hex digit value, e.g. F82DBA:02 or 1F0083:02.", comment: "Add Cheat validation hint, PC Engine"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isPCECode(String($0)) }
+                }
+            )
         default:
             return defaultCheatFormat
         }

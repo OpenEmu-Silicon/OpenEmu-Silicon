@@ -95,6 +95,10 @@ enum CheatCodeValidator {
         case OESystemIdentifierGameGear, OESystemIdentifierSG1000:
             return isSMSGameGenieCode(code) || isSMSActionReplayCode(code) || isRawAddressValue(code)
 
+        case OESystemIdentifierPCE:
+            // Mednafen (pce module): paged (F8-FB) or linear (1F0000-1F7FFF) physical address, 1-byte value
+            return isPCECode(code)
+
         default:
             return true
         }
@@ -222,5 +226,20 @@ enum CheatCodeValidator {
         guard code.contains("-") else { return false }
         let parts = code.split(separator: "-")
         return parts.count == 2 && parts.allSatisfy { $0.count == 4 && $0.allSatisfy(\.isHexDigit) }
+    }
+
+    /// PCE (Mednafen): 6-hex address + 2-hex value, address must land in a real RAM window —
+    /// either the paged form (page F8-FB, slot offset 0x2000-0x3FFF, e.g. F82DBA:02) or the
+    /// linear physical form `setCheat` converts paged addresses into (0x1F0000-0x1F7FFF, e.g. 1F0083:02).
+    static func isPCECode(_ code: String) -> Bool {
+        guard isRawAddressValue(code, addressHexChars: 6, valueHexChars: 2),
+              let addr = UInt32(code.prefix(6), radix: 16)
+        else { return false }
+        let page = (addr >> 16) & 0xFF
+        let offset = addr & 0xFFFF
+        if (0xF8...0xFB).contains(page) && (0x2000...0x3FFF).contains(offset) {
+            return true
+        }
+        return (0x1F0000...0x1F7FFF).contains(addr)
     }
 }
