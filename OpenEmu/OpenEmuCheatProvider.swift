@@ -100,7 +100,8 @@ private class CheatXMLParserDelegate: NSObject, XMLParserDelegate {
             }
         case "cheat":
             if let code = attributeDict["code"], let desc = attributeDict["description"], !code.isEmpty {
-                currentCheats.append(DatabaseCheat(name: desc, code: code, providerName: providerName))
+                // This provider does no normalization, so the stored code is already the raw source text.
+                currentCheats.append(DatabaseCheat(name: desc, code: code, providerName: providerName, rawCode: code))
             }
         default:
             break

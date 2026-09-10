@@ -44,6 +44,8 @@ private struct LibretroCachedSource: Codable {
 private struct LibretroCachedCheat: Codable {
     let name: String
     let code: String
+    /// Unmodified text as published upstream, kept for feedback correlation. Never shown to the user.
+    let rawCode: String
 }
 
 final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
@@ -113,7 +115,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                     anyUpdated = true
                 } else if !anyUpdated {
                     // Nothing updated yet — return the full cached set as-is
-                    return cached.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name) }
+                    return cached.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode) }
                 } else {
                     // Some sources updated, this one didn't — keep cached cheats and this source's existing ETag
                     allCheats.append(contentsOf: cached.cheats)
@@ -124,7 +126,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if anyUpdated {
                 saveCachedCheats(LibretroCachedCheatFile(sources: updatedSources, cheats: cheats), md5: md5, systemIdentifier: systemIdentifier)
             }
-            return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name) }
+            return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode) }
         }
 
         // 2. No local cache — resolve game name via DAT (try MD5 first, then serial)
@@ -200,7 +202,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
         let cheats = dedup(allCheats)
         saveCachedCheats(LibretroCachedCheatFile(sources: sources, cheats: cheats), md5: md5, systemIdentifier: systemIdentifier)
-        return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name) }
+        return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode) }
     }
 
     // MARK: - Local Cache
@@ -372,13 +374,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             }
 
             guard !code.isEmpty else { continue }
+            let rawCode = code
             // Normalize separators: some CHT files use ';' instead of '+'
             var cleaned = code.replacingOccurrences(of: " ", with: "")
                               .replacingOccurrences(of: ";", with: "+")
             cleaned = normalizeCode(cleaned, systemIdentifier: systemIdentifier)
             guard !seenCodes.contains(cleaned) else { continue }
             seenCodes.insert(cleaned)
-            cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned))
+            cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned, rawCode: rawCode))
         }
 
         return cheats

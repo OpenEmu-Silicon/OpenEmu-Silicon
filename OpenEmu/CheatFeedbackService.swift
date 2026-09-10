@@ -52,6 +52,10 @@ struct CheatFeedbackEntry: Codable, Sendable {
     let status: CheatFeedbackStatus?
     /// User-authored, freeform. `nil`/absent for existing files predating this field.
     var notes: String?
+    /// Unmodified text as published by the provider, before normalization. Not shown to the
+    /// user; kept so a future central feedback service can key on the upstream cheat rather
+    /// than on OpenEmu's own normalized encoding, which can change between versions.
+    var rawCode: String?
     let updatedAt: Date
 }
 
@@ -132,14 +136,15 @@ final class CheatFeedbackService {
                    md5: String,
                    systemIdentifier: String,
                    coreIdentifier: String,
-                   coreVersion: String) {
+                   coreVersion: String,
+                   rawCode: String? = nil) {
         let key = Self.key(for: code)
         var file = load(md5: md5, systemIdentifier: systemIdentifier)
             ?? CheatFeedbackFile(schemaVersion: Self.schemaVersion, md5: md5, entries: [])
 
-        let existingNotes = file.entries.first {
+        let existing = file.entries.first {
             $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
-        }?.notes
+        }
 
         file.entries.removeAll {
             $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
@@ -149,7 +154,8 @@ final class CheatFeedbackService {
                                                coreIdentifier: coreIdentifier,
                                                coreVersion: coreVersion,
                                                status: status,
-                                               notes: existingNotes,
+                                               notes: existing?.notes,
+                                               rawCode: rawCode ?? existing?.rawCode,
                                                updatedAt: Date()))
 
         save(file, md5: md5, systemIdentifier: systemIdentifier)
@@ -163,14 +169,15 @@ final class CheatFeedbackService {
                   md5: String,
                   systemIdentifier: String,
                   coreIdentifier: String,
-                  coreVersion: String) {
+                  coreVersion: String,
+                  rawCode: String? = nil) {
         let key = Self.key(for: code)
         var file = load(md5: md5, systemIdentifier: systemIdentifier)
             ?? CheatFeedbackFile(schemaVersion: Self.schemaVersion, md5: md5, entries: [])
 
-        let existingStatus = file.entries.first {
+        let existing = file.entries.first {
             $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
-        }?.status
+        }
 
         file.entries.removeAll {
             $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
@@ -180,12 +187,13 @@ final class CheatFeedbackService {
         let newNotes = (trimmed?.isEmpty ?? true) ? nil : trimmed
 
         // Don't persist an empty shell that has neither a status nor a note.
-        if existingStatus != nil || newNotes != nil {
+        if existing?.status != nil || newNotes != nil {
             file.entries.append(CheatFeedbackEntry(code: key,
                                                    coreIdentifier: coreIdentifier,
                                                    coreVersion: coreVersion,
-                                                   status: existingStatus,
+                                                   status: existing?.status,
                                                    notes: newNotes,
+                                                   rawCode: rawCode ?? existing?.rawCode,
                                                    updatedAt: Date()))
         }
 
