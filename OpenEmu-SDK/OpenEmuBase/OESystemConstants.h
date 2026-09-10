@@ -49,6 +49,7 @@ extern NSString *const OESystemIdentifierAtari2600;
 extern NSString *const OESystemIdentifierLynx;
 extern NSString *const OESystemIdentifierNGP;
 extern NSString *const OESystemIdentifierPCE;
+extern NSString *const OESystemIdentifierPCECD;
 extern NSString *const OESystemIdentifierPSX;
 extern NSString *const OESystemIdentifierSaturn;
 

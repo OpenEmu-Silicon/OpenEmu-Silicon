@@ -55,7 +55,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private static let chtBaseURL = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
 
     // Disc-based systems use redump DATs instead of no-intro
-    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD]
+    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD]
 
     // OpenEmu system ID → Libretro directory/DAT name
     private let systemMap: [String: String] = [
@@ -77,6 +77,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierLynx:      "Atari - Lynx",
         OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
         OESystemIdentifierPCE:       "NEC - PC Engine - TurboGrafx 16",
+        OESystemIdentifierPCECD:     "NEC - PC Engine CD - TurboGrafx-CD",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -130,17 +131,27 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         // For disc systems, OpenEmu's stored MD5 hashes the .cue playlist file, not the disc data,
         // so it never matches Libretro's per-track MD5s. Recompute the data track's MD5 when possible.
         var lookupMD5 = md5
-        if Self.redumpSystems.contains(systemIdentifier), let romURL,
-           let recomputed = dataTrackMD5(forCueURL: romURL) {
-            lookupMD5 = recomputed
+        var lookup: (name: String, libretroSystem: String)?
+        if Self.redumpSystems.contains(systemIdentifier), let romURL {
+            // Some discs (esp. PC Engine CD, occasionally Saturn) don't keep their identifying
+            // data on the first track — try every non-audio track's MD5 in cue order until one matches.
+            for candidate in dataTrackMD5Candidates(forCueURL: romURL) {
+                if let result = try await lookupGameName(md5: candidate, serial: nil, systemIdentifier: systemIdentifier) {
+                    lookupMD5 = candidate
+                    lookup = result
+                    break
+                }
+            }
         }
         // Lynx .lnx dumps prepend a 64-byte header; the no-intro DAT indexes the headerless image.
-        if systemIdentifier == OESystemIdentifierLynx, let romURL,
+        if lookup == nil, systemIdentifier == OESystemIdentifierLynx, let romURL,
            let recomputed = headerlessLynxMD5(forROMURL: romURL) {
             lookupMD5 = recomputed
         }
 
-        let lookup = try await lookupGameName(md5: lookupMD5, serial: serial, systemIdentifier: systemIdentifier)
+        if lookup == nil {
+            lookup = try await lookupGameName(md5: lookupMD5, serial: serial, systemIdentifier: systemIdentifier)
+        }
 
         if lookup == nil && gameName == nil {
             // log.info("No game found for MD5 \(md5) / serial \(serial ?? "nil") in system \(systemIdentifier)")
@@ -376,7 +387,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Address hex-digit width the raw ADDRESS:VALUE validator expects per system (see CheatCodeValidator).
     private static func formatBAddressHexChars(for systemIdentifier: String) -> Int {
         switch systemIdentifier {
-        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD:
+        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
             return 6
         case OESystemIdentifierGBA:
             return 8
@@ -549,28 +560,34 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
     // MARK: - Data Track MD5 Recomputation
 
-    /// Describes where the disc's data track lives and how many bytes of it to hash.
-    /// `length == nil` means "hash the whole referenced file" (single-track disc, or the
-    /// data track already lives in its own separate file per the CUE's FILE statements).
+    /// Describes one candidate data track: where it lives and how many bytes of it to hash.
+    /// `length == nil` means "hash to EOF" (last/only track in its file).
     private struct CUEDataTrackLayout {
         let fileURL: URL
+        let offset: Int
         let length: Int?
     }
 
-    /// Parses a CUE sheet to find the data track (always the first track) and, if a second
-    /// track shares the same underlying file (as with a merged chdman `extractcd` dump),
-    /// the byte offset where that second track begins.
-    private func parseCUEDataTrackLayout(cueURL: URL) -> CUEDataTrackLayout? {
-        guard let content = try? String(contentsOf: cueURL, encoding: .utf8) else { return nil }
+    /// Parses a CUE sheet into every non-audio (MODEx) track's byte range, in cue order.
+    /// PSX/Sega CD always keep their data on the first track, but PC Engine CD (and occasionally
+    /// Saturn) sometimes put it on a later track — callers try each returned candidate in order.
+    /// Handles both "one file per track" dumps (the common case; each data track hashes whole-file)
+    /// and merged single-bin dumps (as with a chdman `extractcd` dump), where a track's end is
+    /// bounded by the next track sharing the same FILE section.
+    private func parseCUEDataTrackLayouts(cueURL: URL) -> [CUEDataTrackLayout] {
+        guard let content = try? String(contentsOf: cueURL, encoding: .utf8) else { return [] }
         let folderURL = cueURL.deletingLastPathComponent()
 
-        struct TrackEntry { var indices: [Int: (mm: Int, ss: Int, ff: Int)] = [:] }
+        struct TrackEntry {
+            var mode: String = ""
+            var indices: [Int: (mm: Int, ss: Int, ff: Int)] = [:]
+        }
         struct FileSection { let fileName: String; var tracks: [TrackEntry] = [] }
 
         var sections: [FileSection] = []
 
         let filePattern = try! NSRegularExpression(pattern: #"^FILE\s+"([^"]+)""#)
-        let trackPattern = try! NSRegularExpression(pattern: #"^TRACK\s+\d+"#)
+        let trackPattern = try! NSRegularExpression(pattern: #"^TRACK\s+\d+\s+(\S+)"#)
         let indexPattern = try! NSRegularExpression(pattern: #"^INDEX\s+(\d+)\s+(\d+):(\d+):(\d+)"#)
 
         for rawLine in content.components(separatedBy: .newlines) {
@@ -580,9 +597,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if let match = filePattern.firstMatch(in: line, range: fullRange),
                let nameRange = Range(match.range(at: 1), in: line) {
                 sections.append(FileSection(fileName: String(line[nameRange])))
-            } else if trackPattern.firstMatch(in: line, range: fullRange) != nil {
+            } else if let match = trackPattern.firstMatch(in: line, range: fullRange),
+                      let modeRange = Range(match.range(at: 1), in: line) {
                 guard !sections.isEmpty else { continue }
-                sections[sections.count - 1].tracks.append(TrackEntry())
+                var entry = TrackEntry()
+                entry.mode = String(line[modeRange]).uppercased()
+                sections[sections.count - 1].tracks.append(entry)
             } else if let match = indexPattern.firstMatch(in: line, range: fullRange),
                       let idxRange = Range(match.range(at: 1), in: line),
                       let mmRange = Range(match.range(at: 2), in: line),
@@ -595,47 +615,62 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             }
         }
 
-        guard let firstSection = sections.first, !firstSection.tracks.isEmpty else { return nil }
-        let dataTrackURL = folderURL.appendingPathComponent(firstSection.fileName)
-
-        // A second track in the SAME file section marks where the data track ends (merged dump)
-        if firstSection.tracks.count > 1 {
-            let secondTrack = firstSection.tracks[1]
-            if let msf = secondTrack.indices[0] ?? secondTrack.indices[1] {
-                let sectors = (msf.mm * 60 + msf.ss) * 75 + msf.ff
-                return CUEDataTrackLayout(fileURL: dataTrackURL, length: sectors * 2352)
-            }
+        func bytes(_ msf: (mm: Int, ss: Int, ff: Int)) -> Int {
+            ((msf.mm * 60 + msf.ss) * 75 + msf.ff) * 2352
         }
 
-        // Single track, or the next track lives in its own separate file — hash the whole file
-        return CUEDataTrackLayout(fileURL: dataTrackURL, length: nil)
+        var layouts: [CUEDataTrackLayout] = []
+        for section in sections {
+            let fileURL = folderURL.appendingPathComponent(section.fileName)
+            for (i, track) in section.tracks.enumerated() {
+                guard track.mode.hasPrefix("MODE") else { continue }
+
+                // Prefer INDEX 00 (this track's own pregap, folded into the track before the
+                // next track's index) for where it starts — matches how Redump/Libretro hash tracks.
+                let start = (track.indices[0] ?? track.indices[1]).map(bytes) ?? 0
+
+                // Prefer the next track's INDEX 00 for where this one ends, same convention.
+                var length: Int?
+                if i + 1 < section.tracks.count,
+                   let nextMSF = section.tracks[i + 1].indices[0] ?? section.tracks[i + 1].indices[1] {
+                    length = bytes(nextMSF) - start
+                }
+
+                layouts.append(CUEDataTrackLayout(fileURL: fileURL, offset: start, length: length))
+            }
+        }
+        return layouts
     }
 
-    /// Recomputes the MD5 of just the disc's data track, matching how Libretro/Redump hash CD images.
+    /// Recomputes the MD5 of each candidate data track, matching how Libretro/Redump hash CD images.
     /// OpenEmu's stored MD5 for CUE-based imports hashes the playlist text file, not disc content,
     /// so it can never match the DAT — this recomputes it directly from the referenced binary.
-    private func dataTrackMD5(forCueURL cueURL: URL) -> String? {
-        guard cueURL.pathExtension.lowercased() == "cue" else { return nil }
-        guard let layout = parseCUEDataTrackLayout(cueURL: cueURL) else { return nil }
+    private func dataTrackMD5Candidates(forCueURL cueURL: URL) -> [String] {
+        guard cueURL.pathExtension.lowercased() == "cue" else { return [] }
 
-        guard let file = try? FileHandle(forReadingFrom: layout.fileURL) else { return nil }
-        defer { try? file.close() }
-
-        var md5 = Insecure.MD5()
-        let bufferSize = 1024 * 1024
-        var remaining = layout.length
-
-        while true {
-            let toRead = remaining.map { min($0, bufferSize) } ?? bufferSize
-            guard toRead > 0, let data = try? file.read(upToCount: toRead), !data.isEmpty else { break }
-            md5.update(data: data)
-            if let r = remaining {
-                remaining = r - data.count
-                if remaining! <= 0 { break }
+        return parseCUEDataTrackLayouts(cueURL: cueURL).compactMap { layout in
+            guard let file = try? FileHandle(forReadingFrom: layout.fileURL) else { return nil }
+            defer { try? file.close() }
+            if layout.offset > 0 {
+                guard (try? file.seek(toOffset: UInt64(layout.offset))) != nil else { return nil }
             }
-        }
 
-        return md5.finalize().map { String(format: "%02X", $0) }.joined()
+            var md5 = Insecure.MD5()
+            let bufferSize = 1024 * 1024
+            var remaining = layout.length
+
+            while true {
+                let toRead = remaining.map { min($0, bufferSize) } ?? bufferSize
+                guard toRead > 0, let data = try? file.read(upToCount: toRead), !data.isEmpty else { break }
+                md5.update(data: data)
+                if let r = remaining {
+                    remaining = r - data.count
+                    if remaining! <= 0 { break }
+                }
+            }
+
+            return md5.finalize().map { String(format: "%02X", $0) }.joined()
+        }
     }
 
     /// Atari Lynx `.lnx` dumps prepend a 64-byte header ("LYNX" magic); the no-intro DAT

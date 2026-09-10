@@ -47,6 +47,7 @@ NSString *const OESystemIdentifierAtari2600  = @"openemu.system.2600";
 NSString *const OESystemIdentifierLynx       = @"openemu.system.lynx";
 NSString *const OESystemIdentifierNGP        = @"openemu.system.ngp";
 NSString *const OESystemIdentifierPCE        = @"openemu.system.pce";
+NSString *const OESystemIdentifierPCECD      = @"openemu.system.pcecd";
 NSString *const OESystemIdentifierPSX        = @"openemu.system.psx";
 NSString *const OESystemIdentifierSaturn     = @"openemu.system.saturn";
 
