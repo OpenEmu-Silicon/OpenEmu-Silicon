@@ -45,7 +45,9 @@ private struct LibretroCachedCheat: Codable {
     let name: String
     let code: String
     /// Unmodified text as published upstream, kept for feedback correlation. Never shown to the user.
-    let rawCode: String
+    /// Optional only so cache files written before this field existed still decode; falls back to
+    /// `code` wherever a mandatory rawCode is required.
+    let rawCode: String?
 }
 
 final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
@@ -115,7 +117,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                     anyUpdated = true
                 } else if !anyUpdated {
                     // Nothing updated yet — return the full cached set as-is
-                    return cached.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode) }
+                    return cached.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
                 } else {
                     // Some sources updated, this one didn't — keep cached cheats and this source's existing ETag
                     allCheats.append(contentsOf: cached.cheats)
@@ -126,7 +128,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if anyUpdated {
                 saveCachedCheats(LibretroCachedCheatFile(sources: updatedSources, cheats: cheats), md5: md5, systemIdentifier: systemIdentifier)
             }
-            return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode) }
+            return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
         }
 
         // 2. No local cache — resolve game name via DAT (try MD5 first, then serial)
@@ -202,7 +204,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
         let cheats = dedup(allCheats)
         saveCachedCheats(LibretroCachedCheatFile(sources: sources, cheats: cheats), md5: md5, systemIdentifier: systemIdentifier)
-        return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode) }
+        return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
     }
 
     // MARK: - Local Cache
@@ -253,6 +255,29 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
               let cached = try? JSONDecoder().decode(LibretroCachedCheatFile.self, from: data)
         else { return nil }
         return cached
+    }
+
+    /// Synchronous lookup for feedback-file migration \u2014 reads the local cache only, no network fetch.
+    /// Returns nil if this game has no cache yet (nothing to reconcile against).
+    func migrationLookup(forMD5 md5: String, systemIdentifier: String) -> (gameName: String?, cheats: [(code: String, rawCode: String)])? {
+        guard let cached = loadCachedCheats(md5: md5, systemIdentifier: systemIdentifier) else { return nil }
+        let gameName = cached.sources.first.map { Self.gameName(fromCHTFileName: $0.chtFileName) }
+        return (gameName, cached.cheats.map { ($0.code, $0.rawCode ?? $0.code) })
+    }
+
+    /// Strips the ".cht" extension and, if present, a trailing known device-suffix tag
+    /// (e.g. "Alien Trilogy (GameShark).cht" \u2192 "Alien Trilogy") to recover the plain game name.
+    private static func gameName(fromCHTFileName chtFileName: String) -> String {
+        var name = chtFileName
+        if name.hasSuffix(".cht") { name.removeLast(4) }
+        for suffix in chtSuffixes {
+            let tag = " (\(suffix))"
+            if name.hasSuffix(tag) {
+                name.removeLast(tag.count)
+                break
+            }
+        }
+        return name
     }
 
     private func saveCachedCheats(_ file: LibretroCachedCheatFile, md5: String, systemIdentifier: String) {

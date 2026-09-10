@@ -1704,7 +1704,7 @@ final class OEGameDocument: NSDocument {
         }
         cheats.remove(at: index)
         saveUserCheats()
-        promptCheatRemovalFeedback(code: cheat.code)
+        promptCheatRemovalFeedback(cheat)
     }
     
     /// In order to load cheats, we need the core plugin and the ROM to be set.
@@ -2181,13 +2181,13 @@ final class OEGameDocument: NSDocument {
         // Only imported cheats have known-good/bad feedback worth asking about — manual/Cheat Search
         // codes aren't sourced from a shared database, so there's nothing to report back against.
         if cheat.cheatSource != nil {
-            promptCheatRemovalFeedback(code: cheat.code)
+            promptCheatRemovalFeedback(cheat)
         }
     }
 
     /// Shared by every place a cheat gets removed — the menu's Remove item and Browse Online
     /// Cheats' Remove button — so the "did it work" report is asked consistently either way.
-    func promptCheatRemovalFeedback(code: String) {
+    func promptCheatRemovalFeedback(_ cheat: Cheat) {
         guard let md5 = rom.md5Hash else { return }
 
         let existingStatuses = CheatFeedbackService.shared.statuses(forMD5: md5,
@@ -2195,7 +2195,7 @@ final class OEGameDocument: NSDocument {
                                                                     coreIdentifier: corePlugin.bundleIdentifier,
                                                                     coreVersion: corePlugin.version)
         // Already reported on for this core build — don't ask again for a value the user already gave.
-        guard existingStatuses[CheatFeedbackService.key(for: code)] == nil else { return }
+        guard existingStatuses[CheatFeedbackService.key(for: cheat.code)] == nil else { return }
 
         let alert = OEAlert()
         alert.messageText = NSLocalizedString("Cheat Removed", comment: "Cheat removal feedback dialog title")
@@ -2214,11 +2214,16 @@ final class OEGameDocument: NSDocument {
         }
 
         CheatFeedbackService.shared.setStatus(status,
-                                             forCode: code,
+                                             forCode: cheat.code,
                                              md5: md5,
                                              systemIdentifier: systemPlugin.systemIdentifier,
                                              coreIdentifier: corePlugin.bundleIdentifier,
-                                             coreVersion: corePlugin.version)
+                                             coreVersion: corePlugin.version,
+                                             rawCode: cheat.rawCode,
+                                             provider: cheat.cheatSource,
+                                             gameName: rom.game?.displayName,
+                                             serial: rom.serial,
+                                             raHash: retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
     }
 
     /// expects `sender.representedObject` to be a `Cheat` object
@@ -2244,7 +2249,11 @@ final class OEGameDocument: NSDocument {
                                              systemIdentifier: systemPlugin.systemIdentifier,
                                              coreIdentifier: corePlugin.bundleIdentifier,
                                              coreVersion: corePlugin.version,
-                                             rawCode: cheat.rawCode)
+                                             rawCode: cheat.rawCode,
+                                             provider: cheat.cheatSource,
+                                             gameName: rom.game?.displayName,
+                                             serial: rom.serial,
+                                             raHash: retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
     }
 
     func setCheat(_ cheat: Cheat) {

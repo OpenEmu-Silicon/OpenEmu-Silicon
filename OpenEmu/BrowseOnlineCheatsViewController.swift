@@ -24,6 +24,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import OpenEmuKit
 import os.log
 
 private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
@@ -1099,7 +1100,11 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                 systemIdentifier: document.systemPlugin.systemIdentifier,
                                                 coreIdentifier: document.corePlugin.bundleIdentifier,
                                                 coreVersion: document.corePlugin.version,
-                                                rawCode: cheat.rawCode)
+                                                rawCode: cheat.rawCode,
+                                                provider: cheat.providerName,
+                                                gameName: document.rom.game?.displayName,
+                                                serial: document.rom.serial,
+                                                raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
 
             if let feedback {
                 CheatFeedbackService.shared.setStatus(feedback,
@@ -1108,7 +1113,11 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                      systemIdentifier: document.systemPlugin.systemIdentifier,
                                                      coreIdentifier: document.corePlugin.bundleIdentifier,
                                                      coreVersion: document.corePlugin.version,
-                                                     rawCode: cheat.rawCode)
+                                                     rawCode: cheat.rawCode,
+                                                     provider: cheat.providerName,
+                                                     gameName: document.rom.game?.displayName,
+                                                     serial: document.rom.serial,
+                                                     raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
                 statuses[key] = feedback
             }
         }
@@ -1237,7 +1246,11 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                  systemIdentifier: document.systemPlugin.systemIdentifier,
                                                  coreIdentifier: document.corePlugin.bundleIdentifier,
                                                  coreVersion: document.corePlugin.version,
-                                                 rawCode: cheat.rawCode)
+                                                 rawCode: cheat.rawCode,
+                                                 provider: cheat.providerName,
+                                                 gameName: document.rom.game?.displayName,
+                                                 serial: document.rom.serial,
+                                                 raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
         }
 
         // Re-filtered rather than redrawn: the new status may exclude this row.
