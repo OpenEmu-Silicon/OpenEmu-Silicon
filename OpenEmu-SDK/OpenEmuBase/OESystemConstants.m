@@ -50,6 +50,7 @@ NSString *const OESystemIdentifierPCE        = @"openemu.system.pce";
 NSString *const OESystemIdentifierPCECD      = @"openemu.system.pcecd";
 NSString *const OESystemIdentifierPSX        = @"openemu.system.psx";
 NSString *const OESystemIdentifierSaturn     = @"openemu.system.saturn";
+NSString *const OESystemIdentifierVB         = @"openemu.system.vb";
 
 // MARK: - Cheat Code Type Strings
 

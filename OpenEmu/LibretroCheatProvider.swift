@@ -89,6 +89,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierPCE:       "NEC - PC Engine - TurboGrafx 16",
         OESystemIdentifierPCECD:     "NEC - PC Engine CD - TurboGrafx-CD",
         OESystemIdentifierSaturn:    "Sega - Saturn",
+        OESystemIdentifierVB:        "Nintendo - Virtual Boy",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -458,7 +459,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         switch systemIdentifier {
         case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
             return 6
-        case OESystemIdentifierGBA:
+        case OESystemIdentifierGBA, OESystemIdentifierVB:
             return 8
         default:
             return 4

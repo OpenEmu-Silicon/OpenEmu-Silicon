@@ -103,6 +103,10 @@ enum CheatCodeValidator {
             // Mednafen (pce module): paged (F8-FB) or linear (1F0000-1F7FFF) physical address, 1-byte value
             return isPCECode(code)
 
+        case OESystemIdentifierVB:
+            // Mednafen (vb module): no named format, only raw WRAM address:value (8 hex address + 2 hex value)
+            return isRawAddressValue(code, addressHexChars: 8, valueHexChars: 2)
+
         default:
             return true
         }

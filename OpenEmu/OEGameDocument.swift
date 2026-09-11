@@ -1912,6 +1912,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isSaturnActionReplayCode(String($0)) }
                 }
             )
+        case OESystemIdentifierVB:
+            return CheatFormat(
+                placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
+                validationHint: NSLocalizedString("Virtual Boy codes must be an 8 hex digit address plus a 2 hex digit value, e.g. 05001234:FF. Only raw WRAM writes are supported (address 0500xxxx-0501xxxx); no Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Virtual Boy"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), addressHexChars: 8, valueHexChars: 2) }
+                }
+            )
         default:
             return defaultCheatFormat
         }
