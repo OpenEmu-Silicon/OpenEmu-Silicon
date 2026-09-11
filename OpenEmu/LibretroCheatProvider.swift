@@ -65,7 +65,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private static let chtBaseURL = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
 
     // Disc-based systems use redump DATs instead of no-intro
-    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD, OESystemIdentifierSaturn]
+    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD, OESystemIdentifierSaturn, OESystemIdentifierPCFX]
 
     // OpenEmu system ID → Libretro directory/DAT name
     private let systemMap: [String: String] = [
@@ -91,6 +91,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierSaturn:    "Sega - Saturn",
         OESystemIdentifierVB:        "Nintendo - Virtual Boy",
         OESystemIdentifierWS:        "Bandai - WonderSwan",
+        OESystemIdentifierPCFX:      "NEC - PC-FX",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
