@@ -90,12 +90,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierPCECD:     "NEC - PC Engine CD - TurboGrafx-CD",
         OESystemIdentifierSaturn:    "Sega - Saturn",
         OESystemIdentifierVB:        "Nintendo - Virtual Boy",
+        OESystemIdentifierWS:        "Bandai - WonderSwan",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
     private let systemFallbacks: [String: [String]] = [
         OESystemIdentifierGB: ["Nintendo - Game Boy", "Nintendo - Game Boy Color"],
         OESystemIdentifierNGP: ["SNK - Neo Geo Pocket", "SNK - Neo Geo Pocket Color"],
+        OESystemIdentifierWS: ["Bandai - WonderSwan", "Bandai - WonderSwan Color"],
     ]
 
     // In-memory cache: systemIdentifier → [key → (gameName, libretroSystem)]
