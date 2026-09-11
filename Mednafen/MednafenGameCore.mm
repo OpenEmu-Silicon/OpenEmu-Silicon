@@ -74,6 +74,8 @@ extern "C" uint8_t *MDFNWS_GetRAMPointer(void);
 extern "C" uint32_t MDFNWS_GetRAMSize(void);
 extern "C" uint8_t *MDFNWS_GetSRAMPointer(void);
 extern "C" uint32_t MDFNWS_GetSRAMSize(void);
+extern "C" uint8_t *MDFNWS_GetROMPointer(void);
+extern "C" uint32_t MDFNWS_GetROMSize(void);
 
 #ifdef DEBUG
     #error "Cores should not be compiled in DEBUG! Follow the guide https://github.com/OpenEmu/OpenEmu/wiki/Compiling-From-Source-Guide"
@@ -130,6 +132,10 @@ static const uint32_t kLynxRAWarmupFrames = 150;
     NSString *_romPath;
     int _rcConsole;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    // wswan ROM-patch cheats only: cheat code -> {rom offset: original byte}, so disabling a code
+    // can revert exactly the bytes it touched. wsCartROM isn't a mempatcher page, so unlike RAM
+    // 'R' patches, nothing else puts these bytes back once written.
+    NSMutableDictionary<NSString *, NSMutableDictionary<NSNumber *, NSNumber *> *> *_romPatchBackups;
     BOOL _isSystemPCECD;
     uint32_t _lynxFrameCount;
     // Owned C-string copy of the active console module name (e.g. "psx", "pce").
@@ -4368,10 +4374,23 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
     if (!_cheatList)
         _cheatList = [NSMutableDictionary dictionary];
 
-    if (enabled)
+    if (enabled) {
         _cheatList[code] = @YES;
-    else
+    } else {
         [_cheatList removeObjectForKey:code];
+
+        // ROM patches persist in wsCartROM until reverted here; unlike RAM 'R' patches, simply
+        // no longer re-asserting them (via MDFN_FlushGameCheats below) doesn't undo them.
+        NSMutableDictionary<NSNumber *, NSNumber *> *romBackups = _romPatchBackups[code];
+        if (romBackups) {
+            uint8_t *rom = MDFNWS_GetROMPointer();
+            if (rom) {
+                for (NSNumber *offsetKey in romBackups)
+                    rom[offsetKey.unsignedIntValue] = romBackups[offsetKey].unsignedCharValue;
+            }
+            [_romPatchBackups removeObjectForKey:code];
+        }
+    }
 
     Mednafen::MDFN_FlushGameCheats(1);
 
@@ -4403,6 +4422,29 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
                     uint32_t page = (addr >> 16) & 0xFF;
                     uint32_t offset = addr & 0x1FFF;
                     addr = (page << 13) | offset;
+                }
+
+                // WonderSwan ROM code patch (GameHacking.org convention: 0x4000000 | ROM file offset).
+                // wsCartROM isn't a mempatcher page, so this bypasses MDFNI_AddCheat and writes the
+                // buffer directly; see the disable branch above for the revert side.
+                if ([_mednafenCoreModule isEqualToString:@"wswan"] && (addr & 0x04000000)) {
+                    uint32_t romOffset = addr & 0x03FFFFFF;
+                    uint8_t *rom = MDFNWS_GetROMPointer();
+                    uint32_t romSize = MDFNWS_GetROMSize();
+                    if (rom && romOffset < romSize) {
+                        if (!_romPatchBackups)
+                            _romPatchBackups = [NSMutableDictionary dictionary];
+                        NSMutableDictionary<NSNumber *, NSNumber *> *backups = _romPatchBackups[key];
+                        if (!backups) {
+                            backups = [NSMutableDictionary dictionary];
+                            _romPatchBackups[key] = backups;
+                        }
+                        NSNumber *offsetKey = @(romOffset);
+                        if (!backups[offsetKey])
+                            backups[offsetKey] = @(rom[romOffset]);
+                        rom[romOffset] = (uint8_t)(val & 0xFF);
+                    }
+                    continue;
                 }
 
                 patch.addr = addr;
