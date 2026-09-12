@@ -1912,6 +1912,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isSaturnActionReplayCode(String($0)) }
                 }
             )
+        case OESystemIdentifier5200:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. 0034:03. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Atari 5200"),
+                validationHint: NSLocalizedString("Atari 5200 codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 0034:03. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari 5200"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
+                }
+            )
         case OESystemIdentifierVB:
             return CheatFormat(
                 placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
