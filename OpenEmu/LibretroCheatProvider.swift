@@ -28,12 +28,18 @@ import OpenEmuBase
 import CryptoKit
 import os.log
 
-// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "LibretroCheatProvider")
+private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "LibretroCheatProvider")
 
 /// Cached cheat file stored on disk per game.
 private struct LibretroCachedCheatFile: Codable {
     let sources: [LibretroCachedSource]
     let cheats: [LibretroCachedCheat]
+    /// The DAT/RDB-resolved name, kept separately from `sources` because the winning `.cht`
+    /// filename can be a broader/narrower region variant of it (e.g. RDB says "(Europe)" but
+    /// only a "(USA, Europe)" file exists) — this is the more precise identity for feedback.
+    /// Optional only so cache files written before this field existed still decode; `cheats(forMD5:)`
+    /// force-refreshes any such file once to backfill it.
+    let resolvedGameName: String?
 }
 
 private struct LibretroCachedSource: Codable {
@@ -44,6 +50,10 @@ private struct LibretroCachedSource: Codable {
 private struct LibretroCachedCheat: Codable {
     let name: String
     let code: String
+    /// Unmodified text as published upstream, kept for feedback correlation. Never shown to the user.
+    /// Optional only so cache files written before this field existed still decode; falls back to
+    /// `code` wherever a mandatory rawCode is required.
+    let rawCode: String?
 }
 
 final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
@@ -55,7 +65,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private static let chtBaseURL = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
 
     // Disc-based systems use redump DATs instead of no-intro
-    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD]
+    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD, OESystemIdentifierSaturn, OESystemIdentifierPCFX]
 
     // OpenEmu system ID → Libretro directory/DAT name
     private let systemMap: [String: String] = [
@@ -74,11 +84,21 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierGB:        "Nintendo - Game Boy",
         OESystemIdentifierColecoVision: "Coleco - ColecoVision",
         OESystemIdentifierPSX:       "Sony - PlayStation",
+        OESystemIdentifierLynx:      "Atari - Lynx",
+        OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
+        OESystemIdentifierPCE:       "NEC - PC Engine - TurboGrafx 16",
+        OESystemIdentifierPCECD:     "NEC - PC Engine CD - TurboGrafx-CD",
+        OESystemIdentifierSaturn:    "Sega - Saturn",
+        OESystemIdentifierVB:        "Nintendo - Virtual Boy",
+        OESystemIdentifierWS:        "Bandai - WonderSwan",
+        OESystemIdentifierPCFX:      "NEC - PC-FX",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
     private let systemFallbacks: [String: [String]] = [
         OESystemIdentifierGB: ["Nintendo - Game Boy", "Nintendo - Game Boy Color"],
+        OESystemIdentifierNGP: ["SNK - Neo Geo Pocket", "SNK - Neo Geo Pocket Color"],
+        OESystemIdentifierWS: ["Bandai - WonderSwan", "Bandai - WonderSwan Color"],
     ]
 
     // In-memory cache: systemIdentifier → [key → (gameName, libretroSystem)]
@@ -86,6 +106,24 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private var datCache: [String: [String: (name: String, libretroSystem: String)]] = [:]
     // Guards datCache; cheats(forMD5:) runs off the caller's actor, so multiple windows can hit it at once.
     private let datCacheLock = NSLock()
+
+    // Games whose whole cheat catalogue has already been rediscovered from scratch this app
+    // session — reset naturally on relaunch, since this is in-memory only. Keeps repeated visits
+    // to the same game within a session from re-running the full candidate search every time.
+    private var sessionRediscoveredGames: Set<String> = []
+    private let sessionRediscoveredGamesLock = NSLock()
+
+    /// Returns true (and marks the game) only the first time it's called for this md5/system in
+    /// the current session. Marks eagerly, before the rediscovery attempt itself, so a failed
+    /// attempt (e.g. offline) isn't retried on every subsequent call in the same session.
+    private func beginSessionRediscoveryIfNeeded(md5: String, systemIdentifier: String) -> Bool {
+        let key = "\(systemIdentifier)/\(md5.uppercased())"
+        sessionRediscoveredGamesLock.lock()
+        defer { sessionRediscoveredGamesLock.unlock() }
+        guard !sessionRediscoveredGames.contains(key) else { return false }
+        sessionRediscoveredGames.insert(key)
+        return true
+    }
 
     func supportsSystem(_ systemIdentifier: String) -> Bool {
         systemMap[systemIdentifier] != nil
@@ -97,6 +135,18 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         // 1. Check local cache
         if let cached = loadCachedCheats(md5: md5, systemIdentifier: systemIdentifier) {
             // log.info("Local cache hit for \(md5) (\(cached.sources.map(\.chtFileName).joined(separator: ", ")))")
+
+            // Once per app session, rebuild this game's whole catalogue from scratch — cheats can be
+            // renamed, added, or removed upstream, and the ETag refresh below only ever re-validates
+            // filenames it already knows about, so it can never discover or react to either. Any
+            // failure here (offline, or genuinely nothing found) falls back to the existing cache
+            // untouched, so offline play is never affected by a failed background refresh.
+            if beginSessionRediscoveryIfNeeded(md5: md5, systemIdentifier: systemIdentifier),
+               let discovered = try? await discoverCheats(md5: md5, serial: serial, gameName: gameName, romURL: romURL, systemIdentifier: systemIdentifier, libretroSystem: libretroSystem) {
+                saveCachedCheats(LibretroCachedCheatFile(sources: discovered.sources, cheats: discovered.cheats, resolvedGameName: discovered.resolvedGameName), md5: md5, systemIdentifier: systemIdentifier)
+                return discovered.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
+            }
+
             // Try to update each cached source
             var anyUpdated = false
             var allCheats: [LibretroCachedCheat] = []
@@ -108,7 +158,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                     anyUpdated = true
                 } else if !anyUpdated {
                     // Nothing updated yet — return the full cached set as-is
-                    return cached.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name) }
+                    return cached.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
                 } else {
                     // Some sources updated, this one didn't — keep cached cheats and this source's existing ETag
                     allCheats.append(contentsOf: cached.cheats)
@@ -117,40 +167,53 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             }
             let cheats = anyUpdated ? dedup(allCheats) : cached.cheats
             if anyUpdated {
-                saveCachedCheats(LibretroCachedCheatFile(sources: updatedSources, cheats: cheats), md5: md5, systemIdentifier: systemIdentifier)
+                saveCachedCheats(LibretroCachedCheatFile(sources: updatedSources, cheats: cheats, resolvedGameName: cached.resolvedGameName), md5: md5, systemIdentifier: systemIdentifier)
             }
-            return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name) }
+            return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
         }
 
-        // 2. No local cache — resolve game name via DAT (try MD5 first, then serial)
-        // For disc systems, OpenEmu's stored MD5 hashes the .cue playlist file, not the disc data,
-        // so it never matches Libretro's per-track MD5s. Recompute the data track's MD5 when possible.
-        var lookupMD5 = md5
-        if Self.redumpSystems.contains(systemIdentifier), let romURL,
-           let recomputed = dataTrackMD5(forCueURL: romURL) {
-            lookupMD5 = recomputed
+        // 2. No local cache — full discovery from scratch
+        guard let discovered = try await discoverCheats(md5: md5, serial: serial, gameName: gameName, romURL: romURL, systemIdentifier: systemIdentifier, libretroSystem: libretroSystem) else {
+            return []
         }
+        _ = beginSessionRediscoveryIfNeeded(md5: md5, systemIdentifier: systemIdentifier)
+        saveCachedCheats(LibretroCachedCheatFile(sources: discovered.sources, cheats: discovered.cheats, resolvedGameName: discovered.resolvedGameName), md5: md5, systemIdentifier: systemIdentifier)
+        return discovered.cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name, rawCode: $0.rawCode ?? $0.code) }
+    }
 
-        let lookup = try await lookupGameName(md5: lookupMD5, serial: serial, systemIdentifier: systemIdentifier)
+    private struct DiscoveredCheats {
+        let sources: [LibretroCachedSource]
+        let cheats: [LibretroCachedCheat]
+        let resolvedGameName: String?
+    }
+
+    /// Runs the full candidate search from scratch (DAT lookup, then name/suffix/region variants),
+    /// ignoring any existing local cache entirely. Returns nil if nothing matched upstream, so the
+    /// caller can decide how to fall back — this never touches the disk cache itself.
+    private func discoverCheats(md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, libretroSystem: String) async throws -> DiscoveredCheats? {
+        // Resolve game name via DAT (try MD5 first, then serial). For disc systems, OpenEmu's stored
+        // MD5 hashes the .cue playlist file, not the disc data, so it never matches Libretro's
+        // per-track MD5s — resolveDATName recomputes the data track's MD5 when possible.
+        let lookup = try await resolveDATName(md5: md5, serial: serial, romURL: romURL, systemIdentifier: systemIdentifier)
 
         if lookup == nil && gameName == nil {
             // log.info("No game found for MD5 \(md5) / serial \(serial ?? "nil") in system \(systemIdentifier)")
-            return []
+            return nil
         }
 
         let resolvedSystem = lookup?.libretroSystem ?? libretroSystem
         // log.info("MD5 \(md5) → \(lookup?.name ?? "nil") (in \(resolvedSystem))")
 
-        // 3. Download plain + device-suffixed + region-variant candidates, merge
+        // Download plain + device-suffixed + region-variant candidates, merge
         var allCheats: [LibretroCachedCheat] = []
         var sources: [LibretroCachedSource] = []
 
-        let useRegionFallback = systemIdentifier == OESystemIdentifierPSX
+        let useRegionFallback = systemIdentifier == OESystemIdentifierPSX || systemIdentifier == OESystemIdentifierSaturn
         var gameNames: [String] = []
-        if let name = lookup?.name {
-            gameNames.append(name)
-            gameNames += compoundRegionVariants(for: name)
-            if useRegionFallback { gameNames += regionVariants(for: name) }
+        if let lookupName = lookup?.name {
+            gameNames.append(lookupName)
+            gameNames += compoundRegionVariants(for: lookupName)
+            if useRegionFallback { gameNames += regionVariants(for: lookupName) }
         }
 
         // Fallback: try the library game name if the DAT lookup didn't work or wasn't found.
@@ -162,8 +225,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if useRegionFallback { gameNames += regionVariants(for: gameName) }
         }
 
-        for gameName in gameNames {
-            let candidates = ["\(gameName).cht"] + Self.chtSuffixes.map { "\(gameName) (\($0)).cht" }
+        for candidateName in gameNames {
+            let candidates = ["\(candidateName).cht"] + Self.chtSuffixes.map { "\(candidateName) (\($0)).cht" }
             for candidate in candidates {
                 if let result = try await downloadCHT(chtFileName: candidate, libretroSystem: resolvedSystem, systemIdentifier: systemIdentifier, existingETag: nil) {
                     allCheats.append(contentsOf: result.cheats)
@@ -175,12 +238,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
         guard !allCheats.isEmpty else {
             // log.info("No CHT files found for \(gameNames.joined(separator: ", "))")
-            return []
+            return nil
         }
 
-        let cheats = dedup(allCheats)
-        saveCachedCheats(LibretroCachedCheatFile(sources: sources, cheats: cheats), md5: md5, systemIdentifier: systemIdentifier)
-        return cheats.map { DatabaseCheat(name: Self.decodingHTMLEntities($0.name), code: $0.code, providerName: name) }
+        return DiscoveredCheats(sources: sources, cheats: dedup(allCheats), resolvedGameName: lookup?.name)
     }
 
     // MARK: - Local Cache
@@ -231,6 +292,31 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
               let cached = try? JSONDecoder().decode(LibretroCachedCheatFile.self, from: data)
         else { return nil }
         return cached
+    }
+
+    /// Synchronous lookup for feedback-file migration \u2014 reads the local cache only, no network fetch.
+    /// Returns nil if this game has no cache yet (nothing to reconcile against).
+    func migrationLookup(forMD5 md5: String, systemIdentifier: String) -> (gameName: String?, cheats: [(code: String, rawCode: String)])? {
+        guard let cached = loadCachedCheats(md5: md5, systemIdentifier: systemIdentifier) else { return nil }
+        // Prefer the DAT-resolved name (more precise) over the winning .cht filename, which can be
+        // a broader/narrower region variant when the exact resolved name had no matching file.
+        let gameName = cached.resolvedGameName ?? cached.sources.first.map { Self.gameName(fromCHTFileName: $0.chtFileName) }
+        return (gameName, cached.cheats.map { ($0.code, $0.rawCode ?? $0.code) })
+    }
+
+    /// Strips the ".cht" extension and, if present, a trailing known device-suffix tag
+    /// (e.g. "Alien Trilogy (GameShark).cht" \u2192 "Alien Trilogy") to recover the plain game name.
+    private static func gameName(fromCHTFileName chtFileName: String) -> String {
+        var name = chtFileName
+        if name.hasSuffix(".cht") { name.removeLast(4) }
+        for suffix in chtSuffixes {
+            let tag = " (\(suffix))"
+            if name.hasSuffix(tag) {
+                name.removeLast(tag.count)
+                break
+            }
+        }
+        return name
     }
 
     private func saveCachedCheats(_ file: LibretroCachedCheatFile, md5: String, systemIdentifier: String) {
@@ -339,8 +425,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
             // If code is empty, try to synthesize from address + value (Format B)
             // TODO: handle big_endian and memory_search_size for multi-byte systems
-            // TODO: filter by cheat_type — only type 1 (set to value) is usable; types 2-7 need RetroArch's RAM engine
-            if code.isEmpty, let addrStr = fields["address"], let valStr = fields["value"],
+            // Only cheat_type "1" (Set To Value) is a plain memory patch we can express as ADDRESS:VALUE.
+            // Other types (e.g. "0", used by rumble-on-match entries with populated rumble_* fields) are
+            // conditional/behavioral cheats RetroArch's RAM engine handles specially, not simple patches.
+            let cheatType = fields["cheat_type"]
+            let isPlainSetToValue = cheatType == nil || cheatType == "1"
+            if code.isEmpty, isPlainSetToValue, let addrStr = fields["address"], let valStr = fields["value"],
                let addr = UInt32(addrStr), let val = UInt32(valStr) {
                 // Pad the address to the width the per-system raw ADDRESS:VALUE validator expects.
                 let addressHexChars = Self.formatBAddressHexChars(for: systemIdentifier)
@@ -348,13 +438,20 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             }
 
             guard !code.isEmpty else { continue }
+            let rawCode = code
             // Normalize separators: some CHT files use ';' instead of '+'
             var cleaned = code.replacingOccurrences(of: " ", with: "")
                               .replacingOccurrences(of: ";", with: "+")
             cleaned = normalizeCode(cleaned, systemIdentifier: systemIdentifier)
+            // Saturn: reject anything that isn't a plain word/byte write (also catches Master Codes
+            // and the RetroArch/Format-B entries this system doesn't support yet).
+            if systemIdentifier == OESystemIdentifierSaturn,
+               !cleaned.split(separator: "+").allSatisfy({ CheatCodeValidator.isSaturnActionReplayCode(String($0)) }) {
+                continue
+            }
             guard !seenCodes.contains(cleaned) else { continue }
             seenCodes.insert(cleaned)
-            cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned))
+            cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned, rawCode: rawCode))
         }
 
         return cheats
@@ -363,9 +460,9 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Address hex-digit width the raw ADDRESS:VALUE validator expects per system (see CheatCodeValidator).
     private static func formatBAddressHexChars(for systemIdentifier: String) -> Int {
         switch systemIdentifier {
-        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD:
+        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
             return 6
-        case OESystemIdentifierGBA:
+        case OESystemIdentifierGBA, OESystemIdentifierVB:
             return 8
         default:
             return 4
@@ -414,6 +511,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             return normalizeGameGearCode(code)
         case OESystemIdentifierPSX:
             return normalizePSXCode(code)
+        case OESystemIdentifierSaturn:
+            return normalizeSaturnCode(code)
         default:
             return code
         }
@@ -465,6 +564,30 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             else {
                 return code
             }
+        }
+        return codes.joined(separator: "+")
+    }
+
+    /// Saturn GameShark/Action Replay: 8-hex address (type nibble + 24-bit address) + '+' + 4-hex
+    /// value, chained with '+' for multi-part patches. Concatenates each pair into a contiguous
+    /// 12-hex code, matching the native `TAAAAAAA` + `VVVV` shape `MednafenGameCore`'s `ss` branch
+    /// expects (its own space is stripped before parsing there).
+    private func normalizeSaturnCode(_ code: String) -> String {
+        let parts = code.split(separator: "+").map { String($0) }
+        guard parts.count >= 2, parts.count.isMultiple(of: 2) else { return code }
+
+        var codes: [String] = []
+        var i = 0
+        while i < parts.count {
+            var addr = parts[i]
+            let val = parts[i + 1]
+            // Some entries drop the address's leading zero (e.g. "160CE42" for "0160CE42").
+            if addr.count == 7, addr.allSatisfy(\.isHexDigit) { addr = "0" + addr }
+            guard addr.count == 8, addr.allSatisfy(\.isHexDigit), val.count == 4, val.allSatisfy(\.isHexDigit) else {
+                return code
+            }
+            codes.append("\(addr)\(val)")
+            i += 2
         }
         return codes.joined(separator: "+")
     }
@@ -536,28 +659,34 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
     // MARK: - Data Track MD5 Recomputation
 
-    /// Describes where the disc's data track lives and how many bytes of it to hash.
-    /// `length == nil` means "hash the whole referenced file" (single-track disc, or the
-    /// data track already lives in its own separate file per the CUE's FILE statements).
+    /// Describes one candidate data track: where it lives and how many bytes of it to hash.
+    /// `length == nil` means "hash to EOF" (last/only track in its file).
     private struct CUEDataTrackLayout {
         let fileURL: URL
+        let offset: Int
         let length: Int?
     }
 
-    /// Parses a CUE sheet to find the data track (always the first track) and, if a second
-    /// track shares the same underlying file (as with a merged chdman `extractcd` dump),
-    /// the byte offset where that second track begins.
-    private func parseCUEDataTrackLayout(cueURL: URL) -> CUEDataTrackLayout? {
-        guard let content = try? String(contentsOf: cueURL, encoding: .utf8) else { return nil }
+    /// Parses a CUE sheet into every non-audio (MODEx) track's byte range, in cue order.
+    /// PSX/Sega CD always keep their data on the first track, but PC Engine CD (and occasionally
+    /// Saturn) sometimes put it on a later track — callers try each returned candidate in order.
+    /// Handles both "one file per track" dumps (the common case; each data track hashes whole-file)
+    /// and merged single-bin dumps (as with a chdman `extractcd` dump), where a track's end is
+    /// bounded by the next track sharing the same FILE section.
+    private func parseCUEDataTrackLayouts(cueURL: URL) -> [CUEDataTrackLayout] {
+        guard let content = try? String(contentsOf: cueURL, encoding: .utf8) else { return [] }
         let folderURL = cueURL.deletingLastPathComponent()
 
-        struct TrackEntry { var indices: [Int: (mm: Int, ss: Int, ff: Int)] = [:] }
+        struct TrackEntry {
+            var mode: String = ""
+            var indices: [Int: (mm: Int, ss: Int, ff: Int)] = [:]
+        }
         struct FileSection { let fileName: String; var tracks: [TrackEntry] = [] }
 
         var sections: [FileSection] = []
 
         let filePattern = try! NSRegularExpression(pattern: #"^FILE\s+"([^"]+)""#)
-        let trackPattern = try! NSRegularExpression(pattern: #"^TRACK\s+\d+"#)
+        let trackPattern = try! NSRegularExpression(pattern: #"^TRACK\s+\d+\s+(\S+)"#)
         let indexPattern = try! NSRegularExpression(pattern: #"^INDEX\s+(\d+)\s+(\d+):(\d+):(\d+)"#)
 
         for rawLine in content.components(separatedBy: .newlines) {
@@ -567,9 +696,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if let match = filePattern.firstMatch(in: line, range: fullRange),
                let nameRange = Range(match.range(at: 1), in: line) {
                 sections.append(FileSection(fileName: String(line[nameRange])))
-            } else if trackPattern.firstMatch(in: line, range: fullRange) != nil {
+            } else if let match = trackPattern.firstMatch(in: line, range: fullRange),
+                      let modeRange = Range(match.range(at: 1), in: line) {
                 guard !sections.isEmpty else { continue }
-                sections[sections.count - 1].tracks.append(TrackEntry())
+                var entry = TrackEntry()
+                entry.mode = String(line[modeRange]).uppercased()
+                sections[sections.count - 1].tracks.append(entry)
             } else if let match = indexPattern.firstMatch(in: line, range: fullRange),
                       let idxRange = Range(match.range(at: 1), in: line),
                       let mmRange = Range(match.range(at: 2), in: line),
@@ -582,44 +714,78 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             }
         }
 
-        guard let firstSection = sections.first, !firstSection.tracks.isEmpty else { return nil }
-        let dataTrackURL = folderURL.appendingPathComponent(firstSection.fileName)
-
-        // A second track in the SAME file section marks where the data track ends (merged dump)
-        if firstSection.tracks.count > 1 {
-            let secondTrack = firstSection.tracks[1]
-            if let msf = secondTrack.indices[0] ?? secondTrack.indices[1] {
-                let sectors = (msf.mm * 60 + msf.ss) * 75 + msf.ff
-                return CUEDataTrackLayout(fileURL: dataTrackURL, length: sectors * 2352)
-            }
+        func bytes(_ msf: (mm: Int, ss: Int, ff: Int)) -> Int {
+            ((msf.mm * 60 + msf.ss) * 75 + msf.ff) * 2352
         }
 
-        // Single track, or the next track lives in its own separate file — hash the whole file
-        return CUEDataTrackLayout(fileURL: dataTrackURL, length: nil)
+        var layouts: [CUEDataTrackLayout] = []
+        for section in sections {
+            let fileURL = folderURL.appendingPathComponent(section.fileName)
+            for (i, track) in section.tracks.enumerated() {
+                guard track.mode.hasPrefix("MODE") else { continue }
+
+                // Prefer INDEX 00 (this track's own pregap, folded into the track before the
+                // next track's index) for where it starts — matches how Redump/Libretro hash tracks.
+                let start = (track.indices[0] ?? track.indices[1]).map(bytes) ?? 0
+
+                // Prefer the next track's INDEX 00 for where this one ends, same convention.
+                var length: Int?
+                if i + 1 < section.tracks.count,
+                   let nextMSF = section.tracks[i + 1].indices[0] ?? section.tracks[i + 1].indices[1] {
+                    length = bytes(nextMSF) - start
+                }
+
+                layouts.append(CUEDataTrackLayout(fileURL: fileURL, offset: start, length: length))
+            }
+        }
+        return layouts
     }
 
-    /// Recomputes the MD5 of just the disc's data track, matching how Libretro/Redump hash CD images.
+    /// Recomputes the MD5 of each candidate data track, matching how Libretro/Redump hash CD images.
     /// OpenEmu's stored MD5 for CUE-based imports hashes the playlist text file, not disc content,
     /// so it can never match the DAT — this recomputes it directly from the referenced binary.
-    private func dataTrackMD5(forCueURL cueURL: URL) -> String? {
-        guard cueURL.pathExtension.lowercased() == "cue" else { return nil }
-        guard let layout = parseCUEDataTrackLayout(cueURL: cueURL) else { return nil }
+    private func dataTrackMD5Candidates(forCueURL cueURL: URL) -> [String] {
+        guard cueURL.pathExtension.lowercased() == "cue" else { return [] }
 
-        guard let file = try? FileHandle(forReadingFrom: layout.fileURL) else { return nil }
+        return parseCUEDataTrackLayouts(cueURL: cueURL).compactMap { layout in
+            guard let file = try? FileHandle(forReadingFrom: layout.fileURL) else { return nil }
+            defer { try? file.close() }
+            if layout.offset > 0 {
+                guard (try? file.seek(toOffset: UInt64(layout.offset))) != nil else { return nil }
+            }
+
+            var md5 = Insecure.MD5()
+            let bufferSize = 1024 * 1024
+            var remaining = layout.length
+
+            while true {
+                let toRead = remaining.map { min($0, bufferSize) } ?? bufferSize
+                guard toRead > 0, let data = try? file.read(upToCount: toRead), !data.isEmpty else { break }
+                md5.update(data: data)
+                if let r = remaining {
+                    remaining = r - data.count
+                    if remaining! <= 0 { break }
+                }
+            }
+
+            return md5.finalize().map { String(format: "%02X", $0) }.joined()
+        }
+    }
+
+    /// Atari Lynx `.lnx` dumps prepend a 64-byte header ("LYNX" magic); the no-intro DAT
+    /// indexes the headerless image, so recompute the MD5 over the data past the header.
+    /// Returns nil when the file has no header (its MD5 already matches the DAT).
+    private func headerlessLynxMD5(forROMURL romURL: URL) -> String? {
+        guard let file = try? FileHandle(forReadingFrom: romURL) else { return nil }
         defer { try? file.close() }
+
+        guard let magic = try? file.read(upToCount: 4), magic == Data("LYNX".utf8) else { return nil }
+        do { try file.seek(toOffset: 64) } catch { return nil }
 
         var md5 = Insecure.MD5()
         let bufferSize = 1024 * 1024
-        var remaining = layout.length
-
-        while true {
-            let toRead = remaining.map { min($0, bufferSize) } ?? bufferSize
-            guard toRead > 0, let data = try? file.read(upToCount: toRead), !data.isEmpty else { break }
+        while let data = try? file.read(upToCount: bufferSize), !data.isEmpty {
             md5.update(data: data)
-            if let r = remaining {
-                remaining = r - data.count
-                if remaining! <= 0 { break }
-            }
         }
 
         return md5.finalize().map { String(format: "%02X", $0) }.joined()
@@ -664,6 +830,29 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if let result = cache[key] { return result }
         }
         return nil
+    }
+
+    /// Resolves the DAT/RDB name for a ROM, trying (in order): redump per-track MD5 candidates for
+    /// disc systems, a headerless MD5 for Lynx, then the plain MD5 (falling back to serial). Shared
+    /// by the no-cache fetch path and the cache-hit gameName backfill, so both resolve identically.
+    private func resolveDATName(md5: String, serial: String?, romURL: URL?, systemIdentifier: String) async throws -> (name: String, libretroSystem: String)? {
+        if Self.redumpSystems.contains(systemIdentifier), let romURL {
+            // Some discs (esp. PC Engine CD, occasionally Saturn) don't keep their identifying
+            // data on the first track — try every non-audio track's MD5 in cue order until one matches.
+            for candidate in dataTrackMD5Candidates(forCueURL: romURL) {
+                if let result = try await lookupGameName(md5: candidate, serial: nil, systemIdentifier: systemIdentifier) {
+                    return result
+                }
+            }
+        }
+
+        var lookupMD5 = md5
+        // Lynx .lnx dumps prepend a 64-byte header; the no-intro DAT indexes the headerless image.
+        if systemIdentifier == OESystemIdentifierLynx, let romURL,
+           let recomputed = headerlessLynxMD5(forROMURL: romURL) {
+            lookupMD5 = recomputed
+        }
+        return try await lookupGameName(md5: lookupMD5, serial: serial, systemIdentifier: systemIdentifier)
     }
 
     private func lookupGameName(md5: String, serial: String?, systemIdentifier: String) async throws -> (name: String, libretroSystem: String)? {

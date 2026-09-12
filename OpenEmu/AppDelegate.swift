@@ -230,6 +230,11 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             
             assert(OELibraryDatabase.default != nil, "No database available!")
             
+            // Must run before any game can load (and so before Browse Online Cheats can open),
+            // so the cached cheat databases on disk still reflect whatever produced the existing
+            // feedback entries, before this session gets a chance to refresh them.
+            CheatFeedbackService.shared.migrateIfNeeded()
+            
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: .libraryDidLoad, object: OELibraryDatabase.default!)
             }

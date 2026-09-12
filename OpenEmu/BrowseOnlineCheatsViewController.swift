@@ -24,6 +24,10 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import OpenEmuKit
+import os.log
+
+private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
 
 final class BrowseOnlineCheatsViewController: NSViewController {
 
@@ -722,7 +726,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                                           comment: "Browse online cheats: disambiguates multiple cheats sharing the same name, e.g. \"99 Magic (2 of 7)\""),
                 cheat.name, index, total
             )
-            return DatabaseCheat(name: disambiguatedName, code: cheat.code, providerName: cheat.providerName)
+            return DatabaseCheat(name: disambiguatedName, code: cheat.code, providerName: cheat.providerName, rawCode: cheat.rawCode)
         }
     }
 
@@ -1026,7 +1030,9 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
     @objc private func showCodeClicked(_ sender: NSButton) {
         let row = resultsTableView.row(for: sender)
         guard row >= 0, row < visibleCheats.count else { return }
-        presentCodeDialog(for: visibleCheats[row])
+        let cheat = visibleCheats[row]
+        // log.debug("rawCode for '\(cheat.name, privacy: .public)': \(cheat.rawCode, privacy: .public)")
+        presentCodeDialog(for: cheat)
     }
 
     // MARK: - Notes Column
@@ -1093,7 +1099,12 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                 md5: md5,
                                                 systemIdentifier: document.systemPlugin.systemIdentifier,
                                                 coreIdentifier: document.corePlugin.bundleIdentifier,
-                                                coreVersion: document.corePlugin.version)
+                                                coreVersion: document.corePlugin.version,
+                                                rawCode: cheat.rawCode,
+                                                provider: cheat.providerName,
+                                                gameName: document.rom.game?.displayName,
+                                                serial: document.rom.serial,
+                                                raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
 
             if let feedback {
                 CheatFeedbackService.shared.setStatus(feedback,
@@ -1101,7 +1112,12 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                      md5: md5,
                                                      systemIdentifier: document.systemPlugin.systemIdentifier,
                                                      coreIdentifier: document.corePlugin.bundleIdentifier,
-                                                     coreVersion: document.corePlugin.version)
+                                                     coreVersion: document.corePlugin.version,
+                                                     rawCode: cheat.rawCode,
+                                                     provider: cheat.providerName,
+                                                     gameName: document.rom.game?.displayName,
+                                                     serial: document.rom.serial,
+                                                     raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
                 statuses[key] = feedback
             }
         }
@@ -1229,7 +1245,12 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                  md5: md5,
                                                  systemIdentifier: document.systemPlugin.systemIdentifier,
                                                  coreIdentifier: document.corePlugin.bundleIdentifier,
-                                                 coreVersion: document.corePlugin.version)
+                                                 coreVersion: document.corePlugin.version,
+                                                 rawCode: cheat.rawCode,
+                                                 provider: cheat.providerName,
+                                                 gameName: document.rom.game?.displayName,
+                                                 serial: document.rom.serial,
+                                                 raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
         }
 
         // Re-filtered rather than redrawn: the new status may exclude this row.
@@ -1288,7 +1309,7 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
 
         switch state {
         case .notImported:
-            gameDocument?.addImportedCheat(code: cheat.code, name: cheat.name, providerName: cheat.providerName)
+            gameDocument?.addImportedCheat(code: cheat.code, name: cheat.name, providerName: cheat.providerName, rawCode: cheat.rawCode)
         case .importedByThisFeature:
             // Blocks on the "did it work" prompt, so statuses are re-read once it returns.
             gameDocument?.removeImportedCheat(code: cheat.code)

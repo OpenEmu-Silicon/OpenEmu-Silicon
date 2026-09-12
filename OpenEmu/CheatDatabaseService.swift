@@ -34,6 +34,18 @@ struct DatabaseCheat: Sendable {
     let name: String
     let code: String
     let providerName: String
+    /// Unmodified text as published by the provider, before normalization. Not shown to the user;
+    /// carried through for future cheat feedback correlation. Mandatory: every provider reads from
+    /// some source text, even when that text equals `code` (e.g. `OpenEmuCheatProvider`, which
+    /// applies no normalization).
+    let rawCode: String
+
+    init(name: String, code: String, providerName: String, rawCode: String) {
+        self.name = name
+        self.code = code
+        self.providerName = providerName
+        self.rawCode = rawCode
+    }
 }
 
 /// A source of cheat codes for a given system and ROM.
