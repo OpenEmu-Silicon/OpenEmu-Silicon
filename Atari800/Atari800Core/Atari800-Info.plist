@@ -30,6 +30,8 @@
 			<true/>
 			<key>OEGameCoreSupportsCheatCode</key>
 			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
 			<key>OERequiredFiles</key>
 			<array>
 				<dict>
