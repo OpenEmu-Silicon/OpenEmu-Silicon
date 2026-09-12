@@ -1031,7 +1031,7 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
         let row = resultsTableView.row(for: sender)
         guard row >= 0, row < visibleCheats.count else { return }
         let cheat = visibleCheats[row]
-        log.debug("rawCode for '\(cheat.name, privacy: .public)': \(cheat.rawCode, privacy: .public)")
+        // log.debug("rawCode for '\(cheat.name, privacy: .public)': \(cheat.rawCode, privacy: .public)")
         presentCodeDialog(for: cheat)
     }
 

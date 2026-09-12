@@ -134,7 +134,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
         // 1. Check local cache
         if let cached = loadCachedCheats(md5: md5, systemIdentifier: systemIdentifier) {
-            log.info("Local cache hit for \(md5) (\(cached.sources.map(\.chtFileName).joined(separator: ", ")))")
+            // log.info("Local cache hit for \(md5) (\(cached.sources.map(\.chtFileName).joined(separator: ", ")))")
 
             // Once per app session, rebuild this game's whole catalogue from scratch — cheats can be
             // renamed, added, or removed upstream, and the ETag refresh below only ever re-validates
@@ -197,12 +197,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         let lookup = try await resolveDATName(md5: md5, serial: serial, romURL: romURL, systemIdentifier: systemIdentifier)
 
         if lookup == nil && gameName == nil {
-            log.info("No game found for MD5 \(md5) / serial \(serial ?? "nil") in system \(systemIdentifier)")
+            // log.info("No game found for MD5 \(md5) / serial \(serial ?? "nil") in system \(systemIdentifier)")
             return nil
         }
 
         let resolvedSystem = lookup?.libretroSystem ?? libretroSystem
-        log.info("MD5 \(md5) → \(lookup?.name ?? "nil") (in \(resolvedSystem))")
+        // log.info("MD5 \(md5) → \(lookup?.name ?? "nil") (in \(resolvedSystem))")
 
         // Download plain + device-suffixed + region-variant candidates, merge
         var allCheats: [LibretroCachedCheat] = []
@@ -237,7 +237,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         }
 
         guard !allCheats.isEmpty else {
-            log.info("No CHT files found for \(gameNames.joined(separator: ", "))")
+            // log.info("No CHT files found for \(gameNames.joined(separator: ", "))")
             return nil
         }
 
@@ -374,7 +374,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
         let newETag = httpResponse.value(forHTTPHeaderField: "ETag")?.replacingOccurrences(of: "\"", with: "")
         let cheats = parseCHTFile(data, systemIdentifier: systemIdentifier)
-        log.info("CHT parsed: \(chtFileName) → \(cheats.count) cheats")
+        // log.info("CHT parsed: \(chtFileName) → \(cheats.count) cheats")
         return CHTDownloadResult(cheats: cheats, etag: newETag)
     }
 
@@ -860,7 +860,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         let cachedSnapshot = datCache[systemIdentifier]
         datCacheLock.unlock()
         if let cached = cachedSnapshot {
-            log.debug("DAT cache hit for \(systemIdentifier)")
+            // log.debug("DAT cache hit for \(systemIdentifier)")
             if let result = cached[md5.uppercased()] { return result }
             if let serial, let result = lookupBySerial(serial, in: cached) { return result }
             return nil
@@ -871,7 +871,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         let datSystems = systemFallbacks[systemIdentifier] ?? [libretroSystem]
         var merged: [String: (name: String, libretroSystem: String)] = [:]
         for datSystem in datSystems {
-            log.info("Downloading DAT for \(datSystem)…")
+            // log.info("Downloading DAT for \(datSystem)…")
             let encoded = datSystem.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? datSystem
             let datBaseURL = Self.redumpSystems.contains(systemIdentifier) ? Self.datBaseURLRedump : Self.datBaseURLNoIntro
             guard let url = URL(string: "\(datBaseURL)\(encoded).dat") else { continue }
