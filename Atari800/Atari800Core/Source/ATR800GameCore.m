@@ -26,6 +26,7 @@
 
 #import "ATR800GameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import "OEA8SystemResponderClient.h"
 #import "OE5200SystemResponderClient.h"
 #import <OpenGL/gl.h>
@@ -386,6 +387,20 @@ static ATR800GameCore *_currentCore;
         _cheatList[code] = @YES;
     else
         [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // 5200 RAM is 0x0000-0x3FFF (see MEMORY_InitialiseMachine); 0x4000-0xFFFF is BIOS/cartridge ROM.
+    if (![[self systemIdentifier] isEqualToString:@"openemu.system.5200"])
+        return @[];
+
+    NSData *data = [NSData dataWithBytes:MEMORY_mem length:0x4000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0x0000
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 #pragma mark - Input
