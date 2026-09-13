@@ -49,6 +49,7 @@
     uint8_t _inputState[17];
     int _videoWidth, _videoHeight;
     BOOL _isLightgunEnabled;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 - (void)setPalette32;
 @end
@@ -278,6 +279,34 @@
     }
 
     return NO;
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Per the 7800 hardware map (78map.txt): 0x1800-0x27FF is System RAM; below
+    // that is hardware I/O (TIA/RIOT/MARIA), above is mirrored RAM/cart ROM/RAM.
+    NSData *data = [NSData dataWithBytes:memory_ram + 0x1800 length:0x1000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0x1800
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 #pragma mark - Input
