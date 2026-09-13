@@ -33,6 +33,12 @@
 #import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 #include "ProSystem.h"
 #include "Database.h"
 #include "Sound.h"
@@ -51,9 +57,24 @@
     int _videoWidth, _videoHeight;
     BOOL _isLightgunEnabled;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 - (void)setPalette32;
 @end
+
+// rcheevos maps the 7800's real CPU address space 1:1 (see rc_memory_regions_atari7800),
+// so no rebasing is needed here unlike Stella's Atari 2600 reader.
+static uint32_t prosystem_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                          uint32_t num_bytes, rc_client_t *client)
+{
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i > 0xFFFF)
+            return i;
+        buffer[i] = memory_ram[address + i];
+    }
+    return num_bytes;
+}
 
 @implementation ProSystemGameCore
 
@@ -70,8 +91,32 @@
 
 - (void)dealloc
 {
+    // Drain the RA serial queue before freeing buffers no in-flight read touches them.
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(_videoBuffer);
     free(_soundBuffer);
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Execution
@@ -127,6 +172,12 @@
         _inputState[LEFT_DIFF_SWITCH] = cartridge_left_switch;
         _inputState[RIGHT_DIFF_SWITCH] = cartridge_right_switch;
 
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:prosystem_rc_read_memory
+                                                               consoleID:RC_CONSOLE_ATARI_7800];
+        [_raBridge startWithROMPath:path];
+        [_raBridge markROMReady];
+
         return YES;
     }
 
@@ -176,16 +227,26 @@
 
     int length = sound_Store(_soundBuffer);
     [[self audioBufferAtIndex:0] write:_soundBuffer maxLength:length];
+
+    [_raBridge doFrame];
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     prosystem_Reset();
 }
 
 - (NSTimeInterval)frameInterval
 {
     return cartridge_region == REGION_NTSC ? 60 : 50;
+}
+
+- (void)stopEmulation
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
+    [super stopEmulation];
 }
 
 #pragma mark - Video
