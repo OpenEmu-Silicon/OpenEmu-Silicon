@@ -71,6 +71,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private let systemMap: [String: String] = [
         OESystemIdentifierAtari2600: "Atari - 2600",
         OESystemIdentifier5200:      "Atari - 5200",
+        OESystemIdentifier7800:      "Atari - 7800",
         OESystemIdentifierSMS:       "Sega - Master System - Mark III",
         OESystemIdentifierNES:       "Nintendo - Nintendo Entertainment System",
         OESystemIdentifierFDS:       "Nintendo - Family Computer Disk System",
