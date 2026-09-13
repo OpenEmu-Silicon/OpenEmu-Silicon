@@ -30,6 +30,7 @@
 
 #import <OpenEmuBase/OEGameCoreController.h>
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 
 #include "ProSystem.h"
@@ -135,6 +136,23 @@
 - (void)executeFrame
 {
 	prosystem_ExecuteFrame(_inputState);
+
+    // Direct RAM pokes (mempatch style): re-applied every frame since nothing else
+    // preserves them across the emulated CPU's own writes to the same addresses.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location != NSNotFound) {
+                unsigned int addr = 0, val = 0;
+                if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+                if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                if (addr > 0xFFFF) continue;
+                memory_Write((uint16_t)addr, (uint8_t)val);
+            }
+        }
+    }
 
     _videoWidth  = ((maria_displayArea.right - maria_displayArea.left) + 1);
     _videoHeight = ((maria_visibleArea.bottom - maria_visibleArea.top) + 1);
