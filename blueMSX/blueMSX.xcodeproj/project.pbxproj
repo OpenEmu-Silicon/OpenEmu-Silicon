@@ -292,6 +292,9 @@
 		FEA841AA187F307200F5CD6D /* Databases in Resources */ = {isa = PBXBuildFile; fileRef = FEA841A9187F307200F5CD6D /* Databases */; };
 		FEB03AF3187BEF33000FDDCF /* blueMSXGameCore.m in Sources */ = {isa = PBXBuildFile; fileRef = FEB03AF2187BEF33000FDDCF /* blueMSXGameCore.m */; };
 		FEB03AF5187BF6F6000FDDCF /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FEB03AF4187BF6F6000FDDCF /* OpenEmuBase.framework */; };
+		OE0BMSX0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0BMSX0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0BMSX0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0BMSX0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0BMSX0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0BMSX0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		FED62A42187BD5D700A88500 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FED62A41187BD5D700A88500 /* Cocoa.framework */; };
 		FED62A4C187BD5D700A88500 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = FED62A4A187BD5D700A88500 /* InfoPlist.strings */; };
 		FEE6DDA0199551030015EC0F /* Microchip24x00.c in Sources */ = {isa = PBXBuildFile; fileRef = FEE6DD9E199551030015EC0F /* Microchip24x00.c */; };
@@ -888,6 +891,10 @@
 		FEB03AF2187BEF33000FDDCF /* blueMSXGameCore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = blueMSXGameCore.m; sourceTree = "<group>"; };
 		FEB03AF4187BF6F6000FDDCF /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FED62A3E187BD5D700A88500 /* blueMSX.oecoreplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = blueMSX.oecoreplugin; sourceTree = BUILT_PRODUCTS_DIR; };
+		OE0BMSX0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0BMSX0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0BMSX0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0BMSX0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		FED62A41187BD5D700A88500 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		FED62A44187BD5D700A88500 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		FED62A45187BD5D700A88500 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
@@ -1690,6 +1697,10 @@
 				FEB03AF0187BEE8C000FDDCF /* OEMSXSystemResponderClient.h */,
 				FEB03AF1187BEF33000FDDCF /* blueMSXGameCore.h */,
 				FEB03AF2187BEF33000FDDCF /* blueMSXGameCore.m */,
+				OE0BMSX0FILEREF000000001 /* rcheevos_build.c */,
+				OE0BMSX0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0BMSX0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0BMSX0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -1829,6 +1840,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				OE0BMSX0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0BMSX0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0BMSX0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				FE6DEA50187C6FF900EFA21E /* PacketFileSystem.c in Sources */,
 				FE6DE958187C6FF800EFA21E /* SVI.c in Sources */,
 				FE6DEA47187C6FF900EFA21E /* ioapi.c in Sources */,
@@ -2211,6 +2225,11 @@
 				FRAMEWORK_SEARCH_PATHS = "$(USER_LIBRARY_DIR)/Developer/Xcode/DerivedData/OpenEmu-ebwcwaohrneqtmcmlxkmguipkwal/Build/Products/Debug";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "blueMSX-Info.plist";
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				OTHER_CFLAGS = (
@@ -2236,6 +2255,11 @@
 				FRAMEWORK_SEARCH_PATHS = "$(USER_LIBRARY_DIR)/Developer/Xcode/DerivedData/OpenEmu-ebwcwaohrneqtmcmlxkmguipkwal/Build/Products/Debug";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "blueMSX-Info.plist";
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				OTHER_CFLAGS = (

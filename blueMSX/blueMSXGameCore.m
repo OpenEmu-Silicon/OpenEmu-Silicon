@@ -32,6 +32,12 @@
 #import "OEMSXSystemResponderClient.h"
 #import "OEColecoVisionSystemResponderClient.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 #include "ArchInput.h"
 #include "ArchNotifications.h"
 #include "Actions.h"
@@ -80,6 +86,7 @@
     Video *video;
     Mixer *mixer;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 
 - (void)initializeEmulator;
@@ -89,6 +96,24 @@
 static blueMSXGameCore *_core;
 static Int32 mixAudio(void *param, Int16 *buffer, UInt32 count);
 static int framebufferScanline = 0;
+
+// rcheevos ColecoVision map: virtual 0x0000-0x03FF == real 0x6000-0x63FF System RAM (see
+// rc_memory_regions_colecovision) -- colecoGetRam() is already RAM-relative, same as the
+// cheat search descriptor, so no rebasing is needed here.
+static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                        uint32_t num_bytes, rc_client_t *client)
+{
+    UInt8 *ram = colecoGetRam();
+    if (!ram) return 0;
+
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i >= 0x400)
+            return i;
+        buffer[i] = ram[address + i];
+    }
+    return num_bytes;
+}
 
 @implementation blueMSXGameCore
 
@@ -108,10 +133,33 @@ static int framebufferScanline = 0;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(_videoBuffer);
     propDestroy(properties);
     mixerSetWriteCallback(mixer, NULL, NULL, 0);
     mixerDestroy(mixer);
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 - (void)initializeEmulator
@@ -301,11 +349,20 @@ static int framebufferScanline = 0;
 
     tryLaunchUnknownFile(properties, [fileToLoad UTF8String], YES);
 
+    // colecoGetRam() only becomes valid once tryLaunchUnknownFile has built the board, so
+    // the memory reader is gated open here rather than in loadFileAtPath (bridge/observer
+    // registration already happened there, so the helper's post-load token replay still lands).
+    if (_raBridge)
+        [_raBridge markROMReady];
+
     [super startEmulation];
 }
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     emulatorSuspend();
     emulatorStop();
 
@@ -324,6 +381,7 @@ static int framebufferScanline = 0;
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     actionEmuResetSoft();
 }
 
@@ -575,6 +633,8 @@ static int framebufferScanline = 0;
             }
         }
     }
+
+    [_raBridge doFrame];
 }
 
 - (NSTimeInterval)frameInterval
@@ -600,6 +660,18 @@ static int framebufferScanline = 0;
         romTypeToLoad = mediaDbGetRomType(mediaType);
 
     fileToLoad = path;
+
+    // Bridge/observer must be registered here, not in startEmulation: the helper replays
+    // the cached RA token immediately after loadFileAtPath returns, and a bridge created
+    // later would miss that one-time replay and never log in / show the boot placard.
+    // markROMReady is deferred to startEmulation, once colecoGetRam() is actually valid.
+    if ([[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
+    {
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:bluemsx_rc_read_memory
+                                                               consoleID:RC_CONSOLE_COLECOVISION];
+        [_raBridge startWithROMPath:path];
+    }
 
     return YES;
 }
