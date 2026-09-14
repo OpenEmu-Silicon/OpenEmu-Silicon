@@ -46,6 +46,7 @@
     NSData *_romData;
     uint8_t _padData[NUMINPUTS][OEColecoVisionButtonCount];
     int16_t *_soundBuffer;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 @end
 
@@ -109,6 +110,22 @@ static __weak JollyCVGameCore *_current;
 - (void)executeFrame
 {
     jcv_exec();
+
+    // Raw RAM pokes: re-applied every frame since nothing else preserves them
+    // across the emulated CPU's own writes to the same addresses.
+    uint8_t *ram = jcv_get_ram();
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            ram[addr & 0x3FF] = (uint8_t)val;
+        }
+    }
 }
 
 - (void)resetEmulation
@@ -238,6 +255,22 @@ static uint16_t cv_input_map[] = {
 - (oneway void)didReleaseColecoVisionButton:(OEColecoVisionButton)button forPlayer:(NSUInteger)player;
 {
     _padData[player-1][button] = 0;
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
 }
 
 #pragma mark - JollyCV callbacks
