@@ -1939,7 +1939,7 @@ final class OEGameDocument: NSDocument {
         case OESystemIdentifierOdyssey2:
             return CheatFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. 002B:0A. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Odyssey 2"),
-                validationHint: NSLocalizedString("Odyssey\u{00B2} codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 002B:0A. Addresses 000-03F target internal RAM; 100-1FF target external RAM (only present on some carts). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Odyssey 2"),
+                validationHint: NSLocalizedString("Odyssey\u{00B2} codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 002B:0A. Addresses 000-03F target internal RAM; 040-13F target external RAM (only present on some carts). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Odyssey 2"),
                 validator: { code in
                     let parts = code.replacingOccurrences(of: " ", with: "")
                                     .replacingOccurrences(of: "\n", with: "")
