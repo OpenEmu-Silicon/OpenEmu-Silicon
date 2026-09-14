@@ -35,6 +35,13 @@
 			<key>OEGameCoreSupportsRetroAchievements</key>
 			<true/>
 		</dict>
+		<key>openemu.system.msx</key>
+		<dict>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+		</dict>
 	</dict>
 	<key>OEGameCorePlayerCount</key>
 	<string>2</string>

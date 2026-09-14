@@ -41,6 +41,7 @@ NSString *const OESystemIdentifierSMS        = @"openemu.system.sms";
 NSString *const OESystemIdentifierGameGear   = @"openemu.system.gg";
 NSString *const OESystemIdentifierSG1000     = @"openemu.system.sg1000";
 NSString *const OESystemIdentifierColecoVision = @"openemu.system.colecovision";
+NSString *const OESystemIdentifierMSX          = @"openemu.system.msx";
 NSString *const OESystemIdentifierSegaCD     = @"openemu.system.scd";
 NSString *const OESystemIdentifierSega32X    = @"openemu.system.32x";
 NSString *const OESystemIdentifierAtari2600  = @"openemu.system.2600";
