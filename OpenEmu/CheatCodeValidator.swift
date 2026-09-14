@@ -48,6 +48,10 @@ enum CheatCodeValidator {
             // Stella: scanHexInt is flexible on length, cast to uInt16/uInt8
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
 
+        case OESystemIdentifierMSX:
+            // blueMSX: raw poke into the CPU's logical 64KB address space via slotWrite
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
         case OESystemIdentifier5200:
             // Atari800: raw poke into MEMORY_mem, same 16-bit address space as Stella
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)

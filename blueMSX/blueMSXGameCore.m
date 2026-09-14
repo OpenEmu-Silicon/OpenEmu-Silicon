@@ -49,6 +49,7 @@
 #include "Emulator.h"
 #include "Board.h"
 #include "Coleco.h"
+#include "SlotManager.h"
 #include "Language.h"
 #include "LaunchFile.h"
 #include "PrinterIO.h"
@@ -610,26 +611,30 @@ static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
     // Update controls
     memcpy(eventMap, _core->virtualCodeMap, sizeof(_core->virtualCodeMap));
 
-    // Raw RAM pokes (ColecoVision only): re-applied every frame since nothing
+    // Raw pokes (ColecoVision/MSX only): re-applied every frame since nothing
     // else preserves them across the emulated CPU's own writes to the same addresses.
-    if ([[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
+    BOOL isColeco = [[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"];
+    BOOL isMSX = [[self systemIdentifier] isEqualToString:@"openemu.system.msx"];
+    // colecoGetRam() is NULL until the board finishes initializing; MSX pokes go through
+    // slotWrite instead, which has no such startup window.
+    UInt8 *ram = isColeco ? colecoGetRam() : NULL;
+    if (isMSX || ram)
     {
-        UInt8 *ram = colecoGetRam();
-        if (ram)
+        for (NSString *key in _cheatList)
         {
-            for (NSString *key in _cheatList)
+            if (![_cheatList[key] boolValue]) continue;
+            NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+            for (NSString *singleCode in codes)
             {
-                if (![_cheatList[key] boolValue]) continue;
-                NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
-                for (NSString *singleCode in codes)
-                {
-                    NSRange colonRange = [singleCode rangeOfString:@":"];
-                    if (colonRange.location == NSNotFound) continue;
-                    unsigned int addr = 0, val = 0;
-                    if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
-                    if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                NSRange colonRange = [singleCode rangeOfString:@":"];
+                if (colonRange.location == NSNotFound) continue;
+                unsigned int addr = 0, val = 0;
+                if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+                if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                if (isColeco)
                     ram[addr & 0x3FF] = (UInt8)val;
-                }
+                else
+                    slotWrite(NULL, (UInt16)addr, (UInt8)val);
             }
         }
     }
@@ -714,6 +719,23 @@ static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
 
 - (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
 {
+    if ([[self systemIdentifier] isEqualToString:@"openemu.system.msx"])
+    {
+        // Dumps the Z80's current logical view of the full address space (whatever is
+        // banked in via slots/subslots right now), same as the built-in debugger does.
+        UInt8 mem[0x10000];
+        for (int i = 0; i < 0x10000; i++)
+            mem[i] = slotPeek(NULL, (UInt16)i);
+
+        NSData *memData = [NSData dataWithBytes:mem length:0x10000];
+        return @[
+            [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                  address:0x0000
+                                             addressBytes:2
+                                                     data:memData]
+        ];
+    }
+
     if (![[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
         return @[];
 

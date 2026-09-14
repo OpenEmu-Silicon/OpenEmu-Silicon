@@ -1948,6 +1948,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierMSX:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),
+                validationHint: NSLocalizedString("MSX codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C123:05. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, MSX"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
+                }
+            )
         case OESystemIdentifierVB:
             return CheatFormat(
                 placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
