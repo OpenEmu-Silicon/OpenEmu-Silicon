@@ -56,6 +56,11 @@ enum CheatCodeValidator {
             // ProSystem: raw poke into memory_ram via memory_Write, same 16-bit address space
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
 
+        case OESystemIdentifierOdyssey2:
+            // O2EM: raw poke into intRAM (0x000-0x03F) or extRAM (0x100-0x1FF, cart-dependent).
+            // Max 4 (not 3) hex digits so zero-padded addresses like 0032:19 still validate.
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
         case OESystemIdentifierNES, OESystemIdentifierFDS:
             // FCEU: raw XXXX:XX, XXXX?XX:XX, NES Game Genie — no Pro Action Rocky
             if coreIdentifier == "org.openemu.FCEU" {
