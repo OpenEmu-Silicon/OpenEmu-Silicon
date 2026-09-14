@@ -29,6 +29,7 @@
 #import "OEOdyssey2SystemResponderClient.h"
 
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #include <IOKit/hid/IOHIDUsageTables.h>
 
@@ -52,6 +53,7 @@
 @interface OdysseyGameCore () <OEOdyssey2SystemResponderClient>
 {
     NSDictionary *virtualPhysicalKeyMap;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 @end
 
@@ -478,6 +480,23 @@ OdysseyGameCore *current;
     //run();
     cpu_exec();
 
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            // 0x000-0x03F: internal RAM (64 bytes, universal); 0x100-0x1FF: external RAM (256 bytes, cart-dependent)
+            if (addr < 0x40)
+                intRAM[addr] = (Byte)val;
+            else if (addr >= 0x100 && addr < 0x200)
+                extRAM[addr - 0x100] = (Byte)val;
+        }
+    }
+
     int len = evblclk == EVBLCLK_NTSC ? 44100/60 : 44100/50;
 
     // Convert 8u to 16s
@@ -621,6 +640,38 @@ OdysseyGameCore *current;
 - (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
     block(loadstate(fileName.fileSystemRepresentation) ? YES : NO, nil);
+}
+
+#pragma mark Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    NSData *intData = [NSData dataWithBytes:intRAM length:64];
+    NSData *extData = [NSData dataWithBytes:extRAM length:256];
+
+    OEMemoryRegionDescriptor *intDescriptor = [OEMemoryRegionDescriptor descriptorWithName:@"Internal RAM"
+                                                                                    address:0x0000
+                                                                               addressBytes:2
+                                                                                       data:intData];
+    OEMemoryRegionDescriptor *extDescriptor = [OEMemoryRegionDescriptor descriptorWithName:@"External RAM"
+                                                                                    address:0x0100
+                                                                               addressBytes:2
+                                                                                       data:extData];
+    return @[intDescriptor, extDescriptor];
 }
 
 @end

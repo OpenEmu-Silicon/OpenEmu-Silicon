@@ -48,6 +48,7 @@ extern NSString *const OESystemIdentifierSega32X;
 extern NSString *const OESystemIdentifierAtari2600;
 extern NSString *const OESystemIdentifier5200;
 extern NSString *const OESystemIdentifier7800;
+extern NSString *const OESystemIdentifierOdyssey2;
 extern NSString *const OESystemIdentifierLynx;
 extern NSString *const OESystemIdentifierNGP;
 extern NSString *const OESystemIdentifierPCE;
