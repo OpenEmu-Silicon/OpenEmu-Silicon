@@ -41,6 +41,7 @@
 #include "Casette.h"
 #include "Emulator.h"
 #include "Board.h"
+#include "Coleco.h"
 #include "Language.h"
 #include "LaunchFile.h"
 #include "PrinterIO.h"
@@ -77,6 +78,7 @@
     Properties *properties;
     Video *video;
     Mixer *mixer;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 
 - (void)initializeEmulator;
@@ -548,6 +550,30 @@ static int framebufferScanline = 0;
 {
     // Update controls
     memcpy(eventMap, _core->virtualCodeMap, sizeof(_core->virtualCodeMap));
+
+    // Raw RAM pokes (ColecoVision only): re-applied every frame since nothing
+    // else preserves them across the emulated CPU's own writes to the same addresses.
+    if ([[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
+    {
+        UInt8 *ram = colecoGetRam();
+        if (ram)
+        {
+            for (NSString *key in _cheatList)
+            {
+                if (![_cheatList[key] boolValue]) continue;
+                NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+                for (NSString *singleCode in codes)
+                {
+                    NSRange colonRange = [singleCode rangeOfString:@":"];
+                    if (colonRange.location == NSNotFound) continue;
+                    unsigned int addr = 0, val = 0;
+                    if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+                    if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                    ram[addr & 0x3FF] = (UInt8)val;
+                }
+            }
+        }
+    }
 }
 
 - (NSTimeInterval)frameInterval
@@ -595,6 +621,22 @@ static int framebufferScanline = 0;
 
         block(YES, nil);
     });
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
 }
 
 #pragma mark - OE Video
