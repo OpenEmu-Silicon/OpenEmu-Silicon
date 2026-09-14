@@ -27,6 +27,7 @@
 #import "blueMSXGameCore.h"
 #import <OpenEmuBase/OEGameCoreController.h>
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "OEMSXSystemResponderClient.h"
 #import "OEColecoVisionSystemResponderClient.h"
@@ -637,6 +638,25 @@ static int framebufferScanline = 0;
         _cheatList[code] = @YES;
     else
         [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (![[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
+        return @[];
+
+    UInt8 *ram = colecoGetRam();
+    if (!ram) return @[];
+
+    // Reported at 0x0000 (not the real $6000 CPU address) to match CrabEmu/JollyCV's
+    // RAM-relative addressing for cheat search and imported cheats.
+    NSData *ramData = [NSData dataWithBytes:ram length:0x400];
+    return @[
+        [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                              address:0x0000
+                                         addressBytes:2
+                                                 data:ramData]
+    ];
 }
 
 #pragma mark - OE Video
