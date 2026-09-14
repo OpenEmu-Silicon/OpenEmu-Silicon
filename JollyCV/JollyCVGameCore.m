@@ -33,6 +33,7 @@
 #include "jcv_z80.h"
 
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import "OEColecoVisionSystemResponderClient.h"
 #import <OpenGL/gl.h>
 
@@ -271,6 +272,19 @@ static uint16_t cv_input_map[] = {
         _cheatList[code] = @YES;
     else
         [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Reported at 0x0000 (not the real $6000 CPU address) to match CrabEmu's
+    // RAM-relative addressing for cheat search and imported cheats.
+    NSData *ramData = [NSData dataWithBytes:jcv_get_ram() length:0x400];
+    return @[
+        [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                              address:0x0000
+                                         addressBytes:2
+                                                 data:ramData]
+    ];
 }
 
 #pragma mark - JollyCV callbacks
