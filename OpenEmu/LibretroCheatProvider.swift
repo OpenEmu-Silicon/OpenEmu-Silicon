@@ -44,6 +44,7 @@ private struct LibretroCachedCheatFile: Codable {
 
 private struct LibretroCachedSource: Codable {
     let chtFileName: String
+    let libretroSystem: String?
     let etag: String?
 }
 
@@ -85,6 +86,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierSG1000:    "Sega - SG-1000",
         OESystemIdentifierGB:        "Nintendo - Game Boy",
         OESystemIdentifierColecoVision: "Coleco - ColecoVision",
+        OESystemIdentifierMSX:       "Microsoft - MSX",
         OESystemIdentifierPSX:       "Sony - PlayStation",
         OESystemIdentifierLynx:      "Atari - Lynx",
         OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
@@ -101,6 +103,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierGB: ["Nintendo - Game Boy", "Nintendo - Game Boy Color"],
         OESystemIdentifierNGP: ["SNK - Neo Geo Pocket", "SNK - Neo Geo Pocket Color"],
         OESystemIdentifierWS: ["Bandai - WonderSwan", "Bandai - WonderSwan Color"],
+        OESystemIdentifierMSX: ["Microsoft - MSX", "Microsoft - MSX2"],
     ]
 
     // In-memory cache: systemIdentifier → [key → (gameName, libretroSystem)]
@@ -154,9 +157,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             var allCheats: [LibretroCachedCheat] = []
             var updatedSources: [LibretroCachedSource] = []
             for source in cached.sources {
-                if let updated = try await downloadCHT(chtFileName: source.chtFileName, libretroSystem: libretroSystem, systemIdentifier: systemIdentifier, existingETag: source.etag) {
+                let sourceSystem = source.libretroSystem ?? libretroSystem
+                if let updated = try await downloadCHT(chtFileName: source.chtFileName, libretroSystem: sourceSystem, systemIdentifier: systemIdentifier, existingETag: source.etag) {
                     allCheats.append(contentsOf: updated.cheats)
-                    updatedSources.append(LibretroCachedSource(chtFileName: source.chtFileName, etag: updated.etag))
+                    updatedSources.append(LibretroCachedSource(chtFileName: source.chtFileName, libretroSystem: sourceSystem, etag: updated.etag))
                     anyUpdated = true
                 } else if !anyUpdated {
                     // Nothing updated yet — return the full cached set as-is
@@ -207,9 +211,6 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         // log.info("MD5 \(md5) → \(lookup?.name ?? "nil") (in \(resolvedSystem))")
 
         // Download plain + device-suffixed + region-variant candidates, merge
-        var allCheats: [LibretroCachedCheat] = []
-        var sources: [LibretroCachedSource] = []
-
         let useRegionFallback = systemIdentifier == OESystemIdentifierPSX || systemIdentifier == OESystemIdentifierSaturn
         var gameNames: [String] = []
         if let lookupName = lookup?.name {
@@ -227,16 +228,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if useRegionFallback { gameNames += regionVariants(for: gameName) }
         }
 
-        for candidateName in gameNames {
-            let candidates = ["\(candidateName).cht"] + Self.chtSuffixes.map { "\(candidateName) (\($0)).cht" }
-            for candidate in candidates {
-                if let result = try await downloadCHT(chtFileName: candidate, libretroSystem: resolvedSystem, systemIdentifier: systemIdentifier, existingETag: nil) {
-                    allCheats.append(contentsOf: result.cheats)
-                    sources.append(LibretroCachedSource(chtFileName: candidate, etag: result.etag))
-                }
-            }
-            if !allCheats.isEmpty { break }
-        }
+        let (allCheats, sources) = try await downloadCandidates(gameNames: gameNames, libretroSystem: resolvedSystem, systemIdentifier: systemIdentifier)
 
         guard !allCheats.isEmpty else {
             // log.info("No CHT files found for \(gameNames.joined(separator: ", "))")
@@ -390,6 +382,24 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         }
     }
 
+    /// Downloads the plain + device-suffixed candidates for each game name variant from one cht/
+    /// directory, stopping at the first name variant that yields anything.
+    private func downloadCandidates(gameNames: [String], libretroSystem: String, systemIdentifier: String) async throws -> (cheats: [LibretroCachedCheat], sources: [LibretroCachedSource]) {
+        var allCheats: [LibretroCachedCheat] = []
+        var sources: [LibretroCachedSource] = []
+        for candidateName in gameNames {
+            let candidates = ["\(candidateName).cht"] + Self.chtSuffixes.map { "\(candidateName) (\($0)).cht" }
+            for candidate in candidates {
+                if let result = try await downloadCHT(chtFileName: candidate, libretroSystem: libretroSystem, systemIdentifier: systemIdentifier, existingETag: nil) {
+                    allCheats.append(contentsOf: result.cheats)
+                    sources.append(LibretroCachedSource(chtFileName: candidate, libretroSystem: libretroSystem, etag: result.etag))
+                }
+            }
+            if !allCheats.isEmpty { break }
+        }
+        return (allCheats, sources)
+    }
+
     // MARK: - CHT Parser
 
     private func parseCHTFile(_ data: Data, systemIdentifier: String) -> [LibretroCachedCheat] {
@@ -456,6 +466,11 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                !cleaned.split(separator: "+").allSatisfy({ CheatCodeValidator.isSaturnActionReplayCode(String($0)) }) {
                 continue
             }
+            // MSX: normalizeMSXCode returns "" when the address can't be translated (needs more than
+            // the fixed 16KB system-RAM page) — drop those rather than poke a bogus address.
+            if systemIdentifier == OESystemIdentifierMSX, cleaned.isEmpty {
+                continue
+            }
             guard !seenCodes.contains(cleaned) else { continue }
             seenCodes.insert(cleaned)
             cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned, rawCode: rawCode))
@@ -520,6 +535,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             return normalizePSXCode(code)
         case OESystemIdentifierSaturn:
             return normalizeSaturnCode(code)
+        case OESystemIdentifierMSX:
+            return normalizeMSXCode(code)
         default:
             return code
         }
@@ -597,6 +614,27 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             i += 2
         }
         return codes.joined(separator: "+")
+    }
+
+    /// Libretro's MSX cht addresses are relative to the fixed 16KB system-RAM page (real CPU
+    /// 0xC000-0xFFFF), confirmed empirically (Kings Valley, 1942, and Vampire Killer all landed
+    /// exactly 0xC000 below their real Cheat-Search-found address). Returns "" (caller drops the
+    /// cheat) when the raw address is >= 0x4000, since adding 0xC000 would overflow past 0xFFFF —
+    /// those need more RAM than the fixed page and aren't expressible as a single CPU address.
+    private func normalizeMSXCode(_ code: String) -> String {
+        let parts = code.split(separator: "+").map(String.init)
+        guard !parts.isEmpty else { return "" }
+
+        var translated: [String] = []
+        for part in parts {
+            guard let colonIdx = part.firstIndex(of: ":"),
+                  let addr = UInt32(part[part.startIndex..<colonIdx], radix: 16),
+                  addr < 0x4000
+            else { return "" }
+            let value = String(part[part.index(after: colonIdx)...])
+            translated.append(String(format: "%04X", addr + 0xC000) + ":" + value)
+        }
+        return translated.joined(separator: "+")
     }
 
     private func normalizeNDSCode(_ code: String) -> String {
