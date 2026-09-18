@@ -49,6 +49,7 @@
 #include "Emulator.h"
 #include "Board.h"
 #include "Coleco.h"
+#include "MSX.h"
 #include "SlotManager.h"
 #include "Language.h"
 #include "LaunchFile.h"
@@ -110,6 +111,25 @@ static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
     uint32_t i;
     for (i = 0; i < num_bytes; i++) {
         if (address + i >= 0x400)
+            return i;
+        buffer[i] = ram[address + i];
+    }
+    return num_bytes;
+}
+
+// rcheevos MSX map exposes the raw linear main RAM contiguously (rc_memory_regions_msx),
+// not the Z80's banked logical view. rc_client passes the region-relative address, so index
+// msxGetRamData() directly and stop at the emulated RAM size.
+static uint32_t bluemsx_rc_read_memory_msx(uint32_t address, uint8_t *buffer,
+                                            uint32_t num_bytes, rc_client_t *client)
+{
+    UInt8 *ram = msxGetRamData();
+    UInt32 ramSize = msxGetRamSize();
+    if (!ram || ramSize == 0) return 0;
+
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i >= ramSize)
             return i;
         buffer[i] = ram[address + i];
     }
@@ -350,9 +370,10 @@ static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
 
     tryLaunchUnknownFile(properties, [fileToLoad UTF8String], YES);
 
-    // colecoGetRam() only becomes valid once tryLaunchUnknownFile has built the board, so
-    // the memory reader is gated open here rather than in loadFileAtPath (bridge/observer
-    // registration already happened there, so the helper's post-load token replay still lands).
+    // The emulated RAM (colecoGetRam() / msxGetRamData()) only becomes valid once
+    // tryLaunchUnknownFile has built the board, so the memory reader is gated open here
+    // rather than in loadFileAtPath (bridge/observer registration already happened there,
+    // so the helper's post-load token replay still lands).
     if (_raBridge)
         [_raBridge markROMReady];
 
@@ -669,12 +690,19 @@ static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
     // Bridge/observer must be registered here, not in startEmulation: the helper replays
     // the cached RA token immediately after loadFileAtPath returns, and a bridge created
     // later would miss that one-time replay and never log in / show the boot placard.
-    // markROMReady is deferred to startEmulation, once colecoGetRam() is actually valid.
+    // markROMReady is deferred to startEmulation, once the emulated RAM is actually valid.
     if ([[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
     {
         _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
                                                             memoryReader:bluemsx_rc_read_memory
                                                                consoleID:RC_CONSOLE_COLECOVISION];
+        [_raBridge startWithROMPath:path];
+    }
+    else if ([[self systemIdentifier] isEqualToString:@"openemu.system.msx"])
+    {
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:bluemsx_rc_read_memory_msx
+                                                               consoleID:RC_CONSOLE_MSX];
         [_raBridge startWithROMPath:path];
     }
 
