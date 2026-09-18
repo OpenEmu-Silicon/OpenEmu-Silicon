@@ -2,6 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>A MAME cheat file has already been imported. Do you want to replace it with this one?</key>
+	<string>Zaten bir MAME hile dosyası içe aktarılmış. Bunu onunla değiştirmek istiyor musunuz?</string>
+	<key>Keep Existing</key>
+	<string>Mevcut olanı koru</string>
+	<key>Replace</key>
+	<string>Değiştir</string>
+	<key>Replace existing MAME cheat file?</key>
+	<string>Mevcut MAME hile dosyası değiştirilsin mi?</string>
+	<key>Cheat File Scanner</key>
+	<string>Hile Dosyası Tarayıcı</string>
+	<key>Importing %1$ld of %2$ld</key>
+	<string>İçe aktarılıyor %1$ld / %2$ld</string>
+	<key>Copying File</key>
+	<string>Dosya kopyalanıyor</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" in %2$@</string>
 	<key>%@ copy</key>
