@@ -16,6 +16,12 @@
 	<string>Important %1$ld de %2$ld</string>
 	<key>Copying File</key>
 	<string>S’està copiant el fitxer</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>Baixa cheat.7z des de %@ i arrossega’l a la finestra de la biblioteca d’OpenEmu.</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>Encara no s’ha importat cap fitxer de trucs de MAME.</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" a %2$@</string>
 	<key>%@ copy</key>

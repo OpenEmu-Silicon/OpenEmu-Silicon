@@ -59,7 +59,8 @@ private struct LibretroCachedCheat: Codable {
 
 final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
-    let name = "Libretro"
+    static let providerName = "Libretro"
+    var name: String { Self.providerName }
 
     private static let datBaseURLNoIntro = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/no-intro/"
     private static let datBaseURLRedump = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/redump/"

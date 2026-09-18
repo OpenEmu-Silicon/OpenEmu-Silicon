@@ -28,6 +28,7 @@ extension URL {
     static let userGuideBIOSFiles = URL(string: "https://github.com/OpenEmu/OpenEmu/wiki/User-guide:-BIOS-files")!
     static let userGuideCDBasedGames = URL(string: "https://github.com/OpenEmu/OpenEmu/wiki/User-guide:-CD-based-games")!
     static let userGuideWiimotePairing = URL(string: "https://github.com/OpenEmu/OpenEmu/wiki/User-guide:-Wiimote-and-Wii-U-Pro-pairing")!
+    static let pugsyMAMECheats = URL(string: "https://www.mamecheat.co.uk/mame_downloads.htm")!
 }
 
 extension URL {

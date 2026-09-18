@@ -31,14 +31,15 @@ import os.log
 /// Provides cheats from the bundled cheats-database.xml file.
 final class OpenEmuCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
-    let name = "OpenEmu"
+    static let providerName = "OpenEmu"
+    var name: String { Self.providerName }
 
     func supportsSystem(_ systemIdentifier: String) -> Bool {
         loadIfNeeded()
         return database.keys.contains(systemIdentifier)
     }
 
-    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String) async throws -> [DatabaseCheat] {
+    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, coreIdentifier: String) async throws -> [DatabaseCheat] {
         loadIfNeeded()
         return database[systemIdentifier]?[md5.lowercased()] ?? []
     }

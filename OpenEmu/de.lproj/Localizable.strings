@@ -16,6 +16,12 @@
 	<string>Importiere %1$ld von %2$ld</string>
 	<key>Copying File</key>
 	<string>Datei wird kopiert</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>Lade cheat.7z von %@ herunter und ziehe es auf das OpenEmu-Bibliotheksfenster.</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>Noch keine MAME-Cheat-Datei importiert.</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" in %2$@</string>
 	<key>%@ copy</key>
