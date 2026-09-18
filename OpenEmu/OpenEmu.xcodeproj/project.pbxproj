@@ -241,6 +241,7 @@
 		AA0000011000000100000006 /* OpenEmuCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000005 /* OpenEmuCheatProvider.swift */; };
 		AA0000011000000100000008 /* CheatCodeValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000007 /* CheatCodeValidator.swift */; };
 		AA0000011000000100000014 /* PugsyCheatFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000013 /* PugsyCheatFile.swift */; };
+		AA0000011000000100000016 /* PugsyCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000015 /* PugsyCheatProvider.swift */; };
 		5A6C157C1DC96C3700839986 /* OEMediaViewController+TouchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6C157B1DC96C3700839986 /* OEMediaViewController+TouchBar.swift */; };
 		5A6E80A71DCA6B210022F2AE /* OEGameCollectionViewController+TouchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6E80A61DCA6B210022F2AE /* OEGameCollectionViewController+TouchBar.swift */; };
 		5A79F7951C15F542003124D5 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A79F7941C15F542003124D5 /* PreferencesWindowController.swift */; };
@@ -1317,6 +1318,7 @@
 		AA0000011000000100000005 /* OpenEmuCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenEmuCheatProvider.swift; sourceTree = "<group>"; };
 		AA0000011000000100000007 /* CheatCodeValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatCodeValidator.swift; sourceTree = "<group>"; };
 		AA0000011000000100000013 /* PugsyCheatFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PugsyCheatFile.swift; sourceTree = "<group>"; };
+		AA0000011000000100000015 /* PugsyCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PugsyCheatProvider.swift; sourceTree = "<group>"; };
 		5A6C157B1DC96C3700839986 /* OEMediaViewController+TouchBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "OEMediaViewController+TouchBar.swift"; sourceTree = "<group>"; };
 		5A6E80A61DCA6B210022F2AE /* OEGameCollectionViewController+TouchBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "OEGameCollectionViewController+TouchBar.swift"; sourceTree = "<group>"; };
 		5A79F7941C15F542003124D5 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
@@ -3281,6 +3283,7 @@
 				AA0000011000000100000005 /* OpenEmuCheatProvider.swift */,
 				AA0000011000000100000007 /* CheatCodeValidator.swift */,
 				AA0000011000000100000013 /* PugsyCheatFile.swift */,
+				AA0000011000000100000015 /* PugsyCheatProvider.swift */,
 			);
 			name = Utilities;
 			sourceTree = "<group>";
@@ -6256,6 +6259,7 @@
 				AA0000011000000100000006 /* OpenEmuCheatProvider.swift in Sources */,
 				AA0000011000000100000008 /* CheatCodeValidator.swift in Sources */,
 				AA0000011000000100000014 /* PugsyCheatFile.swift in Sources */,
+				AA0000011000000100000016 /* PugsyCheatProvider.swift in Sources */,
 				53439A9A13B92C97005C0CC8 /* OEDBAllGamesCollection.swift in Sources */,
 				8FEE03E126D556610087CB51 /* OEDBRom.swift in Sources */,
 				83CACEC8196D6D1300999E70 /* Download.swift in Sources */,

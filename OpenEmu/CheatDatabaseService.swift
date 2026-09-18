@@ -52,13 +52,13 @@ struct DatabaseCheat: Sendable {
 protocol CheatDatabaseProvider {
     var name: String { get }
     func supportsSystem(_ systemIdentifier: String) -> Bool
-    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String) async throws -> [DatabaseCheat]
+    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, coreIdentifier: String) async throws -> [DatabaseCheat]
 }
 
 /// Facade that aggregates cheat database providers and presents a unified interface to the UI.
 final class CheatDatabaseService {
 
-    static let shared = CheatDatabaseService(providers: [OpenEmuCheatProvider(), LibretroCheatProvider()])
+    static let shared = CheatDatabaseService(providers: [OpenEmuCheatProvider(), LibretroCheatProvider(), PugsyCheatProvider()])
 
     private let providers: [CheatDatabaseProvider]
 
@@ -77,7 +77,7 @@ final class CheatDatabaseService {
         var results: [DatabaseCheat] = []
         var seenCodes: Set<String> = []
         for provider in providers where provider.supportsSystem(systemIdentifier) {
-            let providerCheats = try await provider.cheats(forMD5: md5, serial: serial, gameName: gameName, romURL: romURL, systemIdentifier: systemIdentifier)
+            let providerCheats = try await provider.cheats(forMD5: md5, serial: serial, gameName: gameName, romURL: romURL, systemIdentifier: systemIdentifier, coreIdentifier: coreIdentifier)
             for cheat in providerCheats {
                 guard CheatCodeValidator.isValid(code: cheat.code, systemIdentifier: systemIdentifier, coreIdentifier: coreIdentifier) else {
                     // log.info("Skipping invalid cheat code: \(cheat.code) (\(cheat.name)) from \(provider.name)")

@@ -16,6 +16,12 @@
 	<string>正在导入第 %1$ld 个，共 %2$ld 个</string>
 	<key>Copying File</key>
 	<string>正在复制文件</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>从 %@ 下载 cheat.7z，然后将其拖到 OpenEmu 资源库窗口中。</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>尚未导入 MAME 金手指文件。</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" 于 %2$@</string>
 	<key>%@ copy</key>

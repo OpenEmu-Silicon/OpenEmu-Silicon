@@ -38,10 +38,11 @@ extension Notification.Name {
 /// Detects and imports Pugsy's MAME cheat archive (mamecheat.co.uk `cheat.7z`).
 ///
 /// The archive is never bundled or auto-downloaded — the user downloads it themselves and drops it
-/// onto the library window, exactly like a BIOS file. Recognition is by filename only (kept
-/// deliberately simple, per the feature spec). On import the archive is decompressed once into a
-/// fixed host-owned location (a sibling of the Libretro cache), so per-game lookups read a small
-/// `<romset>.xml` instead of re-scanning a ~4 MB 7z each time:
+/// onto the library window, exactly like a BIOS file. Pugsy publishes it as `cheatNNNN.zip` (a
+/// versioned zip containing `cheat.7z`), so a dropped file is recognized either as `cheat.7z`
+/// directly or as one of those zips, whose inner `cheat.7z` is extracted first. On import the
+/// archive is decompressed once into a fixed host-owned location (a sibling of the Libretro cache),
+/// so per-game lookups read a small `<romset>.xml` instead of re-scanning a ~4 MB 7z each time:
 ///
 ///     <library>/CheatDatabase/pugsy/cheat.7z   ← the imported archive, kept as-is
 ///     <library>/CheatDatabase/pugsy/cheats/     ← decompressed contents, replaced on every import
@@ -76,13 +77,53 @@ enum PugsyCheatFile {
         return FileManager.default.fileExists(atPath: url.path)
     }
 
-    /// Returns true if the file's name matches Pugsy's cheat archive.
-    static func isPugsyCheatFile(at url: URL) -> Bool {
-        url.lastPathComponent.caseInsensitiveCompare(expectedFileName) == .orderedSame
+    /// How a recognized drop yields the inner `cheat.7z`.
+    private enum RecognizedSource {
+        /// The dropped file already is the `cheat.7z`.
+        case direct
+        /// The dropped file is a Pugsy `cheatNNNN.zip` whose entry at this index is the `cheat.7z`.
+        case insideZip(entryIndex: Int32)
     }
 
-    /// Recognize a dropped file as Pugsy's cheat archive and, if so, import it: copy the archive in
-    /// and decompress it into `cheats/`, replacing any previous import entirely.
+    /// Recognizes the dropped file as a Pugsy cheat package, or returns `nil` for anything else.
+    private static func recognize(at url: URL) -> RecognizedSource? {
+        let name = url.lastPathComponent.lowercased()
+        if name == expectedFileName { return .direct }
+        // Pugsy's download is `cheatNNNN.zip` with `cheat.7z` inside. Filter by name first to avoid
+        // opening every dropped ROM zip, then confirm it really contains `cheat.7z` before claiming it.
+        guard name.hasPrefix("cheat"), name.hasSuffix(".zip"),
+              let index = innerCheatEntryIndex(inArchiveAt: url) else { return nil }
+        return .insideZip(entryIndex: index)
+    }
+
+    /// Index of the `cheat.7z` entry inside an archive, or `nil` if absent. Only reads the archive
+    /// directory (entry names), not the compressed data.
+    private static func innerCheatEntryIndex(inArchiveAt url: URL) -> Int32? {
+        guard let archive = XADArchive.oe_archiveForFile(at: url) else { return nil }
+        for i in 0 ..< archive.numberOfEntries() where !archive.entryIsDirectory(i) {
+            let entryLast = (archive.name(ofEntry: i) as NSString).lastPathComponent
+            if entryLast.caseInsensitiveCompare(expectedFileName) == .orderedSame { return i }
+        }
+        return nil
+    }
+
+    /// Extracts a single archive entry into a fresh temp directory. The caller owns the returned
+    /// file's parent directory and must delete it when done.
+    private static func extractEntry(_ index: Int32, from archiveURL: URL) -> URL? {
+        guard let archive = XADArchive.oe_archiveForFile(at: archiveURL) else { return nil }
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destination = tempDir.appendingPathComponent(expectedFileName, isDirectory: false)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        if archive.oe_extractEntry(index, as: destination.path, deferDirectories: true, dataFork: true, resourceFork: false) {
+            return destination
+        }
+        try? FileManager.default.removeItem(at: tempDir)
+        return nil
+    }
+
+    /// Recognize a dropped file as Pugsy's cheat archive (either `cheat.7z` or a `cheatNNNN.zip`
+    /// containing it) and, if so, import it: copy the archive in and decompress it into `cheats/`,
+    /// replacing any previous import entirely.
     ///
     /// When an archive already exists the user is asked whether to replace it; declining keeps the
     /// existing import. Either way the return value is `true` — a recognized cheat archive is never a
@@ -91,7 +132,7 @@ enum PugsyCheatFile {
     ///   the import pipeline), `false` if it is some other file the importer should keep handling.
     @discardableResult
     static func checkIfPugsyCheatFileAndImport(at url: URL) -> Bool {
-        guard isPugsyCheatFile(at: url) else { return false }
+        guard let source = recognize(at: url) else { return false }
 
         guard let folder = folderURL,
               let archiveDest = importedArchiveURL,
@@ -117,6 +158,23 @@ enum PugsyCheatFile {
             }
         }
 
+        // Resolve the dropped file to a `cheat.7z` on disk, unwrapping Pugsy's `cheatNNNN.zip` if needed.
+        var tempDirToClean: URL?
+        let sevenZipURL: URL
+        switch source {
+        case .direct:
+            sevenZipURL = url
+        case .insideZip(let entryIndex):
+            guard let extracted = extractEntry(entryIndex, from: url) else {
+                postProgress(current: 0, total: 0, finished: true)
+                DLog("Could not extract \(expectedFileName) from \(url)")
+                return true
+            }
+            sevenZipURL = extracted
+            tempDirToClean = extracted.deletingLastPathComponent()
+        }
+        defer { if let tempDirToClean { try? fileManager.removeItem(at: tempDirToClean) } }
+
         do {
             try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
 
@@ -124,7 +182,7 @@ enum PugsyCheatFile {
             if fileManager.fileExists(atPath: archiveDest.path) {
                 try fileManager.removeItem(at: archiveDest)
             }
-            try fileManager.copyItem(at: url, to: archiveDest)
+            try fileManager.copyItem(at: sevenZipURL, to: archiveDest)
 
             // Replace the decompressed contents entirely.
             if fileManager.fileExists(atPath: decompressedDest.path) {

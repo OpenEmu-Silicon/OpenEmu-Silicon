@@ -124,6 +124,11 @@ enum CheatCodeValidator {
             // Mednafen (vb module): no named format, only raw WRAM address:value (8 hex address + 2 hex value)
             return isRawAddressValue(code, addressHexChars: 8, valueHexChars: 2)
 
+        case "openemu.system.arcade":
+            // MAME (Pugsy cheats): raw ADDRESS:VALUE hex pokes, joined with '+'. Address up to
+            // 32-bit and value up to 4 bytes; the value's hex width encodes the poke size.
+            return isRawAddressValue(code, maxAddressHexChars: 8, maxValueHexChars: 8)
+
         default:
             return true
         }
