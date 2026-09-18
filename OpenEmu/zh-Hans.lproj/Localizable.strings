@@ -2,6 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>A MAME cheat file has already been imported. Do you want to replace it with this one?</key>
+	<string>已导入一个 MAME 金手指文件。要用这个文件替换它吗？</string>
+	<key>Keep Existing</key>
+	<string>保留现有</string>
+	<key>Replace</key>
+	<string>替换</string>
+	<key>Replace existing MAME cheat file?</key>
+	<string>替换现有的 MAME 金手指文件？</string>
+	<key>Cheat File Scanner</key>
+	<string>扫描金手指文件</string>
+	<key>Importing %1$ld of %2$ld</key>
+	<string>正在导入第 %1$ld 个，共 %2$ld 个</string>
+	<key>Copying File</key>
+	<string>正在复制文件</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" 于 %2$@</string>
 	<key>%@ copy</key>

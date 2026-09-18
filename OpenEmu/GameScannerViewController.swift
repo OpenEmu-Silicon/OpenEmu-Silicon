@@ -48,6 +48,9 @@ final class GameScannerViewController: NSViewController {
     private var itemsFailedImport = [ImportOperation]()
     private var isScanningDirectory = false
     private var isGameScannerVisible = true // The game scanner view is already visible in SidebarController.xib.
+
+    // Non-nil while a Pugsy cheat archive is being decompressed; overrides the normal banner.
+    private var cheatFileImportProgress: (current: Int, total: Int)?
     
     private var importer: ROMImporter { return OELibraryDatabase.default!.importer }
     
@@ -60,6 +63,7 @@ final class GameScannerViewController: NSViewController {
         notificationCenter.addObserver(self, selector: #selector(gameInfoHelperDidChangeUpdateProgress(_:)), name: .GameInfoHelperDidChangeUpdateProgress, object: nil)
         notificationCenter.addObserver(self, selector: #selector(gameInfoHelperDidUpdate(_:)), name: .GameInfoHelperDidUpdate, object: nil)
         notificationCenter.addObserver(self, selector: #selector(toggleGameScannerView), name: GameScannerViewController.OEGameScannerToggleNotification, object: nil)
+        notificationCenter.addObserver(self, selector: #selector(pugsyCheatImportDidChangeProgress(_:)), name: .pugsyCheatImportProgress, object: nil)
     }
     
     override var nibName: NSNib.Name? { "GameScanner" }
@@ -182,6 +186,29 @@ final class GameScannerViewController: NSViewController {
         defer { CATransaction.commit() }
         
         headlineLabel.stringValue = NSLocalizedString("Game Scanner", comment: "")
+        
+        // A Pugsy cheat archive is being decompressed — take over the banner with its own progress.
+        if let cheatProgress = cheatFileImportProgress {
+            headlineLabel.stringValue = NSLocalizedString("Cheat File Scanner", comment: "Game scanner banner title while importing a MAME cheat file")
+            // Keep the bar determinate the whole time. Stop any animation first, then clear
+            // indeterminate — doing it in the other order leaves the barber-pole timer running.
+            progressIndicator.stopAnimation(self)
+            progressIndicator.isIndeterminate = false
+            progressIndicator.minValue = 0
+            if cheatProgress.total > 0 {
+                progressIndicator.maxValue = Double(cheatProgress.total)
+                progressIndicator.doubleValue = Double(cheatProgress.current)
+                statusLabel.stringValue = String(format: NSLocalizedString("Importing %1$ld of %2$ld", comment: "Game scanner status while decompressing a MAME cheat file: current of total"), cheatProgress.current, cheatProgress.total)
+            } else {
+                // Copy phase: no count yet, show an empty determinate bar (the copy is quick).
+                progressIndicator.maxValue = 1
+                progressIndicator.doubleValue = 0
+                statusLabel.stringValue = NSLocalizedString("Copying File", comment: "Game scanner status while the dropped MAME cheat archive is being copied, before decompression progress is known")
+            }
+            fixButton.isHidden = true
+            togglePauseButton.isHidden = true
+            return
+        }
         
         let helper = OpenVGDB.shared
         if helper.isUpdating {
@@ -406,6 +433,18 @@ extension GameScannerViewController {
     }
     
     @objc func gameInfoHelperDidChangeUpdateProgress(_ notification: Notification) {
+        updateProgress()
+    }
+    
+    @objc func pugsyCheatImportDidChangeProgress(_ notification: Notification) {
+        let info = notification.userInfo
+        let finished = info?["finished"] as? Bool ?? false
+        if finished {
+            cheatFileImportProgress = nil
+        } else {
+            cheatFileImportProgress = (info?["current"] as? Int ?? 0, info?["total"] as? Int ?? 0)
+            showGameScannerView(animated: true)
+        }
         updateProgress()
     }
     
