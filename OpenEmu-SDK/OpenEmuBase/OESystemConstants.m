@@ -53,6 +53,7 @@ NSString *const OESystemIdentifierNGP        = @"openemu.system.ngp";
 NSString *const OESystemIdentifierPCE        = @"openemu.system.pce";
 NSString *const OESystemIdentifierPCECD      = @"openemu.system.pcecd";
 NSString *const OESystemIdentifierPSX        = @"openemu.system.psx";
+NSString *const OESystemIdentifierPSP        = @"openemu.system.psp";
 NSString *const OESystemIdentifierSaturn     = @"openemu.system.saturn";
 NSString *const OESystemIdentifierVB         = @"openemu.system.vb";
 NSString *const OESystemIdentifierWS         = @"openemu.system.ws";

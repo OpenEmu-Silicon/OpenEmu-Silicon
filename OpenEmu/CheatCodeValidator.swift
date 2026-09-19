@@ -32,6 +32,12 @@ enum CheatCodeValidator {
 
     /// Returns true if the code (possibly multi-part with '+') is valid for the given core and system.
     static func isValid(code: String, systemIdentifier: String, coreIdentifier: String) -> Bool {
+        // PSP (PPSSPP CwCheat/TempAR): whitespace is structural (`_L 0xADDR 0xVAL` pairs) and a code
+        // can span several `_L` lines, so validate the raw token stream before the space-stripping
+        // and '+'-splitting the other systems rely on.
+        if systemIdentifier == OESystemIdentifierPSP {
+            return isCWCheatCode(code)
+        }
         let normalized = code.replacingOccurrences(of: " ", with: "")
         // NDS: each '+'-separated part must be a 16-hex AR line (already normalized by provider)
         if systemIdentifier == OESystemIdentifierNDS {
@@ -135,6 +141,33 @@ enum CheatCodeValidator {
     }
 
     // MARK: - Format Checks
+
+    /// PSP CwCheat (`_L`) / TempAR (`_M`) code: one or more tags, each followed by two hex words.
+    /// Whitespace and newlines separate tokens; interpretation is left to the core, so this only
+    /// checks token structure — not per-line address/value semantics, since many command types are
+    /// multi-line (trailing `_L` lines are parameters, not standalone writes).
+    static func isCWCheatCode(_ code: String) -> Bool {
+        let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" })
+        var index = 0
+        var groups = 0
+        while index < tokens.count {
+            let tag = tokens[index].uppercased()
+            guard tag == "_L" || tag == "_M" else { return false }
+            guard index + 2 < tokens.count,
+                  isCWCheatWord(tokens[index + 1]),
+                  isCWCheatWord(tokens[index + 2])
+            else { return false }
+            index += 3
+            groups += 1
+        }
+        return groups > 0
+    }
+
+    private static func isCWCheatWord(_ token: Substring) -> Bool {
+        var hex = token
+        if hex.hasPrefix("0x") || hex.hasPrefix("0X") { hex = hex.dropFirst(2) }
+        return !hex.isEmpty && hex.count <= 8 && hex.allSatisfy(\.isHexDigit)
+    }
 
     /// Raw address:value hex format. Accepts optional exact or max size constraints.
     static func isRawAddressValue(

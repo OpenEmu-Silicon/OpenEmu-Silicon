@@ -39,6 +39,7 @@
 #include "Core/ConfigValues.h"
 #include "Core/CoreParameter.h"
 #include "Core/CoreTiming.h"
+#include "Core/ELF/ParamSFO.h"
 #include "Core/HLE/sceCtrl.h"
 #include "Core/HLE/sceUtility.h"
 #include "Core/Host.h"
@@ -46,6 +47,7 @@
 #include "Core/System.h"
 #undef ExceptionInfo
 
+#include "Common/File/Path.h"
 #include "Common/GraphicsContext.h"
 #include "Common/LogManager.h"
 #include "Common/Data/Text/I18n.h"
@@ -92,6 +94,11 @@ void NativeSetThreadState(OpenEmuCoreThread::EmuThreadState threadState);
 	float y;
 
    OpenEmuGLContext *OEgraphicsContext;
+
+    // Cheats: OpenEmu hands us CwCheat codes one at a time; we buffer their enabled state and
+    // flush them to PPSSPP's per-game <DISC_ID>.ini once the disc has booted (see -executeFrame).
+    NSMutableDictionary<NSString *, NSNumber *> *_cheats;
+    BOOL _cheatsDirty;
 }
 @end
 
@@ -113,6 +120,8 @@ PPSSPPGameCore *_current = 0;
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     NSURL *romURL = [NSURL fileURLWithPath:path];
+    _cheats = [NSMutableDictionary dictionary];
+    _cheatsDirty = NO;
     NSURL *resourceURL = self.owner.bundle.resourceURL;
     NSURL *supportDirectoryURL = [NSURL fileURLWithPath:self.supportDirectoryPath isDirectory:YES];
 
@@ -167,6 +176,11 @@ PPSSPPGameCore *_current = 0;
     g_Config.iGPUBackend           = (int)GPUBackend::OPENGL;
     g_Config.bHideStateWarnings    = false;
     g_Config.iLanguage             = PSP_SYSTEMPARAM_LANGUAGE_ENGLISH;
+
+    // Cheats are controlled entirely by -setCheat:setType:setEnabled:; force-disable here (after
+    // the config Load above) so a stale saved config can't auto-start the CwCheat engine with a
+    // disc ID that isn't known yet.
+    g_Config.bEnableCheats         = false;
     
     _coreParam.cpuCore      = CPUCore::JIT;
     _coreParam.gpuCore      = GPUCORE_GLES;
@@ -267,10 +281,100 @@ PPSSPPGameCore *_current = 0;
         //If Fast forward rate is detected, unthrottle the rndering
         PSP_CoreParameter().fastForward = (self.rate > 1) ? true : false;
 
+        // Flush any pending cheats now that the disc (and its DISC_ID) is available.
+        [self writePendingCheats];
+
         //Let PPSSPP Core run a loop and return
         UpdateRunLoop();
     }
 }
+# pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    NSString *key = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (key.length == 0)
+        return;
+
+    if (_cheats == nil)
+        _cheats = [NSMutableDictionary dictionary];
+
+    _cheats[key] = @(enabled);
+    _cheatsDirty = YES;
+}
+
+// Rebuilds a stored code into the one-pair-per-line form PPSSPP's parser needs: each _L/_M tag
+// followed by exactly two hex words on its own line. A single stored code may hold several pairs
+// (multi-line codes), even all on one line if the user pasted it that way.
+- (NSString *)cheatLinesForCode:(NSString *)code
+{
+    NSArray<NSString *> *rawTokens = [code componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSMutableArray<NSString *> *tokens = [NSMutableArray array];
+    for (NSString *token in rawTokens) {
+        if (token.length > 0)
+            [tokens addObject:token];
+    }
+
+    NSMutableArray<NSString *> *lines = [NSMutableArray array];
+    NSUInteger i = 0;
+    while (i < tokens.count) {
+        NSString *tag = tokens[i].uppercaseString;
+        if (([tag isEqualToString:@"_L"] || [tag isEqualToString:@"_M"]) && i + 2 < tokens.count) {
+            [lines addObject:[NSString stringWithFormat:@"%@ %@ %@", tag, tokens[i + 1], tokens[i + 2]]];
+            i += 3;
+        } else {
+            i += 1;
+        }
+    }
+
+    return [lines componentsJoinedByString:@"\n"];
+}
+
+// Writes every enabled cheat into PPSSPP's per-game <DISC_ID>.ini and asks the running engine to
+// reload. The CwCheat engine keys that file on the disc's DISC_ID, which only exists once the game
+// has booted far enough to read PARAM.SFO — until then we keep the codes buffered and retry.
+- (void)writePendingCheats
+{
+    if (!_cheatsDirty)
+        return;
+
+    std::string discID = g_paramSFO.GetValueString("DISC_ID");
+    if (discID.empty())
+        return;
+
+    Path cheatDir = GetSysDirectory(DIRECTORY_CHEATS);
+    NSString *cheatDirPath = [NSString stringWithUTF8String:cheatDir.c_str()];
+    [[NSFileManager defaultManager] createDirectoryAtPath:cheatDirPath withIntermediateDirectories:YES attributes:nil error:nil];
+
+    Path cheatFile = cheatDir / (discID + ".ini");
+    NSString *cheatFilePath = [NSString stringWithUTF8String:cheatFile.c_str()];
+
+    NSMutableString *contents = [NSMutableString string];
+    [contents appendFormat:@"_S %s\n", discID.c_str()];
+    [contents appendString:@"_G OpenEmu\n"];
+
+    NSUInteger enabledCount = 0;
+    for (NSString *code in _cheats) {
+        if (![_cheats[code] boolValue])
+            continue;
+        NSString *lines = [self cheatLinesForCode:code];
+        if (lines.length == 0)
+            continue;
+        enabledCount += 1;
+        [contents appendFormat:@"_C1 Cheat %lu\n", (unsigned long)enabledCount];
+        [contents appendString:lines];
+        [contents appendString:@"\n"];
+    }
+
+    [contents writeToFile:cheatFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+
+    // Toggling bEnableCheats to match the enabled count lets hleCheat start the engine (now that
+    // the disc ID is valid) or stop it when nothing is enabled; bReloadCheats forces a re-parse.
+    g_Config.bEnableCheats = (enabledCount > 0);
+    g_Config.bReloadCheats = true;
+    _cheatsDirty = NO;
+}
+
 # pragma mark - Video
 
 - (OEGameCoreRendering)gameCoreRendering

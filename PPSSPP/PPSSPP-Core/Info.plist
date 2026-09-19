@@ -24,6 +24,14 @@
 	<string>OEGameCoreController</string>
 	<key>OEGameCoreClass</key>
 	<string>PPSSPPGameCore</string>
+	<key>OEGameCoreOptions</key>
+	<dict>
+		<key>openemu.system.psp</key>
+		<dict>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+		</dict>
+	</dict>
 	<key>OEGameCorePlayerCount</key>
 	<string>1</string>
 	<key>OEProjectURL</key>
