@@ -55,6 +55,7 @@ extern NSString *const OESystemIdentifierNGP;
 extern NSString *const OESystemIdentifierPCE;
 extern NSString *const OESystemIdentifierPCECD;
 extern NSString *const OESystemIdentifierPSX;
+extern NSString *const OESystemIdentifierPSP;
 extern NSString *const OESystemIdentifierSaturn;
 extern NSString *const OESystemIdentifierVB;
 extern NSString *const OESystemIdentifierWS;

@@ -1972,6 +1972,14 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), addressHexChars: 8, valueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierPSP:
+            return CheatFormat(
+                placeholder: NSLocalizedString("CwCheat code, e.g. _L 0x2024DA44 0x3F800000. Paste the whole code, including every _L line.", comment: "Add Cheat dialog placeholder, PSP"),
+                validationHint: NSLocalizedString("PSP codes use the CwCheat/TempAR format: one or more _L (or _M) lines, each followed by two hex words, e.g. _L 0x2024DA44 0x3F800000. Paste the code exactly as published — don't strip the _L tags or split multi-line codes.", comment: "Add Cheat validation hint, PSP"),
+                validator: { code in
+                    CheatCodeValidator.isCWCheatCode(code)
+                }
+            )
         default:
             return defaultCheatFormat
         }
