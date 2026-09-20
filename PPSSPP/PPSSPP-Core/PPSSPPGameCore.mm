@@ -26,6 +26,7 @@
 
 #import "PPSSPPGameCore.h"
 #import <OpenEmuBase/OEGameCoreController.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenEmuBase/OERingBuffer.h>
 #import <OpenGL/gl.h>
 
@@ -43,6 +44,7 @@
 #include "Core/HLE/sceCtrl.h"
 #include "Core/HLE/sceUtility.h"
 #include "Core/Host.h"
+#include "Core/MemMap.h"
 #include "Core/SaveState.h"
 #include "Core/System.h"
 #undef ExceptionInfo
@@ -373,6 +375,31 @@ PPSSPPGameCore *_current = 0;
     g_Config.bEnableCheats = (enabledCount > 0);
     g_Config.bReloadCheats = true;
     _cheatsDirty = NO;
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (!_isInitialized)
+        return @[];
+
+    // Expose only user RAM (0x08800000 .. kernel base + g_MemorySize). Results below the user base
+    // (kernel/volatile RAM) can't be expressed as a CwCheat write, so there's no point searching them.
+    const uint32_t base = PSP_GetUserMemoryBase();
+    const uint32_t end  = PSP_GetUserMemoryEnd();
+    if (end <= base)
+        return @[];
+
+    const uint32_t size = end - base;
+    const uint8_t *ptr = Memory::GetPointerRange(base, size);
+    if (ptr == nullptr)
+        return @[];
+
+    NSData *data = [NSData dataWithBytes:ptr length:size];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"User RAM"
+                                                                                address:base
+                                                                           addressBytes:4
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 # pragma mark - Video
