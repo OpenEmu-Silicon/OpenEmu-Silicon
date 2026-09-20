@@ -44,7 +44,8 @@ enum CheatFeedbackStatus: String, Codable, Sendable {
 /// (`status`), a note, or both — a note alone leaves `status` nil so it isn't
 /// mistaken for a report.
 struct CheatFeedbackEntry: Codable, Sendable {
-    /// Whitespace-stripped, lowercased — matches how `CheatDatabaseService` deduplicates.
+    /// The cheat code as reported, stored verbatim. Matching normalizes via `key(for:)`, so this
+    /// keeps the readable form (case and spacing) rather than the lowercased/space-stripped key.
     let code: String
     let coreIdentifier: String
     let coreVersion: String
@@ -121,7 +122,7 @@ final class CheatFeedbackService {
         var result: [String: CheatFeedbackStatus] = [:]
         for entry in entries where entry.coreIdentifier == coreIdentifier && entry.coreVersion == coreVersion {
             // Skip note-only entries (nil status) so they don't read as a report.
-            if let status = entry.status { result[entry.code] = status }
+            if let status = entry.status { result[Self.key(for: entry.code)] = status }
         }
         return result
     }
@@ -132,7 +133,7 @@ final class CheatFeedbackService {
         let key = Self.key(for: code)
         let entries = load(md5: md5, systemIdentifier: systemIdentifier)?.entries ?? []
         return entries
-            .filter { $0.code == key }
+            .filter { Self.key(for: $0.code) == key }
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
@@ -146,7 +147,7 @@ final class CheatFeedbackService {
         var result: [String: String] = [:]
         for entry in entries where entry.coreIdentifier == coreIdentifier && entry.coreVersion == coreVersion {
             if let notes = entry.notes, !notes.isEmpty {
-                result[entry.code] = notes
+                result[Self.key(for: entry.code)] = notes
             }
         }
         return result
@@ -176,14 +177,14 @@ final class CheatFeedbackService {
         file.raHash = raHash ?? file.raHash
 
         let existing = file.entries.first {
-            $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
+            Self.key(for: $0.code) == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
         }
 
         file.entries.removeAll {
-            $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
+            Self.key(for: $0.code) == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
         }
 
-        file.entries.append(CheatFeedbackEntry(code: key,
+        file.entries.append(CheatFeedbackEntry(code: code,
                                                coreIdentifier: coreIdentifier,
                                                coreVersion: coreVersion,
                                                status: status,
@@ -218,11 +219,11 @@ final class CheatFeedbackService {
         file.raHash = raHash ?? file.raHash
 
         let existing = file.entries.first {
-            $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
+            Self.key(for: $0.code) == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
         }
 
         file.entries.removeAll {
-            $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
+            Self.key(for: $0.code) == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
         }
 
         let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -230,7 +231,7 @@ final class CheatFeedbackService {
 
         // Don't persist an empty shell that has neither a status nor a note.
         if existing?.status != nil || newNotes != nil {
-            file.entries.append(CheatFeedbackEntry(code: key,
+            file.entries.append(CheatFeedbackEntry(code: code,
                                                    coreIdentifier: coreIdentifier,
                                                    coreVersion: coreVersion,
                                                    status: existing?.status,
@@ -358,7 +359,7 @@ final class CheatFeedbackService {
         }
 
         for index in file.entries.indices {
-            let code = file.entries[index].code
+            let code = Self.key(for: file.entries[index].code)
             guard file.entries[index].rawCode == nil || file.entries[index].provider == nil else { continue }
             if let rawCode = openEmuByCode[code] {
                 file.entries[index].rawCode = file.entries[index].rawCode ?? rawCode
