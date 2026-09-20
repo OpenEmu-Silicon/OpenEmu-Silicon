@@ -2005,6 +2005,8 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToActionReplayDS(code), type: OECheatTypeActionReplay)
         case OESystemIdentifierSaturn:
             return ConvertedCheat(code: Self.convertToSaturnAR(code), type: OECheatTypeActionReplay)
+        case OESystemIdentifierPSP:
+            return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeRaw)
         default:
             return ConvertedCheat(code: Self.convertToRaw(code, addressBytes: addressBytes, minDataBytes: minDataBytes), type: OECheatTypeRaw)
         }
@@ -2034,6 +2036,48 @@ final class OEGameDocument: NSDocument {
         let arAddr1 = (UInt64(1) << 28) | (address & 0x0FFFFFFF)
         let arAddr2 = (UInt64(1) << 28) | ((address + 2) & 0x0FFFFFFF)
         return String(format: "%08X %04X+%08X %04X", UInt32(arAddr1), highWord, UInt32(arAddr2), lowWord)
+    }
+
+    // MARK: PSP CwCheat (_L 0xTAAAAAAA 0xVVVVVVVV)
+
+    /// Cheat-search addresses are absolute PSP addresses (0x0885xxxx); a CwCheat write's address
+    /// field is relative to the user RAM base, which the engine adds back via GetAddress. The top
+    /// nibble is the write type: 0 = 8-bit, 1 = 16-bit, 2 = 32-bit.
+    private static func convertToCWCheat(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let absolute = UInt32(addressPart, radix: 16) ?? 0
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        let userBase: UInt32 = 0x0880_0000
+        let relative = (absolute >= userBase ? absolute - userBase : absolute) & 0x0FFF_FFFF
+
+        func line(type: UInt32, address: UInt32, value: UInt32) -> String {
+            String(format: "_L 0x%01X%07X 0x%08X", type, address & 0x0FFF_FFFF, value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(type: 0x0, address: relative, value: UInt32(value & 0xFF))
+        case 2:
+            return line(type: 0x1, address: relative, value: UInt32(value & 0xFFFF))
+        case 3, 4:
+            // No native 3-byte write; a 3-byte value rides in a 32-bit write with a zero high byte.
+            return line(type: 0x2, address: relative, value: UInt32(value & 0xFFFF_FFFF))
+        default:
+            // >4 bytes: split into consecutive 32-bit writes.
+            let chunkCount = (byteCount + 3) / 4
+            var lines: [String] = []
+            for i in 0..<chunkCount {
+                let chunk = UInt32((value >> (UInt64(i) * 32)) & 0xFFFF_FFFF)
+                let address = relative &+ UInt32(i * 4)
+                lines.append(line(type: 0x2, address: address, value: chunk))
+            }
+            return lines.joined(separator: " ")
+        }
     }
 
     // MARK: Raw format (ADDRESS:VALUE with padding and multi-byte splitting)
