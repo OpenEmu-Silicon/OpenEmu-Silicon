@@ -26,6 +26,7 @@
 #include <rc_client.h>
 
 @class OEGameCore;
+struct rc_hash_filereader;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -84,6 +85,13 @@ typedef uint32_t (*OERetroAchievementsMemoryReader)(uint32_t address,
 /// their `Memory.LoadROM`/equivalent succeeds — before this, the memory
 /// reader returns 0 for everything.
 - (void)markROMReady;
+
+/// Install a custom rcheevos hash file reader on the underlying rc_client, so a
+/// core can present a compressed image (e.g. PSP CSO) to rcheevos as a plain
+/// stream during game identification. Must be called after `startWithROMPath:`
+/// and before identification runs; the bridge only keeps rcheevos's default
+/// cdreader, which reads through this file reader. No-op if the client is gone.
+- (void)setHashFileReader:(const struct rc_hash_filereader *)reader;
 
 /// Cancel in-flight URL tasks, drain pending serial-queue work, remove
 /// observers, and destroy rc_client. Safe to call from any thread.
