@@ -63,6 +63,9 @@
 		081A461B1B95660100565444 /* freebios.c in Sources */ = {isa = PBXBuildFile; fileRef = 081A46191B95660100565444 /* freebios.c */; };
 		081A461E1B95669B00565444 /* NoUI.c in Sources */ = {isa = PBXBuildFile; fileRef = 081A461D1B95669B00565444 /* NoUI.c */; };
 		084808A61BA4AEFC000EEA6F /* PokeMini.icns in Resources */ = {isa = PBXBuildFile; fileRef = 084808A51BA4AEFC000EEA6F /* PokeMini.icns */; };
+		OE0PKMN0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0PKMN0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0PKMN0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PKMN0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0PKMN0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PKMN0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +81,10 @@
 /* Begin PBXFileReference section */
 		081A458C1B955FA800565444 /* PokeMini.oecoreplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PokeMini.oecoreplugin; sourceTree = BUILT_PRODUCTS_DIR; };
 		081A45901B955FA800565444 /* PokeMini-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PokeMini-Info.plist"; sourceTree = "<group>"; };
+		OE0PKMN0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0PKMN0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0PKMN0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0PKMN0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		081A45961B95603D00565444 /* PokeMini-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "PokeMini-Prefix.pch"; path = "PokeMini/PokeMini-Prefix.pch"; sourceTree = SOURCE_ROOT; };
 		081A45971B95604700565444 /* PokeMiniGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PokeMiniGameCore.h; path = PokeMini/PokeMiniGameCore.h; sourceTree = SOURCE_ROOT; };
 		081A45981B95604700565444 /* PokeMiniGameCore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = PokeMiniGameCore.m; path = PokeMini/PokeMiniGameCore.m; sourceTree = SOURCE_ROOT; };
@@ -199,6 +206,10 @@
 				086769701B96EA26006545DA /* OEPMSystemResponderClient.h */,
 				081A45971B95604700565444 /* PokeMiniGameCore.h */,
 				081A45981B95604700565444 /* PokeMiniGameCore.m */,
+				OE0PKMN0FILEREF000000001 /* rcheevos_build.c */,
+				OE0PKMN0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0PKMN0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0PKMN0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				081A46181B9565F800565444 /* freebios */,
 				081A45FF1B9565CF00565444 /* resources */,
 				081A459A1B95605100565444 /* src */,
@@ -409,6 +420,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				081A45991B95604700565444 /* PokeMiniGameCore.m in Sources */,
+				OE0PKMN0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0PKMN0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0PKMN0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				081A45D71B95605F00565444 /* MinxCPU_CE.c in Sources */,
 				081A45DC1B95605F00565444 /* MinxIO.c in Sources */,
 				081A45E01B95605F00565444 /* MinxTimers.c in Sources */,
@@ -544,6 +558,11 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "PokeMini/PokeMini-Info.plist";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
@@ -559,6 +578,11 @@
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = "NO_ZIP=1";
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "PokeMini/PokeMini-Info.plist";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
