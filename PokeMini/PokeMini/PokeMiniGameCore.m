@@ -27,6 +27,7 @@
 #import "PokeMiniGameCore.h"
 
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "PokeMini.h"
 #import "Hardware.h"
@@ -39,6 +40,7 @@
     uint32_t *videoBuffer;
     int videoWidth, videoHeight;
     NSString *romPath;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 @end
 
@@ -182,7 +184,24 @@ int saveEEPROM(const char *filename)
 {
     // Emulate 1 frame
     PokeMini_EmulateFrame();
-    
+
+    // Direct RAM pokes (mempatch style): re-applied every frame since the emulated CPU
+    // overwrites the same RAM addresses. PM_RAM[0] maps to CPU address 0x1000; RAM spans
+    // CPU 0x1000-0x1FFF, so only addresses in that range are poked.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            if (addr >= 0x1000 && addr <= 0x1FFF)
+                PM_RAM[addr - 0x1000] = (uint8_t)val;
+        }
+    }
+
     if(PokeMini_Rumbling) {
         PokeMini_VideoBlit(videoBuffer + PokeMini_GenRumbleOffset(current->videoWidth), current->videoWidth);
     }
@@ -226,6 +245,33 @@ int saveEEPROM(const char *filename)
 - (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
     block(PokeMini_LoadSSFile(fileName.fileSystemRepresentation) ? YES : NO, nil);
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Pokemon Mini RAM is CPU 0x1000-0x1FFF (4KB), backed by PM_RAM[0]..PM_RAM[0x0FFF].
+    NSData *data = [NSData dataWithBytes:PM_RAM length:0x1000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0x1000
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 #pragma mark - Video

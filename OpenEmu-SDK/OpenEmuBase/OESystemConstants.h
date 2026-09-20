@@ -60,6 +60,7 @@ extern NSString *const OESystemIdentifierSaturn;
 extern NSString *const OESystemIdentifierVB;
 extern NSString *const OESystemIdentifierWS;
 extern NSString *const OESystemIdentifierPCFX;
+extern NSString *const OESystemIdentifierPokeMini;
 
 // MARK: - Cheat Code Type Strings
 
