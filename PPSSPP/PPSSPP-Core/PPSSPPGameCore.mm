@@ -30,6 +30,12 @@
 #import <OpenEmuBase/OERingBuffer.h>
 #import <OpenGL/gl.h>
 
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+#include <rc_consoles.h>
+#include <rc_hash.h>
+#include <zlib.h>
+
 #include "Common/GPU/OpenGL/OpenEmuGLContext.h"
 
 #include "System/NativeApp.h"
@@ -101,10 +107,203 @@ void NativeSetThreadState(OpenEmuCoreThread::EmuThreadState threadState);
     // flush them to PPSSPP's per-game <DISC_ID>.ini once the disc has booted (see -executeFrame).
     NSMutableDictionary<NSString *, NSNumber *> *_cheats;
     BOOL _cheatsDirty;
+
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
 PPSSPPGameCore *_current = 0;
+
+// rcheevos addresses PSP RAM from 0 across a flat span; PPSSPP maps that RAM at 0x08000000.
+static uint32_t ppsspp_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                      uint32_t num_bytes, rc_client_t *client)
+{
+    const uint32_t pspAddress = 0x08000000u + address;
+    const uint32_t readable = Memory::ValidSize(pspAddress, num_bytes);
+    if (readable == 0)
+        return 0;
+    const uint8_t *ptr = Memory::GetPointerRange(pspAddress, readable);
+    if (ptr == nullptr)
+        return 0;
+    memcpy(buffer, ptr, readable);
+    return readable;
+}
+
+#pragma mark - CSO hash file reader (RetroAchievements identification)
+
+// rcheevos identifies a PSP game by reading PSP_GAME/PARAM.SFO + SYSDIR/EBOOT.BIN out of the
+// disc's ISO 9660 filesystem. Its default file reader can't parse a .cso (CISO-compressed ISO),
+// so we install this reader, which transparently inflates CISO frames on demand and presents the
+// decompressed ISO to rcheevos — producing the same hash a plain .iso would. Non-CISO inputs
+// (.iso, .pbp) fall through to raw file I/O. CISO layout matches PPSSPP's own CISOFileBlockDevice.
+typedef struct {
+    FILE     *fp;
+    bool      isCSO;
+    int64_t   logicalPos;   // position in the decompressed stream (CSO mode)
+    uint64_t  totalBytes;   // decompressed size
+    uint32_t  frameSize;    // CISO block_size
+    uint8_t   indexShift;   // CISO align
+    uint8_t   version;
+    uint32_t  numFrames;
+    uint32_t *index;        // numFrames + 1 entries
+    int64_t   cachedFrame;  // -1 when no frame is decompressed
+    uint8_t  *frameBuf;     // frameSize bytes
+    uint8_t  *readBuf;      // frameSize + (1 << indexShift) bytes
+} oe_psp_cso_file;
+
+static uint32_t oe_read_u32le(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static uint64_t oe_read_u64le(const uint8_t *p) {
+    return (uint64_t)oe_read_u32le(p) | ((uint64_t)oe_read_u32le(p + 4) << 32);
+}
+
+static void ppsspp_cso_close(void *handle) {
+    oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
+    if (!f) return;
+    if (f->fp) fclose(f->fp);
+    free(f->index);
+    free(f->frameBuf);
+    free(f->readBuf);
+    free(f);
+}
+
+// Ensure the requested frame is decompressed into f->frameBuf. Returns false on any error.
+static bool oe_cso_load_frame(oe_psp_cso_file *f, uint32_t frame) {
+    if (f->cachedFrame == (int64_t)frame) return true;
+    if (frame >= f->numFrames) return false;
+
+    const uint32_t idx     = f->index[frame]     & 0x7FFFFFFFu;
+    const uint32_t nextIdx = f->index[frame + 1] & 0x7FFFFFFFu;
+    const uint64_t readPos = (uint64_t)idx     << f->indexShift;
+    const uint64_t readEnd = (uint64_t)nextIdx << f->indexShift;
+    if (readEnd < readPos) return false;
+    const size_t compSize = (size_t)(readEnd - readPos);
+
+    bool plain;
+    if (f->version >= 2)
+        plain = compSize >= f->frameSize;   // v2+: uncompressed when a frame doesn't shrink
+    else
+        plain = (f->index[frame] & 0x80000000u) != 0;
+
+    if (fseeko(f->fp, (off_t)readPos, SEEK_SET) != 0) return false;
+
+    if (plain) {
+        const size_t got = fread(f->frameBuf, 1, f->frameSize, f->fp);
+        if (got < f->frameSize) memset(f->frameBuf + got, 0, f->frameSize - got);
+    } else {
+        if (compSize == 0 || compSize > (size_t)f->frameSize + ((size_t)1 << f->indexShift)) return false;
+        if (fread(f->readBuf, 1, compSize, f->fp) != compSize) return false;
+
+        z_stream z;
+        memset(&z, 0, sizeof(z));
+        if (inflateInit2(&z, -15) != Z_OK) return false;
+        z.next_in   = f->readBuf;
+        z.avail_in  = (uInt)compSize;
+        z.next_out  = f->frameBuf;
+        z.avail_out = (uInt)f->frameSize;
+        const int status = inflate(&z, Z_FINISH);
+        const uInt produced = f->frameSize - z.avail_out;
+        inflateEnd(&z);
+        if (status != Z_STREAM_END && status != Z_OK) return false;
+        if (produced < f->frameSize) memset(f->frameBuf + produced, 0, f->frameSize - produced);
+    }
+
+    f->cachedFrame = (int64_t)frame;
+    return true;
+}
+
+static void *ppsspp_cso_open(const char *path) {
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return NULL;
+
+    oe_psp_cso_file *f = (oe_psp_cso_file *)calloc(1, sizeof(*f));
+    if (!f) { fclose(fp); return NULL; }
+    f->fp = fp;
+    f->cachedFrame = -1;
+
+    uint8_t hdr[24];
+    if (fread(hdr, 1, sizeof(hdr), fp) == sizeof(hdr) && memcmp(hdr, "CISO", 4) == 0) {
+        f->isCSO      = true;
+        f->totalBytes = oe_read_u64le(hdr + 8);
+        f->frameSize  = oe_read_u32le(hdr + 16);
+        f->version    = hdr[20];
+        f->indexShift = hdr[21];
+        const uint32_t headerSize = oe_read_u32le(hdr + 4);
+
+        if (f->frameSize == 0 || (f->frameSize & (f->frameSize - 1)) != 0) {
+            ppsspp_cso_close(f);
+            return NULL;
+        }
+        f->numFrames = (uint32_t)((f->totalBytes + f->frameSize - 1) / f->frameSize);
+
+        const uint32_t indexCount = f->numFrames + 1;
+        f->index    = (uint32_t *)malloc((size_t)indexCount * sizeof(uint32_t));
+        f->frameBuf = (uint8_t  *)malloc(f->frameSize);
+        f->readBuf  = (uint8_t  *)malloc((size_t)f->frameSize + ((size_t)1 << f->indexShift));
+        if (!f->index || !f->frameBuf || !f->readBuf) { ppsspp_cso_close(f); return NULL; }
+
+        const long indexOffset = (f->version > 1) ? (long)headerSize : (long)sizeof(hdr);
+        if (fseek(fp, indexOffset, SEEK_SET) != 0) { ppsspp_cso_close(f); return NULL; }
+        for (uint32_t i = 0; i < indexCount; i++) {
+            uint8_t b[4];
+            if (fread(b, 1, 4, fp) != 4) { ppsspp_cso_close(f); return NULL; }
+            f->index[i] = oe_read_u32le(b);
+        }
+        f->logicalPos = 0;
+    } else {
+        f->isCSO = false;
+        fseek(fp, 0, SEEK_SET);
+    }
+    return f;
+}
+
+static void ppsspp_cso_seek(void *handle, int64_t offset, int origin) {
+    oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
+    if (!f) return;
+    if (!f->isCSO) { fseeko(f->fp, (off_t)offset, origin); return; }
+
+    int64_t base = 0;
+    switch (origin) {
+        case SEEK_SET: base = 0; break;
+        case SEEK_CUR: base = f->logicalPos; break;
+        case SEEK_END: base = (int64_t)f->totalBytes; break;
+        default: return;
+    }
+    f->logicalPos = base + offset;
+}
+
+static int64_t ppsspp_cso_tell(void *handle) {
+    oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
+    if (!f) return -1;
+    if (!f->isCSO) return (int64_t)ftello(f->fp);
+    return f->logicalPos;
+}
+
+static size_t ppsspp_cso_read(void *handle, void *buffer, size_t requested) {
+    oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
+    if (!f) return 0;
+    if (!f->isCSO) return fread(buffer, 1, requested, f->fp);
+
+    if (f->logicalPos < 0 || (uint64_t)f->logicalPos >= f->totalBytes) return 0;
+    const uint64_t remain = f->totalBytes - (uint64_t)f->logicalPos;
+    if (requested > remain) requested = (size_t)remain;
+
+    uint8_t *out = (uint8_t *)buffer;
+    size_t copied = 0;
+    while (copied < requested) {
+        const uint32_t frame      = (uint32_t)((uint64_t)f->logicalPos / f->frameSize);
+        const uint32_t offInFrame = (uint32_t)((uint64_t)f->logicalPos % f->frameSize);
+        if (!oe_cso_load_frame(f, frame)) break;
+        size_t n = f->frameSize - offInFrame;
+        if (n > requested - copied) n = requested - copied;
+        memcpy(out + copied, f->frameBuf + offInFrame, n);
+        copied += n;
+        f->logicalPos += (int64_t)n;
+    }
+    return copied;
+}
 
 @implementation PPSSPPGameCore
 
@@ -117,6 +316,34 @@ PPSSPPGameCore *_current = 0;
     
     return self;
 }
+
+- (void)dealloc
+{
+    // Drain the RA serial queue before teardown so no in-flight read touches freed state.
+    [_raBridge shutdown];
+    _raBridge = nil;
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
+}
+
 # pragma mark - Execution
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
@@ -200,12 +427,30 @@ PPSSPPGameCore *_current = 0;
 
     coreState = CORE_POWERUP;
     
+    // Start the RA bridge now (login + hashing run off the ROM path, independent of
+    // emulation state). markROMReady is deferred to -executeFrame, once PSP memory is mapped.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:ppsspp_rc_read_memory
+                                                          consoleID:(uint32_t)RC_CONSOLE_PSP];
+    [_raBridge startWithROMPath:path];
+    // Let rcheevos hash .cso images by decompressing them transparently during identification.
+    static const rc_hash_filereader_t pspHashFileReader = {
+        ppsspp_cso_open,
+        ppsspp_cso_seek,
+        ppsspp_cso_tell,
+        ppsspp_cso_read,
+        ppsspp_cso_close,
+    };
+    [_raBridge setHashFileReader:&pspHashFileReader];
     
     return true;
 }
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     NativeSetThreadState(OpenEmuCoreThread::EmuThreadState::PAUSE_REQUESTED);
 
     PSP_Shutdown();
@@ -219,6 +464,7 @@ PPSSPPGameCore *_current = 0;
 - (void)resetEmulation
 {
     _shouldReset = YES;
+    [_raBridge reset];
 }
 
 - (void)executeFrame
@@ -278,6 +524,9 @@ PPSSPPGameCore *_current = 0;
 
         //Start the Emulator Thread
         NativeSetThreadState(OpenEmuCoreThread::EmuThreadState::START_REQUESTED);
+
+        // PSP memory is mapped now; allow rcheevos to read it during -doFrame.
+        [_raBridge markROMReady];
         
     } else {
         //If Fast forward rate is detected, unthrottle the rndering
@@ -288,6 +537,8 @@ PPSSPPGameCore *_current = 0;
 
         //Let PPSSPP Core run a loop and return
         UpdateRunLoop();
+
+        [_raBridge doFrame];
     }
 }
 # pragma mark - Cheats
