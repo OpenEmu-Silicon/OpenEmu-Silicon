@@ -65,4 +65,5 @@ NSString *const OECheatTypeGameShark    = @"GameShark";
 NSString *const OECheatTypeActionReplay = @"Action Replay";
 NSString *const OECheatTypeGameGenie    = @"Game Genie";
 NSString *const OECheatTypeRaw          = @"Raw";
+NSString *const OECheatTypeCWCheat      = @"CWCheat";
 NSString *const OECheatTypeUnknown      = @"Unknown";
