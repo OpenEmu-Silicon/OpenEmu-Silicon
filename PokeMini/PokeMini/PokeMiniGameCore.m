@@ -34,6 +34,12 @@
 #import "Joystick.h"
 #import "Video_x1.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 @interface PokeMiniGameCore () <OEPMSystemResponderClient>
 {
     uint8_t *audioStream;
@@ -41,6 +47,7 @@
     int videoWidth, videoHeight;
     NSString *romPath;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
@@ -49,6 +56,24 @@ PokeMiniGameCore *current;
 // Sound buffer size
 #define SOUNDBUFFER	2048
 #define PMSOUNDBUFF	(SOUNDBUFFER*2)
+
+// RA addresses index the reference (libretro) core's SYSTEM_RAM block, which is PM_RAM
+// (0x2000 bytes) straight — PM_RAM[0] is CPU 0x1000. rcheevos maps both its "BIOS RAM"
+// (0x0000) and "System RAM" (0x1000) regions sequentially onto that single block, so a
+// plain PM_RAM index is what achievement sets were authored against; the region map's
+// "real" addresses are display labels only, not the runtime mapping.
+static uint32_t pokemini_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                        uint32_t num_bytes, rc_client_t *client)
+{
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        uint32_t offset = address + i;
+        if (offset < 0x2000)
+            buffer[i] = PM_RAM[offset];
+        else
+            return i;
+    }
+    return num_bytes;
+}
 
 int OpenEmu_KeysMapping[] =
 {
@@ -85,6 +110,10 @@ int OpenEmu_KeysMapping[] =
 
 - (void)dealloc
 {
+    // Drain the RA serial queue before tearing down emulator memory.
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     PokeMini_VideoPalette_Free();
     PokeMini_Destroy();
     free(audioStream);
@@ -177,6 +206,11 @@ int saveEEPROM(const char *filename)
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     romPath = path;
+
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                      memoryReader:pokemini_rc_read_memory
+                                                         consoleID:RC_CONSOLE_POKEMON_MINI];
+    [_raBridge startWithROMPath:path];
     return YES;
 }
 
@@ -210,7 +244,9 @@ int saveEEPROM(const char *filename)
         PokeMini_VideoBlit(videoBuffer, current->videoWidth);
     }
     LCDDirty = 0;
-    
+
+    [_raBridge doFrame];
+
     MinxAudio_GetSamplesU8(audioStream, PMSOUNDBUFF);
     [[current ringBufferAtIndex:0] write:audioStream maxLength:PMSOUNDBUFF];
 }
@@ -221,17 +257,22 @@ int saveEEPROM(const char *filename)
 
     [super startEmulation];
     PokeMini_LoadROM((char*)[romPath UTF8String]);
+    [_raBridge markROMReady];
 }
 
 - (void)stopEmulation
 {
     PokeMini_SaveFromCommandLines(1);
-    
+
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     [super stopEmulation];
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     PokeMini_Reset(1);
 }
 
@@ -245,6 +286,28 @@ int saveEEPROM(const char *filename)
 - (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
     block(PokeMini_LoadSSFile(fileName.fileSystemRepresentation) ? YES : NO, nil);
+}
+
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Cheats
