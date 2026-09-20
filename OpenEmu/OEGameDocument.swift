@@ -1951,6 +1951,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierPokeMini:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. 1300:63. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Pokemon Mini"),
+                validationHint: NSLocalizedString("Pok\u{00E9}mon mini codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 1300:63. Addresses target RAM (1000-1FFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Pokemon Mini"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
+                }
+            )
         case OESystemIdentifierMSX:
             return CheatFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),
