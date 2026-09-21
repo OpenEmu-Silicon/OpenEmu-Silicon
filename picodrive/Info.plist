@@ -32,6 +32,8 @@
 			<integer>60</integer>
 			<key>OEGameCoreRewindInterval</key>
 			<integer>2</integer>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
 			<key>OEGameCoreSupportsRewinding</key>
 			<true/>
 		</dict>
