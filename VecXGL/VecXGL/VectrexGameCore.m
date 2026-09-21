@@ -34,6 +34,12 @@
 #import "vecx.h"
 #import "osint.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 @interface VectrexGameCore () <OEVectrexSystemResponderClient>
 {
     int videoWidth, videoHeight;
@@ -41,10 +47,27 @@
     NSString *overlayFile;
     BOOL overlayIsLoaded;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
 VectrexGameCore *g_core;
+
+// RA System RAM: rcheevos maps RA address 0x0000-0x03FF to the Vectrex's 1KB work RAM
+// (CPU 0xC800-0xCBFF = ram[0]..ram[0x3FF]). The consoleinfo real_address 0xC800 is a
+// display label; the runtime mapping is a plain ram[] index from a 0-based RA address.
+static uint32_t vectrex_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                       uint32_t num_bytes, rc_client_t *client)
+{
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        uint32_t offset = address + i;
+        if (offset < 0x400)
+            buffer[i] = ram[offset];
+        else
+            return i;
+    }
+    return num_bytes;
+}
 
 @implementation VectrexGameCore
 
@@ -67,6 +90,11 @@ VectrexGameCore *g_core;
     osint_defaults();           //setup defaults including sound buffer
     openCart(path.fileSystemRepresentation);
     osint_gencolors();          //setup colors
+
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                      memoryReader:vectrex_rc_read_memory
+                                                         consoleID:RC_CONSOLE_VECTREX];
+    [_raBridge startWithROMPath:path];
     return YES;
 }
 
@@ -101,6 +129,8 @@ VectrexGameCore *g_core;
         }
     }
 
+    [_raBridge doFrame];
+
     glFlush();
 }
 
@@ -110,6 +140,8 @@ VectrexGameCore *g_core;
 
     [super startEmulation];
     vecx_reset();
+
+    [_raBridge markROMReady];
 
     NSFileManager *defaultFileManager = [NSFileManager defaultManager];
     if ([defaultFileManager fileExistsAtPath:[[romPath stringByDeletingPathExtension] stringByAppendingString:@".tga"]])
@@ -127,7 +159,22 @@ VectrexGameCore *g_core;
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     vecx_reset();
+}
+
+- (void)stopEmulation
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
+
+    [super stopEmulation];
+}
+
+- (void)dealloc
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
 }
 
 - (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
@@ -152,13 +199,15 @@ VectrexGameCore *g_core;
 
     if (sizeof(VECXState) != data.length) {
         block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadStateError userInfo:@{
-            NSLocalizedFailureReasonErrorKey: @"THe size of the saved file is different from the size of the state.",
+            NSLocalizedFailureReasonErrorKey: @"The size of the saved file is different from the size of the state.",
         }]);
         return;
     }
 
     VECXState *state = (void *)data.bytes;
     loadVecxState(state);
+
+    block(YES, nil);
 }
 
 - (OEIntSize)aspectSize
@@ -260,10 +309,31 @@ VectrexGameCore *g_core;
     osint_btnUp(button);
 }
 
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
+}
+
 #pragma mark - Cheats
 
-- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
-{
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled{
     if (!_cheatList)
         _cheatList = [NSMutableDictionary dictionary];
 

@@ -33,6 +33,9 @@
 		986F328216D40A9100BB38E2 /* osint.m in Sources */ = {isa = PBXBuildFile; fileRef = 986F327616D40A9100BB38E2 /* osint.m */; };
 		986F328316D40A9100BB38E2 /* readme_old.txt in Resources */ = {isa = PBXBuildFile; fileRef = 986F327916D40A9100BB38E2 /* readme_old.txt */; };
 		986F328516D40A9100BB38E2 /* vecx.m in Sources */ = {isa = PBXBuildFile; fileRef = 986F327C16D40A9100BB38E2 /* vecx.m */; };
+		OE0VECX0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0VECX0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0VECX0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0VECX0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0VECX0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0VECX0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +76,10 @@
 		986F327D16D40A9100BB38E2 /* vecx.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vecx.h; sourceTree = "<group>"; };
 		986F327E16D40A9100BB38E2 /* wnoise.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = wnoise.h; sourceTree = "<group>"; };
 		98EFD838170B4D4E00E4C50D /* OEVectrexSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEVectrexSystemResponderClient.h; path = ../../OpenEmu/SystemPlugins/Vectrex/OEVectrexSystemResponderClient.h; sourceTree = "<group>"; };
+		OE0VECX0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0VECX0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0VECX0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0VECX0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -134,6 +141,10 @@
 				98EFD838170B4D4E00E4C50D /* OEVectrexSystemResponderClient.h */,
 				986F324F16D4014B00BB38E2 /* VectrexGameCore.h */,
 				986F325016D4014B00BB38E2 /* VectrexGameCore.m */,
+				OE0VECX0FILEREF000000001 /* rcheevos_build.c */,
+				OE0VECX0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0VECX0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0VECX0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				986F327016D40A6300BB38E2 /* src */,
 				986F323D16D3FF4F00BB38E2 /* Supporting Files */,
 			);
@@ -256,6 +267,9 @@
 				986F328216D40A9100BB38E2 /* osint.m in Sources */,
 				986F328516D40A9100BB38E2 /* vecx.m in Sources */,
 				982C136017153B1500E47845 /* e8910.c in Sources */,
+				OE0VECX0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0VECX0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0VECX0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,6 +358,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "VecXGL/VecXGL-Info.plist";
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
@@ -356,6 +375,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "VecXGL/VecXGL-Info.plist";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
