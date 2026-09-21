@@ -26,6 +26,7 @@
 
 #import "SVGameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "OESVSystemResponderClient.h"
 
@@ -44,6 +45,8 @@
     COLOR_SCHEME displayMode;
 
     NSTimeInterval frameInterval;
+
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 
 @end
@@ -141,6 +144,24 @@ static __weak SVGameCore *_current;
 - (void)executeFrame
 {
     supervision_exec_fast((int16*)videoBuffer,1);
+
+    // Direct RAM pokes (mempatch style): re-applied every frame since the emulated CPU
+    // overwrites the same RAM addresses. Lower work RAM is CPU 0x0000-0x1FFF; upper (video)
+    // RAM is CPU 0x4000-0x5FFF. Registers (0x2000-0x3FFF) and ROM (0x6000+) are not poked.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        for (NSString *singleCode in [key componentsSeparatedByString:@"+"]) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            if (addr <= 0x1FFF)
+                memorymap_lowerRam[addr] = (uint8_t)val;
+            else if (addr >= 0x4000 && addr <= 0x5FFF)
+                memorymap_upperRam[addr & 0x1FFF] = (uint8_t)val;
+        }
+    }
 }
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
@@ -231,5 +252,32 @@ static __weak SVGameCore *_current;
     const char * path = [fileName cStringUsingEncoding:NSUTF8StringEncoding];
     int success = sv_loadState(path, 0);
     if(block) block(success==1, nil);
+}
+
+#pragma mark - Cheats
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Watara Supervision work RAM is CPU 0x0000-0x1FFF (8KB), backed by memorymap_lowerRam.
+    // Upper RAM (0x4000-0x5FFF) is the LCD framebuffer, excluded from search as pure video noise.
+    NSData *data = [NSData dataWithBytes:memorymap_lowerRam length:0x2000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"System RAM"
+                                                                                address:0x0000
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 @end

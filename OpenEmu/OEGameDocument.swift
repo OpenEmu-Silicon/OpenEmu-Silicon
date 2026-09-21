@@ -1975,6 +1975,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierSupervision:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. 0040:63. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Watara Supervision"),
+                validationHint: NSLocalizedString("Watara Supervision codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 0040:63. Addresses target RAM (0000-1FFF work RAM, 4000-5FFF video RAM). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Watara Supervision"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
+                }
+            )
         case OESystemIdentifierMSX:
             return CheatFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),

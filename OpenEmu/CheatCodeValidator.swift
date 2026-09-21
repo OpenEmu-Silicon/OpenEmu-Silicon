@@ -74,6 +74,10 @@ enum CheatCodeValidator {
             // VecXGL: raw poke into ram[] (CPU 0xC800-0xCBFF), 16-bit address space
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
 
+        case OESystemIdentifierSupervision:
+            // Potator: raw poke into lowerRam (CPU 0x0000-0x1FFF) / upperRam (0x4000-0x5FFF), 16-bit space
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
         case OESystemIdentifierOdyssey2:
             // O2EM: raw poke into intRAM (0x000-0x03F) or extRAM (0x100-0x1FF, cart-dependent).
             // Max 4 (not 3) hex digits so zero-padded addresses like 0032:19 still validate.
