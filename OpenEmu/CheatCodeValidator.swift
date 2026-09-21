@@ -70,6 +70,10 @@ enum CheatCodeValidator {
             // PokeMini: raw poke into PM_RAM (CPU 0x1000-0x1FFF), 16-bit address space
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
 
+        case OESystemIdentifierVectrex:
+            // VecXGL: raw poke into ram[] (CPU 0xC800-0xCBFF), 16-bit address space
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
         case OESystemIdentifierOdyssey2:
             // O2EM: raw poke into intRAM (0x000-0x03F) or extRAM (0x100-0x1FF, cart-dependent).
             // Max 4 (not 3) hex digits so zero-padded addresses like 0032:19 still validate.
