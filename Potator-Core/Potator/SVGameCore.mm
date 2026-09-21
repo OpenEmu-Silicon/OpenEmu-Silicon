@@ -190,7 +190,10 @@ static __weak SVGameCore *_current;
 
 - (GLenum)pixelFormat
 {
-    return GL_BGRA;
+    // Palette packs pixels as x-B5-G5-R5 (R in the low bits, see RGB555 in gpu.c), which the
+    // Metal renderer maps to r5g5b5a1Unorm via RGBA + 1_5_5_5_REV. BGRA is not an accepted
+    // Metal combination here and also swaps R/B.
+    return GL_RGBA;
 }
 
 - (GLenum)pixelType
