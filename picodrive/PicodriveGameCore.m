@@ -26,6 +26,7 @@
 
 #import "PicodriveGameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import "OESega32XSystemResponderClient.h"
 #import <OpenGL/gl.h>
 
@@ -131,7 +132,9 @@ static __weak PicodriveGameCore *_current;
 
 - (void)executeFrame
 {
-    //PicoPatchApply();
+    // Re-assert RAM cheats every frame, otherwise the game overwrites them (value would
+    // only flash once at enable time). ROM Game Genie patches are also reapplied here.
+    PicoPatchApply();
     PicoFrame();
 }
 
@@ -181,6 +184,27 @@ static __weak PicodriveGameCore *_current;
     }
 
     PicoPatchApply();
+}
+
+// MARK: - Cheat Search
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (!Pico.rom || Pico.romsize == 0)
+        return @[];
+
+    // 68k work RAM (64KB) at 68k address 0xFF0000. This is the only region the raw memory
+    // patch / Game Genie engine can write (m68k_write16, 24-bit address). The 32X SDRAM lives
+    // in the SH2 address space (0x06000000) and can't be expressed as a 6-hex patch address,
+    // so it's excluded. Stored host-endian word-wise, matching the word-aligned (minDataBytes:2)
+    // search stride, so found word values round-trip through m68k_write16.
+    NSData *data = [NSData dataWithBytes:PicoMem.ram length:sizeof(PicoMem.ram)];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"Work RAM"
+                                                                                address:0xFF0000
+                                                                           addressBytes:3
+                                                                           minDataBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 - (void)stopEmulation
