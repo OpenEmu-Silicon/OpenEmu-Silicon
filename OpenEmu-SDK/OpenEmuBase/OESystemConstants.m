@@ -60,6 +60,7 @@ NSString *const OESystemIdentifierWS         = @"openemu.system.ws";
 NSString *const OESystemIdentifierPCFX       = @"openemu.system.pcfx";
 NSString *const OESystemIdentifierPokeMini   = @"openemu.system.pokemonmini";
 NSString *const OESystemIdentifierVectrex    = @"openemu.system.vectrex";
+NSString *const OESystemIdentifierSupervision = @"openemu.system.sv";
 
 // MARK: - Cheat Code Type Strings
 
