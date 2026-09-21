@@ -544,7 +544,8 @@ int PicoPatchAdd(const char *code, int enabled)
    PicoPatches[PicoPatchCount].comp = pt.comp;
 
    addr = pt.addr;
-   if (addr < Pico.romsize)
+   // addr+1 guards the 16-bit access from reading one byte past the ROM at addr == romsize-1.
+   if (addr + 1 < Pico.romsize)
       PicoPatches[PicoPatchCount].data_old = *(unsigned short *)(Pico.rom + addr);
    else if (!(PicoIn.AHW & PAHW_SMS))
       PicoPatches[PicoPatchCount].data_old = (unsigned short) m68k_read16(addr);
@@ -565,7 +566,8 @@ void PicoPatchResetAll(void)
       if (!PicoPatches[i].active)
          continue;
       addr = PicoPatches[i].addr;
-      if (addr < Pico.romsize)
+      // addr+1 guards the 16-bit access from writing one byte past the ROM at addr == romsize-1.
+      if (addr + 1 < Pico.romsize)
          *(unsigned short *)(Pico.rom + addr) = PicoPatches[i].data_old;
       else if (!(PicoIn.AHW & PAHW_SMS))
          m68k_write16(addr, PicoPatches[i].data_old);

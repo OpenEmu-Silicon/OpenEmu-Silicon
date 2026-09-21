@@ -751,11 +751,11 @@ static uint32_t bluemsx_rc_read_memory_msx(uint32_t address, uint8_t *buffer,
     {
         // Dumps the Z80's current logical view of the full address space (whatever is
         // banked in via slots/subslots right now), same as the built-in debugger does.
-        UInt8 mem[0x10000];
+        NSMutableData *memData = [NSMutableData dataWithLength:0x10000];
+        UInt8 *mem = (UInt8 *)memData.mutableBytes;
         for (int i = 0; i < 0x10000; i++)
             mem[i] = slotPeek(NULL, (UInt16)i);
 
-        NSData *memData = [NSData dataWithBytes:mem length:0x10000];
         return @[
             [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
                                                   address:0x0000
