@@ -42,6 +42,7 @@ static int16_t ALIGNED(4) soundBuffer[2 * 44100 / 50];
     uint16_t *_videoBuffer;
     int _videoWidth;
     NSURL *_romFile;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 
 @end
@@ -56,6 +57,7 @@ static __weak PicodriveGameCore *_current;
     {
         _videoBuffer = (uint16_t *)malloc(320 * 240 * sizeof(uint16_t));
         _videoWidth = 292; // initial viewport width
+        _cheatList = [[NSMutableDictionary alloc] init];
     }
 
 	_current = self;
@@ -136,6 +138,49 @@ static __weak PicodriveGameCore *_current;
 - (void)resetEmulation
 {
     PicoReset();
+}
+
+// MARK: - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    // Sanitize: trim, drop spaces, and uppercase (PicoDrive's decoder expects uppercase
+    // for both the hex "XXXXXX:XXXX" and the Game Genie "XXXX-XXXX" alphabets).
+    code = [code stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+    if (code.length == 0)
+        return;
+    code = code.uppercaseString;
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+
+    [self applyCheats];
+}
+
+- (void)applyCheats
+{
+    // Rebuild PicoDrive's patch list from scratch: restore any ROM writes, then re-add
+    // every enabled code. executeFrame re-applies them each frame.
+    PicoPatchResetAll();
+
+    for (NSString *code in _cheatList)
+    {
+        if (![_cheatList[code] boolValue])
+            continue;
+
+        // Multi-line cheats are joined with '+'
+        for (NSString *singleCode in [code componentsSeparatedByString:@"+"])
+        {
+            if (singleCode.length == 0)
+                continue;
+            PicoPatchAdd(singleCode.UTF8String, 1);
+        }
+    }
+
+    PicoPatchApply();
 }
 
 - (void)stopEmulation

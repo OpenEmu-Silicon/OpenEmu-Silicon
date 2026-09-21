@@ -124,6 +124,10 @@ enum CheatCodeValidator {
             // GenesisPlus MD mode: Game Genie (XXXX-XXXX) or Patch/PAR (XXXXXX:XXXX)
             return isGenesisGameGenieCode(code) || isGenesisPARCode(code)
 
+        case OESystemIdentifierSega32X:
+            // Picodrive: Game Genie (XXXX-XXXX) or raw memory patch (XXXXXX:XXXX)
+            return isGenesisGameGenieCode(code) || isGenesisPARCode(code)
+
         case OESystemIdentifierSMS:
             if coreIdentifier == "org.openemu.CrabEmu" {
                 return isSMSActionReplayCode(code) || isRawAddressValue(code)

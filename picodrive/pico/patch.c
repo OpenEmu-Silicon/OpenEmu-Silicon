@@ -515,3 +515,61 @@ void PicoPatchApply(void)
    }
 }
 
+/* Decode a single code (Game Genie "XXXX-XXXX" or hex "XXXXXX:XXXX") and append it to
+ * PicoPatches with the given active state. The original value is captured immediately, so
+ * the ROM must already be loaded. Returns 0 on success, -1 on a bad/undecodable code. */
+int PicoPatchAdd(const char *code, int enabled)
+{
+   struct patch pt;
+   void *ptr;
+   unsigned int addr;
+
+   decode(code, &pt);
+   if (pt.addr == (unsigned int)-1 || pt.data == (unsigned short)-1)
+      return -1;
+
+   ptr = realloc(PicoPatches, (PicoPatchCount + 1) * sizeof(PicoPatches[0]));
+   if (ptr == NULL)
+      return -1;
+   PicoPatches = ptr;
+
+   PicoPatches[PicoPatchCount].code[0] = 0;
+   strncpy(PicoPatches[PicoPatchCount].code, code, sizeof(PicoPatches[0].code) - 1);
+   PicoPatches[PicoPatchCount].code[sizeof(PicoPatches[0].code) - 1] = 0;
+   PicoPatches[PicoPatchCount].name[0] = 0;
+   PicoPatches[PicoPatchCount].active = enabled ? 1 : 0;
+   PicoPatches[PicoPatchCount].addr = pt.addr;
+   PicoPatches[PicoPatchCount].data = pt.data;
+   PicoPatches[PicoPatchCount].data_old = 0;
+   PicoPatches[PicoPatchCount].comp = pt.comp;
+
+   addr = pt.addr;
+   if (addr < Pico.romsize)
+      PicoPatches[PicoPatchCount].data_old = *(unsigned short *)(Pico.rom + addr);
+   else if (!(PicoIn.AHW & PAHW_SMS))
+      PicoPatches[PicoPatchCount].data_old = (unsigned short) m68k_read16(addr);
+
+   PicoPatchCount++;
+   return 0;
+}
+
+/* Restore the original value of every active patch, then drop all patches. Used to rebuild
+ * the patch list from scratch when the enabled cheat set changes. */
+void PicoPatchResetAll(void)
+{
+   int i;
+   unsigned int addr;
+
+   for (i = 0; i < PicoPatchCount; i++)
+   {
+      if (!PicoPatches[i].active)
+         continue;
+      addr = PicoPatches[i].addr;
+      if (addr < Pico.romsize)
+         *(unsigned short *)(Pico.rom + addr) = PicoPatches[i].data_old;
+      else if (!(PicoIn.AHW & PAHW_SMS))
+         m68k_write16(addr, PicoPatches[i].data_old);
+   }
+   PicoPatchUnload();
+}
+
