@@ -34,6 +34,12 @@
 #import "supervision.h"
 #import "sound.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 #define SV_AUDIO_SAMPLE_RATE 44100
 #define SV_MAX_FRAMES        2048
 static const double kAudioGain = 400.0;
@@ -55,9 +61,26 @@ static const double kAudioGain = 400.0;
 
     double _sampleAccumulator;
     double _dcPrevInL, _dcPrevOutL, _dcPrevInR, _dcPrevOutR;
+
+    OERetroAchievementsBridge *_raBridge;
 }
 
 @end
+
+// RA memory: libretro Potator exposes lowerRam@0x0000, regs@0x2000, upperRam@0x4000 via its
+// memory map, and rcheevos' Supervision regions use those same guest addresses, so the RA
+// address maps 1:1 to the CPU address across the 0x0000-0x5FFF RAM window.
+static uint32_t potator_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t num_bytes, rc_client_t *client)
+{
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        uint32_t a = address + i;
+        if (a < 0x2000)      buffer[i] = memorymap_lowerRam[a];
+        else if (a < 0x4000) buffer[i] = memorymap_regs[a - 0x2000];
+        else if (a < 0x6000) buffer[i] = memorymap_upperRam[a - 0x4000];
+        else return i;
+    }
+    return num_bytes;
+}
 
 #define SCREEN_HEIGHT 160
 #define SCREEN_WIDTH  160
@@ -88,6 +111,8 @@ static __weak SVGameCore *_current;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
     free(videoBuffer);
 }
 
@@ -139,6 +164,7 @@ static __weak SVGameCore *_current;
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     supervision_reset();
     _sampleAccumulator = 0;
     _dcPrevInL = _dcPrevOutL = _dcPrevInR = _dcPrevOutR = 0;
@@ -146,6 +172,8 @@ static __weak SVGameCore *_current;
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
     supervision_done();
 
     [super stopEmulation];
@@ -199,6 +227,8 @@ static __weak SVGameCore *_current;
         }
         [[self ringBufferAtIndex:0] write:s16 maxLength:frames * 2 * sizeof(int16_t)];
     }
+
+    [_raBridge doFrame];
 }
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
@@ -222,7 +252,15 @@ static __weak SVGameCore *_current;
     [dataObj getBytes:romBuffer length:romBufferSize];
 
     supervision_init();
-    return supervision_load(romBuffer, (uint32_t)romBufferSize);
+    BOOL loaded = supervision_load(romBuffer, (uint32_t)romBufferSize);
+    if (loaded) {
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                          memoryReader:potator_rc_read_memory
+                                                             consoleID:RC_CONSOLE_SUPERVISION];
+        [_raBridge startWithROMPath:romName];
+        [_raBridge markROMReady];
+    }
+    return loaded;
 }
 
 #pragma mark - Video
@@ -289,6 +327,27 @@ static __weak SVGameCore *_current;
     const char * path = [fileName cStringUsingEncoding:NSUTF8StringEncoding];
     int success = sv_loadState(path, 0);
     if(block) block(success==1, nil);
+}
+
+#pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Cheats
