@@ -1963,6 +1963,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierVectrex:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. C880:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Vectrex"),
+                validationHint: NSLocalizedString("Vectrex codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C880:05. Addresses target RAM (C800-CBFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Vectrex"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
+                }
+            )
         case OESystemIdentifierMSX:
             return CheatFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),

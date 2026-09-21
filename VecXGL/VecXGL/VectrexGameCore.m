@@ -29,6 +29,7 @@
 #import "VectrexGameCore.h"
 
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "vecx.h"
 #import "osint.h"
@@ -39,6 +40,7 @@
     NSString *romPath;
     NSString *overlayFile;
     BOOL overlayIsLoaded;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 @end
 
@@ -81,6 +83,24 @@ VectrexGameCore *g_core;
     }
 
     vecx_emu ((VECTREX_MHZ / 1000) * EMU_TIMER, 0);
+
+    // Direct RAM pokes (mempatch style): re-applied every frame since the emulated CPU
+    // overwrites the same RAM addresses. ram[0] maps to CPU address 0xC800; RAM spans
+    // CPU 0xC800-0xCFFF (0xCC00-0xCFFF mirrors 0xC800-0xCBFF), so only those addresses are poked.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            if ((addr & 0xe000) == 0xc000 && (addr & 0x800))
+                ram[addr & 0x3ff] = (unsigned char)val;
+        }
+    }
+
     glFlush();
 }
 
@@ -238,6 +258,33 @@ VectrexGameCore *g_core;
     padData[player][button] = 0;
     
     osint_btnUp(button);
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Vectrex RAM is CPU 0xC800-0xCBFF (1KB), backed by ram[0]..ram[0x3FF].
+    NSData *data = [NSData dataWithBytes:ram length:1024];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0xC800
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 
