@@ -224,9 +224,18 @@ enum PugsyCheatFile {
             let current = Int(i) + 1
             if !(archive.entryIsDirectory(i) || archive.entryIsEncrypted(i) || archive.entryIsArchive(i)) {
                 let destination = directory.appendingPathComponent(archive.name(ofEntry: i))
-                try? fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-                if archive.oe_extractEntry(i, as: destination.path, deferDirectories: true, dataFork: true, resourceFork: false) {
-                    extractedCount += 1
+                // Zip-Slip guard: the archive is user-downloaded and unverified, so an entry named
+                // like "../../../tmp/evil" could escape `directory`. Reject anything that, once its
+                // `..` segments are resolved, doesn't stay under the destination directory.
+                let basePath = directory.standardizedFileURL.path
+                let destPath = destination.standardizedFileURL.path
+                if destPath == basePath || destPath.hasPrefix(basePath + "/") {
+                    try? fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if archive.oe_extractEntry(i, as: destination.path, deferDirectories: true, dataFork: true, resourceFork: false) {
+                        extractedCount += 1
+                    }
+                } else {
+                    DLog("Skipping Pugsy cheat entry with unsafe path: \(archive.name(ofEntry: i))")
                 }
             }
             if let progress, total > 0 {

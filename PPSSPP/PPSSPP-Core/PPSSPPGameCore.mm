@@ -236,7 +236,26 @@ static void *ppsspp_cso_open(const char *path) {
             ppsspp_cso_close(f);
             return NULL;
         }
-        f->numFrames = (uint32_t)((f->totalBytes + f->frameSize - 1) / f->frameSize);
+        // CISO `align` (indexShift) has a legit range of 0–11. A raw attacker byte would make
+        // `1 << indexShift` undefined (>= 64) or request an absurd allocation (32–63).
+        if (f->indexShift > 11) {
+            ppsspp_cso_close(f);
+            return NULL;
+        }
+        // Reject an absurd decompressed size before it truncates the 32-bit frame count and
+        // wraps `numFrames + 1` to 0. The largest PSP UMD is well under 8 GiB; cap generously.
+        static const uint64_t kMaxTotalBytes = 8ULL << 30; // 8 GiB
+        if (f->totalBytes == 0 || f->totalBytes > kMaxTotalBytes) {
+            ppsspp_cso_close(f);
+            return NULL;
+        }
+        const uint64_t numFrames64 = (f->totalBytes + f->frameSize - 1) / f->frameSize;
+        // numFrames + 1 index entries must stay within 32 bits (and a sane allocation).
+        if (numFrames64 == 0 || numFrames64 >= 0xFFFFFFFFu) {
+            ppsspp_cso_close(f);
+            return NULL;
+        }
+        f->numFrames = (uint32_t)numFrames64;
 
         const uint32_t indexCount = f->numFrames + 1;
         f->index    = (uint32_t *)malloc((size_t)indexCount * sizeof(uint32_t));

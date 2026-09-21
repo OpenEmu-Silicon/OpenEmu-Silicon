@@ -384,7 +384,11 @@ final class CheatFeedbackService {
         // first-match-wins on a duplicate code), so mirror that order here too.
         file.gameName = file.gameName ?? openEmuLookup?.gameName ?? libretroLookup?.gameName
         if file.serial == nil, let context = OELibraryDatabase.default?.mainThreadContext {
-            file.serial = (try? OEDBRom.rom(withMD5HashString: file.md5, in: context))?.serial
+            // The migration-retry path reaches here off the main queue, so confine the fetch to the
+            // main-queue context. `performAndWait` is reentrant-safe on the normal main-thread path.
+            context.performAndWait {
+                file.serial = (try? OEDBRom.rom(withMD5HashString: file.md5, in: context))?.serial
+            }
         }
 
         for index in file.entries.indices {
