@@ -32,6 +32,11 @@
 
 
 #import "supervision.h"
+#import "sound.h"
+
+#define SV_AUDIO_SAMPLE_RATE 44100
+#define SV_MAX_FRAMES        2048
+static const double kAudioGain = 400.0;
 
 @interface SVGameCore () <OESVSystemResponderClient>
 {
@@ -47,6 +52,9 @@
     NSTimeInterval frameInterval;
 
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+
+    double _sampleAccumulator;
+    double _dcPrevInL, _dcPrevOutL, _dcPrevInR, _dcPrevOutR;
 }
 
 @end
@@ -132,6 +140,8 @@ static __weak SVGameCore *_current;
 - (void)resetEmulation
 {
     supervision_reset();
+    _sampleAccumulator = 0;
+    _dcPrevInL = _dcPrevOutL = _dcPrevInR = _dcPrevOutR = 0;
 }
 
 - (void)stopEmulation
@@ -161,6 +171,33 @@ static __weak SVGameCore *_current;
             else if (addr >= 0x4000 && addr <= 0x5FFF)
                 memorymap_upperRam[addr & 0x1FFF] = (uint8_t)val;
         }
+    }
+
+    // Note-duration counters tick once per frame (upstream cadence).
+    sound_decrement();
+
+    // Render this frame's audio and push it to the ring buffer. The synthesizer emits
+    // unsigned 8-bit stereo; a one-pole DC blocker centers it before the int16 conversion.
+    _sampleAccumulator += (double)SV_AUDIO_SAMPLE_RATE / [self frameInterval];
+    uint32_t frames = (uint32_t)_sampleAccumulator;
+    _sampleAccumulator -= frames;
+    if (frames > SV_MAX_FRAMES) frames = SV_MAX_FRAMES;
+    if (frames > 0) {
+        uint8_t u8[SV_MAX_FRAMES * 2];
+        int16_t s16[SV_MAX_FRAMES * 2];
+        sound_stream_update(u8, frames * 2);
+        for (uint32_t i = 0; i < frames; i++) {
+            double xL = (double)u8[2 * i]     * kAudioGain;
+            double xR = (double)u8[2 * i + 1] * kAudioGain;
+            double yL = xL - _dcPrevInL + 0.995 * _dcPrevOutL;
+            double yR = xR - _dcPrevInR + 0.995 * _dcPrevOutR;
+            _dcPrevInL = xL; _dcPrevOutL = yL;
+            _dcPrevInR = xR; _dcPrevOutR = yR;
+            long vL = (long)yL, vR = (long)yR;
+            s16[2 * i]     = (int16_t)(vL > 32767 ? 32767 : (vL < -32768 ? -32768 : vL));
+            s16[2 * i + 1] = (int16_t)(vR > 32767 ? 32767 : (vR < -32768 ? -32768 : vR));
+        }
+        [[self ringBufferAtIndex:0] write:s16 maxLength:frames * 2 * sizeof(int16_t)];
     }
 }
 
@@ -230,7 +267,7 @@ static __weak SVGameCore *_current;
 #pragma mark - Audio
 - (double)audioSampleRate
 {
-    return sampleRate ? sampleRate : 48000;
+    return SV_AUDIO_SAMPLE_RATE;
 }
 
 - (NSUInteger)channelCount
