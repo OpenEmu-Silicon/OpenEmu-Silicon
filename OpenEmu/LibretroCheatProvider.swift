@@ -79,6 +79,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierFDS:       "Nintendo - Family Computer Disk System",
         OESystemIdentifierN64:       "Nintendo - Nintendo 64",
         OESystemIdentifierGenesis:   "Sega - Mega Drive - Genesis",
+        OESystemIdentifierSega32X:   "Sega - 32X",
         OESystemIdentifierSegaCD:    "Sega - Mega-CD - Sega CD",
         OESystemIdentifierGBA:       "Nintendo - Game Boy Advance",
         OESystemIdentifierSNES:      "Nintendo - Super Nintendo Entertainment System",
@@ -617,7 +618,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Address hex-digit width the raw ADDRESS:VALUE validator expects per system (see CheatCodeValidator).
     private static func formatBAddressHexChars(for systemIdentifier: String) -> Int {
         switch systemIdentifier {
-        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
+        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSega32X, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
             return 6
         case OESystemIdentifierGBA, OESystemIdentifierVB:
             return 8
@@ -658,7 +659,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Normalizes non-standard code formats into forms the core can parse.
     private func normalizeCode(_ code: String, systemIdentifier: String) -> String {
         switch systemIdentifier {
-        case OESystemIdentifierGenesis:
+        case OESystemIdentifierGenesis, OESystemIdentifierSega32X:
             return normalizeGenesisCode(code)
         case OESystemIdentifierGBA:
             return normalizeGBACode(code)
