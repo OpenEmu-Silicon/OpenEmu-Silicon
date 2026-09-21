@@ -30,6 +30,8 @@
 			<true/>
 			<key>OEGameCoreSupportsCheatSearch</key>
 			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 		</dict>
 	</dict>
 	<key>OEGameCorePlayerCount</key>
