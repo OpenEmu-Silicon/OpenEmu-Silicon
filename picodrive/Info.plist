@@ -36,6 +36,8 @@
 			<true/>
 			<key>OEGameCoreSupportsCheatSearch</key>
 			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 			<key>OEGameCoreSupportsRewinding</key>
 			<true/>
 		</dict>

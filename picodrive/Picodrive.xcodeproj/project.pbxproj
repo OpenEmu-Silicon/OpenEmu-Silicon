@@ -37,6 +37,9 @@
 /* Begin PBXBuildFile section */
 		82287C09101E9C2C0072172D /* libz.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 82287C08101E9C2C0072172D /* libz.dylib */; };
 		82287C39101E9DB40072172D /* PicodriveGameCore.m in Sources */ = {isa = PBXBuildFile; fileRef = 82287C34101E9DB40072172D /* PicodriveGameCore.m */; };
+		OE0PICO0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0PICO0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0PICO0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PICO0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0PICO0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PICO0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		87249C7E1F96FE2200DD78C0 /* eeprom_spi.c in Sources */ = {isa = PBXBuildFile; fileRef = 87249C7D1F96FE2200DD78C0 /* eeprom_spi.c */; };
 		8D5B49B0048680CD000E48DA /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C167DFE841241C02AAC07 /* InfoPlist.strings */; };
 		8D5B49B4048680CD000E48DA /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7ADFEA557BF11CA2CBB /* Cocoa.framework */; };
@@ -142,6 +145,10 @@
 		82287C08101E9C2C0072172D /* libz.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libz.dylib; path = usr/lib/libz.dylib; sourceTree = SDKROOT; };
 		82287C33101E9DB40072172D /* PicodriveGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PicodriveGameCore.h; sourceTree = "<group>"; };
 		82287C34101E9DB40072172D /* PicodriveGameCore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PicodriveGameCore.m; sourceTree = "<group>"; };
+		OE0PICO0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0PICO0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0PICO0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0PICO0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		825C7E44101FAB7F0072187B /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		87249C651F96FDEB00DD78C0 /* libretro.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = libretro.c; sourceTree = "<group>"; };
 		87249C6F1F96FDEB00DD78C0 /* libretro.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = libretro.h; sourceTree = "<group>"; };
@@ -612,6 +619,10 @@
 				946B948A1782996900A212AC /* OESega32XSystemResponderClient.h */,
 				82287C33101E9DB40072172D /* PicodriveGameCore.h */,
 				82287C34101E9DB40072172D /* PicodriveGameCore.m */,
+				OE0PICO0FILEREF000000001 /* rcheevos_build.c */,
+				OE0PICO0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0PICO0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0PICO0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -1510,6 +1521,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				82287C39101E9DB40072172D /* PicodriveGameCore.m in Sources */,
+				OE0PICO0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0PICO0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0PICO0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				946B979E1782A91100A212AC /* mp3_dummy.c in Sources */,
 				946B979F1782A92A00A212AC /* gzio.c in Sources */,
 				946B97A01782A93D00A212AC /* inffast.c in Sources */,
@@ -1616,6 +1630,9 @@
 					"\"$(SRCROOT)/platform/linux\"",
 					"\"$(SRCROOT)/pico\"",
 					"\"$(SRCROOT)\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -1646,6 +1663,9 @@
 					"\"$(SRCROOT)/platform/linux\"",
 					"\"$(SRCROOT)/pico\"",
 					"\"$(SRCROOT)\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
