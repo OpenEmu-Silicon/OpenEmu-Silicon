@@ -143,7 +143,7 @@ get_current_version() {
   # If plist uses a build-setting variable, fall back to the pbxproj
   if [[ "$raw" == *'$('* ]] || [ -z "$raw" ]; then
     local pbxproj
-    pbxproj=$(find "$REPO_ROOT" -maxdepth 3 -ipath "*${core}*" -name "project.pbxproj" 2>/dev/null | head -1)
+    pbxproj=$(find "$REPO_ROOT" -maxdepth 4 -ipath "*${core}*" -name "project.pbxproj" 2>/dev/null | head -1)
     [ -n "$pbxproj" ] || { echo "0"; return; }
     grep "CURRENT_PROJECT_VERSION" "$pbxproj" | head -1 | grep -o '[0-9.]*'
   else
@@ -163,7 +163,7 @@ set_version() {
   if [[ "$raw" == *'$('* ]] || [ -z "$raw" ]; then
     # Version lives in the pbxproj
     local pbxproj
-    pbxproj=$(find "$REPO_ROOT" -maxdepth 3 -ipath "*${core}*" -name "project.pbxproj" 2>/dev/null | head -1)
+    pbxproj=$(find "$REPO_ROOT" -maxdepth 4 -ipath "*${core}*" -name "project.pbxproj" 2>/dev/null | head -1)
     [ -n "$pbxproj" ] || die "Could not find pbxproj for $core"
     sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9.]*/CURRENT_PROJECT_VERSION = $new_ver/" "$pbxproj"
     MODIFIED_PLISTS+=("$pbxproj")

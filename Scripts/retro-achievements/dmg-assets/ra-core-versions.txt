@@ -1,4 +1,4 @@
-Core plugin versions built from commit 607f39324
+Core plugin versions built from commit fc85cefe7
 
 Picodrive 1.93.1
 Potator 0.1.1
