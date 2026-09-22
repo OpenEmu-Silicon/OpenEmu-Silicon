@@ -25,31 +25,35 @@ RA integration is rolling out in phases. See [issue #258](https://github.com/Ope
 | Core | System(s) | RA Status |
 |------|-----------|-----------|
 | mGBA | Game Boy Advance, Game Boy, Game Boy Color | ✅ Supported |
-| GenesisPlus | Genesis, SMS, Game Gear, SG-1000, Sega CD | ✅ Supported |
-| FCEU | NES / Famicom | ✅ Supported |
-| Nestopia | NES, Famicom Disk System | ✅ Supported |
-| SNES9x | Super Nintendo | ✅ Supported |
-| BSNES | Super Nintendo | ✅ Supported |
 | Gambatte | Game Boy, Game Boy Color | ✅ Supported |
+| FCEU | NES / Famicom | ✅ Supported |
+| Nestopia | NES / Famicom, Famicom Disk System | ✅ Supported |
+| SNES9x | SNES / Super Famicom | ✅ Supported |
+| BSNES | SNES / Super Famicom | ✅ Supported |
 | Mupen64Plus | Nintendo 64 | ✅ Supported |
-| Mednafen | PlayStation, PC Engine, Atari Lynx, Neo Geo Pocket | ✅ Supported |
-| picodrive | 32X, Sega CD | 🔄 In Progress |
-| Flycast | Dreamcast | 🔄 In Progress |
-| Dolphin | GameCube, Wii | 🔄 In Progress |
-| Mednafen (ext.) | Saturn, Virtual Boy, WonderSwan, PC-FX | 🔲 Planned |
-| DeSmuME | Nintendo DS | 🔲 Planned |
-| PPSSPP | PSP | 🔲 Planned |
-| Stella | Atari 2600 | 🔲 Planned |
-| ProSystem | Atari 7800 | 🔲 Planned |
+| GenesisPlus | Genesis / Mega Drive, Master System, Game Gear, SG-1000, Sega CD | ✅ Supported |
+| picodrive | Sega 32X | ✅ Supported |
+| Mednafen | PlayStation, Saturn, PC Engine / TurboGrafx-16, PC Engine CD / TurboGrafx-CD, PC-FX, Atari Lynx, Neo Geo Pocket, Virtual Boy, WonderSwan | ✅ Supported |
+| Stella | Atari 2600 | ✅ Supported |
+| ProSystem | Atari 7800 | ✅ Supported |
+| DeSmuME | Nintendo DS | ✅ Supported |
+| PPSSPP | PSP | ✅ Supported |
+| CrabEmu | ColecoVision | ✅ Supported |
+| blueMSX | MSX, ColecoVision | ✅ Supported |
+| O2EM | Odyssey² / Videopac+ | ✅ Supported |
+| VecXGL | Vectrex | ✅ Supported |
+| PokeMini | Pokémon Mini | ✅ Supported |
+| Potator | Watara Supervision | ✅ Supported |
+| Flycast | Dreamcast | � Planned |
+| Dolphin | GameCube, Wii | 🔲 Planned |
 | Atari800 | Atari 5200, Atari 8-bit | 🔲 Planned |
-| VecXGL, Bliss, O2EM, 4DO, blueMSX, PokeMini, Potator | Various | 🔲 Planned |
+| Bliss, 4DO | Various | 🔲 Planned |
 
 **Legend:**
 - ✅ Supported — integrated and tested against known achievement sets
-- 🔄 In Progress — actively being worked on
-- 🔲 Planned — tracked in the rollout issue; contributors welcome
+-  Planned — tracked in the rollout issue; contributors welcome
 
-> **Note:** The native-core hardcore compliance rollout is tracked in #438. The main P0 enforcement work is complete for supported native RA cores; remaining work is focused on manual verification evidence, submission-readiness documentation, and follow-up polish before the official RetroAchievements listing.
+> **Note:** The native-core hardcore compliance rollout was tracked in #438. The main P0 enforcement work is complete for supported native RA cores; remaining work is focused on manual verification evidence, submission-readiness documentation, and follow-up polish before the official RetroAchievements listing.
 
 ---
 

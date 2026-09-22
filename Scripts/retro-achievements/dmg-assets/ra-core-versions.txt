@@ -1,13 +1,11 @@
-Core plugin versions built from commit dcf5f98ff
+Core plugin versions built from commit 607f39324
 
-BSNES 115.4
-DeSmuME 0.9.14.2
-FCEU 2.6.12
-Gambatte 0.5.6
-GenesisPlus 1.7.5.8
-Mednafen 1.26.8.2
-mGBA 0.10.10.2
-Mupen64Plus 2.5.18
-Nestopia 1.52.5.2
-SNES9x 1.63.6
-Stella 3.9.3.5
+Picodrive 1.93.1
+Potator 0.1.1
+VecXGL 1.2.3
+PokeMini 0.6.1
+PPSSPP 1.14.9
+blueMSX 2.9.1294
+O2EM 1.18.2
+CrabEmu 0.2.1.271
+ProSystem 1.5.3
