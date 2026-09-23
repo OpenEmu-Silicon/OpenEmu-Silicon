@@ -44,6 +44,10 @@
 #define MAX_RESPONSE_WAIT_SECONDS (10.0)
 #define PING_INTERVAL_SECONDS (60.0)
 
+#define NINTENDO_VENDOR_ID (0x57E)
+#define PRO_CONTROLLER_PRODUCT_ID (0x2009)
+#define N64_CONTROLLER_PRODUCT_ID (0x2019)
+
 //#define LOG_COMMUNICATION
 
 
@@ -329,6 +333,10 @@ static CGFloat OEHACScaleValueWithCalibration(
     
     OEHACProControllerStickCalibration _leftStickCalibration;
     OEHACProControllerStickCalibration _rightStickCalibration;
+
+    /* The Nintendo Switch Online N64 controller speaks the same protocol as
+     * the Pro Controller, with the same button bits, but has no right stick. */
+    BOOL _isN64Controller;
 }
 
 
@@ -338,15 +346,21 @@ static CGFloat OEHACScaleValueWithCalibration(
 + (BOOL)canHandleDevice:(IOHIDDeviceRef)aDevice
 {
     NSString *deviceName = (__bridge id)IOHIDDeviceGetProperty(aDevice, CFSTR(kIOHIDProductKey));
-    
-    if ([deviceName isEqualToString:@"Pro Controller"]) {
-        NSNumber *vid = (__bridge id)IOHIDDeviceGetProperty(aDevice, CFSTR(kIOHIDVendorIDKey));
-        NSNumber *pid = (__bridge id)IOHIDDeviceGetProperty(aDevice, CFSTR(kIOHIDProductIDKey));
-        if ([vid integerValue] == 0x57E && [pid integerValue] == 0x2009) {
-            return YES;
-        }
-    }
-    
+    NSNumber *vid = (__bridge id)IOHIDDeviceGetProperty(aDevice, CFSTR(kIOHIDVendorIDKey));
+    NSNumber *pid = (__bridge id)IOHIDDeviceGetProperty(aDevice, CFSTR(kIOHIDProductIDKey));
+
+    if ([vid integerValue] != NINTENDO_VENDOR_ID)
+        return NO;
+
+    if ([deviceName isEqualToString:@"Pro Controller"] && [pid integerValue] == PRO_CONTROLLER_PRODUCT_ID)
+        return YES;
+
+    /* The N64 controller needs the same start-up handshake as the Pro Controller,
+     * otherwise it never sends usable input. Match on the ID only, since the
+     * name it reports differs between Bluetooth and USB. */
+    if ([pid integerValue] == N64_CONTROLLER_PRODUCT_ID)
+        return YES;
+
     return NO;
 }
 
@@ -360,7 +374,10 @@ static CGFloat OEHACScaleValueWithCalibration(
 - (instancetype)initWithIOHIDDevice:(IOHIDDeviceRef)aDevice deviceDescription:(nullable OEDeviceDescription *)deviceDescription
 {
     self = [super initWithIOHIDDevice:aDevice deviceDescription:deviceDescription];
-    
+
+    NSNumber *pid = (__bridge id)IOHIDDeviceGetProperty(aDevice, CFSTR(kIOHIDProductIDKey));
+    _isN64Controller = ([pid integerValue] == N64_CONTROLLER_PRODUCT_ID);
+
     /* plausible default calibration
      * if everything goes according to plan, it will be rewritten by values
      * read from the controller's internal flash memory at connection time */
@@ -467,7 +484,7 @@ static CGFloat OEHACScaleValueWithCalibration(
     self->_leftStickCalibration = OEHACConvertCalibration(calibData->left_maxDelta, calibData->left_zero, calibData->left_minDelta);
     self->_rightStickCalibration = OEHACConvertCalibration(calibData->right_maxDelta, calibData->right_zero, calibData->right_minDelta);
     
-    NSLog(@"Loaded calibration successfully for Switch Pro Controller %@", self);
+    NSLog(@"Loaded calibration successfully for %@ %@", _isN64Controller ? @"Switch N64 Controller" : @"Switch Pro Controller", self);
     NSLog(@"Left stick (x, y): [+] %d, %d; [0] %d %d; [-] %d %d",
         (int)self->_leftStickCalibration.x.max,
         (int)self->_leftStickCalibration.y.max,
@@ -545,9 +562,12 @@ static CGFloat OEHACScaleValueWithCalibration(
     OEHAC16BitUnsignedPair leftStick = OEHACUnpackPair(report->leftStick);
     [self _dispatchEventsOfXAxis:OEHIDEventAxisX YAxis:OEHIDEventAxisY withData:leftStick calibration:&_leftStickCalibration timestamp:now];
     
-    /* Right stick */
-    OEHAC16BitUnsignedPair rightStick = OEHACUnpackPair(report->rightStick);
-    [self _dispatchEventsOfXAxis:OEHIDEventAxisRx YAxis:OEHIDEventAxisRy withData:rightStick calibration:&_rightStickCalibration timestamp:now];
+    /* Right stick (the N64 controller has none; its unused bytes would
+     * otherwise show up as a stuck axis while mapping buttons) */
+    if (!_isN64Controller) {
+        OEHAC16BitUnsignedPair rightStick = OEHACUnpackPair(report->rightStick);
+        [self _dispatchEventsOfXAxis:OEHIDEventAxisRx YAxis:OEHIDEventAxisRy withData:rightStick calibration:&_rightStickCalibration timestamp:now];
+    }
 }
 
 
