@@ -27,7 +27,7 @@ import Cocoa
 import OpenEmuKit
 import os.log
 
-private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
+// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
 
 final class BrowseOnlineCheatsViewController: NSViewController {
 

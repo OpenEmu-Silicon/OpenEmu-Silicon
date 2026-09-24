@@ -132,10 +132,12 @@ static const uint32_t kLynxRAWarmupFrames = 150;
     NSString *_romPath;
     int _rcConsole;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
-    // wswan ROM-patch cheats only: cheat code -> {rom offset: original byte}, so disabling a code
-    // can revert exactly the bytes it touched. wsCartROM isn't a mempatcher page, so unlike RAM
-    // 'R' patches, nothing else puts these bytes back once written.
-    NSMutableDictionary<NSString *, NSMutableDictionary<NSNumber *, NSNumber *> *> *_romPatchBackups;
+    // wswan ROM-patch cheats only: rom offset -> original (pristine) byte. Every setCheat call
+    // reverts these offsets to their stored bytes and then re-applies the enabled set, so disabling
+    // a cheat can never leave a stale patched byte behind. Keyed by offset (not cheat code) so two
+    // cheats touching the same byte both back up the pristine value, not each other's writes.
+    // wsCartROM isn't a mempatcher page, so unlike RAM 'R' patches nothing else puts these back.
+    NSMutableDictionary<NSNumber *, NSNumber *> *_romPatchBackups;
     BOOL _isSystemPCECD;
     uint32_t _lynxFrameCount;
     // Owned C-string copy of the active console module name (e.g. "psx", "pce").
@@ -4378,21 +4380,22 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
         _cheatList[code] = @YES;
     } else {
         [_cheatList removeObjectForKey:code];
-
-        // ROM patches persist in wsCartROM until reverted here; unlike RAM 'R' patches, simply
-        // no longer re-asserting them (via MDFN_FlushGameCheats below) doesn't undo them.
-        NSMutableDictionary<NSNumber *, NSNumber *> *romBackups = _romPatchBackups[code];
-        if (romBackups) {
-            uint8_t *rom = MDFNWS_GetROMPointer();
-            if (rom) {
-                for (NSNumber *offsetKey in romBackups)
-                    rom[offsetKey.unsignedIntValue] = romBackups[offsetKey].unsignedCharValue;
-            }
-            [_romPatchBackups removeObjectForKey:code];
-        }
     }
 
     Mednafen::MDFN_FlushGameCheats(1);
+
+    // wsCartROM ROM-patch cheats stay written until we put the bytes back — unlike RAM 'R' patches,
+    // which MDFN_FlushGameCheats re-asserts. Revert every patched offset to its pristine byte before
+    // re-applying the still-enabled set below, so disabling any cheat can never leave a stale patched
+    // byte behind and overlapping cheats always restore the original ROM value, not each other's writes.
+    if (_romPatchBackups.count) {
+        uint8_t *rom = MDFNWS_GetROMPointer();
+        if (rom) {
+            for (NSNumber *offsetKey in _romPatchBackups)
+                rom[offsetKey.unsignedIntValue] = _romPatchBackups[offsetKey].unsignedCharValue;
+            [_romPatchBackups removeAllObjects];
+        }
+    }
 
     for (NSString *key in _cheatList) {
         if (![_cheatList[key] boolValue]) continue;
@@ -4426,7 +4429,7 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
 
                 // WonderSwan ROM code patch (GameHacking.org convention: 0x4000000 | ROM file offset).
                 // wsCartROM isn't a mempatcher page, so this bypasses MDFNI_AddCheat and writes the
-                // buffer directly; see the disable branch above for the revert side.
+                // buffer directly; the revert-all block above puts the pristine bytes back.
                 if ([_mednafenCoreModule isEqualToString:@"wswan"] && (addr & 0x04000000)) {
                     uint32_t romOffset = addr & 0x03FFFFFF;
                     uint8_t *rom = MDFNWS_GetROMPointer();
@@ -4434,14 +4437,9 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
                     if (rom && romOffset < romSize) {
                         if (!_romPatchBackups)
                             _romPatchBackups = [NSMutableDictionary dictionary];
-                        NSMutableDictionary<NSNumber *, NSNumber *> *backups = _romPatchBackups[key];
-                        if (!backups) {
-                            backups = [NSMutableDictionary dictionary];
-                            _romPatchBackups[key] = backups;
-                        }
                         NSNumber *offsetKey = @(romOffset);
-                        if (!backups[offsetKey])
-                            backups[offsetKey] = @(rom[romOffset]);
+                        if (!_romPatchBackups[offsetKey])
+                            _romPatchBackups[offsetKey] = @(rom[romOffset]);
                         rom[romOffset] = (uint8_t)(val & 0xFF);
                     }
                     continue;

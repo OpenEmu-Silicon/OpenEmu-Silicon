@@ -294,7 +294,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         return cached
     }
 
-    /// Synchronous lookup for feedback-file migration \u2014 reads the local cache only, no network fetch.
+    /// Synchronous lookup for feedback-file migration — reads the local cache only, no network fetch.
     /// Returns nil if this game has no cache yet (nothing to reconcile against).
     func migrationLookup(forMD5 md5: String, systemIdentifier: String) -> (gameName: String?, cheats: [(code: String, rawCode: String)])? {
         guard let cached = loadCachedCheats(md5: md5, systemIdentifier: systemIdentifier) else { return nil }
@@ -741,35 +741,31 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         return layouts
     }
 
-    /// Recomputes the MD5 of each candidate data track, matching how Libretro/Redump hash CD images.
+    /// Recomputes the MD5 of a single data track, matching how Libretro/Redump hash CD images.
     /// OpenEmu's stored MD5 for CUE-based imports hashes the playlist text file, not disc content,
     /// so it can never match the DAT — this recomputes it directly from the referenced binary.
-    private func dataTrackMD5Candidates(forCueURL cueURL: URL) -> [String] {
-        guard cueURL.pathExtension.lowercased() == "cue" else { return [] }
-
-        return parseCUEDataTrackLayouts(cueURL: cueURL).compactMap { layout in
-            guard let file = try? FileHandle(forReadingFrom: layout.fileURL) else { return nil }
-            defer { try? file.close() }
-            if layout.offset > 0 {
-                guard (try? file.seek(toOffset: UInt64(layout.offset))) != nil else { return nil }
-            }
-
-            var md5 = Insecure.MD5()
-            let bufferSize = 1024 * 1024
-            var remaining = layout.length
-
-            while true {
-                let toRead = remaining.map { min($0, bufferSize) } ?? bufferSize
-                guard toRead > 0, let data = try? file.read(upToCount: toRead), !data.isEmpty else { break }
-                md5.update(data: data)
-                if let r = remaining {
-                    remaining = r - data.count
-                    if remaining! <= 0 { break }
-                }
-            }
-
-            return md5.finalize().map { String(format: "%02X", $0) }.joined()
+    private func dataTrackMD5(for layout: CUEDataTrackLayout) -> String? {
+        guard let file = try? FileHandle(forReadingFrom: layout.fileURL) else { return nil }
+        defer { try? file.close() }
+        if layout.offset > 0 {
+            guard (try? file.seek(toOffset: UInt64(layout.offset))) != nil else { return nil }
         }
+
+        var md5 = Insecure.MD5()
+        let bufferSize = 1024 * 1024
+        var remaining = layout.length
+
+        while true {
+            let toRead = remaining.map { min($0, bufferSize) } ?? bufferSize
+            guard toRead > 0, let data = try? file.read(upToCount: toRead), !data.isEmpty else { break }
+            md5.update(data: data)
+            if let r = remaining {
+                remaining = r - data.count
+                if remaining! <= 0 { break }
+            }
+        }
+
+        return md5.finalize().map { String(format: "%02X", $0) }.joined()
     }
 
     /// Atari Lynx `.lnx` dumps prepend a 64-byte header ("LYNX" magic); the no-intro DAT
@@ -777,18 +773,11 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Returns nil when the file has no header (its MD5 already matches the DAT).
     private func headerlessLynxMD5(forROMURL romURL: URL) -> String? {
         guard let file = try? FileHandle(forReadingFrom: romURL) else { return nil }
-        defer { try? file.close() }
+        let magic = try? file.read(upToCount: 4)
+        try? file.close()
+        guard magic == Data("LYNX".utf8) else { return nil }
 
-        guard let magic = try? file.read(upToCount: 4), magic == Data("LYNX".utf8) else { return nil }
-        do { try file.seek(toOffset: 64) } catch { return nil }
-
-        var md5 = Insecure.MD5()
-        let bufferSize = 1024 * 1024
-        while let data = try? file.read(upToCount: bufferSize), !data.isEmpty {
-            md5.update(data: data)
-        }
-
-        return md5.finalize().map { String(format: "%02X", $0) }.joined()
+        return (try? FileManager.default.hashFile(at: romURL, fileOffset: 64, hashFunction: .md5))?.uppercased()
     }
 
     // MARK: - DAT Lookup
@@ -836,10 +825,13 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// disc systems, a headerless MD5 for Lynx, then the plain MD5 (falling back to serial). Shared
     /// by the no-cache fetch path and the cache-hit gameName backfill, so both resolve identically.
     private func resolveDATName(md5: String, serial: String?, romURL: URL?, systemIdentifier: String) async throws -> (name: String, libretroSystem: String)? {
-        if Self.redumpSystems.contains(systemIdentifier), let romURL {
+        if Self.redumpSystems.contains(systemIdentifier), let romURL,
+           romURL.pathExtension.lowercased() == "cue" {
             // Some discs (esp. PC Engine CD, occasionally Saturn) don't keep their identifying
-            // data on the first track — try every non-audio track's MD5 in cue order until one matches.
-            for candidate in dataTrackMD5Candidates(forCueURL: romURL) {
+            // data on the first track — try each non-audio track's MD5 in cue order, hashing one
+            // track at a time so a match on an early track skips the I/O of hashing the rest.
+            for layout in parseCUEDataTrackLayouts(cueURL: romURL) {
+                guard let candidate = dataTrackMD5(for: layout) else { continue }
                 if let result = try await lookupGameName(md5: candidate, serial: nil, systemIdentifier: systemIdentifier) {
                     return result
                 }

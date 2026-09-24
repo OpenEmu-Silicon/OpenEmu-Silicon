@@ -71,12 +71,12 @@ private struct CheatFeedbackFile: Codable {
     var systemIdentifier: String?
     /// Best-effort, for identifying the game if its MD5 no longer resolves (e.g. re-dumped ROM).
     var gameName: String?
-    /// Cartridge/disc serial, a second fallback identifier alongside MD5 \u2014 same role it already
+    /// Cartridge/disc serial, a second fallback identifier alongside MD5 — same role it already
     /// plays as a DAT lookup fallback in `LibretroCheatProvider`. Backfillable during migration
     /// since it's already stored on the ROM in the library, independent of any game/core running.
     var serial: String?
     /// RetroAchievements' own per-console game hash. Unlike `serial`, this is computed inside the
-    /// core at runtime from the loaded ROM, so it can only ever be captured at write time \u2014 never
+    /// core at runtime from the loaded ROM, so it can only ever be captured at write time — never
     /// backfilled during migration, which runs before any game or core exists.
     var raHash: String?
     var entries: [CheatFeedbackEntry]
@@ -167,32 +167,23 @@ final class CheatFeedbackService {
                    gameName: String? = nil,
                    serial: String? = nil,
                    raHash: String? = nil) {
-        let key = Self.key(for: code)
-        var file = load(md5: md5, systemIdentifier: systemIdentifier)
-            ?? CheatFeedbackFile(schemaVersion: Self.schemaVersion, md5: md5, systemIdentifier: systemIdentifier, gameName: gameName, serial: serial, raHash: raHash, entries: [])
-        file.systemIdentifier = systemIdentifier
-        file.gameName = gameName ?? file.gameName
-        file.serial = serial ?? file.serial
-        file.raHash = raHash ?? file.raHash
-
-        let existing = file.entries.first {
-            $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
+        upsertEntry(forCode: code,
+                    md5: md5,
+                    systemIdentifier: systemIdentifier,
+                    coreIdentifier: coreIdentifier,
+                    coreVersion: coreVersion,
+                    gameName: gameName,
+                    serial: serial,
+                    raHash: raHash) { existing, key in
+            CheatFeedbackEntry(code: key,
+                               coreIdentifier: coreIdentifier,
+                               coreVersion: coreVersion,
+                               status: status,
+                               notes: existing?.notes,
+                               rawCode: rawCode ?? existing?.rawCode,
+                               provider: provider ?? existing?.provider,
+                               updatedAt: Date())
         }
-
-        file.entries.removeAll {
-            $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
-        }
-
-        file.entries.append(CheatFeedbackEntry(code: key,
-                                               coreIdentifier: coreIdentifier,
-                                               coreVersion: coreVersion,
-                                               status: status,
-                                               notes: existing?.notes,
-                                               rawCode: rawCode ?? existing?.rawCode,
-                                               provider: provider ?? existing?.provider,
-                                               updatedAt: Date()))
-
-        save(file, md5: md5, systemIdentifier: systemIdentifier)
     }
 
     /// Records a personal note, replacing any previous one for the same code and core build.
@@ -209,6 +200,42 @@ final class CheatFeedbackService {
                   gameName: String? = nil,
                   serial: String? = nil,
                   raHash: String? = nil) {
+        let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newNotes = (trimmed?.isEmpty ?? true) ? nil : trimmed
+
+        upsertEntry(forCode: code,
+                    md5: md5,
+                    systemIdentifier: systemIdentifier,
+                    coreIdentifier: coreIdentifier,
+                    coreVersion: coreVersion,
+                    gameName: gameName,
+                    serial: serial,
+                    raHash: raHash) { existing, key in
+            // Don't persist an empty shell that has neither a status nor a note.
+            guard existing?.status != nil || newNotes != nil else { return nil }
+            return CheatFeedbackEntry(code: key,
+                                      coreIdentifier: coreIdentifier,
+                                      coreVersion: coreVersion,
+                                      status: existing?.status,
+                                      notes: newNotes,
+                                      rawCode: rawCode ?? existing?.rawCode,
+                                      provider: provider ?? existing?.provider,
+                                      updatedAt: Date())
+        }
+    }
+
+    /// Load-or-create the file, refresh its metadata, replace any entry for this code and core build
+    /// with the one `makeEntry` returns (or drop it if that returns `nil`), then save. Shared by
+    /// `setStatus`/`setNotes` so a new metadata field only has to be threaded through here once.
+    private func upsertEntry(forCode code: String,
+                             md5: String,
+                             systemIdentifier: String,
+                             coreIdentifier: String,
+                             coreVersion: String,
+                             gameName: String?,
+                             serial: String?,
+                             raHash: String?,
+                             makeEntry: (_ existing: CheatFeedbackEntry?, _ key: String) -> CheatFeedbackEntry?) {
         let key = Self.key(for: code)
         var file = load(md5: md5, systemIdentifier: systemIdentifier)
             ?? CheatFeedbackFile(schemaVersion: Self.schemaVersion, md5: md5, systemIdentifier: systemIdentifier, gameName: gameName, serial: serial, raHash: raHash, entries: [])
@@ -225,19 +252,8 @@ final class CheatFeedbackService {
             $0.code == key && $0.coreIdentifier == coreIdentifier && $0.coreVersion == coreVersion
         }
 
-        let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newNotes = (trimmed?.isEmpty ?? true) ? nil : trimmed
-
-        // Don't persist an empty shell that has neither a status nor a note.
-        if existing?.status != nil || newNotes != nil {
-            file.entries.append(CheatFeedbackEntry(code: key,
-                                                   coreIdentifier: coreIdentifier,
-                                                   coreVersion: coreVersion,
-                                                   status: existing?.status,
-                                                   notes: newNotes,
-                                                   rawCode: rawCode ?? existing?.rawCode,
-                                                   provider: provider ?? existing?.provider,
-                                                   updatedAt: Date()))
+        if let entry = makeEntry(existing, key) {
+            file.entries.append(entry)
         }
 
         save(file, md5: md5, systemIdentifier: systemIdentifier)
@@ -305,6 +321,10 @@ final class CheatFeedbackService {
         var config = loadMigrationConfig(at: configURL) ?? CheatFeedbackMigrationConfig(schemaVersion: 1)
         guard config.schemaVersion < Self.schemaVersion else { return }
 
+        // Only bump schemaVersion after a clean full pass: a transient directory-read failure would
+        // otherwise mark the migration done and permanently skip the unread files on later launches.
+        var cleanPass = true
+
         if let systemDirs = try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) {
             let libretro = LibretroCheatProvider()
             let openEmu = OpenEmuCheatProvider()
@@ -312,13 +332,19 @@ final class CheatFeedbackService {
             for systemDir in systemDirs {
                 guard (try? systemDir.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else { continue }
                 let systemIdentifier = systemDir.lastPathComponent
-                guard let files = try? fileManager.contentsOfDirectory(at: systemDir, includingPropertiesForKeys: nil) else { continue }
+                guard let files = try? fileManager.contentsOfDirectory(at: systemDir, includingPropertiesForKeys: nil) else {
+                    cleanPass = false
+                    continue
+                }
                 for fileURL in files where fileURL.pathExtension == "json" {
                     migrateFile(at: fileURL, systemIdentifier: systemIdentifier, libretro: libretro, openEmu: openEmu)
                 }
             }
+        } else {
+            cleanPass = false
         }
 
+        guard cleanPass else { return }
         config.schemaVersion = Self.schemaVersion
         saveMigrationConfig(config, at: configURL)
     }
