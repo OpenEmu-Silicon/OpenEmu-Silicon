@@ -26,9 +26,9 @@
 import Foundation
 import OpenEmuBase
 import CryptoKit
-import os.log
+// import os.log
 
-private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "LibretroCheatProvider")
+// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "LibretroCheatProvider")
 
 /// Cached cheat file stored on disk per game.
 private struct LibretroCachedCheatFile: Codable {
@@ -422,6 +422,9 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             guard let desc = fields["desc"], !desc.isEmpty else { continue }
 
             var code = fields["code"] ?? ""
+            // Captured before any synthesis/normalization: rawCode must stay independent of OpenEmu's
+            // own encoding (which can change between versions) so feedback correlates across releases.
+            var rawCode = code
 
             // If code is empty, try to synthesize from address + value (Format B)
             // TODO: handle big_endian and memory_search_size for multi-byte systems
@@ -435,10 +438,12 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 // Pad the address to the width the per-system raw ADDRESS:VALUE validator expects.
                 let addressHexChars = Self.formatBAddressHexChars(for: systemIdentifier)
                 code = String(format: "%0\(addressHexChars)X:%02X", addr, val)
+                // Format B has no upstream `code` text; key rawCode off the verbatim upstream fields so
+                // it survives any future change to formatBAddressHexChars padding/case.
+                rawCode = "address=\(addrStr);value=\(valStr)"
             }
 
             guard !code.isEmpty else { continue }
-            let rawCode = code
             // Normalize separators: some CHT files use ';' instead of '+'
             var cleaned = code.replacingOccurrences(of: " ", with: "")
                               .replacingOccurrences(of: ";", with: "+")

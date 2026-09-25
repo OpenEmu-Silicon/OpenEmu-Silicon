@@ -4397,7 +4397,11 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
         }
     }
 
-    for (NSString *key in _cheatList) {
+    // Sorted so the replay order is stable. When two enabled cheats write the same ROM byte (or the
+    // same RAM address), the last writer wins; NSDictionary iteration order isn't guaranteed, so
+    // without a fixed order the winning value could flip between passes when any unrelated cheat is
+    // toggled (each toggle forces a full revert + replay).
+    for (NSString *key in [_cheatList.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
         if (![_cheatList[key] boolValue]) continue;
         NSArray<NSString *> *parts = [key componentsSeparatedByString:@"+"];
         for (NSString *singleCode in parts) {

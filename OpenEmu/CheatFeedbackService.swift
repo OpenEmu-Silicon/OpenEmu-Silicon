@@ -340,7 +340,10 @@ final class CheatFeedbackService {
                     migrateFile(at: fileURL, systemIdentifier: systemIdentifier, libretro: libretro, openEmu: openEmu)
                 }
             }
-        } else {
+        } else if fileManager.fileExists(atPath: root.path) {
+            // A read failure on an existing directory should retry next launch. A root that simply
+            // doesn't exist yet (fresh install / never used feedback) has nothing to migrate — that's
+            // a clean pass, so let the version bump and short-circuit instead of re-walking forever.
             cleanPass = false
         }
 
