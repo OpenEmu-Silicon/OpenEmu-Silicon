@@ -24,6 +24,10 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import OpenEmuKit
+// import os.log
+
+// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
 
 final class BrowseOnlineCheatsViewController: NSViewController {
 
@@ -133,6 +137,15 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         emptyLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         emptyLabel.textColor = .secondaryLabelColor
         emptyLabel.alignment = .center
+        emptyLabel.maximumNumberOfLines = 0
+        emptyLabel.lineBreakMode = .byWordWrapping
+        // Selectable + editable attributes make the download link in the empty-state message clickable.
+        emptyLabel.isSelectable = true
+        emptyLabel.allowsEditingTextAttributes = true
+        // Wrap at a fixed width and don't resist compression, so the multi-line message never forces
+        // the window wider than its normal size.
+        emptyLabel.preferredMaxLayoutWidth = 320
+        emptyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         emptyLabel.isHidden = true
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyLabel)
@@ -158,10 +171,15 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
             emptyLabel.centerXAnchor.constraint(equalTo: resultsScrollView.centerXAnchor),
             emptyLabel.centerYAnchor.constraint(equalTo: resultsScrollView.centerYAnchor),
+            emptyLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
         ])
 
         updateGameInfo()
         updateResultsCountLabel()
+
+        // Refresh when the user imports the Pugsy cheat archive while this window is open (or was
+        // left open), otherwise it keeps showing the "download the file" empty state.
+        NotificationCenter.default.addObserver(self, selector: #selector(pugsyDatabaseWasImported), name: .didImportPugsyCheatFile, object: nil)
     }
 
     // MARK: - Results Table
@@ -376,7 +394,54 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     }
 
     private func updateEmptyState() {
-        emptyStateLabel?.isHidden = isLoading || !visibleCheats.isEmpty
+        let shouldShow = !isLoading && visibleCheats.isEmpty
+        emptyStateLabel?.isHidden = !shouldShow
+        guard shouldShow, let label = emptyStateLabel else { return }
+        if shouldShowPugsyImportMessage {
+            label.attributedStringValue = Self.pugsyImportMessage()
+        } else {
+            label.stringValue = NSLocalizedString("No cheats found", comment: "Browse online cheats empty table")
+        }
+    }
+
+    /// Arcade games get their cheats only from Pugsy's archive, which is MAME-specific; when the MAME
+    /// core is in use and the archive hasn't been imported yet, the empty state points the user to
+    /// download and drop it instead of a bare "No cheats found".
+    private var shouldShowPugsyImportMessage: Bool {
+        guard let document = gameDocument else { return false }
+        return document.systemPlugin.systemIdentifier == "openemu.system.arcade"
+            && document.corePlugin.bundleIdentifier == PugsyCheatProvider.mameCoreIdentifier
+            && !PugsyCheatFile.isArchiveImported
+    }
+
+    private static func pugsyImportMessage() -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.lineSpacing = 2
+
+        let baseAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraph,
+        ]
+        let linkAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+            .paragraphStyle: paragraph,
+            .link: URL.pugsyMAMECheats,
+        ]
+
+        let title = NSLocalizedString("No MAME cheat file imported yet.", comment: "Browse online cheats empty state (arcade, no Pugsy archive): title line")
+        let linkText = NSLocalizedString("Pugsy's MAME Cheats", comment: "Browse online cheats: clickable link text to Pugsy's website")
+        let instruction = String(format: NSLocalizedString("Download cheat.7z from %@ and drag it onto the OpenEmu library window.", comment: "Browse online cheats empty state (arcade, no Pugsy archive): instruction; %@ is the website link"), linkText)
+
+        let fullText = "\(title)\n\n\(instruction)"
+        let attributed = NSMutableAttributedString(string: fullText, attributes: baseAttributes)
+        let linkRange = (fullText as NSString).range(of: linkText)
+        if linkRange.location != NSNotFound {
+            attributed.setAttributes(linkAttributes, range: linkRange)
+        }
+        return attributed
     }
 
     /// Reports the match count, and says so plainly when the table is only showing
@@ -722,7 +787,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                                           comment: "Browse online cheats: disambiguates multiple cheats sharing the same name, e.g. \"99 Magic (2 of 7)\""),
                 cheat.name, index, total
             )
-            return DatabaseCheat(name: disambiguatedName, code: cheat.code, providerName: cheat.providerName)
+            return DatabaseCheat(name: disambiguatedName, code: cheat.code, providerName: cheat.providerName, rawCode: cheat.rawCode)
         }
     }
 
@@ -755,6 +820,16 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         refreshStatuses()
         refreshImportedCodeKeys()
         resultsTableView?.reloadData()
+    }
+
+    /// The Pugsy archive was (re)imported. Posted from the import background queue, so hop to main,
+    /// drop the previously-loaded (likely empty) result, and refetch.
+    @objc private func pugsyDatabaseWasImported() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.hasLoaded = false
+            self.fetchOnlineCheats()
+        }
     }
 }
 
@@ -857,8 +932,9 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
 
     private func providerIcon(for providerName: String) -> NSImage? {
         switch providerName {
-        case "OpenEmu": return NSImage(named: "cheat_provider_openemu")
-        case "Libretro": return NSImage(named: "cheat_provider_libretro")
+        case OpenEmuCheatProvider.providerName: return NSImage(named: "cheat_provider_openemu")
+        case LibretroCheatProvider.providerName: return NSImage(named: "cheat_provider_libretro")
+        case PugsyCheatProvider.providerName: return NSImage(named: "cheat_provider_pugsy")
         default: return nil
         }
     }
@@ -1026,7 +1102,9 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
     @objc private func showCodeClicked(_ sender: NSButton) {
         let row = resultsTableView.row(for: sender)
         guard row >= 0, row < visibleCheats.count else { return }
-        presentCodeDialog(for: visibleCheats[row])
+        let cheat = visibleCheats[row]
+        // log.debug("rawCode for '\(cheat.name, privacy: .public)': \(cheat.rawCode, privacy: .public)")
+        presentCodeDialog(for: cheat)
     }
 
     // MARK: - Notes Column
@@ -1093,7 +1171,12 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                 md5: md5,
                                                 systemIdentifier: document.systemPlugin.systemIdentifier,
                                                 coreIdentifier: document.corePlugin.bundleIdentifier,
-                                                coreVersion: document.corePlugin.version)
+                                                coreVersion: document.corePlugin.version,
+                                                rawCode: cheat.rawCode,
+                                                provider: cheat.providerName,
+                                                gameName: document.rom.game?.displayName,
+                                                serial: document.rom.serial,
+                                                raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
 
             if let feedback {
                 CheatFeedbackService.shared.setStatus(feedback,
@@ -1101,7 +1184,12 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                      md5: md5,
                                                      systemIdentifier: document.systemPlugin.systemIdentifier,
                                                      coreIdentifier: document.corePlugin.bundleIdentifier,
-                                                     coreVersion: document.corePlugin.version)
+                                                     coreVersion: document.corePlugin.version,
+                                                     rawCode: cheat.rawCode,
+                                                     provider: cheat.providerName,
+                                                     gameName: document.rom.game?.displayName,
+                                                     serial: document.rom.serial,
+                                                     raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
                 statuses[key] = feedback
             }
         }
@@ -1229,7 +1317,12 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
                                                  md5: md5,
                                                  systemIdentifier: document.systemPlugin.systemIdentifier,
                                                  coreIdentifier: document.corePlugin.bundleIdentifier,
-                                                 coreVersion: document.corePlugin.version)
+                                                 coreVersion: document.corePlugin.version,
+                                                 rawCode: cheat.rawCode,
+                                                 provider: cheat.providerName,
+                                                 gameName: document.rom.game?.displayName,
+                                                 serial: document.rom.serial,
+                                                 raHash: document.retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
         }
 
         // Re-filtered rather than redrawn: the new status may exclude this row.
@@ -1288,7 +1381,7 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
 
         switch state {
         case .notImported:
-            gameDocument?.addImportedCheat(code: cheat.code, name: cheat.name, providerName: cheat.providerName)
+            gameDocument?.addImportedCheat(code: cheat.code, name: cheat.name, providerName: cheat.providerName, rawCode: cheat.rawCode)
         case .importedByThisFeature:
             // Blocks on the "did it work" prompt, so statuses are re-read once it returns.
             gameDocument?.removeImportedCheat(code: cheat.code)

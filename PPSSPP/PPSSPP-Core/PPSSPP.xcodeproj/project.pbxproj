@@ -688,6 +688,9 @@
 		8CAFC1011785B4D900647A96 /* StringUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAFA82F1785B3C200647A96 /* StringUtils.cpp */; };
 		8CAFC1231785B6C400647A96 /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CAFC1221785B6C400647A96 /* OpenEmuBase.framework */; };
 		8CAFC1261785B6F700647A96 /* PPSSPPGameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8CAFC1251785B6F700647A96 /* PPSSPPGameCore.mm */; };
+		OE0PPSP0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0PPSP0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1 -Dmd5_init=rc_md5_init -Dmd5_append=rc_md5_append -Dmd5_finish=rc_md5_finish -Dmd5_process=rc_md5_process"; }; };
+		OE0PPSP0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PPSP0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0PPSP0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PPSP0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		8CAFC17D1785C3AD00647A96 /* GeDisasm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAFBABD1785B3D200647A96 /* GeDisasm.cpp */; };
 		8CAFC17F1785C3AD00647A96 /* GPUCommon.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAFBAD81785B3D200647A96 /* GPUCommon.cpp */; };
 		8CAFC1821785C3AD00647A96 /* GPUState.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8CAFBADB1785B3D200647A96 /* GPUState.cpp */; };
@@ -2316,6 +2319,10 @@
 		8CAFC1221785B6C400647A96 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAFC1241785B6F700647A96 /* PPSSPPGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PPSSPPGameCore.h; sourceTree = "<group>"; };
 		8CAFC1251785B6F700647A96 /* PPSSPPGameCore.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PPSSPPGameCore.mm; sourceTree = "<group>"; };
+		OE0PPSP0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0PPSP0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0PPSP0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0PPSP0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		8CAFC12E1785B93F00647A96 /* libnative.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libnative.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAFC1631785C33D00647A96 /* libGPU.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libGPU.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CAFC18C1785C48600647A96 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
@@ -6247,6 +6254,10 @@
 				8CB3FB7A1786D2E500A3C50D /* OEPSPSystemResponderClient.h */,
 				8CAFC1241785B6F700647A96 /* PPSSPPGameCore.h */,
 				8CAFC1251785B6F700647A96 /* PPSSPPGameCore.mm */,
+				OE0PPSP0FILEREF000000001 /* rcheevos_build.c */,
+				OE0PPSP0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0PPSP0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0PPSP0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				8CC4D25E178C7EC00094E987 /* NativeApp.cpp */,
 			);
 			name = Classes;
@@ -9253,6 +9264,9 @@
 				3E3044D31F224F0900B06252 /* NativeApp.cpp in Sources */,
 				EE76806720C892F9006470A2 /* OpenEmuGLContext.cpp in Sources */,
 				8CAFC1261785B6F700647A96 /* PPSSPPGameCore.mm in Sources */,
+				OE0PPSP0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0PPSP0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0PPSP0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -10369,6 +10383,9 @@
 					"\"$(SRCROOT)/ppsspp/ffmpeg/macosx/universal/include\"",
 					"\"$(SRCROOT)/ppsspp/ext/zstd/lib\"",
 					"\"$(SRCROOT)/../../OpenEmu/SystemPlugins/PSP\"",
+					"\"$(SRCROOT)/../../Vendor/rcheevos/include\"",
+					"\"$(SRCROOT)/../../Vendor/rcheevos/src\"",
+					"\"$(SRCROOT)/../../OpenEmuKit/Source\"",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -10421,6 +10438,9 @@
 					"\"$(SRCROOT)/ppsspp/ffmpeg/macosx/universal/include\"",
 					"\"$(SRCROOT)/ppsspp/ext/zstd/lib\"",
 					"\"$(SRCROOT)/../../OpenEmu/SystemPlugins/PSP\"",
+					"\"$(SRCROOT)/../../Vendor/rcheevos/include\"",
+					"\"$(SRCROOT)/../../Vendor/rcheevos/src\"",
+					"\"$(SRCROOT)/../../OpenEmuKit/Source\"",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";

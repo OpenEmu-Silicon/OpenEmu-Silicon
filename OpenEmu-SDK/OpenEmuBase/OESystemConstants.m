@@ -41,11 +41,26 @@ NSString *const OESystemIdentifierSMS        = @"openemu.system.sms";
 NSString *const OESystemIdentifierGameGear   = @"openemu.system.gg";
 NSString *const OESystemIdentifierSG1000     = @"openemu.system.sg1000";
 NSString *const OESystemIdentifierColecoVision = @"openemu.system.colecovision";
+NSString *const OESystemIdentifierMSX          = @"openemu.system.msx";
 NSString *const OESystemIdentifierSegaCD     = @"openemu.system.scd";
 NSString *const OESystemIdentifierSega32X    = @"openemu.system.32x";
 NSString *const OESystemIdentifierAtari2600  = @"openemu.system.2600";
+NSString *const OESystemIdentifier5200       = @"openemu.system.5200";
+NSString *const OESystemIdentifier7800       = @"openemu.system.7800";
+NSString *const OESystemIdentifierOdyssey2   = @"openemu.system.odyssey2";
+NSString *const OESystemIdentifierLynx       = @"openemu.system.lynx";
+NSString *const OESystemIdentifierNGP        = @"openemu.system.ngp";
+NSString *const OESystemIdentifierPCE        = @"openemu.system.pce";
+NSString *const OESystemIdentifierPCECD      = @"openemu.system.pcecd";
 NSString *const OESystemIdentifierPSX        = @"openemu.system.psx";
+NSString *const OESystemIdentifierPSP        = @"openemu.system.psp";
 NSString *const OESystemIdentifierSaturn     = @"openemu.system.saturn";
+NSString *const OESystemIdentifierVB         = @"openemu.system.vb";
+NSString *const OESystemIdentifierWS         = @"openemu.system.ws";
+NSString *const OESystemIdentifierPCFX       = @"openemu.system.pcfx";
+NSString *const OESystemIdentifierPokeMini   = @"openemu.system.pokemonmini";
+NSString *const OESystemIdentifierVectrex    = @"openemu.system.vectrex";
+NSString *const OESystemIdentifierSupervision = @"openemu.system.sv";
 
 // MARK: - Cheat Code Type Strings
 
@@ -53,4 +68,5 @@ NSString *const OECheatTypeGameShark    = @"GameShark";
 NSString *const OECheatTypeActionReplay = @"Action Replay";
 NSString *const OECheatTypeGameGenie    = @"Game Genie";
 NSString *const OECheatTypeRaw          = @"Raw";
+NSString *const OECheatTypeCWCheat      = @"CWCheat";
 NSString *const OECheatTypeUnknown      = @"Unknown";

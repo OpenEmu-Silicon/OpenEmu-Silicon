@@ -16,6 +16,7 @@ uint8 *memorymap_getUpperRomBank(void);
 uint8 *memorymap_getLowerRomBank(void);
 uint8 *memorymap_getRegisters(void);
 uint8 *memorymap_getRomPointer(void);
+uint32 memorymap_getRomSize(void);
 
 extern uint8	*memorymap_programRom;
 extern uint8	*memorymap_lowerRam;

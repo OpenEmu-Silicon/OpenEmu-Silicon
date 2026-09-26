@@ -43,11 +43,26 @@ extern NSString *const OESystemIdentifierSMS;
 extern NSString *const OESystemIdentifierGameGear;
 extern NSString *const OESystemIdentifierSG1000;
 extern NSString *const OESystemIdentifierColecoVision;
+extern NSString *const OESystemIdentifierMSX;
 extern NSString *const OESystemIdentifierSegaCD;
 extern NSString *const OESystemIdentifierSega32X;
 extern NSString *const OESystemIdentifierAtari2600;
+extern NSString *const OESystemIdentifier5200;
+extern NSString *const OESystemIdentifier7800;
+extern NSString *const OESystemIdentifierOdyssey2;
+extern NSString *const OESystemIdentifierLynx;
+extern NSString *const OESystemIdentifierNGP;
+extern NSString *const OESystemIdentifierPCE;
+extern NSString *const OESystemIdentifierPCECD;
 extern NSString *const OESystemIdentifierPSX;
+extern NSString *const OESystemIdentifierPSP;
 extern NSString *const OESystemIdentifierSaturn;
+extern NSString *const OESystemIdentifierVB;
+extern NSString *const OESystemIdentifierWS;
+extern NSString *const OESystemIdentifierPCFX;
+extern NSString *const OESystemIdentifierPokeMini;
+extern NSString *const OESystemIdentifierVectrex;
+extern NSString *const OESystemIdentifierSupervision;
 
 // MARK: - Cheat Code Type Strings
 
@@ -55,6 +70,7 @@ extern NSString *const OECheatTypeGameShark;
 extern NSString *const OECheatTypeActionReplay;
 extern NSString *const OECheatTypeGameGenie;
 extern NSString *const OECheatTypeRaw;
+extern NSString *const OECheatTypeCWCheat;
 extern NSString *const OECheatTypeUnknown;
 
 NS_ASSUME_NONNULL_END

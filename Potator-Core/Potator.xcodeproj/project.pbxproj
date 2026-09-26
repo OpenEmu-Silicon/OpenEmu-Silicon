@@ -38,6 +38,9 @@
 		8379653D1A6154B700A8DE5C /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8379653C1A6154B700A8DE5C /* OpenEmuBase.framework */; };
 		837965401A6154D800A8DE5C /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8379653F1A6154D800A8DE5C /* Cocoa.framework */; };
 		837965421A61570F00A8DE5C /* log.c in Sources */ = {isa = PBXBuildFile; fileRef = 837965171A614E8900A8DE5C /* log.c */; };
+		OE0POTA0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0POTA0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0POTA0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0POTA0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0POTA0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0POTA0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +89,10 @@
 		8379653C1A6154B700A8DE5C /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		8379653F1A6154D800A8DE5C /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
 		837965411A6154FD00A8DE5C /* OESVSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OESVSystemResponderClient.h; path = ../../OpenEmu/SystemPlugins/Supervision/OESVSystemResponderClient.h; sourceTree = "<group>"; };
+		OE0POTA0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0POTA0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0POTA0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0POTA0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +132,10 @@
 				837965411A6154FD00A8DE5C /* OESVSystemResponderClient.h */,
 				837965391A61543C00A8DE5C /* SVGameCore.h */,
 				8379653A1A61543C00A8DE5C /* SVGameCore.mm */,
+				OE0POTA0FILEREF000000001 /* rcheevos_build.c */,
+				OE0POTA0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0POTA0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0POTA0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				8379650E1A614E8900A8DE5C /* common */,
 			);
 			path = Potator;
@@ -292,6 +303,9 @@
 				8379652E1A614E8900A8DE5C /* interrupts.c in Sources */,
 				8379652C1A614E8900A8DE5C /* controls.c in Sources */,
 				8379653B1A61543C00A8DE5C /* SVGameCore.mm in Sources */,
+				OE0POTA0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0POTA0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0POTA0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,6 +401,11 @@
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = Potator/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:identifier}";
@@ -401,6 +420,11 @@
 			buildSettings = {
 				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = Potator/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Bundles";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:identifier}";

@@ -26,6 +26,7 @@
 
 #import "ATR800GameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import "OEA8SystemResponderClient.h"
 #import "OE5200SystemResponderClient.h"
 #import <OpenGL/gl.h>
@@ -82,6 +83,7 @@ typedef struct {
     uint8_t *_renderTarget;
     uint8_t *_soundBuffer;
 	ATR5200ControllerState controllerStates[4];
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 - (ATR5200ControllerState)controllerStateForPlayer:(NSUInteger)playerNum;
 //int16_t convertSample(uint8_t);
@@ -245,6 +247,23 @@ static ATR800GameCore *_currentCore;
 {
     Atari800_Frame();
 
+    // Direct RAM pokes (mempatch style): re-applied every frame since nothing else
+    // preserves them across the emulated CPU's own writes to the same addresses.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location != NSNotFound) {
+                unsigned int addr = 0, val = 0;
+                if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+                if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                if (addr > 0xFFFF) continue;
+                MEMORY_dPutByte((UWORD)addr, (UBYTE)val);
+            }
+        }
+    }
+
     // Convert palette-indexed Screen_atari to BGRA directly into the Metal-accessible
     // render target set by getVideoBufferWithHint:. Doing this here (after Atari800_Frame)
     // rather than inside getVideoBufferWithHint: ensures the buffer is always current in
@@ -352,6 +371,36 @@ static ATR800GameCore *_currentCore;
 {
     BOOL success = StateSav_ReadAtariState(fileName.fileSystemRepresentation, "rb");
     if(block) block(success==YES, nil);
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // 5200 RAM is 0x0000-0x3FFF (see MEMORY_InitialiseMachine); 0x4000-0xFFFF is BIOS/cartridge ROM.
+    if (![[self systemIdentifier] isEqualToString:@"openemu.system.5200"])
+        return @[];
+
+    NSData *data = [NSData dataWithBytes:MEMORY_mem length:0x4000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0x0000
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 #pragma mark - Input

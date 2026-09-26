@@ -27,9 +27,16 @@
 #import "blueMSXGameCore.h"
 #import <OpenEmuBase/OEGameCoreController.h>
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "OEMSXSystemResponderClient.h"
 #import "OEColecoVisionSystemResponderClient.h"
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #include "ArchInput.h"
 #include "ArchNotifications.h"
@@ -41,6 +48,9 @@
 #include "Casette.h"
 #include "Emulator.h"
 #include "Board.h"
+#include "Coleco.h"
+#include "MSX.h"
+#include "SlotManager.h"
 #include "Language.h"
 #include "LaunchFile.h"
 #include "PrinterIO.h"
@@ -77,6 +87,8 @@
     Properties *properties;
     Video *video;
     Mixer *mixer;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 
 - (void)initializeEmulator;
@@ -86,6 +98,43 @@
 static blueMSXGameCore *_core;
 static Int32 mixAudio(void *param, Int16 *buffer, UInt32 count);
 static int framebufferScanline = 0;
+
+// rcheevos ColecoVision map: virtual 0x0000-0x03FF == real 0x6000-0x63FF System RAM (see
+// rc_memory_regions_colecovision) -- colecoGetRam() is already RAM-relative, same as the
+// cheat search descriptor, so no rebasing is needed here.
+static uint32_t bluemsx_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                        uint32_t num_bytes, rc_client_t *client)
+{
+    UInt8 *ram = colecoGetRam();
+    if (!ram) return 0;
+
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i >= 0x400)
+            return i;
+        buffer[i] = ram[address + i];
+    }
+    return num_bytes;
+}
+
+// rcheevos MSX map exposes the raw linear main RAM contiguously (rc_memory_regions_msx),
+// not the Z80's banked logical view. rc_client passes the region-relative address, so index
+// msxGetRamData() directly and stop at the emulated RAM size.
+static uint32_t bluemsx_rc_read_memory_msx(uint32_t address, uint8_t *buffer,
+                                            uint32_t num_bytes, rc_client_t *client)
+{
+    UInt8 *ram = msxGetRamData();
+    UInt32 ramSize = msxGetRamSize();
+    if (!ram || ramSize == 0) return 0;
+
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i >= ramSize)
+            return i;
+        buffer[i] = ram[address + i];
+    }
+    return num_bytes;
+}
 
 @implementation blueMSXGameCore
 
@@ -105,10 +154,33 @@ static int framebufferScanline = 0;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(_videoBuffer);
     propDestroy(properties);
     mixerSetWriteCallback(mixer, NULL, NULL, 0);
     mixerDestroy(mixer);
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 - (void)initializeEmulator
@@ -298,11 +370,21 @@ static int framebufferScanline = 0;
 
     tryLaunchUnknownFile(properties, [fileToLoad UTF8String], YES);
 
+    // The emulated RAM (colecoGetRam() / msxGetRamData()) only becomes valid once
+    // tryLaunchUnknownFile has built the board, so the memory reader is gated open here
+    // rather than in loadFileAtPath (bridge/observer registration already happened there,
+    // so the helper's post-load token replay still lands).
+    if (_raBridge)
+        [_raBridge markROMReady];
+
     [super startEmulation];
 }
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     emulatorSuspend();
     emulatorStop();
 
@@ -321,6 +403,7 @@ static int framebufferScanline = 0;
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     actionEmuResetSoft();
 }
 
@@ -548,6 +631,36 @@ static int framebufferScanline = 0;
 {
     // Update controls
     memcpy(eventMap, _core->virtualCodeMap, sizeof(_core->virtualCodeMap));
+
+    // Raw pokes (ColecoVision/MSX only): re-applied every frame since nothing
+    // else preserves them across the emulated CPU's own writes to the same addresses.
+    BOOL isColeco = [[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"];
+    BOOL isMSX = [[self systemIdentifier] isEqualToString:@"openemu.system.msx"];
+    // colecoGetRam() is NULL until the board finishes initializing; MSX pokes go through
+    // slotWrite instead, which has no such startup window.
+    UInt8 *ram = isColeco ? colecoGetRam() : NULL;
+    if (isMSX || ram)
+    {
+        for (NSString *key in _cheatList)
+        {
+            if (![_cheatList[key] boolValue]) continue;
+            NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+            for (NSString *singleCode in codes)
+            {
+                NSRange colonRange = [singleCode rangeOfString:@":"];
+                if (colonRange.location == NSNotFound) continue;
+                unsigned int addr = 0, val = 0;
+                if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+                if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                if (isColeco)
+                    ram[addr & 0x3FF] = (UInt8)val;
+                else
+                    slotWrite(NULL, (UInt16)addr, (UInt8)val);
+            }
+        }
+    }
+
+    [_raBridge doFrame];
 }
 
 - (NSTimeInterval)frameInterval
@@ -574,6 +687,25 @@ static int framebufferScanline = 0;
 
     fileToLoad = path;
 
+    // Bridge/observer must be registered here, not in startEmulation: the helper replays
+    // the cached RA token immediately after loadFileAtPath returns, and a bridge created
+    // later would miss that one-time replay and never log in / show the boot placard.
+    // markROMReady is deferred to startEmulation, once the emulated RAM is actually valid.
+    if ([[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
+    {
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:bluemsx_rc_read_memory
+                                                               consoleID:RC_CONSOLE_COLECOVISION];
+        [_raBridge startWithROMPath:path];
+    }
+    else if ([[self systemIdentifier] isEqualToString:@"openemu.system.msx"])
+    {
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:bluemsx_rc_read_memory_msx
+                                                               consoleID:RC_CONSOLE_MSX];
+        [_raBridge startWithROMPath:path];
+    }
+
     return YES;
 }
 
@@ -595,6 +727,58 @@ static int framebufferScanline = 0;
 
         block(YES, nil);
     });
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if ([[self systemIdentifier] isEqualToString:@"openemu.system.msx"])
+    {
+        // Dumps the Z80's current logical view of the full address space (whatever is
+        // banked in via slots/subslots right now), same as the built-in debugger does.
+        NSMutableData *memData = [NSMutableData dataWithLength:0x10000];
+        UInt8 *mem = (UInt8 *)memData.mutableBytes;
+        for (int i = 0; i < 0x10000; i++)
+            mem[i] = slotPeek(NULL, (UInt16)i);
+
+        return @[
+            [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                  address:0x0000
+                                             addressBytes:2
+                                                     data:memData]
+        ];
+    }
+
+    if (![[self systemIdentifier] isEqualToString:@"openemu.system.colecovision"])
+        return @[];
+
+    UInt8 *ram = colecoGetRam();
+    if (!ram) return @[];
+
+    // Reported at 0x0000 (not the real $6000 CPU address) to match CrabEmu/JollyCV's
+    // RAM-relative addressing for cheat search and imported cheats.
+    NSData *ramData = [NSData dataWithBytes:ram length:0x400];
+    return @[
+        [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                              address:0x0000
+                                         addressBytes:2
+                                                 data:ramData]
+    ];
 }
 
 #pragma mark - OE Video

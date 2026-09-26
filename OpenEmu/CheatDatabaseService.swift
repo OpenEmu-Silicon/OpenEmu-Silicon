@@ -34,19 +34,31 @@ struct DatabaseCheat: Sendable {
     let name: String
     let code: String
     let providerName: String
+    /// Unmodified text as published by the provider, before normalization. Not shown to the user;
+    /// carried through for future cheat feedback correlation. Mandatory: every provider reads from
+    /// some source text, even when that text equals `code` (e.g. `OpenEmuCheatProvider`, which
+    /// applies no normalization).
+    let rawCode: String
+
+    init(name: String, code: String, providerName: String, rawCode: String) {
+        self.name = name
+        self.code = code
+        self.providerName = providerName
+        self.rawCode = rawCode
+    }
 }
 
 /// A source of cheat codes for a given system and ROM.
 protocol CheatDatabaseProvider {
     var name: String { get }
     func supportsSystem(_ systemIdentifier: String) -> Bool
-    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String) async throws -> [DatabaseCheat]
+    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, coreIdentifier: String) async throws -> [DatabaseCheat]
 }
 
 /// Facade that aggregates cheat database providers and presents a unified interface to the UI.
 final class CheatDatabaseService {
 
-    static let shared = CheatDatabaseService(providers: [OpenEmuCheatProvider(), LibretroCheatProvider()])
+    static let shared = CheatDatabaseService(providers: [OpenEmuCheatProvider(), LibretroCheatProvider(), PugsyCheatProvider()])
 
     private let providers: [CheatDatabaseProvider]
 
@@ -65,7 +77,7 @@ final class CheatDatabaseService {
         var results: [DatabaseCheat] = []
         var seenCodes: Set<String> = []
         for provider in providers where provider.supportsSystem(systemIdentifier) {
-            let providerCheats = try await provider.cheats(forMD5: md5, serial: serial, gameName: gameName, romURL: romURL, systemIdentifier: systemIdentifier)
+            let providerCheats = try await provider.cheats(forMD5: md5, serial: serial, gameName: gameName, romURL: romURL, systemIdentifier: systemIdentifier, coreIdentifier: coreIdentifier)
             for cheat in providerCheats {
                 guard CheatCodeValidator.isValid(code: cheat.code, systemIdentifier: systemIdentifier, coreIdentifier: coreIdentifier) else {
                     // log.info("Skipping invalid cheat code: \(cheat.code) (\(cheat.name)) from \(provider.name)")
