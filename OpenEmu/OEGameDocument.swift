@@ -1679,12 +1679,12 @@ final class OEGameDocument: NSDocument {
 
     /// `cheatSource` (the provider name) is what marks this as Browse Online Cheats-imported,
     /// distinguishing it from cheats added manually or via Cheat Search.
-    func addImportedCheat(code: String, name: String, providerName: String) {
+    func addImportedCheat(code: String, name: String, providerName: String, rawCode: String? = nil) {
         // BSNES is the only core that reads the cheat type — it strips ':' from raw
         // address:value codes only when tagged Raw/Action Replay. Everyone else ignores
         // the type or strips the colon itself, so the code shape is all we need.
         let type = code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark
-        let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName)
+        let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode)
         cheat.isEnabled = true
         setCheat(cheat)
         cheats.append(cheat)
@@ -1704,7 +1704,7 @@ final class OEGameDocument: NSDocument {
         }
         cheats.remove(at: index)
         saveUserCheats()
-        promptCheatRemovalFeedback(code: cheat.code)
+        promptCheatRemovalFeedback(cheat)
     }
     
     /// In order to load cheats, we need the core plugin and the ROM to be set.
@@ -1886,6 +1886,42 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { p in
                         p.count == 12 && p.allSatisfy { $0.isHexDigit }
                     }
+                }
+            )
+        case OESystemIdentifierPCE:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Physical (F82DBA:02) or linear (1F0083:02) address. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, PC Engine"),
+                validationHint: NSLocalizedString("PC Engine codes must be a 6 hex digit address plus a 2 hex digit value, e.g. F82DBA:02 or 1F0083:02.", comment: "Add Cheat validation hint, PC Engine"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isPCECode(String($0)) }
+                }
+            )
+        case OESystemIdentifierSaturn:
+            return CheatFormat(
+                placeholder: NSLocalizedString("12 hex chars per code, e.g. 16073358 0003. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Saturn"),
+                validationHint: NSLocalizedString("Saturn Action Replay codes must be 12 hex characters (8-char address + 4-char value), e.g. 16073358 0003. The first hex digit must be 1 (word write) or 3 (byte write).", comment: "Add Cheat validation hint, Saturn"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isSaturnActionReplayCode(String($0)) }
+                }
+            )
+        case OESystemIdentifierVB:
+            return CheatFormat(
+                placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
+                validationHint: NSLocalizedString("Virtual Boy codes must be an 8 hex digit address plus a 2 hex digit value, e.g. 05001234:FF. Only raw WRAM writes are supported (address 0500xxxx-0501xxxx); no Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Virtual Boy"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), addressHexChars: 8, valueHexChars: 2) }
                 }
             )
         default:
@@ -2169,13 +2205,13 @@ final class OEGameDocument: NSDocument {
         // Only imported cheats have known-good/bad feedback worth asking about — manual/Cheat Search
         // codes aren't sourced from a shared database, so there's nothing to report back against.
         if cheat.cheatSource != nil {
-            promptCheatRemovalFeedback(code: cheat.code)
+            promptCheatRemovalFeedback(cheat)
         }
     }
 
     /// Shared by every place a cheat gets removed — the menu's Remove item and Browse Online
     /// Cheats' Remove button — so the "did it work" report is asked consistently either way.
-    func promptCheatRemovalFeedback(code: String) {
+    func promptCheatRemovalFeedback(_ cheat: Cheat) {
         guard let md5 = rom.md5Hash else { return }
 
         let existingStatuses = CheatFeedbackService.shared.statuses(forMD5: md5,
@@ -2183,7 +2219,7 @@ final class OEGameDocument: NSDocument {
                                                                     coreIdentifier: corePlugin.bundleIdentifier,
                                                                     coreVersion: corePlugin.version)
         // Already reported on for this core build — don't ask again for a value the user already gave.
-        guard existingStatuses[CheatFeedbackService.key(for: code)] == nil else { return }
+        guard existingStatuses[CheatFeedbackService.key(for: cheat.code)] == nil else { return }
 
         let alert = OEAlert()
         alert.messageText = NSLocalizedString("Cheat Removed", comment: "Cheat removal feedback dialog title")
@@ -2202,11 +2238,16 @@ final class OEGameDocument: NSDocument {
         }
 
         CheatFeedbackService.shared.setStatus(status,
-                                             forCode: code,
+                                             forCode: cheat.code,
                                              md5: md5,
                                              systemIdentifier: systemPlugin.systemIdentifier,
                                              coreIdentifier: corePlugin.bundleIdentifier,
-                                             coreVersion: corePlugin.version)
+                                             coreVersion: corePlugin.version,
+                                             rawCode: cheat.rawCode,
+                                             provider: cheat.cheatSource,
+                                             gameName: rom.game?.displayName,
+                                             serial: rom.serial,
+                                             raHash: retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
     }
 
     /// expects `sender.representedObject` to be a `Cheat` object
@@ -2231,7 +2272,12 @@ final class OEGameDocument: NSDocument {
                                              md5: md5,
                                              systemIdentifier: systemPlugin.systemIdentifier,
                                              coreIdentifier: corePlugin.bundleIdentifier,
-                                             coreVersion: corePlugin.version)
+                                             coreVersion: corePlugin.version,
+                                             rawCode: cheat.rawCode,
+                                             provider: cheat.cheatSource,
+                                             gameName: rom.game?.displayName,
+                                             serial: rom.serial,
+                                             raHash: retroAchievementsSessionInfo?[OERetroAchievementsGameHashKey] as? String)
     }
 
     func setCheat(_ cheat: Cheat) {
