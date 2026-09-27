@@ -43,10 +43,19 @@ final class OpenEmuCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         return database[systemIdentifier]?[md5.lowercased()] ?? []
     }
 
+    /// Synchronous lookup for feedback-file migration — the bundled database needs no network fetch.
+    func migrationLookup(forMD5 md5: String, systemIdentifier: String) -> (gameName: String?, cheats: [DatabaseCheat])? {
+        loadIfNeeded()
+        guard let cheats = database[systemIdentifier]?[md5.lowercased()], !cheats.isEmpty else { return nil }
+        return (gameNames[systemIdentifier]?[md5.lowercased()], cheats)
+    }
+
     // MARK: - XML Parsing
 
     // systemIdentifier → [lowercased MD5 → [DatabaseCheat]]
     private var database: [String: [String: [DatabaseCheat]]] = [:]
+    // systemIdentifier → [lowercased MD5 → game title], for feedback-file migration only.
+    private var gameNames: [String: [String: String]] = [:]
     private var loaded = false
     // supportsSystem (main thread) and cheats (off-actor) both trigger the lazy load; serialize it.
     private let loadLock = NSLock()
@@ -69,6 +78,7 @@ final class OpenEmuCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         parser.delegate = delegate
         parser.parse()
         database = delegate.result
+        gameNames = delegate.gameNames
         // let totalCheats = database.values.flatMap(\.values).flatMap({ $0 }).count
         // log.info("Loaded bundled cheat database: \(totalCheats) cheats")
     }
@@ -78,10 +88,13 @@ private class CheatXMLParserDelegate: NSObject, XMLParserDelegate {
     let providerName: String
     // systemIdentifier → [lowercased MD5 → [DatabaseCheat]]
     var result: [String: [String: [DatabaseCheat]]] = [:]
+    // systemIdentifier → [lowercased MD5 → game title]
+    var gameNames: [String: [String: String]] = [:]
 
     private var currentSystem: String?
     private var currentMD5s: [String] = []
     private var currentCheats: [DatabaseCheat] = []
+    private var currentGameName: String?
 
     init(providerName: String) {
         self.providerName = providerName
@@ -94,13 +107,15 @@ private class CheatXMLParserDelegate: NSObject, XMLParserDelegate {
         case "game":
             currentMD5s = []
             currentCheats = []
+            currentGameName = attributeDict["title"]
         case "hash":
             if let md5 = attributeDict["md5"] {
                 currentMD5s.append(md5.lowercased())
             }
         case "cheat":
             if let code = attributeDict["code"], let desc = attributeDict["description"], !code.isEmpty {
-                currentCheats.append(DatabaseCheat(name: desc, code: code, providerName: providerName))
+                // This provider does no normalization, so the stored code is already the raw source text.
+                currentCheats.append(DatabaseCheat(name: desc, code: code, providerName: providerName, rawCode: code))
             }
         default:
             break
@@ -111,6 +126,9 @@ private class CheatXMLParserDelegate: NSObject, XMLParserDelegate {
         guard elementName == "game", let system = currentSystem, !currentCheats.isEmpty else { return }
         for md5 in currentMD5s {
             result[system, default: [:]][md5] = currentCheats
+            if let currentGameName {
+                gameNames[system, default: [:]][md5] = currentGameName
+            }
         }
     }
 }

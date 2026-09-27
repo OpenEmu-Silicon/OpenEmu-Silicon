@@ -32,18 +32,22 @@ final class Cheat: Codable {
     var name: String
     var isEnabled = false
     var cheatSource: String?
+    /// Unmodified text as published by the provider, before normalization. Not shown to the user;
+    /// carried through for future cheat feedback correlation. `nil` for manual/Cheat Search entries.
+    var rawCode: String?
     /// Set at runtime; not persisted. False when the current core can't handle this code format.
     var isCompatibleWithCore = true
 
     private enum CodingKeys: String, CodingKey {
-        case code, type, name, isEnabled, cheatSource
+        case code, type, name, isEnabled, cheatSource, rawCode
     }
 
-    init(code: String, type: String, name: String, cheatSource: String? = nil) {
+    init(code: String, type: String, name: String, cheatSource: String? = nil, rawCode: String? = nil) {
         self.code = code
         self.type = type
         self.name = name
         self.cheatSource = cheatSource
+        self.rawCode = rawCode
     }
 
     init(from decoder: Decoder) throws {
@@ -53,6 +57,7 @@ final class Cheat: Codable {
         name = try c.decode(String.self, forKey: .name)
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
         cheatSource = try c.decodeIfPresent(String.self, forKey: .cheatSource)
+        rawCode = try c.decodeIfPresent(String.self, forKey: .rawCode)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -62,5 +67,6 @@ final class Cheat: Codable {
         try c.encode(name, forKey: .name)
         try c.encode(isEnabled, forKey: .isEnabled)
         try c.encodeIfPresent(cheatSource, forKey: .cheatSource)
+        try c.encodeIfPresent(rawCode, forKey: .rawCode)
     }
 }

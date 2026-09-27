@@ -901,3 +901,6 @@ extern "C" uint8_t *MDFNWS_GetRAMPointer(void) { return MDFN_IEN_WSWAN::wsRAM; }
 extern "C" uint32_t MDFNWS_GetRAMSize(void) { return MDFN_IEN_WSWAN::wsRAMSize; }
 extern "C" uint8_t *MDFNWS_GetSRAMPointer(void) { return MDFN_IEN_WSWAN::wsSRAM; }
 extern "C" uint32_t MDFNWS_GetSRAMSize(void) { return MDFN_IEN_WSWAN::sram_size; }
+// Not a mempatcher page (ROM isn't registered via MDFNMP_AddRAM); setCheat: pokes this buffer directly for ROM-patch cheats.
+extern "C" uint8_t *MDFNWS_GetROMPointer(void) { return MDFN_IEN_WSWAN::wsCartROM; }
+extern "C" uint32_t MDFNWS_GetROMSize(void) { return MDFN_IEN_WSWAN::rom_size; }
