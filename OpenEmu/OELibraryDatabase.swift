@@ -455,16 +455,21 @@ final class OELibraryDatabase: NSObject {
         {
             if !urlString.contains("file://") {
                 return URL(string: urlString, relativeTo: databaseFolderURL)
-            } else {
-                return URL(string: urlString)
+            } else if let absoluteURL = URL(string: urlString),
+                      (try? absoluteURL.checkResourceIsReachable()) == true {
+                return absoluteURL
             }
-        } else {
-            let result = databaseFolderURL.appendingPathComponent("roms", isDirectory: true)
-            try? FileManager.default.createDirectory(at: result, withIntermediateDirectories: true)
-            setRomsFolderURL(result)
-            
-            return result
+            // Stored path is an absolute file:// URL that no longer resolves, most likely
+            // because the library was moved to a different volume. "Change Library Location"
+            // only updates where the library itself lives, not this stored metadata, so it
+            // keeps pointing at the old, now-missing volume. Fall through and repair it below.
         }
+
+        let result = databaseFolderURL.appendingPathComponent("roms", isDirectory: true)
+        try? FileManager.default.createDirectory(at: result, withIntermediateDirectories: true)
+        setRomsFolderURL(result)
+
+        return result
     }
     
     func setRomsFolderURL(_ url: URL) {
