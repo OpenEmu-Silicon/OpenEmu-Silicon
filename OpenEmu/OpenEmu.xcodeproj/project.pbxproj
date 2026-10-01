@@ -7230,7 +7230,7 @@
 					"@loader_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.broker;
@@ -7264,7 +7264,7 @@
 					"@loader_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.broker;
@@ -7303,7 +7303,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuTests;
@@ -7342,7 +7342,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuTests;
@@ -7422,7 +7422,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				INSTALL_PATH = "";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuHelperApp;
 				PRODUCT_NAME = OpenEmuHelperApp;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -7459,7 +7459,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				INSTALL_PATH = "";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuHelperApp;
 				PRODUCT_NAME = OpenEmuHelperApp;
 				SWIFT_VERSION = 5.0;
@@ -7725,7 +7725,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -7746,7 +7746,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 11.5;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -7761,7 +7761,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLThumbnail/OpenEmuQLThumbnail.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLThumbnail/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -7775,7 +7775,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLThumbnail/OpenEmuQLThumbnail.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLThumbnail/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -7789,7 +7789,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLPreview/OpenEmuQLPreview.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLPreview/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -7803,7 +7803,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLPreview/OpenEmuQLPreview.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLPreview/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -8344,7 +8344,7 @@
 					"~/Library/Frameworks",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmu.debug;
 				PRODUCT_NAME = OpenEmu;
@@ -8389,7 +8389,7 @@
 					"~/Library/Frameworks",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = OpenEmu;
@@ -8457,7 +8457,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14.4;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_LANGUAGE_REVISION = Metal20;
 				ONLY_ACTIVE_ARCH = YES;
 				PRECOMPS_INCLUDE_HEADERS_FROM_BUILT_PRODUCTS_DIR = NO;
@@ -8523,7 +8523,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.14.4;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MTL_LANGUAGE_REVISION = Metal20;
 				PRECOMPS_INCLUDE_HEADERS_FROM_BUILT_PRODUCTS_DIR = NO;
 				SDKROOT = macosx;
