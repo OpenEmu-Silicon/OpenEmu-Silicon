@@ -694,7 +694,7 @@ static CGFloat OEHACScaleValueWithCalibration(
             #endif
             return OEHACResponseNotForUs;
         }
-
+        
         result = [NSData dataWithBytes:reply->data length:in_len];
         return OEHACResponseAccepted;
     }];
@@ -715,16 +715,19 @@ static CGFloat OEHACScaleValueWithCalibration(
 {
     OEHACRumbleAndSubcommandOutputReport report = {0};
     NSAssert(length < sizeof(report.subcmdParam), @"too much data for a single report");
-
+    
     report.reportID = OEHACOutputReportIDRumbleAndSubcommand;
     report.seqNumber = _packetCounter;
     _packetCounter = (_packetCounter + 1) & 0xF;
     report.subcmdID = cmdid;
     if (data)
         memcpy(report.subcmdParam, data, length);
-
+    
     NSData *reportData = [NSData dataWithBytes:&report length:sizeof(OEHACRumbleAndSubcommandOutputReport)];
     return [self _attemptSendingOutputReport:reportData responseHandler:^OEHACResponseVerdict(NSData *respData) {
+        /* A USB-style reply while we wait for a Bluetooth-style one is someone else's. */
+        if (respData.length < 1 || ((const uint8_t *)respData.bytes)[0] != OEHACInputReportIDSubcommandReply)
+            return OEHACResponseNotForUs;
         if ([respData length] < sizeof(OEHACAcknowledgmentHIDInputReport)) {
             NSLog(@"[dev %p] Invalid ACK from controller (subcommand %02X)", self, cmdid);
             return OEHACResponseRejected;
@@ -781,15 +784,14 @@ static CGFloat OEHACScaleValueWithCalibration(
     NSData *reportData = [NSData dataWithBytes:(void*)&report length:sizeof(OEHACUSBSubcommandOutputReport)];
     
     return [self _attemptSendingOutputReport:reportData responseHandler:^OEHACResponseVerdict(NSData *respData) {
+        /* A Bluetooth-style reply while we wait for a USB-style one is someone else's. */
+        if (respData.length < 1 || ((const uint8_t *)respData.bytes)[0] != OEHACInputReportIDUSBSubcommandReply)
+            return OEHACResponseNotForUs;
         if ([respData length] < sizeof(OEHACUSBAcknowledgmentOutputReport)) {
             NSLog(@"[dev %p] Invalid ACK from controller (USB subcommand %02X)", self, cmdid);
             return OEHACResponseRejected;
         }
         const OEHACUSBAcknowledgmentOutputReport *response = respData.bytes;
-        if (response->reportID != OEHACInputReportIDUSBSubcommandReply) {
-            /* A Bluetooth-style reply while we wait for a USB one: not ours. */
-            return OEHACResponseNotForUs;
-        }
         if (response->subcommand != cmdid) {
             #ifdef LOG_COMMUNICATION
             NSLog(@"[dev %p] Ignoring a reply to USB subcommand %02X sent by someone else (we are waiting on %02X)", self, response->subcommand, cmdid);
@@ -830,7 +832,7 @@ static CGFloat OEHACScaleValueWithCalibration(
 - (NSData *)_attemptSendingOutputReport:(NSData *)report responseHandler:(OEHACResponseVerdict (^)(NSData *respData))respHandler
 {
     NSAssert(report.length > 1, @"HID reports must be at least one byte long!");
-
+    
     NSData *ack = nil;
     BOOL sendFailed = NO;
     const uint8_t *bytes = report.bytes;
@@ -840,17 +842,17 @@ static CGFloat OEHACScaleValueWithCalibration(
     uint8_t commandID = (reportID == OEHACOutputReportIDRumbleAndSubcommand && report.length > offsetof(OEHACRumbleAndSubcommandOutputReport, subcmdID))
         ? bytes[offsetof(OEHACRumbleAndSubcommandOutputReport, subcmdID)] : reportID;
     int rejected = 0;
-
+    
     [_responseAvailable lock];
-
+    
     /* Replies that arrived before this command was sent cannot be answers to it. */
     [_pendingResponses removeAllObjects];
     _waitingForResponse = YES;
-
+    
     for (int sendAttempt = 0; sendAttempt < MAX_SEND_ATTEMPTS && ack == nil; sendAttempt++) {
         if (sendAttempt > 0)
             NSLog(@"[dev %p] No answer to command %02X after %.1f s, sending it again (attempt %d of %d)", self, commandID, RESPONSE_WAIT_SECONDS, sendAttempt + 1, MAX_SEND_ATTEMPTS);
-
+        
         #ifdef LOG_COMMUNICATION
         NSLog(@"[dev %p] sent output report %@", self, report);
         #endif
@@ -860,7 +862,7 @@ static CGFloat OEHACScaleValueWithCalibration(
             sendFailed = YES;
             break;
         }
-
+        
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:RESPONSE_WAIT_SECONDS];
         BOOL timedOut = NO;
         while (ack == nil && !timedOut && rejected < MAX_REJECTED_RESPONSES) {
@@ -868,10 +870,10 @@ static CGFloat OEHACScaleValueWithCalibration(
                 timedOut = ![_responseAvailable waitUntilDate:deadline];
             if (_pendingResponses.count == 0)
                 break;
-
+            
             NSData *response = _pendingResponses.firstObject;
             [_pendingResponses removeObjectAtIndex:0];
-
+            
             switch (respHandler(response)) {
                 case OEHACResponseAccepted:
                     ack = response;
@@ -883,21 +885,21 @@ static CGFloat OEHACScaleValueWithCalibration(
                     break;
             }
         }
-
+        
         if (rejected >= MAX_REJECTED_RESPONSES) {
             NSLog(@"[dev %p] Giving up on command %02X: the controller answered it %d times but never with usable data", self, commandID, rejected);
             break;
         }
     }
-
+    
     if (ack == nil && !sendFailed && rejected < MAX_REJECTED_RESPONSES)
         NSLog(@"[dev %p] Giving up on command %02X: no answer from the controller after %d attempts", self, commandID, MAX_SEND_ATTEMPTS);
     
     _waitingForResponse = NO;
     [_pendingResponses removeAllObjects];
-
+    
     [_responseAvailable unlock];
-
+    
     return ack;
 }
 
