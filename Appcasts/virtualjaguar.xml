@@ -4,7 +4,18 @@
   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>VirtualJaguar</title>
-        <item>
+            <item>
+      <title>VirtualJaguar 2.1.2</title>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/download/cores-v1.5.1/VirtualJaguar.oecoreplugin.zip"
+        sparkle:version="2.1.2"
+        sparkle:shortVersionString="2.1.2"
+        length="699013"
+        sparkle:edSignature="OKYlUsQy1O9fWjemXdZFcW8wiHe8mlj3ejNri64GvbNNtz1Md1TVl4gGasqVZA2F3vkzZ3F2mHFtaE6qP0YmAA=="
+        type="application/octet-stream" />
+    </item>
+<item>
       <title>VirtualJaguar 2.1.1</title>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
       <enclosure
