@@ -351,6 +351,10 @@ static CGFloat OEHACScaleValueWithCalibration(
      * A queue, not a single slot, so a burst of replies cannot overwrite the one
      * we are waiting for. */
     NSMutableArray<NSData *> *_pendingResponses;
+    /* YES while _attemptSendingOutputReport is waiting for an answer. Replies
+     * that arrive at any other time are answers to someone else's commands and
+     * are dropped, so the queue cannot grow between our own commands. */
+    BOOL _waitingForResponse;
     
     OEHACProControllerStickCalibration _leftStickCalibration;
     OEHACProControllerStickCalibration _rightStickCalibration;
@@ -828,6 +832,7 @@ static CGFloat OEHACScaleValueWithCalibration(
     NSAssert(report.length > 1, @"HID reports must be at least one byte long!");
 
     NSData *ack = nil;
+    BOOL sendFailed = NO;
     const uint8_t *bytes = report.bytes;
     uint8_t reportID = bytes[0];
     /* For a "rumble and subcommand" report, name the subcommand in log lines;
@@ -840,6 +845,7 @@ static CGFloat OEHACScaleValueWithCalibration(
 
     /* Replies that arrived before this command was sent cannot be answers to it. */
     [_pendingResponses removeAllObjects];
+    _waitingForResponse = YES;
 
     for (int sendAttempt = 0; sendAttempt < MAX_SEND_ATTEMPTS && ack == nil; sendAttempt++) {
         if (sendAttempt > 0)
@@ -850,7 +856,8 @@ static CGFloat OEHACScaleValueWithCalibration(
         #endif
         IOReturn ret = IOHIDDeviceSetReport([self device], kIOHIDReportTypeOutput, reportID, report.bytes, report.length);
         if (ret != kIOReturnSuccess) {
-            NSLog(@"[dev %p] Could not send command, error: %x", self, ret);
+            NSLog(@"[dev %p] Could not send command %02X, error: %x", self, commandID, ret);
+            sendFailed = YES;
             break;
         }
 
@@ -883,8 +890,11 @@ static CGFloat OEHACScaleValueWithCalibration(
         }
     }
 
-    if (ack == nil && rejected < MAX_REJECTED_RESPONSES)
+    if (ack == nil && !sendFailed && rejected < MAX_REJECTED_RESPONSES)
         NSLog(@"[dev %p] Giving up on command %02X: no answer from the controller after %d attempts", self, commandID, MAX_SEND_ATTEMPTS);
+    
+    _waitingForResponse = NO;
+    [_pendingResponses removeAllObjects];
 
     [_responseAvailable unlock];
 
@@ -896,12 +906,19 @@ static CGFloat OEHACScaleValueWithCalibration(
 {
     if (data[0] == OEHACInputReportIDSubcommandReply || data[0] == OEHACInputReportIDUSBSubcommandReply) {
         [_responseAvailable lock];
-        NSData *response = [NSData dataWithBytes:data length:length];
-        [_pendingResponses addObject:response];
+        if (_waitingForResponse) {
+            NSData *response = [NSData dataWithBytes:data length:length];
+            [_pendingResponses addObject:response];
+            #ifdef LOG_COMMUNICATION
+            NSLog(@"[dev %p] ack report %@", self, response);
+            #endif
+            [_responseAvailable signal];
+        }
         #ifdef LOG_COMMUNICATION
-        NSLog(@"[dev %p] ack report %@", self, response);
+        else {
+            NSLog(@"[dev %p] dropped an ack report while no command of ours was waiting: %@", self, [NSData dataWithBytes:data length:length]);
+        }
         #endif
-        [_responseAvailable signal];
         [_responseAvailable unlock];
         
     } else if (data[0] == OEHACInputReportIDFullReport && length >= sizeof(OEHACStandardHIDInputReport)) {
