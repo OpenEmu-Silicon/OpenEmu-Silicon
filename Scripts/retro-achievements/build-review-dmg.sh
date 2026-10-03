@@ -100,10 +100,13 @@ find_plugin_plist() {
     -exec grep -l "OEGameCoreClass" {} \; 2>/dev/null | head -1
 }
 
-# Parse cores from ra-core-versions.txt (skip header line)
+# Parse cores from ra-core-versions.txt (skip header line).
+# The `|| [ -n "$name" ]` guard keeps the final line even when the file has no
+# trailing newline — without it `read` returns non-zero at EOF and the loop body
+# is skipped, silently dropping the last core (this dropped ProSystem once).
 CORE_NAMES=()
 CORE_VERSIONS=()
-while IFS=' ' read -r name version; do
+while IFS=' ' read -r name version || [ -n "$name" ]; do
   [ -z "$name" ] && continue
   [[ "$name" == "Core" ]] && continue
   CORE_NAMES+=("$name")
@@ -326,8 +329,9 @@ ditto "$APP_PATH" "$STAGING_DIR/OpenEmu.app"
 step "6/8  Staging DMG assets"
 
 cp "$README_FILE" "$STAGING_DIR/readme.html"
-# Inject core versions from ra-core-versions.txt into the HTML table cells
-while IFS=' ' read -r name version; do
+# Inject core versions from ra-core-versions.txt into the HTML table cells.
+# `|| [ -n "$name" ]` keeps the final line when the file lacks a trailing newline.
+while IFS=' ' read -r name version || [ -n "$name" ]; do
   [ -z "$name" ] && continue
   [[ "$name" == "Core" ]] && continue
   sed -i '' "s|<td>${name}</td>|<td>${name} (${version})</td>|g" "$STAGING_DIR/readme.html"
