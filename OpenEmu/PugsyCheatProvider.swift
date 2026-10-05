@@ -46,20 +46,16 @@ final class PugsyCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     static let providerName = "Pugsy's"
     var name: String { Self.providerName }
 
-    /// The one system this provider covers. No `OESystemIdentifierArcade` constant exists in the
-    /// SDK, so the raw identifier string is used (matching the rest of the codebase).
-    private static let arcadeSystemIdentifier = "openemu.system.arcade"
-
     /// Pugsy's cheats are MAME-address-based, so they only apply to the MAME core — not other arcade
     /// cores (e.g. a future FinalBurn), whose memory maps differ. This is the MAME core's bundle id.
     static let mameCoreIdentifier = "org.openemu.MAME"
 
     func supportsSystem(_ systemIdentifier: String) -> Bool {
-        systemIdentifier == Self.arcadeSystemIdentifier
+        systemIdentifier == OESystemIdentifierArcade
     }
 
     func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, coreIdentifier: String) async throws -> [DatabaseCheat] {
-        guard systemIdentifier == Self.arcadeSystemIdentifier, coreIdentifier == Self.mameCoreIdentifier else { return [] }
+        guard systemIdentifier == OESystemIdentifierArcade, coreIdentifier == Self.mameCoreIdentifier else { return [] }
 
         // The arcade romset name is the ROM's filename without extension (e.g. ".../sf2.zip" → "sf2").
         // Fall back to gameName only if a romURL wasn't provided.

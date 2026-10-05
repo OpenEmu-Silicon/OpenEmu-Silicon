@@ -25,6 +25,7 @@
 
 import Cocoa
 import OpenEmuKit
+import OpenEmuBase
 // import os.log
 
 // private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
@@ -409,7 +410,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// download and drop it instead of a bare "No cheats found".
     private var shouldShowPugsyImportMessage: Bool {
         guard let document = gameDocument else { return false }
-        return document.systemPlugin.systemIdentifier == "openemu.system.arcade"
+        return document.systemPlugin.systemIdentifier == OESystemIdentifierArcade
             && document.corePlugin.bundleIdentifier == PugsyCheatProvider.mameCoreIdentifier
             && !PugsyCheatFile.isArchiveImported
     }

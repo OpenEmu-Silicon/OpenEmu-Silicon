@@ -232,7 +232,11 @@ static void *ppsspp_cso_open(const char *path) {
         f->indexShift = hdr[21];
         const uint32_t headerSize = oe_read_u32le(hdr + 4);
 
-        if (f->frameSize == 0 || (f->frameSize & (f->frameSize - 1)) != 0) {
+        // frameSize (CISO block_size) must be a power of two in the real-world range. Real discs
+        // use ~2048; without a floor a tiny value (e.g. 4) forces a multi-GB index allocation, and
+        // without a ceiling a huge value forces a huge frame buffer. Clamp to [2048, 1 MiB].
+        if (f->frameSize < 2048 || f->frameSize > (1u << 20) ||
+            (f->frameSize & (f->frameSize - 1)) != 0) {
             ppsspp_cso_close(f);
             return NULL;
         }

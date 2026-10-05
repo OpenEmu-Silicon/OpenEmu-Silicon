@@ -45,7 +45,7 @@ extension Notification.Name {
 /// so per-game lookups read a small `<romset>.xml` instead of re-scanning a ~4 MB 7z each time:
 ///
 ///     <library>/CheatDatabase/pugsy/cheat.7z   ← the imported archive, kept as-is
-///     <library>/CheatDatabase/pugsy/cheats/     ← decompressed contents, replaced on every import
+///     <library>/CheatDatabase/pugsy/cheats/     ← decompressed contents, swapped in on a successful import
 enum PugsyCheatFile {
 
     /// The exact filename Pugsy publishes. Recognition is a case-insensitive match on this.
@@ -65,16 +65,23 @@ enum PugsyCheatFile {
         folderURL?.appendingPathComponent(expectedFileName, isDirectory: false)
     }
 
-    /// The decompressed `<romset>.xml` files. Wiped and rebuilt on every import; the single source
-    /// of truth `PugsyCheatProvider` reads from.
+    /// The decompressed `<romset>.xml` files. Swapped in only on a successful import; the single
+    /// source of truth `PugsyCheatProvider` reads from.
     static var decompressedFolderURL: URL? {
         folderURL?.appendingPathComponent("cheats", isDirectory: true)
     }
 
-    /// True once an archive has been imported and decompressed.
+    /// True once an archive has been imported and decompressed into at least one file. Checking for
+    /// a non-empty folder (not just its existence) means a failed import that left an empty `cheats/`
+    /// behind still reports as "not imported", so Browse shows the "download it" message rather than
+    /// "No cheats found".
     static var isArchiveImported: Bool {
-        guard let url = decompressedFolderURL else { return false }
-        return FileManager.default.fileExists(atPath: url.path)
+        guard let url = decompressedFolderURL,
+              let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.isRegularFileKey]) else { return false }
+        for case let fileURL as URL in enumerator {
+            if (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true { return true }
+        }
+        return false
     }
 
     /// How a recognized drop yields the inner `cheat.7z`.
@@ -178,25 +185,37 @@ enum PugsyCheatFile {
         do {
             try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
 
-            // Replace the archive.
+            // Decompress into a staging folder first and only swap it in once we know it produced
+            // files. We only match on the filename, so a truncated or non-Pugsy `cheat.7z` must not
+            // destroy a working import before we've confirmed the new one is good. The staging folder
+            // is a sibling of the real one (same volume) so the final swap is a cheap, reliable move.
+            let stagingDest = folder.appendingPathComponent("cheats.incoming-\(UUID().uuidString)", isDirectory: true)
+            defer { try? fileManager.removeItem(at: stagingDest) }
+            try fileManager.createDirectory(at: stagingDest, withIntermediateDirectories: true)
+
+            let extracted = decompress(archiveAt: sevenZipURL, into: stagingDest) { current, total in
+                postProgress(current: current, total: total, finished: false)
+            }
+
+            guard extracted > 0 else {
+                postProgress(current: 0, total: 0, finished: true)
+                DLog("Pugsy cheat archive produced no files; keeping any existing import")
+                return true
+            }
+
+            // Decompression succeeded — now swap in the new archive and decompressed contents,
+            // replacing any previous import.
             if fileManager.fileExists(atPath: archiveDest.path) {
                 try fileManager.removeItem(at: archiveDest)
             }
             try fileManager.copyItem(at: sevenZipURL, to: archiveDest)
 
-            // Replace the decompressed contents entirely.
             if fileManager.fileExists(atPath: decompressedDest.path) {
                 try fileManager.removeItem(at: decompressedDest)
             }
-            try fileManager.createDirectory(at: decompressedDest, withIntermediateDirectories: true)
+            try fileManager.moveItem(at: stagingDest, to: decompressedDest)
 
-            let extracted = decompress(archiveAt: archiveDest, into: decompressedDest) { current, total in
-                postProgress(current: current, total: total, finished: false)
-            }
             postProgress(current: extracted, total: extracted, finished: true)
-            if extracted == 0 {
-                DLog("Pugsy cheat archive imported but decompression produced no files")
-            }
             NotificationCenter.default.post(name: .didImportPugsyCheatFile, object: nil)
             DLog("Imported Pugsy cheat archive to \(archiveDest); decompressed \(extracted) file(s) into \(decompressedDest)")
         } catch {
@@ -222,7 +241,10 @@ enum PugsyCheatFile {
         var lastReportedPercent = -1
         for i in 0 ..< archive.numberOfEntries() {
             let current = Int(i) + 1
-            if !(archive.entryIsDirectory(i) || archive.entryIsEncrypted(i) || archive.entryIsArchive(i)) {
+            // Skip symlinks too: `standardizedFileURL` below doesn't resolve them, so a symlink
+            // pointing outside `directory` followed by a regular entry written through it would slip
+            // past the path guard. Pugsy's archive is plain XML, so nothing legitimate is lost.
+            if !(archive.entryIsDirectory(i) || archive.entryIsEncrypted(i) || archive.entryIsArchive(i) || archive.entryIsLink(i)) {
                 let destination = directory.appendingPathComponent(archive.name(ofEntry: i))
                 // Zip-Slip guard: the archive is user-downloaded and unverified, so an entry named
                 // like "../../../tmp/evil" could escape `directory`. Reject anything that, once its

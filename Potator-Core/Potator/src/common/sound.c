@@ -8,6 +8,9 @@
 // entry points keep the signatures this tree's memorymap.c already calls, so
 // the memory map needs no changes.
 //
+// libretro Potator is released into the public domain (the Unlicense); its
+// sound.c carries no per-file copyright notice, so there is none to reproduce.
+//
 ////////////////////////////////////////////////////////////////////////////////
 #include "sound.h"
 #include "memorymap.h"

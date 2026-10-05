@@ -1838,6 +1838,22 @@ final class OEGameDocument: NSDocument {
         validator: nil
     )
 
+    /// Shared format for systems whose cheats are a plain hex address + hex value (≤4 and ≤2 digits)
+    /// with no Game Genie/GameShark equivalent. These differ only in their example strings.
+    private static func rawAddressValueFormat(placeholder: String, hint: String) -> CheatFormat {
+        CheatFormat(
+            placeholder: placeholder,
+            validationHint: hint,
+            validator: { code in
+                let parts = code.replacingOccurrences(of: " ", with: "")
+                                .replacingOccurrences(of: "\n", with: "")
+                                .split(separator: "+")
+                guard !parts.isEmpty else { return false }
+                return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
+            }
+        )
+    }
+
     private static func cheatFormat(for systemIdentifier: String) -> CheatFormat {
         switch systemIdentifier {
         case OESystemIdentifierN64:
@@ -1916,89 +1932,33 @@ final class OEGameDocument: NSDocument {
                 }
             )
         case OESystemIdentifier5200:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. 0034:03. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Atari 5200"),
-                validationHint: NSLocalizedString("Atari 5200 codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 0034:03. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari 5200"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("Atari 5200 codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 0034:03. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari 5200"))
         case OESystemIdentifier7800:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. 210E:04. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Atari 7800"),
-                validationHint: NSLocalizedString("Atari 7800 codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 210E:04. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari 7800"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("Atari 7800 codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 210E:04. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari 7800"))
         case OESystemIdentifierOdyssey2:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. 002B:0A. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Odyssey 2"),
-                validationHint: NSLocalizedString("Odyssey\u{00B2} codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 002B:0A. Addresses 000-03F target internal RAM; 040-13F target external RAM (only present on some carts). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Odyssey 2"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("Odyssey\u{00B2} codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 002B:0A. Addresses 000-03F target internal RAM; 040-13F target external RAM (only present on some carts). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Odyssey 2"))
         case OESystemIdentifierPokeMini:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. 1300:63. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Pokemon Mini"),
-                validationHint: NSLocalizedString("Pok\u{00E9}mon mini codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 1300:63. Addresses target RAM (1000-1FFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Pokemon Mini"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("Pok\u{00E9}mon mini codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 1300:63. Addresses target RAM (1000-1FFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Pokemon Mini"))
         case OESystemIdentifierVectrex:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C880:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Vectrex"),
-                validationHint: NSLocalizedString("Vectrex codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C880:05. Addresses target RAM (C800-CBFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Vectrex"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("Vectrex codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C880:05. Addresses target RAM (C800-CBFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Vectrex"))
         case OESystemIdentifierSupervision:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. 0040:63. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Watara Supervision"),
-                validationHint: NSLocalizedString("Watara Supervision codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 0040:63. Addresses target RAM (0000-1FFF work RAM, 4000-5FFF video RAM). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Watara Supervision"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("Watara Supervision codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. 0040:63. Addresses target RAM (0000-1FFF work RAM, 4000-5FFF video RAM). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Watara Supervision"))
         case OESystemIdentifierMSX:
-            return CheatFormat(
+            return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),
-                validationHint: NSLocalizedString("MSX codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C123:05. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, MSX"),
-                validator: { code in
-                    let parts = code.replacingOccurrences(of: " ", with: "")
-                                    .replacingOccurrences(of: "\n", with: "")
-                                    .split(separator: "+")
-                    guard !parts.isEmpty else { return false }
-                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 2) }
-                }
-            )
+                hint: NSLocalizedString("MSX codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C123:05. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, MSX"))
         case OESystemIdentifierVB:
             return CheatFormat(
                 placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),

@@ -44,14 +44,14 @@ RA integration is rolling out in phases. See [issue #258](https://github.com/Ope
 | VecXGL | Vectrex | ✅ Supported |
 | PokeMini | Pokémon Mini | ✅ Supported |
 | Potator | Watara Supervision | ✅ Supported |
-| Flycast | Dreamcast | � Planned |
+| Flycast | Dreamcast | 🔲 Planned |
 | Dolphin | GameCube, Wii | 🔲 Planned |
 | Atari800 | Atari 5200, Atari 8-bit | 🔲 Planned |
 | Bliss, 4DO | Various | 🔲 Planned |
 
 **Legend:**
 - ✅ Supported — integrated and tested against known achievement sets
--  Planned — tracked in the rollout issue; contributors welcome
+- 🔲 Planned — tracked in the rollout issue; contributors welcome
 
 > **Note:** The native-core hardcore compliance rollout was tracked in #438. The main P0 enforcement work is complete for supported native RA cores; remaining work is focused on manual verification evidence, submission-readiness documentation, and follow-up polish before the official RetroAchievements listing.
 

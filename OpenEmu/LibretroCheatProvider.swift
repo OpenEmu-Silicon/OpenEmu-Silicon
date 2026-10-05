@@ -123,7 +123,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
     // PSP matches by disc serial against a GitHub directory listing of the cht folder, not the
     // DAT/name flow. This serial→[cht filename] index is fetched at most once per session (like
-    // datCache); nil until the first fetch, empty on failure.
+    // datCache); nil until the first fetch. A failed fetch falls back to the last good copy
+    // persisted on disk, so a single offline/rate-limited launch doesn't disable PSP cheats.
     private var pspSerialIndexCache: [String: [String]]?
     private var pspSerialIndexAttempted = false
     private let pspSerialIndexLock = NSLock()
@@ -282,23 +283,56 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     }
 
     /// Serial → [cht filename] index for PSP, built from the GitHub tree listing and cached in
-    /// memory for the session (fetched at most once, like datCache). Empty on failure; won't retry.
+    /// memory for the session (fetched at most once, like datCache). On a failed fetch it falls back
+    /// to the last successfully persisted copy on disk, so one offline launch — or GitHub's 60/hour
+    /// per-IP limit on a shared network — doesn't disable PSP cheats for the whole session.
     private func pspSerialIndex() async -> [String: [String]] {
         pspSerialIndexLock.lock()
         if let cached = pspSerialIndexCache { pspSerialIndexLock.unlock(); return cached }
-        if pspSerialIndexAttempted { pspSerialIndexLock.unlock(); return [:] }
+        if pspSerialIndexAttempted { pspSerialIndexLock.unlock(); return loadPersistedPSPSerialIndex() ?? [:] }
         pspSerialIndexAttempted = true
         pspSerialIndexLock.unlock()
 
-        guard let index = try? await fetchPSPSerialIndex(), !index.isEmpty else {
-            // log.info("PSP serial index unavailable this session")
-            return [:]
+        let index: [String: [String]]
+        if let fetched = try? await fetchPSPSerialIndex(), !fetched.isEmpty {
+            savePersistedPSPSerialIndex(fetched)
+            index = fetched
+            // log.info("PSP serial index built: \(fetched.count) serials")
+        } else {
+            // Fetch failed — serve the last good on-disk index rather than nothing.
+            index = loadPersistedPSPSerialIndex() ?? [:]
+            // log.info("PSP serial index fetch failed; using \(index.count) persisted serials")
         }
         pspSerialIndexLock.lock()
         pspSerialIndexCache = index
         pspSerialIndexLock.unlock()
-        // log.info("PSP serial index built: \(index.count) serials")
         return index
+    }
+
+    /// `<library>/CheatDatabase/libretro/psp-serial-index.json` — the persisted PSP serial index.
+    private func pspSerialIndexFileURL() -> URL? {
+        guard let base = OELibraryDatabase.default?.databaseFolderURL else { return nil }
+        let dir = base
+            .appendingPathComponent("CheatDatabase", isDirectory: true)
+            .appendingPathComponent("libretro", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("psp-serial-index.json")
+    }
+
+    private func loadPersistedPSPSerialIndex() -> [String: [String]]? {
+        guard let url = pspSerialIndexFileURL(),
+              let data = try? Data(contentsOf: url),
+              let index = try? JSONDecoder().decode([String: [String]].self, from: data),
+              !index.isEmpty
+        else { return nil }
+        return index
+    }
+
+    private func savePersistedPSPSerialIndex(_ index: [String: [String]]) {
+        guard let url = pspSerialIndexFileURL(),
+              let data = try? JSONEncoder().encode(index)
+        else { return }
+        try? data.write(to: url, options: .atomic)
     }
 
     private struct GitHubTree: Decodable {
