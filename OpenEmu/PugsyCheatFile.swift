@@ -257,7 +257,7 @@ enum PugsyCheatFile {
                         extractedCount += 1
                     }
                 } else {
-                    DLog("Skipping Pugsy cheat entry with unsafe path: \(archive.name(ofEntry: i))")
+                    DLog("Skipping Pugsy cheat entry with unsafe path: \(archive.name(ofEntry: i) ?? "<unknown>")")
                 }
             }
             if let progress, total > 0 {

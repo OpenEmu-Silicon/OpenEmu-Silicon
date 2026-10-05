@@ -287,11 +287,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// to the last successfully persisted copy on disk, so one offline launch — or GitHub's 60/hour
     /// per-IP limit on a shared network — doesn't disable PSP cheats for the whole session.
     private func pspSerialIndex() async -> [String: [String]] {
-        pspSerialIndexLock.lock()
-        if let cached = pspSerialIndexCache { pspSerialIndexLock.unlock(); return cached }
-        if pspSerialIndexAttempted { pspSerialIndexLock.unlock(); return loadPersistedPSPSerialIndex() ?? [:] }
-        pspSerialIndexAttempted = true
-        pspSerialIndexLock.unlock()
+        switch beginPSPSerialIndexLookup() {
+        case .cached(let cached):
+            return cached
+        case .useDiskFallback:
+            return loadPersistedPSPSerialIndex() ?? [:]
+        case .needsFetch:
+            break
+        }
 
         let index: [String: [String]]
         if let fetched = try? await fetchPSPSerialIndex(), !fetched.isEmpty {
@@ -303,10 +306,31 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             index = loadPersistedPSPSerialIndex() ?? [:]
             // log.info("PSP serial index fetch failed; using \(index.count) persisted serials")
         }
+        storePSPSerialIndex(index)
+        return index
+    }
+
+    private enum PSPSerialIndexDecision {
+        case cached([String: [String]])
+        case useDiskFallback
+        case needsFetch
+    }
+
+    /// Synchronous locked transition for `pspSerialIndex()` — NSLock's lock/unlock are unavailable
+    /// from async contexts, so the state check and the "mark attempted" flip live here.
+    private func beginPSPSerialIndexLookup() -> PSPSerialIndexDecision {
+        pspSerialIndexLock.lock()
+        defer { pspSerialIndexLock.unlock() }
+        if let cached = pspSerialIndexCache { return .cached(cached) }
+        if pspSerialIndexAttempted { return .useDiskFallback }
+        pspSerialIndexAttempted = true
+        return .needsFetch
+    }
+
+    private func storePSPSerialIndex(_ index: [String: [String]]) {
         pspSerialIndexLock.lock()
         pspSerialIndexCache = index
         pspSerialIndexLock.unlock()
-        return index
     }
 
     /// `<library>/CheatDatabase/libretro/psp-serial-index.json` — the persisted PSP serial index.
@@ -730,7 +754,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
     private func normalizePSXCode(_ code: String) -> String {
         // Fix common typo: letter O/o used instead of zero
-        var code = code.replacingOccurrences(of: "O", with: "0").replacingOccurrences(of: "o", with: "0")
+        let code = code.replacingOccurrences(of: "O", with: "0").replacingOccurrences(of: "o", with: "0")
         // PSX codes in Libretro use '+' as separator within codes, not between codes.
         // Two patterns: 8hex+4hex (GameShark) and 4hex+4hex+4hex (GameBuster)
         // Both need to be concatenated into 12-hex codes, then joined by '+' as multi-code separator.
@@ -1063,9 +1087,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     }
 
     private func lookupGameName(md5: String, serial: String?, systemIdentifier: String) async throws -> (name: String, libretroSystem: String)? {
-        datCacheLock.lock()
-        let cachedSnapshot = datCache[systemIdentifier]
-        datCacheLock.unlock()
+        let cachedSnapshot = cachedDAT(for: systemIdentifier)
         if let cached = cachedSnapshot {
             // log.debug("DAT cache hit for \(systemIdentifier)")
             if let result = cached[md5.uppercased()] { return result }
@@ -1095,12 +1117,24 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 }
             }
         }
-        datCacheLock.lock()
-        datCache[systemIdentifier] = merged
-        datCacheLock.unlock()
+        storeDAT(merged, for: systemIdentifier)
         if let result = merged[md5.uppercased()] { return result }
         if let serial, let result = lookupBySerial(serial, in: merged) { return result }
         return nil
+    }
+
+    /// Synchronous locked accessors for `datCache` — NSLock's lock/unlock are unavailable from the
+    /// async `lookupGameName`, so the guarded read/write live in these sync helpers.
+    private func cachedDAT(for systemIdentifier: String) -> [String: (name: String, libretroSystem: String)]? {
+        datCacheLock.lock()
+        defer { datCacheLock.unlock() }
+        return datCache[systemIdentifier]
+    }
+
+    private func storeDAT(_ merged: [String: (name: String, libretroSystem: String)], for systemIdentifier: String) {
+        datCacheLock.lock()
+        datCache[systemIdentifier] = merged
+        datCacheLock.unlock()
     }
 
     // MARK: - DAT Parser (clrmamepro format)
