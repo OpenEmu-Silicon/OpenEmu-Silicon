@@ -56,6 +56,9 @@
 		8D5B49B4048680CD000E48DA /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7ADFEA557BF11CA2CBB /* Cocoa.framework */; };
 		941DFB2715B6425200C6552F /* ProSystemGameCore.m in Sources */ = {isa = PBXBuildFile; fileRef = 941DFB2615B6425200C6552F /* ProSystemGameCore.m */; };
 		941F59DC17A62ADD0005D7EA /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 941F59DB17A62ADD0005D7EA /* OpenEmuBase.framework */; };
+		OE0PROS0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0PROS0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0PROS0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PROS0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0PROS0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0PROS0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -134,6 +137,10 @@
 		941F5A2617A78FF20005D7EA /* OE7800SystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OE7800SystemResponderClient.h; path = "../OpenEmu/SystemPlugins/Atari 7800/OE7800SystemResponderClient.h"; sourceTree = "<group>"; };
 		B5008DAD0E8BFB3E005AECAF /* ProSystemGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ProSystemGameCore.h; sourceTree = "<group>"; };
 		D2F7E65807B2D6F200F64583 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
+		OE0PROS0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0PROS0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0PROS0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0PROS0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -189,6 +196,10 @@
 				941F5A2617A78FF20005D7EA /* OE7800SystemResponderClient.h */,
 				B5008DAD0E8BFB3E005AECAF /* ProSystemGameCore.h */,
 				941DFB2615B6425200C6552F /* ProSystemGameCore.m */,
+				OE0PROS0FILEREF000000001 /* rcheevos_build.c */,
+				OE0PROS0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0PROS0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0PROS0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -362,6 +373,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				941DFB2715B6425200C6552F /* ProSystemGameCore.m in Sources */,
+				OE0PROS0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0PROS0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0PROS0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				87664D0C2956D3C70009C5C1 /* Bios.c in Sources */,
 				87664D072956D3C70009C5C1 /* Cartridge.c in Sources */,
 				87664D082956D3C70009C5C1 /* Database.c in Sources */,
@@ -417,6 +431,9 @@
 				HEADER_SEARCH_PATHS = (
 					"\"$(SRCROOT)/core\"",
 					"\"$(SRCROOT)/Lib\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -437,6 +454,9 @@
 				HEADER_SEARCH_PATHS = (
 					"\"$(SRCROOT)/core\"",
 					"\"$(SRCROOT)/Lib\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";

@@ -2,6 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>A MAME cheat file has already been imported. Do you want to replace it with this one?</key>
+	<string>已匯入一個 MAME 金手指檔案。要用這個檔案取代它嗎？</string>
+	<key>Keep Existing</key>
+	<string>保留現有</string>
+	<key>Replace</key>
+	<string>取代</string>
+	<key>Replace existing MAME cheat file?</key>
+	<string>取代現有的 MAME 金手指檔案？</string>
+	<key>Cheat File Scanner</key>
+	<string>掃描金手指檔案</string>
+	<key>Importing %1$ld of %2$ld</key>
+	<string>正在匯入第 %1$ld 個，共 %2$ld 個</string>
+	<key>Copying File</key>
+	<string>正在複製檔案</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>從 %@ 下載 cheat.7z，然後將其拖曳到 OpenEmu 資料庫視窗中。</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>尚未匯入 MAME 金手指檔案。</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" 於 %2$@</string>
 	<key>%@ copy</key>

@@ -101,11 +101,11 @@
 	<key>OESystemIdentifier</key>
 	<string>openemu.system.odyssey2</string>
 	<key>OESystemName</key>
-	<string>Odyssey²</string>
+	<string>Magnavox Odyssey²</string>
 	<key>OERegionalizedSystemNames</key>
 	<dict>
 		<key>eu</key>
-		<string>Videopac+</string>
+		<string>Videopac+ (Odyssey²)</string>
 	</dict>
 	<key>OESystemType</key>
 	<string>OESystemTypeConsole</string>

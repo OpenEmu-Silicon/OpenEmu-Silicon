@@ -29,9 +29,16 @@
 #import "VectrexGameCore.h"
 
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "vecx.h"
 #import "osint.h"
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 @interface VectrexGameCore () <OEVectrexSystemResponderClient>
 {
@@ -39,10 +46,28 @@
     NSString *romPath;
     NSString *overlayFile;
     BOOL overlayIsLoaded;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
 VectrexGameCore *g_core;
+
+// RA System RAM: rcheevos maps RA address 0x0000-0x03FF to the Vectrex's 1KB work RAM
+// (CPU 0xC800-0xCBFF = ram[0]..ram[0x3FF]). The consoleinfo real_address 0xC800 is a
+// display label; the runtime mapping is a plain ram[] index from a 0-based RA address.
+static uint32_t vectrex_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                       uint32_t num_bytes, rc_client_t *client)
+{
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        uint32_t offset = address + i;
+        if (offset < 0x400)
+            buffer[i] = ram[offset];
+        else
+            return i;
+    }
+    return num_bytes;
+}
 
 @implementation VectrexGameCore
 
@@ -65,6 +90,11 @@ VectrexGameCore *g_core;
     osint_defaults();           //setup defaults including sound buffer
     openCart(path.fileSystemRepresentation);
     osint_gencolors();          //setup colors
+
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                      memoryReader:vectrex_rc_read_memory
+                                                         consoleID:RC_CONSOLE_VECTREX];
+    [_raBridge startWithROMPath:path];
     return YES;
 }
 
@@ -81,6 +111,26 @@ VectrexGameCore *g_core;
     }
 
     vecx_emu ((VECTREX_MHZ / 1000) * EMU_TIMER, 0);
+
+    // Direct RAM pokes (mempatch style): re-applied every frame since the emulated CPU
+    // overwrites the same RAM addresses. ram[0] maps to CPU address 0xC800; RAM spans
+    // CPU 0xC800-0xCFFF (0xCC00-0xCFFF mirrors 0xC800-0xCBFF), so only those addresses are poked.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            if ((addr & 0xe000) == 0xc000 && (addr & 0x800))
+                ram[addr & 0x3ff] = (unsigned char)val;
+        }
+    }
+
+    [_raBridge doFrame];
+
     glFlush();
 }
 
@@ -90,6 +140,8 @@ VectrexGameCore *g_core;
 
     [super startEmulation];
     vecx_reset();
+
+    [_raBridge markROMReady];
 
     NSFileManager *defaultFileManager = [NSFileManager defaultManager];
     if ([defaultFileManager fileExistsAtPath:[[romPath stringByDeletingPathExtension] stringByAppendingString:@".tga"]])
@@ -107,7 +159,22 @@ VectrexGameCore *g_core;
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     vecx_reset();
+}
+
+- (void)stopEmulation
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
+
+    [super stopEmulation];
+}
+
+- (void)dealloc
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
 }
 
 - (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
@@ -132,13 +199,15 @@ VectrexGameCore *g_core;
 
     if (sizeof(VECXState) != data.length) {
         block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadStateError userInfo:@{
-            NSLocalizedFailureReasonErrorKey: @"THe size of the saved file is different from the size of the state.",
+            NSLocalizedFailureReasonErrorKey: @"The size of the saved file is different from the size of the state.",
         }]);
         return;
     }
 
     VECXState *state = (void *)data.bytes;
     loadVecxState(state);
+
+    block(YES, nil);
 }
 
 - (OEIntSize)aspectSize
@@ -238,6 +307,54 @@ VectrexGameCore *g_core;
     padData[player][button] = 0;
     
     osint_btnUp(button);
+}
+
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Vectrex RAM is CPU 0xC800-0xCBFF (1KB), backed by ram[0]..ram[0x3FF].
+    NSData *data = [NSData dataWithBytes:ram length:1024];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0xC800
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 

@@ -44,6 +44,7 @@ private struct LibretroCachedCheatFile: Codable {
 
 private struct LibretroCachedSource: Codable {
     let chtFileName: String
+    let libretroSystem: String?
     let etag: String?
 }
 
@@ -58,7 +59,8 @@ private struct LibretroCachedCheat: Codable {
 
 final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
-    let name = "Libretro"
+    static let providerName = "Libretro"
+    var name: String { Self.providerName }
 
     private static let datBaseURLNoIntro = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/no-intro/"
     private static let datBaseURLRedump = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/redump/"
@@ -70,11 +72,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     // OpenEmu system ID → Libretro directory/DAT name
     private let systemMap: [String: String] = [
         OESystemIdentifierAtari2600: "Atari - 2600",
+        OESystemIdentifier5200:      "Atari - 5200",
+        OESystemIdentifier7800:      "Atari - 7800",
         OESystemIdentifierSMS:       "Sega - Master System - Mark III",
         OESystemIdentifierNES:       "Nintendo - Nintendo Entertainment System",
         OESystemIdentifierFDS:       "Nintendo - Family Computer Disk System",
         OESystemIdentifierN64:       "Nintendo - Nintendo 64",
         OESystemIdentifierGenesis:   "Sega - Mega Drive - Genesis",
+        OESystemIdentifierSega32X:   "Sega - 32X",
         OESystemIdentifierSegaCD:    "Sega - Mega-CD - Sega CD",
         OESystemIdentifierGBA:       "Nintendo - Game Boy Advance",
         OESystemIdentifierSNES:      "Nintendo - Super Nintendo Entertainment System",
@@ -83,7 +88,9 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierSG1000:    "Sega - SG-1000",
         OESystemIdentifierGB:        "Nintendo - Game Boy",
         OESystemIdentifierColecoVision: "Coleco - ColecoVision",
+        OESystemIdentifierMSX:       "Microsoft - MSX",
         OESystemIdentifierPSX:       "Sony - PlayStation",
+        OESystemIdentifierPSP:       "Sony - PlayStation Portable",
         OESystemIdentifierLynx:      "Atari - Lynx",
         OESystemIdentifierNGP:       "SNK - Neo Geo Pocket",
         OESystemIdentifierPCE:       "NEC - PC Engine - TurboGrafx 16",
@@ -99,6 +106,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierGB: ["Nintendo - Game Boy", "Nintendo - Game Boy Color"],
         OESystemIdentifierNGP: ["SNK - Neo Geo Pocket", "SNK - Neo Geo Pocket Color"],
         OESystemIdentifierWS: ["Bandai - WonderSwan", "Bandai - WonderSwan Color"],
+        OESystemIdentifierMSX: ["Microsoft - MSX", "Microsoft - MSX2"],
     ]
 
     // In-memory cache: systemIdentifier → [key → (gameName, libretroSystem)]
@@ -112,6 +120,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     // to the same game within a session from re-running the full candidate search every time.
     private var sessionRediscoveredGames: Set<String> = []
     private let sessionRediscoveredGamesLock = NSLock()
+
+    // PSP matches by disc serial against a GitHub directory listing of the cht folder, not the
+    // DAT/name flow. This serial→[cht filename] index is fetched at most once per session (like
+    // datCache); nil until the first fetch. A failed fetch falls back to the last good copy
+    // persisted on disk, so a single offline/rate-limited launch doesn't disable PSP cheats.
+    private var pspSerialIndexCache: [String: [String]]?
+    private var pspSerialIndexAttempted = false
+    private let pspSerialIndexLock = NSLock()
 
     /// Returns true (and marks the game) only the first time it's called for this md5/system in
     /// the current session. Marks eagerly, before the rediscovery attempt itself, so a failed
@@ -129,7 +145,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         systemMap[systemIdentifier] != nil
     }
 
-    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String) async throws -> [DatabaseCheat] {
+    func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, coreIdentifier: String) async throws -> [DatabaseCheat] {
         guard let libretroSystem = systemMap[systemIdentifier] else { return [] }
 
         // 1. Check local cache
@@ -152,9 +168,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             var allCheats: [LibretroCachedCheat] = []
             var updatedSources: [LibretroCachedSource] = []
             for source in cached.sources {
-                if let updated = try await downloadCHT(chtFileName: source.chtFileName, libretroSystem: libretroSystem, systemIdentifier: systemIdentifier, existingETag: source.etag) {
+                let sourceSystem = source.libretroSystem ?? libretroSystem
+                if let updated = try await downloadCHT(chtFileName: source.chtFileName, libretroSystem: sourceSystem, systemIdentifier: systemIdentifier, existingETag: source.etag) {
                     allCheats.append(contentsOf: updated.cheats)
-                    updatedSources.append(LibretroCachedSource(chtFileName: source.chtFileName, etag: updated.etag))
+                    updatedSources.append(LibretroCachedSource(chtFileName: source.chtFileName, libretroSystem: sourceSystem, etag: updated.etag))
                     anyUpdated = true
                 } else if !anyUpdated {
                     // Nothing updated yet — return the full cached set as-is
@@ -191,6 +208,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// ignoring any existing local cache entirely. Returns nil if nothing matched upstream, so the
     /// caller can decide how to fall back — this never touches the disk cache itself.
     private func discoverCheats(md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, libretroSystem: String) async throws -> DiscoveredCheats? {
+        // PSP matches by disc serial against a GitHub directory listing, not the DAT/name flow.
+        if systemIdentifier == OESystemIdentifierPSP {
+            return try await discoverCheatsPSP(serial: serial, libretroSystem: libretroSystem)
+        }
         // Resolve game name via DAT (try MD5 first, then serial). For disc systems, OpenEmu's stored
         // MD5 hashes the .cue playlist file, not the disc data, so it never matches Libretro's
         // per-track MD5s — resolveDATName recomputes the data track's MD5 when possible.
@@ -205,9 +226,6 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         // log.info("MD5 \(md5) → \(lookup?.name ?? "nil") (in \(resolvedSystem))")
 
         // Download plain + device-suffixed + region-variant candidates, merge
-        var allCheats: [LibretroCachedCheat] = []
-        var sources: [LibretroCachedSource] = []
-
         let useRegionFallback = systemIdentifier == OESystemIdentifierPSX || systemIdentifier == OESystemIdentifierSaturn
         var gameNames: [String] = []
         if let lookupName = lookup?.name {
@@ -225,16 +243,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if useRegionFallback { gameNames += regionVariants(for: gameName) }
         }
 
-        for candidateName in gameNames {
-            let candidates = ["\(candidateName).cht"] + Self.chtSuffixes.map { "\(candidateName) (\($0)).cht" }
-            for candidate in candidates {
-                if let result = try await downloadCHT(chtFileName: candidate, libretroSystem: resolvedSystem, systemIdentifier: systemIdentifier, existingETag: nil) {
-                    allCheats.append(contentsOf: result.cheats)
-                    sources.append(LibretroCachedSource(chtFileName: candidate, etag: result.etag))
-                }
-            }
-            if !allCheats.isEmpty { break }
-        }
+        let (allCheats, sources) = try await downloadCandidates(gameNames: gameNames, libretroSystem: resolvedSystem, systemIdentifier: systemIdentifier)
 
         guard !allCheats.isEmpty else {
             // log.info("No CHT files found for \(gameNames.joined(separator: ", "))")
@@ -242,6 +251,167 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         }
 
         return DiscoveredCheats(sources: sources, cheats: dedup(allCheats), resolvedGameName: lookup?.name)
+    }
+
+    // MARK: - PSP (serial-indexed)
+
+    /// PSP discovery: match the disc serial against a GitHub directory listing of the cht folder,
+    /// then download the matching file(s) directly. No DAT/name resolution — disc serial is the key.
+    private func discoverCheatsPSP(serial: String?, libretroSystem: String) async throws -> DiscoveredCheats? {
+        guard let serial, !serial.isEmpty else { return nil }
+        let key = Self.normalizeSerial(serial)
+        guard !key.isEmpty else { return nil }
+
+        let index = await pspSerialIndex()
+        guard let filenames = index[key], !filenames.isEmpty else {
+            // log.info("No PSP cht file for serial \(serial)")
+            return nil
+        }
+
+        // A serial can map to more than one file (e.g. a "(PlayStation Store)" variant); download
+        // each and dedup so identical codes across them collapse.
+        var allCheats: [LibretroCachedCheat] = []
+        var sources: [LibretroCachedSource] = []
+        for filename in filenames {
+            if let result = try await downloadCHT(chtFileName: filename, libretroSystem: libretroSystem, systemIdentifier: OESystemIdentifierPSP, existingETag: nil) {
+                allCheats.append(contentsOf: result.cheats)
+                sources.append(LibretroCachedSource(chtFileName: filename, libretroSystem: libretroSystem, etag: result.etag))
+            }
+        }
+        guard !allCheats.isEmpty else { return nil }
+        return DiscoveredCheats(sources: sources, cheats: dedup(allCheats), resolvedGameName: nil)
+    }
+
+    /// Serial → [cht filename] index for PSP, built from the GitHub tree listing and cached in
+    /// memory for the session (fetched at most once, like datCache). On a failed fetch it falls back
+    /// to the last successfully persisted copy on disk, so one offline launch — or GitHub's 60/hour
+    /// per-IP limit on a shared network — doesn't disable PSP cheats for the whole session.
+    private func pspSerialIndex() async -> [String: [String]] {
+        switch beginPSPSerialIndexLookup() {
+        case .cached(let cached):
+            return cached
+        case .useDiskFallback:
+            return loadPersistedPSPSerialIndex() ?? [:]
+        case .needsFetch:
+            break
+        }
+
+        let index: [String: [String]]
+        if let fetched = try? await fetchPSPSerialIndex(), !fetched.isEmpty {
+            savePersistedPSPSerialIndex(fetched)
+            index = fetched
+            // log.info("PSP serial index built: \(fetched.count) serials")
+        } else {
+            // Fetch failed — serve the last good on-disk index rather than nothing.
+            index = loadPersistedPSPSerialIndex() ?? [:]
+            // log.info("PSP serial index fetch failed; using \(index.count) persisted serials")
+        }
+        storePSPSerialIndex(index)
+        return index
+    }
+
+    private enum PSPSerialIndexDecision {
+        case cached([String: [String]])
+        case useDiskFallback
+        case needsFetch
+    }
+
+    /// Synchronous locked transition for `pspSerialIndex()` — NSLock's lock/unlock are unavailable
+    /// from async contexts, so the state check and the "mark attempted" flip live here.
+    private func beginPSPSerialIndexLookup() -> PSPSerialIndexDecision {
+        pspSerialIndexLock.lock()
+        defer { pspSerialIndexLock.unlock() }
+        if let cached = pspSerialIndexCache { return .cached(cached) }
+        if pspSerialIndexAttempted { return .useDiskFallback }
+        pspSerialIndexAttempted = true
+        return .needsFetch
+    }
+
+    private func storePSPSerialIndex(_ index: [String: [String]]) {
+        pspSerialIndexLock.lock()
+        pspSerialIndexCache = index
+        pspSerialIndexLock.unlock()
+    }
+
+    /// `<library>/CheatDatabase/libretro/psp-serial-index.json` — the persisted PSP serial index.
+    private func pspSerialIndexFileURL() -> URL? {
+        guard let base = OELibraryDatabase.default?.databaseFolderURL else { return nil }
+        let dir = base
+            .appendingPathComponent("CheatDatabase", isDirectory: true)
+            .appendingPathComponent("libretro", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("psp-serial-index.json")
+    }
+
+    private func loadPersistedPSPSerialIndex() -> [String: [String]]? {
+        guard let url = pspSerialIndexFileURL(),
+              let data = try? Data(contentsOf: url),
+              let index = try? JSONDecoder().decode([String: [String]].self, from: data),
+              !index.isEmpty
+        else { return nil }
+        return index
+    }
+
+    private func savePersistedPSPSerialIndex(_ index: [String: [String]]) {
+        guard let url = pspSerialIndexFileURL(),
+              let data = try? JSONEncoder().encode(index)
+        else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    private struct GitHubTree: Decodable {
+        let tree: [Entry]
+        struct Entry: Decodable {
+            let path: String
+            let type: String
+            let sha: String
+        }
+    }
+
+    /// Walks master → cht → "Sony - PlayStation Portable" via the Git Trees API (3 unauthenticated
+    /// requests), then indexes every "*.cht" blob by the serial in its filename. The Trees API is
+    /// used instead of the Contents API because the latter caps directory listings at 1000 entries
+    /// and the PSP folder has ~2650.
+    private func fetchPSPSerialIndex() async throws -> [String: [String]] {
+        func tree(_ sha: String) async throws -> GitHubTree {
+            let url = URL(string: "https://api.github.com/repos/libretro/libretro-database/git/trees/\(sha)")!
+            var request = URLRequest(url: url)
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { throw URLError(.badServerResponse) }
+            return try JSONDecoder().decode(GitHubTree.self, from: data)
+        }
+
+        let root = try await tree("master")
+        guard let chtSHA = root.tree.first(where: { $0.path == "cht" && $0.type == "tree" })?.sha else { return [:] }
+        let cht = try await tree(chtSHA)
+        guard let pspSHA = cht.tree.first(where: { $0.path == "Sony - PlayStation Portable" && $0.type == "tree" })?.sha else { return [:] }
+        let psp = try await tree(pspSHA)
+
+        var index: [String: [String]] = [:]
+        for entry in psp.tree where entry.type == "blob" && entry.path.hasSuffix(".cht") {
+            guard let key = Self.serialKey(fromFileName: entry.path) else { continue }
+            index[key, default: []].append(entry.path)
+        }
+        return index
+    }
+
+    /// Extracts the disc serial embedded in a PSP cht filename (e.g. "... [ULUS-10080].cht") and
+    /// normalizes it. Returns nil for homebrew/untagged files with no standard serial.
+    private static func serialKey(fromFileName fileName: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: #"\[\s*([A-Za-z]{2,4}-?\d{5})\s*\]"#) else { return nil }
+        let range = NSRange(fileName.startIndex..., in: fileName)
+        guard let match = regex.matches(in: fileName, range: range).last,
+              let serialRange = Range(match.range(at: 1), in: fileName) else { return nil }
+        return normalizeSerial(String(fileName[serialRange]))
+    }
+
+    /// Uppercase, dash- and space-insensitive serial key so "ULES-00569", "ULES00569" and
+    /// "ULES-00569 " all collapse to the same lookup key.
+    private static func normalizeSerial(_ serial: String) -> String {
+        serial.uppercased()
+              .replacingOccurrences(of: "-", with: "")
+              .replacingOccurrences(of: " ", with: "")
     }
 
     // MARK: - Local Cache
@@ -388,6 +558,24 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         }
     }
 
+    /// Downloads the plain + device-suffixed candidates for each game name variant from one cht/
+    /// directory, stopping at the first name variant that yields anything.
+    private func downloadCandidates(gameNames: [String], libretroSystem: String, systemIdentifier: String) async throws -> (cheats: [LibretroCachedCheat], sources: [LibretroCachedSource]) {
+        var allCheats: [LibretroCachedCheat] = []
+        var sources: [LibretroCachedSource] = []
+        for candidateName in gameNames {
+            let candidates = ["\(candidateName).cht"] + Self.chtSuffixes.map { "\(candidateName) (\($0)).cht" }
+            for candidate in candidates {
+                if let result = try await downloadCHT(chtFileName: candidate, libretroSystem: libretroSystem, systemIdentifier: systemIdentifier, existingETag: nil) {
+                    allCheats.append(contentsOf: result.cheats)
+                    sources.append(LibretroCachedSource(chtFileName: candidate, libretroSystem: libretroSystem, etag: result.etag))
+                }
+            }
+            if !allCheats.isEmpty { break }
+        }
+        return (allCheats, sources)
+    }
+
     // MARK: - CHT Parser
 
     private func parseCHTFile(_ data: Data, systemIdentifier: String) -> [LibretroCachedCheat] {
@@ -401,7 +589,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             guard let eqRange = trimmed.range(of: " = ") else { continue }
 
             let key = String(trimmed[..<eqRange.lowerBound])
-            let raw = String(trimmed[eqRange.upperBound...])
+            // Trim before the quote check: PSP cht files use `key =  "value"` (two spaces), and the
+            // leading space would otherwise defeat the surrounding-quote strip. No-op for the
+            // single-space `key = "value"` every other system uses.
+            let raw = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
             let value = raw.hasPrefix("\"") && raw.hasSuffix("\"") && raw.count >= 2
                 ? String(raw.dropFirst().dropLast())
                 : raw
@@ -420,6 +611,21 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             let prefix = "cheat\(index)"
             guard let fields = groups[prefix] else { continue }
             guard let desc = fields["desc"], !desc.isEmpty else { continue }
+
+            // PSP: keep the CwCheat/TempAR code verbatim (whitespace is structural, codes span
+            // several _L lines). code == the cleaned form, rawCode == the untouched upstream text;
+            // skip the space-strip/'+'-normalize path the other systems use.
+            if systemIdentifier == OESystemIdentifierPSP {
+                guard let raw = fields["code"], !raw.isEmpty else { continue }
+                let code = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                              .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                guard !code.isEmpty else { continue }
+                let dedupKey = code.lowercased()
+                guard !seenCodes.contains(dedupKey) else { continue }
+                seenCodes.insert(dedupKey)
+                cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: code, rawCode: raw))
+                continue
+            }
 
             var code = fields["code"] ?? ""
             // Captured before any synthesis/normalization: rawCode must stay independent of OpenEmu's
@@ -454,6 +660,11 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                !cleaned.split(separator: "+").allSatisfy({ CheatCodeValidator.isSaturnActionReplayCode(String($0)) }) {
                 continue
             }
+            // MSX: normalizeMSXCode returns "" when the address can't be translated (needs more than
+            // the fixed 16KB system-RAM page) — drop those rather than poke a bogus address.
+            if systemIdentifier == OESystemIdentifierMSX, cleaned.isEmpty {
+                continue
+            }
             guard !seenCodes.contains(cleaned) else { continue }
             seenCodes.insert(cleaned)
             cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: cleaned, rawCode: rawCode))
@@ -465,7 +676,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Address hex-digit width the raw ADDRESS:VALUE validator expects per system (see CheatCodeValidator).
     private static func formatBAddressHexChars(for systemIdentifier: String) -> Int {
         switch systemIdentifier {
-        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
+        case OESystemIdentifierSNES, OESystemIdentifierGenesis, OESystemIdentifierSega32X, OESystemIdentifierSegaCD, OESystemIdentifierPCE, OESystemIdentifierPCECD:
             return 6
         case OESystemIdentifierGBA, OESystemIdentifierVB:
             return 8
@@ -506,7 +717,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     /// Normalizes non-standard code formats into forms the core can parse.
     private func normalizeCode(_ code: String, systemIdentifier: String) -> String {
         switch systemIdentifier {
-        case OESystemIdentifierGenesis:
+        case OESystemIdentifierGenesis, OESystemIdentifierSega32X:
             return normalizeGenesisCode(code)
         case OESystemIdentifierGBA:
             return normalizeGBACode(code)
@@ -518,6 +729,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             return normalizePSXCode(code)
         case OESystemIdentifierSaturn:
             return normalizeSaturnCode(code)
+        case OESystemIdentifierMSX:
+            return normalizeMSXCode(code)
         default:
             return code
         }
@@ -541,7 +754,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
     private func normalizePSXCode(_ code: String) -> String {
         // Fix common typo: letter O/o used instead of zero
-        var code = code.replacingOccurrences(of: "O", with: "0").replacingOccurrences(of: "o", with: "0")
+        let code = code.replacingOccurrences(of: "O", with: "0").replacingOccurrences(of: "o", with: "0")
         // PSX codes in Libretro use '+' as separator within codes, not between codes.
         // Two patterns: 8hex+4hex (GameShark) and 4hex+4hex+4hex (GameBuster)
         // Both need to be concatenated into 12-hex codes, then joined by '+' as multi-code separator.
@@ -595,6 +808,27 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             i += 2
         }
         return codes.joined(separator: "+")
+    }
+
+    /// Libretro's MSX cht addresses are relative to the fixed 16KB system-RAM page (real CPU
+    /// 0xC000-0xFFFF), confirmed empirically (Kings Valley, 1942, and Vampire Killer all landed
+    /// exactly 0xC000 below their real Cheat-Search-found address). Returns "" (caller drops the
+    /// cheat) when the raw address is >= 0x4000, since adding 0xC000 would overflow past 0xFFFF —
+    /// those need more RAM than the fixed page and aren't expressible as a single CPU address.
+    private func normalizeMSXCode(_ code: String) -> String {
+        let parts = code.split(separator: "+").map(String.init)
+        guard !parts.isEmpty else { return "" }
+
+        var translated: [String] = []
+        for part in parts {
+            guard let colonIdx = part.firstIndex(of: ":"),
+                  let addr = UInt32(part[part.startIndex..<colonIdx], radix: 16),
+                  addr < 0x4000
+            else { return "" }
+            let value = String(part[part.index(after: colonIdx)...])
+            translated.append(String(format: "%04X", addr + 0xC000) + ":" + value)
+        }
+        return translated.joined(separator: "+")
     }
 
     private func normalizeNDSCode(_ code: String) -> String {
@@ -853,9 +1087,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     }
 
     private func lookupGameName(md5: String, serial: String?, systemIdentifier: String) async throws -> (name: String, libretroSystem: String)? {
-        datCacheLock.lock()
-        let cachedSnapshot = datCache[systemIdentifier]
-        datCacheLock.unlock()
+        let cachedSnapshot = cachedDAT(for: systemIdentifier)
         if let cached = cachedSnapshot {
             // log.debug("DAT cache hit for \(systemIdentifier)")
             if let result = cached[md5.uppercased()] { return result }
@@ -885,12 +1117,24 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 }
             }
         }
-        datCacheLock.lock()
-        datCache[systemIdentifier] = merged
-        datCacheLock.unlock()
+        storeDAT(merged, for: systemIdentifier)
         if let result = merged[md5.uppercased()] { return result }
         if let serial, let result = lookupBySerial(serial, in: merged) { return result }
         return nil
+    }
+
+    /// Synchronous locked accessors for `datCache` — NSLock's lock/unlock are unavailable from the
+    /// async `lookupGameName`, so the guarded read/write live in these sync helpers.
+    private func cachedDAT(for systemIdentifier: String) -> [String: (name: String, libretroSystem: String)]? {
+        datCacheLock.lock()
+        defer { datCacheLock.unlock() }
+        return datCache[systemIdentifier]
+    }
+
+    private func storeDAT(_ merged: [String: (name: String, libretroSystem: String)], for systemIdentifier: String) {
+        datCacheLock.lock()
+        datCache[systemIdentifier] = merged
+        datCacheLock.unlock()
     }
 
     // MARK: - DAT Parser (clrmamepro format)

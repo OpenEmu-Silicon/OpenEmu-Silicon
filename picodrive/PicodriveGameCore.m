@@ -26,8 +26,15 @@
 
 #import "PicodriveGameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import "OESega32XSystemResponderClient.h"
 #import <OpenGL/gl.h>
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #include <sys/mman.h>
 #include "pico/pico_int.h"
@@ -42,11 +49,35 @@ static int16_t ALIGNED(4) soundBuffer[2 * 44100 / 50];
     uint16_t *_videoBuffer;
     int _videoWidth;
     NSURL *_romFile;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 
 @end
 
 static __weak PicodriveGameCore *_current;
+
+// rcheevos passes flat region addresses (per rc_memory_regions_megadrive_32x): 0x000000-0x00FFFF
+// is the main MegaDrive 68k work RAM, 0x010000-0x04FFFF is the additional 32X SDRAM. Both buffers
+// are read raw (host byte order), matching Genesis Plus GX's reader and RetroArch's PicoDrive.
+static uint32_t picodrive_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                         uint32_t num_bytes, rc_client_t *client)
+{
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        uint32_t addr = address + i;
+        if (addr <= 0x00FFFF) {
+            buffer[i] = PicoMem.ram[addr];
+        } else if (addr >= 0x010000 && addr <= 0x04FFFF) {
+            if (Pico32xMem == NULL)
+                return i;
+            buffer[i] = Pico32xMem->sdram[addr - 0x010000];
+        } else {
+            return i;
+        }
+    }
+    return num_bytes;
+}
 
 @implementation PicodriveGameCore
 
@@ -56,6 +87,7 @@ static __weak PicodriveGameCore *_current;
     {
         _videoBuffer = (uint16_t *)malloc(320 * 240 * sizeof(uint16_t));
         _videoWidth = 292; // initial viewport width
+        _cheatList = [[NSMutableDictionary alloc] init];
     }
 
 	_current = self;
@@ -65,7 +97,33 @@ static __weak PicodriveGameCore *_current;
 
 - (void)dealloc
 {
+    // Drain the RA serial queue before freeing buffers so no in-flight read touches them.
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(_videoBuffer);
+}
+
+// MARK: - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 // MARK: - Execution
@@ -124,22 +182,100 @@ static __weak PicodriveGameCore *_current;
         NSLog(@"[Picodrive] Loaded sram");
     }
 
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:picodrive_rc_read_memory
+                                                          consoleID:RC_CONSOLE_SEGA_32X];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
+
     return YES;
 }
 
 - (void)executeFrame
 {
-    //PicoPatchApply();
+    // Re-assert RAM cheats every frame, otherwise the game overwrites them (value would
+    // only flash once at enable time). ROM Game Genie patches are also reapplied here.
+    PicoPatchApply();
     PicoFrame();
+
+    [_raBridge doFrame];
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     PicoReset();
+}
+
+// MARK: - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    // Sanitize: trim, drop spaces, and uppercase (PicoDrive's decoder expects uppercase
+    // for both the hex "XXXXXX:XXXX" and the Game Genie "XXXX-XXXX" alphabets).
+    code = [code stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+    if (code.length == 0)
+        return;
+    code = code.uppercaseString;
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+
+    [self applyCheats];
+}
+
+- (void)applyCheats
+{
+    // Rebuild PicoDrive's patch list from scratch: restore any ROM writes, then re-add
+    // every enabled code. executeFrame re-applies them each frame.
+    PicoPatchResetAll();
+
+    for (NSString *code in _cheatList)
+    {
+        if (![_cheatList[code] boolValue])
+            continue;
+
+        // Multi-line cheats are joined with '+'
+        for (NSString *singleCode in [code componentsSeparatedByString:@"+"])
+        {
+            if (singleCode.length == 0)
+                continue;
+            PicoPatchAdd(singleCode.UTF8String, 1);
+        }
+    }
+
+    PicoPatchApply();
+}
+
+// MARK: - Cheat Search
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (!Pico.rom || Pico.romsize == 0)
+        return @[];
+
+    // 68k work RAM (64KB) at 68k address 0xFF0000. This is the only region the raw memory
+    // patch / Game Genie engine can write (m68k_write16, 24-bit address). The 32X SDRAM lives
+    // in the SH2 address space (0x06000000) and can't be expressed as a 6-hex patch address,
+    // so it's excluded. Stored host-endian word-wise, matching the word-aligned (minDataBytes:2)
+    // search stride, so found word values round-trip through m68k_write16.
+    NSData *data = [NSData dataWithBytes:PicoMem.ram length:sizeof(PicoMem.ram)];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"Work RAM"
+                                                                                address:0xFF0000
+                                                                           addressBytes:3
+                                                                           minDataBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     // Only save if SRAM has been modified
     int sram_size = Pico.sv.size;
     uint8_t *sram_data = Pico.sv.data;

@@ -142,7 +142,17 @@ static UInt8* getRamPage(int page) {
 
 	return msxRam + start;
 }
-    
+
+// Raw linear main RAM buffer, as expected by rcheevos' MSX memory map (the raw paged RAM,
+// not the Z80's banked logical view).
+UInt8* msxGetRamData(void) {
+    return msxRam;
+}
+
+UInt32 msxGetRamSize(void) {
+    return msxRamSize;
+}
+
 static void saveState()
 {   
     SaveState* state = saveStateOpenForWrite("msx");

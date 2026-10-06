@@ -99,6 +99,24 @@ final class CheatSearchViewController: NSViewController {
         "%0\(addressHexDigits)X"
     }
 
+    /// Address as shown in the results table / Add Cheat sheet. PSP is rendered in CwCheat form —
+    /// `<typeNibble><7-hex relative address>` (type nibble 0/1/2 = 8/16/32-bit from the selected data
+    /// size, relative = absolute − user RAM base) — so it lines up with published `_L` codes. This is
+    /// display only; the absolute `result.address` still drives the actual code conversion.
+    private func displayAddress(_ address: UInt32) -> String {
+        guard gameDocument?.systemIdentifier == OESystemIdentifierPSP else {
+            return String(format: addressFormatString, address)
+        }
+        let relative = (address >= 0x0880_0000 ? address - 0x0880_0000 : address) & 0x0FFF_FFFF
+        let typeNibble: UInt32
+        switch selectedDataSize {
+        case 1: typeNibble = 0
+        case 2: typeNibble = 1
+        default: typeNibble = 2
+        }
+        return String(format: "%01X%07X", typeNibble, relative)
+    }
+
     private var minDataBytes: Int {
         memoryRegions.map { Int($0.minDataBytes) }.max() ?? 1
     }
@@ -770,7 +788,7 @@ final class CheatSearchViewController: NSViewController {
         grid.addRow(with: [titleLabel, titleField])
 
         let addressLabel = NSTextField(labelWithString: NSLocalizedString("Address:", comment: ""))
-        let addressField = NSTextField(labelWithString: addressString)
+        let addressField = NSTextField(labelWithString: displayAddress(result.address))
         addressField.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         grid.addRow(with: [addressLabel, addressField])
 
@@ -1089,7 +1107,7 @@ extension CheatSearchViewController: NSTableViewDelegate {
 
         switch identifier.rawValue {
         case "address":
-            cell.stringValue = String(format: addressFormatString, result.address)
+            cell.stringValue = displayAddress(result.address)
         case "current":
             cell.stringValue = formatValue(result.currentValue, dataType: dataType, dataSize: dataSize)
         case "previous":

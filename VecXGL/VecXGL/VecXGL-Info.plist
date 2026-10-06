@@ -26,6 +26,18 @@
 	<string>OEGameCoreController</string>
 	<key>OEGameCoreClass</key>
 	<string>VectrexGameCore</string>
+	<key>OEGameCoreOptions</key>
+	<dict>
+		<key>openemu.system.vectrex</key>
+		<dict>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
+		</dict>
+	</dict>
 	<key>OEGameCorePlayerCount</key>
 	<string>1</string>
 	<key>OEProjectURL</key>

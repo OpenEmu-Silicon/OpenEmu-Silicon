@@ -1,5 +1,5 @@
 /*
-  PokeMini - Pokémon-Mini Emulator
+  PokeMini - PokÃ©mon-Mini Emulator
   Copyright (C) 2009-2015  JustBurn
 
   This program is free software: you can redistribute it and/or modify
@@ -722,7 +722,7 @@ int PokeMini_SaveSSFile(const char *statefile, const char *romfile)
 	PMiniID = PokeMini_ID;
 	fwrite(&PMiniID, 1, 4, fo);	// Write State ID
 	memset(PMiniStr, 0, 128);
-	strcpy(PMiniStr, romfile);
+	strncpy(PMiniStr, romfile, 127);	// Bounded: field is 128 bytes and discarded on load; long ROM paths overflowed strcpy
 	fwrite(PMiniStr, 1, 128, fo);	// Write ROM related to state
 	StatTime = Endian32((uint32_t)time(NULL));
 	fwrite(&StatTime, 1, 4, fo);	// Write Time

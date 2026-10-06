@@ -29,8 +29,15 @@
 #import "OEOdyssey2SystemResponderClient.h"
 
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #include <IOKit/hid/IOHIDUsageTables.h>
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #include "crc32.h"
 #include "audio.h"
@@ -52,8 +59,28 @@
 @interface OdysseyGameCore () <OEOdyssey2SystemResponderClient>
 {
     NSDictionary *virtualPhysicalKeyMap;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
+
+// rcheevos maps intRAM/extRAM back-to-back starting at 0 (see rc_memory_regions_magnavox_odyssey_2):
+// 0x00-0x3F = Internal RAM, 0x40-0x13F = External RAM. No further rebasing needed.
+static uint32_t odyssey_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                        uint32_t num_bytes, rc_client_t *client)
+{
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        uint32_t addr = address + i;
+        if (addr < 0x40)
+            buffer[i] = intRAM[addr];
+        else if (addr < 0x140)
+            buffer[i] = extRAM[addr - 0x40];
+        else
+            return i;
+    }
+    return num_bytes;
+}
 
 //uint16_t mbmp[EMUWIDTH * EMUHEIGHT];
 //unsigned short int mbmp[TEX_WIDTH * TEX_HEIGHT];
@@ -386,6 +413,9 @@ OdysseyGameCore *current;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     close_audio();
 	close_voice();
 	close_display();
@@ -394,6 +424,26 @@ OdysseyGameCore *current;
     {
         free(mbmp);
     }
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark Execution
@@ -470,6 +520,12 @@ OdysseyGameCore *current;
     
     set_score(app_data.scoretype, app_data.scoreaddress, app_data.default_highscore);
     
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                        memoryReader:odyssey_rc_read_memory
+                                                           consoleID:RC_CONSOLE_MAGNAVOX_ODYSSEY2];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
+    
     return YES;
 }
 
@@ -477,6 +533,23 @@ OdysseyGameCore *current;
 {
     //run();
     cpu_exec();
+
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location == NSNotFound) continue;
+            unsigned int addr = 0, val = 0;
+            if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+            if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+            // 0x000-0x03F: internal RAM (64 bytes, universal); 0x040-0x13F: external RAM (256 bytes, cart-dependent)
+            if (addr < 0x40)
+                intRAM[addr] = (Byte)val;
+            else if (addr >= 0x40 && addr < 0x140)
+                extRAM[addr - 0x40] = (Byte)val;
+        }
+    }
 
     int len = evblclk == EVBLCLK_NTSC ? 44100/60 : 44100/50;
 
@@ -489,10 +562,13 @@ OdysseyGameCore *current;
     }
 
     RLOOP=1;
+
+    [_raBridge doFrame];
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     init_cpu();
     init_roms();
     init_vpp();
@@ -621,6 +697,45 @@ OdysseyGameCore *current;
 - (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
     block(loadstate(fileName.fileSystemRepresentation) ? YES : NO, nil);
+}
+
+- (void)stopEmulation
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
+    [super stopEmulation];
+}
+
+#pragma mark Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    NSData *intData = [NSData dataWithBytes:intRAM length:64];
+    NSData *extData = [NSData dataWithBytes:extRAM length:256];
+
+    OEMemoryRegionDescriptor *intDescriptor = [OEMemoryRegionDescriptor descriptorWithName:@"Internal RAM"
+                                                                                    address:0x0000
+                                                                               addressBytes:2
+                                                                                       data:intData];
+    OEMemoryRegionDescriptor *extDescriptor = [OEMemoryRegionDescriptor descriptorWithName:@"External RAM"
+                                                                                    address:0x0040
+                                                                               addressBytes:2
+                                                                                       data:extData];
+    return @[intDescriptor, extDescriptor];
 }
 
 @end

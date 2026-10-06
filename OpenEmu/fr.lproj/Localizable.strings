@@ -2,6 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>A MAME cheat file has already been imported. Do you want to replace it with this one?</key>
+	<string>Un fichier de triche MAME a déjà été importé. Voulez-vous le remplacer par celui-ci ?</string>
+	<key>Keep Existing</key>
+	<string>Conserver l’existant</string>
+	<key>Replace</key>
+	<string>Remplacer</string>
+	<key>Replace existing MAME cheat file?</key>
+	<string>Remplacer le fichier de triche MAME existant ?</string>
+	<key>Cheat File Scanner</key>
+	<string>Analyse du fichier de triche</string>
+	<key>Importing %1$ld of %2$ld</key>
+	<string>Importation %1$ld sur %2$ld</string>
+	<key>Copying File</key>
+	<string>Copie du fichier</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>Téléchargez cheat.7z depuis %@ et glissez-le sur la fenêtre de bibliothèque d’OpenEmu.</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>Aucun fichier de triche MAME importé pour l’instant.</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>« %1$@ » dans %2$@</string>
 	<key>%@ copy</key>

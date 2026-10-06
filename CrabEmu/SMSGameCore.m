@@ -34,6 +34,12 @@
 #import "OESG1000SystemResponderClient.h"
 #import "OEColecoVisionSystemResponderClient.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 #include "sms.h"
 #include "smsmem.h"
 #include "sound.h"
@@ -60,6 +66,7 @@ extern uint8 *sms_read_map[256];
     BOOL           paused;
     NSURL         *romFile;
     NSMutableDictionary *cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
@@ -68,6 +75,24 @@ extern uint8 *sms_read_map[256];
 // Global variables because the callbacks need to access them...
 static OERingBuffer *ringBuffer;
 console_t *cur_console;
+
+// rcheevos ColecoVision map: virtual 0x0000-0x03FF == real 0x6000-0x63FF System RAM (see
+// rc_memory_regions_colecovision) -- coleco_get_ram() is already RAM-relative, same as the
+// cheat search descriptor, so no rebasing is needed here.
+static uint32_t crabemu_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                        uint32_t num_bytes, rc_client_t *client)
+{
+    uint8_t *ram = coleco_get_ram();
+    if (!ram) return 0;
+
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i >= 0x400)
+            return i;
+        buffer[i] = ram[address + i];
+    }
+    return num_bytes;
+}
 
 - (id)init
 {
@@ -85,7 +110,30 @@ console_t *cur_console;
 {
     DLog(@"releasing/deallocating CrabEmu memory");
 
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     cur_console->shutdown();
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 # pragma mark - Execution
@@ -102,6 +150,12 @@ console_t *cur_console;
         coleco_init(VIDEO_NTSC);
         coleco_mem_load_bios(biosPath.fileSystemRepresentation);
         coleco_mem_load_rom(path.fileSystemRepresentation);
+
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:crabemu_rc_read_memory
+                                                               consoleID:RC_CONSOLE_COLECOVISION];
+        [_raBridge startWithROMPath:path];
+        [_raBridge markROMReady];
     }
     else
     {
@@ -166,15 +220,21 @@ console_t *cur_console;
     [bufLock lock];
     cur_console->frame(0);
     [bufLock unlock];
+
+    [_raBridge doFrame];
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     cur_console->soft_reset();
 }
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     if(cur_console->console_type != CONSOLE_COLECOVISION)
     {
         NSString *extensionlessFilename = [[romFile lastPathComponent] stringByDeletingPathExtension];

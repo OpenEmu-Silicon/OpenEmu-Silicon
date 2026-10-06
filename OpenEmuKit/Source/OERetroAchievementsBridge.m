@@ -20,6 +20,7 @@
 #import "OERetroAchievementsTransport.h"
 #import <OpenEmuBase/OpenEmuBase.h> // full OEGameCore + OEGameCoreController interfaces (core.pluginName/owner.bundle)
 #import <os/log.h>
+#include <rc_hash.h>
 
 // Bridge owns its own copy of the OERetroAchievements* notification names
 // so per-core code doesn't have to import the transport header alongside the
@@ -434,6 +435,19 @@ static void oe_ra_bridge_server_call(const rc_api_request_t *request,
 - (void)markROMReady
 {
     self.romReady = YES;
+}
+
+- (void)setHashFileReader:(const struct rc_hash_filereader *)reader
+{
+    if (!reader) { return; }
+    rc_hash_filereader_t copy = *reader;
+    dispatch_sync(_serialQueue, ^{
+        if (!self->_rcClient || self.shuttingDown) { return; }
+        rc_hash_callbacks_t callbacks;
+        memset(&callbacks, 0, sizeof(callbacks));
+        callbacks.filereader = copy;
+        rc_client_set_hash_callbacks(self->_rcClient, &callbacks);
+    });
 }
 
 - (void)shutdown

@@ -554,8 +554,9 @@ final class GameControlsBar: NSWindow {
     /// an unrecognized value (or `nil`, for manual/Cheat Search cheats) just means no icon.
     private func providerIcon(for cheatSource: String?) -> NSImage? {
         switch cheatSource {
-        case "OpenEmu": return NSImage(named: "cheat_provider_openemu")
-        case "Libretro": return NSImage(named: "cheat_provider_libretro")
+        case OpenEmuCheatProvider.providerName: return NSImage(named: "cheat_provider_openemu")
+        case LibretroCheatProvider.providerName: return NSImage(named: "cheat_provider_libretro")
+        case PugsyCheatProvider.providerName: return NSImage(named: "cheat_provider_pugsy")
         default: return nil
         }
     }

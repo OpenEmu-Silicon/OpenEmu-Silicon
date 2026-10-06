@@ -256,8 +256,9 @@ CISO_H ciso;
             read_size = (index2-index) << (ciso.align);
         }
        
-        // Ensure the read_size will not overflow the buffer.
-        if (read_size > sizeof(block_buf2))
+        // Ensure the read_size will not overflow the buffer. block_buf2 is a pointer, so its
+        // sizeof is 8 — compare against the actual allocated size (block_size * 2) instead.
+        if (read_size > ciso.block_size * 2)
             return nil;
         
         fseek(fin,read_pos,SEEK_SET);

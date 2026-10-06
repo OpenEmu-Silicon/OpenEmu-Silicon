@@ -87,6 +87,9 @@
 		9443D4691715F75700E452AC /* vrcvisnd.c in Sources */ = {isa = PBXBuildFile; fileRef = 9443D42F1715F33C00E452AC /* vrcvisnd.c */; };
 		94BE9E7A171695AE00AB08E6 /* OEColecoVisionSystemResponderClient.h in Resources */ = {isa = PBXBuildFile; fileRef = 94BE9E79171695AE00AB08E6 /* OEColecoVisionSystemResponderClient.h */; };
 		C66DFC1A0F51D82F0080AA28 /* SMSGameCore.m in Sources */ = {isa = PBXBuildFile; fileRef = C66DFC180F51D82F0080AA28 /* SMSGameCore.m */; };
+		OE0CRAB0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0CRAB0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0CRAB0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0CRAB0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0CRAB0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0CRAB0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		C6D120E91711302600E868A8 /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C6D120E71711302600E868A8 /* OpenEmuBase.framework */; };
 /* End PBXBuildFile section */
 
@@ -255,6 +258,10 @@
 		94BE9E79171695AE00AB08E6 /* OEColecoVisionSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEColecoVisionSystemResponderClient.h; path = ../OpenEmu/SystemPlugins/ColecoVision/OEColecoVisionSystemResponderClient.h; sourceTree = "<group>"; };
 		B5DA7D8C0F5B28940008F047 /* CrabEmu.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CrabEmu.h; sourceTree = "<group>"; };
 		C66DFC180F51D82F0080AA28 /* SMSGameCore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SMSGameCore.m; sourceTree = "<group>"; };
+		OE0CRAB0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0CRAB0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0CRAB0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0CRAB0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		C66DFC190F51D82F0080AA28 /* SMSGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SMSGameCore.h; sourceTree = "<group>"; };
 		C6B3E67C1365255700D34947 /* OESMSSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OESMSSystemResponderClient.h; path = ../OpenEmu/SystemPlugins/SegaMasterSystem/OESMSSystemResponderClient.h; sourceTree = "<group>"; };
 		C6D120E71711302600E868A8 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -317,6 +324,10 @@
 				8291C4E21489595000A72540 /* OEGGSystemResponderClient.h */,
 				946C18AF171491B300C64BF9 /* OESG1000SystemResponderClient.h */,
 				94BE9E79171695AE00AB08E6 /* OEColecoVisionSystemResponderClient.h */,
+				OE0CRAB0FILEREF000000001 /* rcheevos_build.c */,
+				OE0CRAB0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0CRAB0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0CRAB0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -693,6 +704,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				OE0CRAB0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0CRAB0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0CRAB0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				834A0CAC1B79371A0073803A /* nesmapper2.c in Sources */,
 				834A0CAD1B79371A0073803A /* nesmapper3.c in Sources */,
 				834A0CAE1B79371A0073803A /* nesmapper7.c in Sources */,
@@ -775,6 +789,11 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				OTHER_CFLAGS = (
@@ -796,6 +815,11 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				OTHER_CFLAGS = (

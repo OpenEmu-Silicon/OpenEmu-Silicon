@@ -32,6 +32,12 @@ enum CheatCodeValidator {
 
     /// Returns true if the code (possibly multi-part with '+') is valid for the given core and system.
     static func isValid(code: String, systemIdentifier: String, coreIdentifier: String) -> Bool {
+        // PSP (PPSSPP CwCheat/TempAR): whitespace is structural (`_L 0xADDR 0xVAL` pairs) and a code
+        // can span several `_L` lines, so validate the raw token stream before the space-stripping
+        // and '+'-splitting the other systems rely on.
+        if systemIdentifier == OESystemIdentifierPSP {
+            return isCWCheatCode(code)
+        }
         let normalized = code.replacingOccurrences(of: " ", with: "")
         // NDS: each '+'-separated part must be a 16-hex AR line (already normalized by provider)
         if systemIdentifier == OESystemIdentifierNDS {
@@ -46,6 +52,35 @@ enum CheatCodeValidator {
         switch systemIdentifier {
         case OESystemIdentifierAtari2600, OESystemIdentifierColecoVision:
             // Stella: scanHexInt is flexible on length, cast to uInt16/uInt8
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifierMSX:
+            // blueMSX: raw poke into the CPU's logical 64KB address space via slotWrite
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifier5200:
+            // Atari800: raw poke into MEMORY_mem, same 16-bit address space as Stella
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifier7800:
+            // ProSystem: raw poke into memory_ram via memory_Write, same 16-bit address space
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifierPokeMini:
+            // PokeMini: raw poke into PM_RAM (CPU 0x1000-0x1FFF), 16-bit address space
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifierVectrex:
+            // VecXGL: raw poke into ram[] (CPU 0xC800-0xCBFF), 16-bit address space
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifierSupervision:
+            // Potator: raw poke into lowerRam (CPU 0x0000-0x1FFF) / upperRam (0x4000-0x5FFF), 16-bit space
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifierOdyssey2:
+            // O2EM: raw poke into intRAM (0x000-0x03F) or extRAM (0x100-0x1FF, cart-dependent).
+            // Max 4 (not 3) hex digits so zero-padded addresses like 0032:19 still validate.
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
 
         case OESystemIdentifierNES, OESystemIdentifierFDS:
@@ -89,6 +124,10 @@ enum CheatCodeValidator {
             // GenesisPlus MD mode: Game Genie (XXXX-XXXX) or Patch/PAR (XXXXXX:XXXX)
             return isGenesisGameGenieCode(code) || isGenesisPARCode(code)
 
+        case OESystemIdentifierSega32X:
+            // Picodrive: Game Genie (XXXX-XXXX) or raw memory patch (XXXXXX:XXXX)
+            return isGenesisGameGenieCode(code) || isGenesisPARCode(code)
+
         case OESystemIdentifierSMS:
             if coreIdentifier == "org.openemu.CrabEmu" {
                 return isSMSActionReplayCode(code) || isRawAddressValue(code)
@@ -107,12 +146,44 @@ enum CheatCodeValidator {
             // Mednafen (vb module): no named format, only raw WRAM address:value (8 hex address + 2 hex value)
             return isRawAddressValue(code, addressHexChars: 8, valueHexChars: 2)
 
+        case OESystemIdentifierArcade:
+            // MAME (Pugsy cheats): raw ADDRESS:VALUE hex pokes, joined with '+'. Address up to
+            // 32-bit and value up to 4 bytes; the value's hex width encodes the poke size.
+            return isRawAddressValue(code, maxAddressHexChars: 8, maxValueHexChars: 8)
+
         default:
             return true
         }
     }
 
     // MARK: - Format Checks
+
+    /// PSP CwCheat (`_L`) / TempAR (`_M`) code: one or more tags, each followed by two hex words.
+    /// Whitespace and newlines separate tokens; interpretation is left to the core, so this only
+    /// checks token structure — not per-line address/value semantics, since many command types are
+    /// multi-line (trailing `_L` lines are parameters, not standalone writes).
+    static func isCWCheatCode(_ code: String) -> Bool {
+        let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" })
+        var index = 0
+        var groups = 0
+        while index < tokens.count {
+            let tag = tokens[index].uppercased()
+            guard tag == "_L" || tag == "_M" else { return false }
+            guard index + 2 < tokens.count,
+                  isCWCheatWord(tokens[index + 1]),
+                  isCWCheatWord(tokens[index + 2])
+            else { return false }
+            index += 3
+            groups += 1
+        }
+        return groups > 0
+    }
+
+    private static func isCWCheatWord(_ token: Substring) -> Bool {
+        var hex = token
+        if hex.hasPrefix("0x") || hex.hasPrefix("0X") { hex = hex.dropFirst(2) }
+        return !hex.isEmpty && hex.count <= 8 && hex.allSatisfy(\.isHexDigit)
+    }
 
     /// Raw address:value hex format. Accepts optional exact or max size constraints.
     static func isRawAddressValue(

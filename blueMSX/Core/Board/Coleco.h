@@ -34,5 +34,9 @@ int colecoCreate(Machine* machine,
                  VdpSyncMode vdpSyncMode,
                  BoardInfo* boardInfo);
 
+// System RAM (1K, mirrored), for cheat pokes and cheat search
+UInt8* colecoGetRam(void);
+UInt32 colecoGetRamSize(void);
+
 #endif /* COLECO_H */
 

@@ -23,6 +23,8 @@ int  PicoPatchLoad(const char *fname);
 void PicoPatchUnload(void);
 void PicoPatchPrepare(void);
 void PicoPatchApply(void);
+int  PicoPatchAdd(const char *code, int enabled);
+void PicoPatchResetAll(void);
 
 
 #ifdef __cplusplus

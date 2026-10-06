@@ -24,6 +24,27 @@
 	<string>OEGameCoreController</string>
 	<key>OEGameCoreClass</key>
 	<string>blueMSXGameCore</string>
+	<key>OEGameCoreOptions</key>
+	<dict>
+		<key>openemu.system.colecovision</key>
+		<dict>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
+		</dict>
+		<key>openemu.system.msx</key>
+		<dict>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
+		</dict>
+	</dict>
 	<key>OEGameCorePlayerCount</key>
 	<string>2</string>
 	<key>OEGameCoreRequiresFiles</key>

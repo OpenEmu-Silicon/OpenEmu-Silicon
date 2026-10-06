@@ -30,6 +30,12 @@
 			<integer>60</integer>
 			<key>OEGameCoreRewindInterval</key>
 			<integer>0</integer>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 			<key>OEGameCoreSupportsRewinding</key>
 			<true/>
 		</dict>
