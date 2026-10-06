@@ -566,11 +566,12 @@ void PicoPatchResetAll(void)
       if (!PicoPatches[i].active)
          continue;
       addr = PicoPatches[i].addr;
+      // Only ROM patches are restored. For RAM, data_old is the value read when the cheat was
+      // added, so writing it back would clobber live RAM with a stale value (e.g. resetting lives
+      // to their count at enable time); just stop patching instead.
       // addr+1 guards the 16-bit access from writing one byte past the ROM at addr == romsize-1.
       if (addr + 1 < Pico.romsize)
          *(unsigned short *)(Pico.rom + addr) = PicoPatches[i].data_old;
-      else if (!(PicoIn.AHW & PAHW_SMS))
-         m68k_write16(addr, PicoPatches[i].data_old);
    }
    PicoPatchUnload();
 }
