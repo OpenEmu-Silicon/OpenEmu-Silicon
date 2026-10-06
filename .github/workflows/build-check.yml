@@ -162,6 +162,13 @@ jobs:
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
           cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 
+      - name: Test DualSense Bluetooth report decoding
+        run: |
+          xcrun clang -std=c11 -UNDEBUG -Wall -Wextra -Werror -fsanitize=address,undefined \
+            OpenEmu-SDK/OpenEmuSystemTests/OEDualSenseBluetoothReportTests.c \
+            -lz -o "$RUNNER_TEMP/dualsense-report-tests"
+          "$RUNNER_TEMP/dualsense-report-tests"
+
       - name: Build OpenEmu (Debug, arm64)
         run: |
           xcodebuild build \
