@@ -21,6 +21,7 @@ jobs:
         run: |
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
           cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
       - name: Build OpenEmu
         working-directory: ${{github.workspace}}
         run: xcodebuild -workspace "OpenEmu-metal.xcworkspace" -scheme "OpenEmu" -configuration Release -sdk macosx -arch arm64 -derivedDataPath DerivedData CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO

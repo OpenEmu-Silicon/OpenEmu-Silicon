@@ -39,6 +39,7 @@ cd OpenEmu-Silicon
 # 2. Copy credential stubs (required — real credentials are never committed)
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
 cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
 # 3. Open the workspace (not the .xcodeproj)
 open OpenEmu-metal.xcworkspace
