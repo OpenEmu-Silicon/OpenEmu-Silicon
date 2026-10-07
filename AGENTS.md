@@ -72,6 +72,7 @@ Before compiling for the first time, you must generate the local gitignored secr
 ```bash
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
 cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 ```
 
 ---
