@@ -75,6 +75,15 @@ enum CheatWorksConfig {
         systemMap[systemIdentifier]
     }
 
+    /// The CheatWorks emulator code for an OpenEmu core identifier, or `nil` if the core is not a
+    /// recognized CheatWorks emulator. Relies on OpenEmu's convention that a core's bundle-id last
+    /// component lowercases to the backend emulator code (e.g. `org.openemu.GenesisPlus` →
+    /// `genesisplus`), which holds for every shipped core.
+    static func emulatorCode(for coreIdentifier: String) -> CheatWorksEmulatorCode? {
+        guard let last = coreIdentifier.components(separatedBy: ".").last else { return nil }
+        return CheatWorksEmulatorCode(rawValue: last.lowercased())
+    }
+
     private static let systemMap: [String: CheatWorksSystem] = [
         OESystemIdentifierNES: .nintendo,
         OESystemIdentifierFDS: .famicomDiskSystem,
