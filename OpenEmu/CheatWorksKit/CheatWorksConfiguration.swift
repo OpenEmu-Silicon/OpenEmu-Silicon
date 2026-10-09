@@ -43,6 +43,9 @@ public struct CheatWorksConfiguration: Sendable {
     /// Client access token issued to the consuming app; exchanged for a per-installation token.
     public let clientAccessToken: String
 
+    /// Version of the consuming app, reported with every feedback submission, e.g. `"1.3.0"`.
+    public let clientVersion: String
+
     /// Base URL of the CheatWorks API. Defaults to production.
     public let baseURL: URL
 
@@ -51,13 +54,16 @@ public struct CheatWorksConfiguration: Sendable {
 
     public init(clientCode: String,
                 clientAccessToken: String,
+                clientVersion: String,
                 baseURL: URL = URL(string: "https://api.cheatworks.org")!,
                 externalIDPrefix: String = "cw-ins-") {
         self.clientCode = clientCode
         self.clientAccessToken = clientAccessToken
+        self.clientVersion = clientVersion
         self.baseURL = baseURL
         self.externalIDPrefix = externalIDPrefix
     }
 
     var installationURL: URL { baseURL.appendingPathComponent("v1/installation") }
+    var feedbackURL: URL { baseURL.appendingPathComponent("v1/feedback") }
 }

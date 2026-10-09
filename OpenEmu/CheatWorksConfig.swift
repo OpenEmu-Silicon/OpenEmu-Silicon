@@ -23,13 +23,15 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Foundation
+import OpenEmuBase
 
 /// OpenEmu's integration with the (portable) CheatWorks Integration SDK.
 ///
 /// This is the host-specific layer: it names OpenEmu as the CheatWorks client, pulls the shipped
 /// client access token from the gitignored `CheatWorksSecrets.swift`, and vends the shared
-/// ``CheatWorksAuthClient`` the rest of the app talks to. Everything portable lives in the
-/// `CheatWorks*` SDK-core files; nothing here should be needed once the SDK is a separate package.
+/// ``CheatWorksService`` the rest of the app talks to. The authentication layer is internal to that
+/// service and is never used directly. Everything portable lives in the `CheatWorksKit` SDK-core
+/// files; nothing here should be needed once the SDK is a separate package.
 enum CheatWorksConfig {
 
     /// Code identifying OpenEmu to CheatWorks when reporting feedback.
@@ -52,11 +54,60 @@ enum CheatWorksConfig {
         !clientAccessToken.isEmpty && clientAccessToken != placeholderClientAccessToken
     }
 
-    /// The shared auth client for the app. Uses the SDK's own on-device storage and
-    /// hardware-derived device id — OpenEmu supplies only the configuration.
-    static let authClient = CheatWorksAuthClient(
+    /// OpenEmu's version string, reported with every feedback submission.
+    private static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+    }
+
+    /// The shared CheatWorks service for the app. It owns the authentication layer internally and
+    /// uses the SDK's own on-device storage and hardware-derived device id.
+    static let service = CheatWorksService(
         configuration: CheatWorksConfiguration(
             clientCode: clientCode,
             clientAccessToken: clientAccessToken,
+            clientVersion: appVersion,
             externalIDPrefix: externalIDPrefix))
+
+    /// The CheatWorks system for an OpenEmu system identifier, or `nil` for systems CheatWorks has
+    /// no cheat-feedback story for. Keyed by the `OESystemIdentifier` constants `CheatCodeValidator`
+    /// uses, so it covers exactly the cheat-supported systems.
+    static func system(for systemIdentifier: String) -> CheatWorksSystem? {
+        systemMap[systemIdentifier]
+    }
+
+    private static let systemMap: [String: CheatWorksSystem] = [
+        OESystemIdentifierNES: .nintendo,
+        OESystemIdentifierFDS: .famicomDiskSystem,
+        OESystemIdentifierSNES: .superNintendo,
+        OESystemIdentifierN64: .nintendo64,
+        OESystemIdentifierGB: .gameboy,
+        OESystemIdentifierGBA: .gameboyAdvance,
+        OESystemIdentifierNDS: .nintendoDS,
+        OESystemIdentifierGenesis: .megaDrive,
+        OESystemIdentifierSMS: .masterSystem,
+        OESystemIdentifierGameGear: .gameGear,
+        OESystemIdentifierSG1000: .sg1000,
+        OESystemIdentifierColecoVision: .colecovision,
+        OESystemIdentifierMSX: .msx,
+        OESystemIdentifierSegaCD: .segaCD,
+        OESystemIdentifierSega32X: .sega32X,
+        OESystemIdentifierAtari2600: .atari2600,
+        OESystemIdentifier5200: .atari5200,
+        OESystemIdentifier7800: .atari7800,
+        OESystemIdentifierOdyssey2: .magnavoxOdyssey2,
+        OESystemIdentifierLynx: .atariLynx,
+        OESystemIdentifierNGP: .neogeoPocket,
+        OESystemIdentifierPCE: .pcEngine,
+        OESystemIdentifierPCECD: .pcEngineCD,
+        OESystemIdentifierPSX: .playstation,
+        OESystemIdentifierPSP: .psp,
+        OESystemIdentifierSaturn: .saturn,
+        OESystemIdentifierVB: .virtualBoy,
+        OESystemIdentifierWS: .wonderswan,
+        OESystemIdentifierPCFX: .pcfx,
+        OESystemIdentifierPokeMini: .pokemonMini,
+        OESystemIdentifierVectrex: .vectrex,
+        OESystemIdentifierSupervision: .supervision,
+        OESystemIdentifierArcade: .arcade,
+    ]
 }

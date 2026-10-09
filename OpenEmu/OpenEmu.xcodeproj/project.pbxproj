@@ -666,6 +666,15 @@
 		CC0011223344556901900001 /* PrefScreenScraperController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344556801900001 /* PrefScreenScraperController.swift */; };
 		CC0011223344556B01900001 /* LibretroThumbnailsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344556A01900001 /* LibretroThumbnailsClient.swift */; };
 		CC0011223344557101900001 /* ScreenScraperDevCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344557001900001 /* ScreenScraperDevCredentials.swift */; };
+		CC00CW00CONF000000000002 /* CheatWorksConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00CONF000000000001 /* CheatWorksConfig.swift */; };
+		CC00CW00AUTH000000000002 /* CheatWorksAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00AUTH000000000001 /* CheatWorksAuthClient.swift */; };
+		CC00CW00SVC0000000000002 /* CheatWorksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00SVC0000000000001 /* CheatWorksService.swift */; };
+		CC00CW00SYST000000000002 /* CheatWorksSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00SYST000000000001 /* CheatWorksSystem.swift */; };
+		CC00CW00EMUL000000000002 /* CheatWorksEmulatorCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00EMUL000000000001 /* CheatWorksEmulatorCode.swift */; };
+		CC00CW00CFGN000000000002 /* CheatWorksConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00CFGN000000000001 /* CheatWorksConfiguration.swift */; };
+		CC00CW00STOR000000000002 /* CheatWorksStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00STOR000000000001 /* CheatWorksStorage.swift */; };
+		CC00CW00IDEN000000000002 /* CheatWorksDeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00IDEN000000000001 /* CheatWorksDeviceIdentity.swift */; };
+		CC00CW00SECR000000000002 /* CheatWorksSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00SECR000000000001 /* CheatWorksSecrets.swift */; };
 		CEA508990AF842369046D92D /* OEFolderBackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9964A7D7B3C4438D9BE62654 /* OEFolderBackupManager.swift */; };
 		D3360575D5430005882E67D6 /* ArtworkImportReviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44117B42E921F7FC91F8889D /* ArtworkImportReviewViewController.swift */; };
 		DEAAB8E598494A97A260F43C84A6B563 /* Dreamcast.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 87DF04FE1BCE2D100060E2C2 /* Dreamcast.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -1920,6 +1929,16 @@
 		CC0011223344556A01900001 /* LibretroThumbnailsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibretroThumbnailsClient.swift; sourceTree = "<group>"; };
 		CC0011223344557001900001 /* ScreenScraperDevCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenScraperDevCredentials.swift; sourceTree = "<group>"; };
 		CC0011223344557201900001 /* ScreenScraperDevCredentials.template.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenScraperDevCredentials.template.swift; sourceTree = "<group>"; };
+		CC00CW00CONF000000000001 /* CheatWorksConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksConfig.swift; sourceTree = "<group>"; };
+		CC00CW00AUTH000000000001 /* CheatWorksAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksAuthClient.swift; sourceTree = "<group>"; };
+		CC00CW00SVC0000000000001 /* CheatWorksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksService.swift; sourceTree = "<group>"; };
+		CC00CW00SYST000000000001 /* CheatWorksSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksSystem.swift; sourceTree = "<group>"; };
+		CC00CW00EMUL000000000001 /* CheatWorksEmulatorCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksEmulatorCode.swift; sourceTree = "<group>"; };
+		CC00CW00CFGN000000000001 /* CheatWorksConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksConfiguration.swift; sourceTree = "<group>"; };
+		CC00CW00STOR000000000001 /* CheatWorksStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksStorage.swift; sourceTree = "<group>"; };
+		CC00CW00IDEN000000000001 /* CheatWorksDeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksDeviceIdentity.swift; sourceTree = "<group>"; };
+		CC00CW00SECR000000000001 /* CheatWorksSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksSecrets.swift; sourceTree = "<group>"; };
+		CC00CW00TMPL000000000001 /* CheatWorksSecrets.template.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheatWorksSecrets.template.swift; sourceTree = "<group>"; };
 		DBFF44DC2E9D79C700B30F0A /* OENESSystemResponderClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OENESSystemResponderClient.h; sourceTree = "<group>"; };
 		DBFF44DD2E9D79D400B30F0A /* OEFDSSystemResponderClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OEFDSSystemResponderClient.h; sourceTree = "<group>"; };
 		ED2D0AB7012BE11642E384A3 /* CheatSearchWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheatSearchWindowController.swift; sourceTree = "<group>"; };
@@ -4067,6 +4086,20 @@
 			path = Wii;
 			sourceTree = "<group>";
 		};
+		CC00CW00KIT0000000000001 /* CheatWorksKit */ = {
+			isa = PBXGroup;
+			children = (
+				CC00CW00CFGN000000000001 /* CheatWorksConfiguration.swift */,
+				CC00CW00AUTH000000000001 /* CheatWorksAuthClient.swift */,
+				CC00CW00SVC0000000000001 /* CheatWorksService.swift */,
+				CC00CW00SYST000000000001 /* CheatWorksSystem.swift */,
+				CC00CW00EMUL000000000001 /* CheatWorksEmulatorCode.swift */,
+				CC00CW00STOR000000000001 /* CheatWorksStorage.swift */,
+				CC00CW00IDEN000000000001 /* CheatWorksDeviceIdentity.swift */,
+			);
+			path = CheatWorksKit;
+			sourceTree = "<group>";
+		};
 		B8396A2616B1FF9F2C6C8029 /* OpenEmu */ = {
 			isa = PBXGroup;
 			children = (
@@ -4078,6 +4111,10 @@
 				35F8401C31D685D3E7EAA048 /* OEGoogleDriveSecrets.template.swift */,
 				CC0011223344557201900001 /* ScreenScraperDevCredentials.template.swift */,
 				42A14B489D09FD1B597AD586 /* OECredentialStore.swift */,
+				CC00CW00KIT0000000000001 /* CheatWorksKit */,
+				CC00CW00CONF000000000001 /* CheatWorksConfig.swift */,
+				CC00CW00SECR000000000001 /* CheatWorksSecrets.swift */,
+				CC00CW00TMPL000000000001 /* CheatWorksSecrets.template.swift */,
 				ED2D0AB7012BE11642E384A3 /* CheatSearchWindowController.swift */,
 				8045ABD4E2FC2F0F03CEECB4 /* CheatSearchViewController.swift */,
 				ED2D0AB7012BE11642E384A4 /* BrowseOnlineCheatsWindowController.swift */,
@@ -6358,6 +6395,15 @@
 				CC0011223344556901900001 /* PrefScreenScraperController.swift in Sources */,
 				OE0RA0APPBUILDFILE0000001 /* PrefRetroAchievementsController.swift in Sources */,
 				CC0011223344557101900001 /* ScreenScraperDevCredentials.swift in Sources */,
+				CC00CW00CONF000000000002 /* CheatWorksConfig.swift in Sources */,
+				CC00CW00CFGN000000000002 /* CheatWorksConfiguration.swift in Sources */,
+				CC00CW00AUTH000000000002 /* CheatWorksAuthClient.swift in Sources */,
+				CC00CW00SVC0000000000002 /* CheatWorksService.swift in Sources */,
+				CC00CW00SYST000000000002 /* CheatWorksSystem.swift in Sources */,
+				CC00CW00EMUL000000000002 /* CheatWorksEmulatorCode.swift in Sources */,
+				CC00CW00STOR000000000002 /* CheatWorksStorage.swift in Sources */,
+				CC00CW00IDEN000000000002 /* CheatWorksDeviceIdentity.swift in Sources */,
+				CC00CW00SECR000000000002 /* CheatWorksSecrets.swift in Sources */,
 				8FBD79192736A17B00E455FC /* GameInfoHelper.swift in Sources */,
 				5A438A1B1D89AEB60061A47C /* OpenEmuApplication.swift in Sources */,
 				8F2F92AA2519A9E700699691 /* GameScannerButton.swift in Sources */,
