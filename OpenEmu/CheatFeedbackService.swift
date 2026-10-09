@@ -162,8 +162,10 @@ final class CheatFeedbackService: @unchecked Sendable {
 
     // MARK: - Writing
 
-    /// Records a report, replacing any previous one for the same code and core build.
-    /// Existing notes for that code/build are carried over untouched.
+    /// Records a report, replacing any previous one for the same code and core build. Existing notes
+    /// for that code/build are carried over untouched. A new report, or a changed verdict, is also
+    /// submitted to CheatWorks right after it is saved (the save always wins; the network is
+    /// best-effort and non-blocking).
     func setStatus(_ status: CheatFeedbackStatus,
                    forCode code: String,
                    md5: String,
@@ -175,6 +177,10 @@ final class CheatFeedbackService: @unchecked Sendable {
                    gameName: String? = nil,
                    serial: String? = nil,
                    raHash: String? = nil) {
+        // Captured inside the upsert (which runs under the file lock) so the submission uses exactly
+        // what was stored. Set only when the verdict is new or changed — an unchanged verdict keeps
+        // its sync state and is not resent.
+        var submission: (rawCode: String?, provider: String?)?
         upsertEntry(forCode: code,
                     md5: md5,
                     systemIdentifier: systemIdentifier,
@@ -183,14 +189,25 @@ final class CheatFeedbackService: @unchecked Sendable {
                     gameName: gameName,
                     serial: serial,
                     raHash: raHash) { existing in
-            CheatFeedbackEntry(code: code,
-                               coreIdentifier: coreIdentifier,
-                               coreVersion: coreVersion,
-                               status: status,
-                               notes: existing?.notes,
-                               rawCode: rawCode ?? existing?.rawCode,
-                               provider: provider ?? existing?.provider,
-                               updatedAt: Date())
+            let verdictChanged = existing?.status != status
+            let storedRawCode = rawCode ?? existing?.rawCode
+            let storedProvider = provider ?? existing?.provider
+            if verdictChanged { submission = (storedRawCode, storedProvider) }
+            return CheatFeedbackEntry(code: code,
+                                      coreIdentifier: coreIdentifier,
+                                      coreVersion: coreVersion,
+                                      status: status,
+                                      notes: existing?.notes,
+                                      rawCode: storedRawCode,
+                                      provider: storedProvider,
+                                      cheatWorksSynced: verdictChanged ? nil : existing?.cheatWorksSynced,
+                                      updatedAt: Date())
+        }
+
+        if let submission {
+            submitToCheatWorks(status: status, code: code, rawCode: submission.rawCode, md5: md5,
+                               systemIdentifier: systemIdentifier, coreIdentifier: coreIdentifier,
+                               coreVersion: coreVersion, gameName: gameName, provider: submission.provider)
         }
     }
 
@@ -363,7 +380,7 @@ final class CheatFeedbackService: @unchecked Sendable {
 
             do {
                 _ = try await CheatWorksConfig.service.submitFeedback(feedback, localSyncMode: true)
-                markSynced(code: entry.code, coreIdentifier: entry.coreIdentifier, coreVersion: entry.coreVersion, at: fileURL)
+                markSynced(code: entry.code, coreIdentifier: entry.coreIdentifier, coreVersion: entry.coreVersion, status: status, at: fileURL)
             } catch CheatWorksServiceError.rateLimited(let retryAfter) {
                 return .rateLimited(retryAfter: retryAfter)
             } catch CheatWorksAuthError.installationRevoked {
@@ -376,9 +393,10 @@ final class CheatFeedbackService: @unchecked Sendable {
         return .next
     }
 
-    /// Rewrites the file to flag the matching report synced. Locked, since a user edit may be
-    /// writing the same file on the main thread.
-    private func markSynced(code: String, coreIdentifier: String, coreVersion: String, at fileURL: URL) {
+    /// Flags the matching report synced, but only if its verdict still equals `status` — so a value
+    /// the user changed after we submitted isn't marked synced for the wrong verdict. Locked, since a
+    /// user edit may be writing the same file on the main thread.
+    private func markSynced(code: String, coreIdentifier: String, coreVersion: String, status: CheatFeedbackStatus, at fileURL: URL) {
         fileWriteLock.lock()
         defer { fileWriteLock.unlock() }
 
@@ -389,6 +407,7 @@ final class CheatFeedbackService: @unchecked Sendable {
         where Self.key(for: file.entries[index].code) == key
             && file.entries[index].coreIdentifier == coreIdentifier
             && file.entries[index].coreVersion == coreVersion
+            && file.entries[index].status == status
             && file.entries[index].cheatWorksSynced != true {
             file.entries[index].cheatWorksSynced = true
             changed = true
@@ -401,6 +420,37 @@ final class CheatFeedbackService: @unchecked Sendable {
         case .works: return .works
         case .doesNotWork: return .doesNotWork
         case .unknown: return .notSure
+        }
+    }
+
+    /// Submits a single just-recorded report to CheatWorks and marks it synced on success. Fire-and-
+    /// forget on a background task; any failure (offline, rate-limited, revoked) leaves it unsynced
+    /// for the next-launch sync. Never blocks the caller.
+    private func submitToCheatWorks(status: CheatFeedbackStatus, code: String, rawCode: String?, md5: String,
+                                    systemIdentifier: String, coreIdentifier: String, coreVersion: String,
+                                    gameName: String?, provider: String?) {
+        guard CheatWorksConfig.isClientTokenConfigured,
+              let system = CheatWorksConfig.system(for: systemIdentifier),
+              let emulatorCode = CheatWorksConfig.emulatorCode(for: coreIdentifier),
+              let url = fileURL(md5: md5, systemIdentifier: systemIdentifier)
+        else { return }
+
+        let feedback = CheatWorksFeedback(
+            system: system,
+            gameFingerprint: md5,
+            cheatCode: rawCode ?? code,
+            status: Self.cheatWorksStatus(for: status),
+            emulator: CheatWorksEmulator(emulatorCode, version: coreVersion),
+            gameName: gameName,
+            provider: provider)
+
+        Task {
+            do {
+                _ = try await CheatWorksConfig.service.submitFeedback(feedback)
+                self.markSynced(code: code, coreIdentifier: coreIdentifier, coreVersion: coreVersion, status: status, at: url)
+            } catch {
+                // Offline / rate-limited / revoked — leave unsynced; the next-launch sync retries.
+            }
         }
     }
 
