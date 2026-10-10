@@ -68,9 +68,9 @@ enum CheatWorksConfig {
             clientVersion: appVersion,
             externalIDPrefix: externalIDPrefix))
 
-    /// The CheatWorks system for an OpenEmu system identifier, or `nil` for systems CheatWorks has
-    /// no cheat-feedback story for. Keyed by the `OESystemIdentifier` constants `CheatCodeValidator`
-    /// uses, so it covers exactly the cheat-supported systems.
+    /// The CheatWorks system for an OpenEmu system identifier, or `nil` if CheatWorks has no code
+    /// for that platform. Covers every known OpenEmu system CheatWorks recognizes (Atari 8-bit is
+    /// the lone exception — CheatWorks has no code for it, and it has no cheats anyway).
     static func system(for systemIdentifier: String) -> CheatWorksSystem? {
         systemMap[systemIdentifier]
     }
@@ -118,5 +118,13 @@ enum CheatWorksConfig {
         OESystemIdentifierVectrex: .vectrex,
         OESystemIdentifierSupervision: .supervision,
         OESystemIdentifierArcade: .arcade,
+        OESystemIdentifierGameCube: .gamecube,
+        OESystemIdentifierWii: .wii,
+        OESystemIdentifierJaguar: .atariJaguar,
+        OESystemIdentifierIntellivision: .intellivision,
+        OESystemIdentifierDreamcast: .dreamcast,
+        OESystemIdentifier3DO: .the3DO,
+        OESystemIdentifierC64: .commodore64,
+        OESystemIdentifierPS2: .playstation2,
     ]
 }

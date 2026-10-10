@@ -62,6 +62,14 @@ NSString *const OESystemIdentifierPokeMini   = @"openemu.system.pokemonmini";
 NSString *const OESystemIdentifierVectrex    = @"openemu.system.vectrex";
 NSString *const OESystemIdentifierSupervision = @"openemu.system.sv";
 NSString *const OESystemIdentifierArcade     = @"openemu.system.arcade";
+NSString *const OESystemIdentifierGameCube = @"openemu.system.gc";
+NSString *const OESystemIdentifierWii = @"openemu.system.wii";
+NSString *const OESystemIdentifierJaguar = @"openemu.system.jaguar";
+NSString *const OESystemIdentifierIntellivision = @"openemu.system.intellivision";
+NSString *const OESystemIdentifierDreamcast = @"openemu.system.dc";
+NSString *const OESystemIdentifier3DO = @"openemu.system.3do";
+NSString *const OESystemIdentifierC64 = @"openemu.system.c64";
+NSString *const OESystemIdentifierPS2 = @"openemu.system.ps2";
 
 // MARK: - Cheat Code Type Strings
 
