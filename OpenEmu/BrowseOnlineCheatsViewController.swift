@@ -26,9 +26,9 @@
 import Cocoa
 import OpenEmuKit
 import OpenEmuBase
-// import os.log
+import os.log
 
-// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
+private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsRatings")
 
 final class BrowseOnlineCheatsViewController: NSViewController {
 
@@ -82,6 +82,14 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// User-reported status for the current core build, keyed by normalized code.
     private var statuses: [String: CheatFeedbackStatus] = [:]
     private var notes: [String: String] = [:]
+
+    /// CheatWorks ratings fetched this session, keyed by the cheat's raw code. Held until the window
+    /// closes so codes aren't re-queried on every filter change; cleared by ``flushRatings()``.
+    private var ratings: [String: CheatWorksRating] = [:]
+
+    /// Raw codes already sent to the ratings API this session (whether or not a rating came back),
+    /// so a code with no rating on record isn't re-requested on the next filter change.
+    private var requestedRatingCodes: Set<String> = []
 
     /// Normalized codes of cheats already in the user's inventory that came from elsewhere
     /// (manual "Add Cheat" or Cheat Search) — these block Import rather than offering Remove.
@@ -181,6 +189,9 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         // Refresh when the user imports the Pugsy cheat archive while this window is open (or was
         // left open), otherwise it keeps showing the "download the file" empty state.
         NotificationCenter.default.addObserver(self, selector: #selector(pugsyDatabaseWasImported), name: .didImportPugsyCheatFile, object: nil)
+
+        // Re-fetch a code's rating once the user's own feedback for it has landed on CheatWorks.
+        NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksFeedbackDidSubmit(_:)), name: .cheatWorksFeedbackDidSubmit, object: nil)
     }
 
     // MARK: - Results Table
@@ -392,6 +403,114 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         resultsTableView?.reloadData()
         updateResultsCountLabel()
         updateEmptyState()
+        fetchRatingsForVisibleCheats()
+    }
+
+    // MARK: - CheatWorks Ratings
+
+    /// Queries CheatWorks for the ratings of the codes currently shown in the table (the capped
+    /// subset the user sees), skipping any already requested this session. Fires on the initial load
+    /// and on every filter change; results are cached in `ratings` until the window closes. The UI
+    /// doesn't surface ratings yet — this logs them so the pipeline can be verified.
+    private func fetchRatingsForVisibleCheats() {
+        guard CheatWorksConfig.isClientTokenConfigured,
+              let document = gameDocument,
+              let md5 = document.rom.md5Hash,
+              let system = CheatWorksConfig.system(for: document.systemPlugin.systemIdentifier),
+              let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
+        else { return }
+
+        // Only the rows actually displayed (the table caps at `displayLimit`).
+        let shownCodes = visibleCheats.prefix(Self.displayLimit).map(\.rawCode)
+        let codesToFetch = Array(Set(shownCodes).subtracting(requestedRatingCodes))
+        guard !codesToFetch.isEmpty else { return }
+
+        // Mark as requested up front so overlapping filter changes don't re-query the same codes.
+        requestedRatingCodes.formUnion(codesToFetch)
+
+        log.info("querying ratings for \(codesToFetch.count, privacy: .public) code(s): \(system.rawValue, privacy: .public)/\(emulatorCode.rawValue, privacy: .public)")
+
+        Task { [weak self] in
+            do {
+                let fetched = try await CheatWorksConfig.service.queryRatings(
+                    system: system,
+                    gameFingerprint: md5,
+                    emulatorCode: emulatorCode.rawValue,
+                    cheatCodes: codesToFetch)
+
+                guard let self else { return }
+                for rating in fetched {
+                    self.ratings[rating.cheatCode] = rating
+                    log.info("rating \(rating.cheatCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
+                }
+                log.info("ratings cached: \(fetched.count, privacy: .public) of \(codesToFetch.count, privacy: .public) queried code(s) have ratings; \(self.ratings.count, privacy: .public) total cached")
+            } catch {
+                // Read-only, best-effort: log and move on. Codes stay marked requested so a transient
+                // failure doesn't spam the API on every subsequent filter change.
+                log.error("ratings query failed: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// Drops every cached rating and the requested-codes set. Called when the window closes (or the
+    /// core changes) so a fresh session re-queries rather than reusing stale, out-of-scope data.
+    func flushRatings() {
+        guard !ratings.isEmpty || !requestedRatingCodes.isEmpty else { return }
+        log.info("flushing \(self.ratings.count, privacy: .public) cached rating(s)")
+        ratings.removeAll()
+        requestedRatingCodes.removeAll()
+    }
+
+    /// Fired after the user's own feedback for a code reaches CheatWorks. Re-fetches just that code's
+    /// rating if it belongs to the game/core this window is showing.
+    @objc private func cheatWorksFeedbackDidSubmit(_ notification: Notification) {
+        guard let document = gameDocument,
+              let md5 = document.rom.md5Hash,
+              let info = notification.userInfo,
+              info[CheatFeedbackService.cheatWorksSubmissionMD5Key] as? String == md5,
+              info[CheatFeedbackService.cheatWorksSubmissionSystemIdentifierKey] as? String == document.systemPlugin.systemIdentifier,
+              info[CheatFeedbackService.cheatWorksSubmissionCoreIdentifierKey] as? String == document.corePlugin.bundleIdentifier,
+              let rawCode = info[CheatFeedbackService.cheatWorksSubmissionRawCodeKey] as? String
+        else { return }
+
+        refreshRating(forRawCode: rawCode)
+    }
+
+    /// Force re-queries a single code's rating (bypassing the session cache, since the user just
+    /// changed its feedback) and replaces its cached value with the fresh server result.
+    private func refreshRating(forRawCode rawCode: String) {
+        guard CheatWorksConfig.isClientTokenConfigured,
+              let document = gameDocument,
+              let md5 = document.rom.md5Hash,
+              let system = CheatWorksConfig.system(for: document.systemPlugin.systemIdentifier),
+              let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
+        else { return }
+
+        // Keep it marked requested so a plain filter change doesn't redundantly re-fetch it.
+        requestedRatingCodes.insert(rawCode)
+        log.info("refreshing rating after feedback for code: \(rawCode, privacy: .public)")
+
+        Task { [weak self] in
+            do {
+                let fetched = try await CheatWorksConfig.service.queryRatings(
+                    system: system,
+                    gameFingerprint: md5,
+                    emulatorCode: emulatorCode.rawValue,
+                    cheatCodes: [rawCode])
+
+                guard let self else { return }
+                if let rating = fetched.first {
+                    self.ratings[rawCode] = rating
+                    log.info("rating updated \(rawCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
+                } else {
+                    // Server returned nothing for it; clear any stale cached value rather than keep it.
+                    self.ratings[rawCode] = nil
+                    log.info("rating update for \(rawCode, privacy: .public): no rating returned")
+                }
+            } catch {
+                log.error("rating refresh failed for \(rawCode, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
+        }
     }
 
     private func updateEmptyState() {
@@ -800,6 +919,9 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         statuses = [:]
         notes = [:]
         hasLoaded = false
+
+        // Ratings are scoped to the emulator, so a core change invalidates the cached set too.
+        flushRatings()
 
         statusFilter = .all
         nameFilter = ""

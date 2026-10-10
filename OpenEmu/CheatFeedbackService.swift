@@ -28,6 +28,13 @@ import os.log
 
 private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "CheatFeedbackService")
 
+extension Notification.Name {
+    /// Posted on the main thread once a cheat-code report has been accepted by CheatWorks, so UI
+    /// showing server ratings can refresh the affected code. The `userInfo` carries the scope keys
+    /// defined on ``CheatFeedbackService`` (`cheatWorksSubmission…Key`).
+    static let cheatWorksFeedbackDidSubmit = Notification.Name("CheatWorksFeedbackDidSubmit")
+}
+
 /// Whether a cheat code worked for the user on a specific core build.
 ///
 /// `unknown` is an explicit user signal ("I don't know" / retracting a report),
@@ -101,6 +108,13 @@ private struct CheatFeedbackMigrationConfig: Codable {
 final class CheatFeedbackService: @unchecked Sendable {
 
     static let shared = CheatFeedbackService()
+
+    /// `userInfo` keys for `.cheatWorksFeedbackDidSubmit`.
+    static let cheatWorksSubmissionRawCodeKey = "rawCode"
+    static let cheatWorksSubmissionMD5Key = "md5"
+    static let cheatWorksSubmissionSystemIdentifierKey = "systemIdentifier"
+    static let cheatWorksSubmissionCoreIdentifierKey = "coreIdentifier"
+    static let cheatWorksSubmissionCoreVersionKey = "coreVersion"
 
     /// v2 added `rawCode`/`provider` per entry and `gameName`/`systemIdentifier` per file.
     /// See `migrateIfNeeded()` for the one-time reconciliation of files predating this.
@@ -435,10 +449,13 @@ final class CheatFeedbackService: @unchecked Sendable {
               let url = fileURL(md5: md5, systemIdentifier: systemIdentifier)
         else { return }
 
+        // The exact code the server aggregates its rating under, so a rating refresh can key on it.
+        let submittedCode = rawCode ?? code
+
         let feedback = CheatWorksFeedback(
             system: system,
             gameFingerprint: md5,
-            cheatCode: rawCode ?? code,
+            cheatCode: submittedCode,
             status: Self.cheatWorksStatus(for: status),
             emulator: CheatWorksEmulator(emulatorCode, version: coreVersion),
             gameName: gameName,
@@ -448,6 +465,17 @@ final class CheatFeedbackService: @unchecked Sendable {
             do {
                 _ = try await CheatWorksConfig.service.submitFeedback(feedback)
                 self.markSynced(code: code, coreIdentifier: coreIdentifier, coreVersion: coreVersion, status: status, at: url)
+                // The server evicts its ratings cache on accept, so this code's rating can now be
+                // re-fetched fresh — tell any interested UI which code to refresh.
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .cheatWorksFeedbackDidSubmit, object: nil, userInfo: [
+                        Self.cheatWorksSubmissionRawCodeKey: submittedCode,
+                        Self.cheatWorksSubmissionMD5Key: md5,
+                        Self.cheatWorksSubmissionSystemIdentifierKey: systemIdentifier,
+                        Self.cheatWorksSubmissionCoreIdentifierKey: coreIdentifier,
+                        Self.cheatWorksSubmissionCoreVersionKey: coreVersion,
+                    ])
+                }
             } catch {
                 // Offline / rate-limited / revoked — leave unsynced; the next-launch sync retries.
             }

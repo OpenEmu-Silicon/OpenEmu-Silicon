@@ -86,6 +86,11 @@ final class BrowseOnlineCheatsWindowController: NSWindowController, NSWindowDele
         browseViewController?.refreshDynamicState()
     }
 
+    func windowWillClose(_ notification: Notification) {
+        // Ratings are cached only for the lifetime of an open window; drop them on close.
+        browseViewController?.flushRatings()
+    }
+
     func resetForCoreChange() {
         browseViewController?.resetForCoreChange()
     }

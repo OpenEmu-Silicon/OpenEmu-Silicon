@@ -66,4 +66,5 @@ public struct CheatWorksConfiguration: Sendable {
 
     var installationURL: URL { baseURL.appendingPathComponent("v1/installation") }
     var feedbackURL: URL { baseURL.appendingPathComponent("v1/feedback") }
+    var ratingsQueryURL: URL { baseURL.appendingPathComponent("v1/ratings/query") }
 }
