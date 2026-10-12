@@ -61,8 +61,6 @@ public struct CheatWorksEmulator: Sendable {
 
 /// One cheat-code feedback submission. `cheatCode` is stored verbatim by the backend.
 public struct CheatWorksFeedback: Sendable {
-    /// The system/platform the cheat code targets.
-    public let system: CheatWorksSystem
     /// 32-character hexadecimal game fingerprint.
     public let gameFingerprint: String
     /// Optional game name, used when the game is first seen by the backend.
@@ -76,14 +74,12 @@ public struct CheatWorksFeedback: Sendable {
     /// Optional cheat-code provider name, e.g. `"pugsy"`.
     public let provider: String?
 
-    public init(system: CheatWorksSystem,
-                gameFingerprint: String,
+    public init(gameFingerprint: String,
                 cheatCode: String,
                 status: CheatWorksFeedbackStatus,
                 emulator: CheatWorksEmulator,
                 gameName: String? = nil,
                 provider: String? = nil) {
-        self.system = system
         self.gameFingerprint = gameFingerprint
         self.cheatCode = cheatCode
         self.status = status
@@ -217,7 +213,7 @@ public final class CheatWorksService: Sendable {
         switch http.statusCode {
         case 202:
             let decoded = try JSONDecoder().decode(FeedbackResponseBody.self, from: data)
-            // log.info("feedback \(decoded.status, privacy: .public): \(feedback.system.rawValue, privacy: .public)/\(feedback.emulator.code, privacy: .public) \(feedback.status.rawValue, privacy: .public) [\(feedback.cheatCode, privacy: .public)] warnings=[\((decoded.warnings ?? []).joined(separator: ", "), privacy: .public)]")
+            // log.info("feedback \(decoded.status, privacy: .public): \(feedback.emulator.code, privacy: .public) \(feedback.status.rawValue, privacy: .public) [\(feedback.cheatCode, privacy: .public)] warnings=[\((decoded.warnings ?? []).joined(separator: ", "), privacy: .public)]")
             return CheatWorksFeedbackResult(status: decoded.status, warnings: decoded.warnings ?? [])
         case 401:
             // log.notice("feedback rejected (401): installation revoked")
@@ -253,8 +249,7 @@ public final class CheatWorksService: Sendable {
     /// default) to aggregate ratings across all versions.
     ///
     /// Throws ``CheatWorksServiceError`` for a rate-limited / bad / unexpected response.
-    public func queryRatings(system: CheatWorksSystem,
-                             gameFingerprint: String,
+    public func queryRatings(gameFingerprint: String,
                              emulatorCode: String,
                              cheatCodes: [String],
                              clientVersion: String? = nil,
@@ -270,7 +265,6 @@ public final class CheatWorksService: Sendable {
         while index < uniqueCodes.count {
             let chunk = Array(uniqueCodes[index..<min(index + Self.maxRatingsPerRequest, uniqueCodes.count)])
             results.append(contentsOf: try await queryRatingsChunk(
-                system: system,
                 gameFingerprint: gameFingerprint,
                 emulatorCode: emulatorCode,
                 cheatCodes: chunk,
@@ -281,8 +275,7 @@ public final class CheatWorksService: Sendable {
         return results
     }
 
-    private func queryRatingsChunk(system: CheatWorksSystem,
-                                   gameFingerprint: String,
+    private func queryRatingsChunk(gameFingerprint: String,
                                    emulatorCode: String,
                                    cheatCodes: [String],
                                    clientVersion: String?,
@@ -291,7 +284,6 @@ public final class CheatWorksService: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(RatingsQueryRequestBody(
-            system: system.rawValue,
             gameFingerprint: gameFingerprint,
             client: configuration.clientCode,
             emulator: emulatorCode,
@@ -354,7 +346,6 @@ public final class CheatWorksService: Sendable {
 // MARK: - Wire models
 
 private struct FeedbackRequestBody: Encodable {
-    let system: String
     let gameFingerprint: String
     let gameName: String?
     let cheatCode: String
@@ -364,7 +355,6 @@ private struct FeedbackRequestBody: Encodable {
     let provider: String?
 
     enum CodingKeys: String, CodingKey {
-        case system
         case gameFingerprint = "game_fingerprint"
         case gameName = "game_name"
         case cheatCode = "cheat_code"
@@ -381,7 +371,6 @@ private struct FeedbackRequestBody: Encodable {
     }
 
     init(feedback: CheatWorksFeedback, clientVersion: String) {
-        system = feedback.system.rawValue
         gameFingerprint = feedback.gameFingerprint
         gameName = feedback.gameName
         cheatCode = feedback.cheatCode
@@ -399,7 +388,6 @@ private struct FeedbackResponseBody: Decodable {
 }
 
 private struct RatingsQueryRequestBody: Encodable {
-    let system: String
     let gameFingerprint: String
     let client: String
     let emulator: String
@@ -408,7 +396,6 @@ private struct RatingsQueryRequestBody: Encodable {
     let cheatCodes: [String]
 
     enum CodingKeys: String, CodingKey {
-        case system
         case gameFingerprint = "game_fingerprint"
         case client
         case emulator

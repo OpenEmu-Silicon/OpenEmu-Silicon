@@ -418,7 +418,6 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     private func fetchRatingsForVisibleCheats() {
         guard let document = gameDocument,
               let md5 = document.rom.md5Hash,
-              let system = CheatWorksConfig.system(for: document.systemPlugin.systemIdentifier),
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
         else { return }
 
@@ -430,12 +429,11 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         // Mark as requested up front so overlapping filter changes don't re-query the same codes.
         requestedRatingCodes.formUnion(codesToFetch)
 
-        // log.info("querying ratings for \(codesToFetch.count, privacy: .public) code(s): \(system.rawValue, privacy: .public)/\(emulatorCode.rawValue, privacy: .public)")
+        // log.info("querying ratings for \(codesToFetch.count, privacy: .public) code(s): \(emulatorCode.rawValue, privacy: .public)")
 
         Task { [weak self] in
             do {
                 let fetched = try await CheatWorksConfig.service.queryRatings(
-                    system: system,
                     gameFingerprint: md5,
                     emulatorCode: emulatorCode.rawValue,
                     cheatCodes: codesToFetch)
@@ -529,7 +527,6 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     private func refreshRating(forRawCode rawCode: String) {
         guard let document = gameDocument,
               let md5 = document.rom.md5Hash,
-              let system = CheatWorksConfig.system(for: document.systemPlugin.systemIdentifier),
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
         else { return }
 
@@ -540,7 +537,6 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         Task { [weak self] in
             do {
                 let fetched = try await CheatWorksConfig.service.queryRatings(
-                    system: system,
                     gameFingerprint: md5,
                     emulatorCode: emulatorCode.rawValue,
                     cheatCodes: [rawCode])

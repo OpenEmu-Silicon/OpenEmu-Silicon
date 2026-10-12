@@ -329,8 +329,8 @@ final class CheatFeedbackService: @unchecked Sendable {
         // log.info("CheatWorks sync: \(files.count) feedback file(s) to scan")
         var index = 0
         while index < files.count {
-            let file = files[index]
-            switch await syncFile(at: file.url, system: file.system) {
+            let fileURL = files[index]
+            switch await syncFile(at: fileURL) {
             case .next:
                 index += 1
             case .stop:
@@ -353,29 +353,28 @@ final class CheatFeedbackService: @unchecked Sendable {
         // log.info("CheatWorks sync finished")
     }
 
-    /// The feedback files to sync, in order, each paired with its CheatWorks system. Snapshotted once
-    /// so a `Retry-After` pause can resume by index instead of re-walking the whole store.
-    private func collectFeedbackFiles() -> [(url: URL, system: CheatWorksSystem)] {
+    /// The feedback files to sync, in order. Snapshotted once so a `Retry-After` pause can resume by
+    /// index instead of re-walking the whole store.
+    private func collectFeedbackFiles() -> [URL] {
         guard let root = feedbackRootURL(),
               let systemDirs = try? fileManager.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])
         else { return [] }
 
-        var result: [(url: URL, system: CheatWorksSystem)] = []
+        var result: [URL] = []
         for systemDir in systemDirs {
             guard (try? systemDir.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
-                  let system = CheatWorksConfig.system(for: systemDir.lastPathComponent),
                   let files = try? fileManager.contentsOfDirectory(at: systemDir, includingPropertiesForKeys: nil)
             else { continue }
 
             for fileURL in files where fileURL.pathExtension == "json" {
-                result.append((url: fileURL, system: system))
+                result.append(fileURL)
             }
         }
         return result
     }
 
     /// Submits the unsynced reports in one file.
-    private func syncFile(at fileURL: URL, system: CheatWorksSystem) async -> SyncStep {
+    private func syncFile(at fileURL: URL) async -> SyncStep {
         guard let file = loadFile(at: fileURL) else { return .next }
 
         for entry in file.entries {
@@ -384,7 +383,6 @@ final class CheatFeedbackService: @unchecked Sendable {
             else { continue }
 
             let feedback = CheatWorksFeedback(
-                system: system,
                 gameFingerprint: file.md5,
                 cheatCode: entry.rawCode ?? entry.code,
                 status: Self.cheatWorksStatus(for: status),
@@ -444,7 +442,6 @@ final class CheatFeedbackService: @unchecked Sendable {
                                     systemIdentifier: String, coreIdentifier: String, coreVersion: String,
                                     gameName: String?, provider: String?) {
         guard CheatWorksConfig.isClientTokenConfigured,
-              let system = CheatWorksConfig.system(for: systemIdentifier),
               let emulatorCode = CheatWorksConfig.emulatorCode(for: coreIdentifier),
               let url = fileURL(md5: md5, systemIdentifier: systemIdentifier)
         else { return }
@@ -453,7 +450,6 @@ final class CheatFeedbackService: @unchecked Sendable {
         let submittedCode = rawCode ?? code
 
         let feedback = CheatWorksFeedback(
-            system: system,
             gameFingerprint: md5,
             cheatCode: submittedCode,
             status: Self.cheatWorksStatus(for: status),
