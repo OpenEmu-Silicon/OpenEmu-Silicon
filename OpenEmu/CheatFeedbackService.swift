@@ -26,7 +26,7 @@
 import Foundation
 import os.log
 
-private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "CheatFeedbackService")
+// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "CheatFeedbackService")
 
 extension Notification.Name {
     /// Posted on the main thread once a cheat-code report has been accepted by CheatWorks, so UI
@@ -326,7 +326,7 @@ final class CheatFeedbackService: @unchecked Sendable {
         guard CheatWorksConfig.isClientTokenConfigured else { return }
 
         let files = collectFeedbackFiles()
-        log.info("CheatWorks sync: \(files.count) feedback file(s) to scan")
+        // log.info("CheatWorks sync: \(files.count) feedback file(s) to scan")
         var index = 0
         while index < files.count {
             let file = files[index]
@@ -350,7 +350,7 @@ final class CheatFeedbackService: @unchecked Sendable {
                 // and the rate-limited one is retried, so the queue keeps moving forward.
             }
         }
-        log.info("CheatWorks sync finished")
+        // log.info("CheatWorks sync finished")
     }
 
     /// The feedback files to sync, in order, each paired with its CheatWorks system. Snapshotted once

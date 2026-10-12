@@ -45,7 +45,6 @@ enum CheatWorksConfig {
 
     // The client access token lives in CheatWorksSecrets.swift (gitignored).
     // Locally: copy CheatWorksSecrets.template.swift → CheatWorksSecrets.swift and fill it in.
-    // In CI: the build workflow copies the template, then injects the real token.
     // The property is declared there as an extension on this type.
     // static let clientAccessToken: String — defined in CheatWorksSecrets.swift
 

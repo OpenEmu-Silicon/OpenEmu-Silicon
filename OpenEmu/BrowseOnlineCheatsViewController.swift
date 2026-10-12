@@ -28,7 +28,7 @@ import OpenEmuKit
 import OpenEmuBase
 import os.log
 
-private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsRatings")
+// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsRatings")
 
 final class BrowseOnlineCheatsViewController: NSViewController {
 
@@ -413,11 +413,10 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
     /// Queries CheatWorks for the ratings of the codes currently shown in the table (the capped
     /// subset the user sees), skipping any already requested this session. Fires on the initial load
-    /// and on every filter change; results are cached in `ratings` until the window closes. The UI
-    /// doesn't surface ratings yet — this logs them so the pipeline can be verified.
+    /// and on every filter change; results are cached in `ratings` until the window closes and drive
+    /// the rating column's circles and tooltips.
     private func fetchRatingsForVisibleCheats() {
-        guard CheatWorksConfig.isClientTokenConfigured,
-              let document = gameDocument,
+        guard let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let system = CheatWorksConfig.system(for: document.systemPlugin.systemIdentifier),
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
@@ -431,7 +430,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         // Mark as requested up front so overlapping filter changes don't re-query the same codes.
         requestedRatingCodes.formUnion(codesToFetch)
 
-        log.info("querying ratings for \(codesToFetch.count, privacy: .public) code(s): \(system.rawValue, privacy: .public)/\(emulatorCode.rawValue, privacy: .public)")
+        // log.info("querying ratings for \(codesToFetch.count, privacy: .public) code(s): \(system.rawValue, privacy: .public)/\(emulatorCode.rawValue, privacy: .public)")
 
         Task { [weak self] in
             do {
@@ -444,7 +443,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                 guard let self else { return }
                 for rating in fetched {
                     self.ratings[rating.cheatCode] = rating
-                    log.info("rating \(rating.cheatCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
+                    // log.info("rating \(rating.cheatCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
                 }
                 // Codes the successful query returned nothing for still get a base-colour circle (a
                 // "none" rating), rather than no circle — only an outright failure leaves them blank.
@@ -452,12 +451,12 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                 for code in codesToFetch where !returnedCodes.contains(code) {
                     self.ratings[code] = Self.noRatingPlaceholder(for: code)
                 }
-                log.info("ratings cached: \(fetched.count, privacy: .public) of \(codesToFetch.count, privacy: .public) queried code(s) have ratings; \(self.ratings.count, privacy: .public) total cached")
+                // log.info("ratings cached: \(fetched.count, privacy: .public) of \(codesToFetch.count, privacy: .public) queried code(s) have ratings; \(self.ratings.count, privacy: .public) total cached")
                 self.reloadRatingColumn()
             } catch {
                 // Read-only, best-effort: log and move on. Codes stay marked requested so a transient
                 // failure doesn't spam the API on every subsequent filter change.
-                log.error("ratings query failed: \(String(describing: error), privacy: .public)")
+                // log.error("ratings query failed: \(String(describing: error), privacy: .public)")
             }
         }
     }
@@ -466,7 +465,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// core changes) so a fresh session re-queries rather than reusing stale, out-of-scope data.
     func flushRatings() {
         guard !ratings.isEmpty || !requestedRatingCodes.isEmpty else { return }
-        log.info("flushing \(self.ratings.count, privacy: .public) cached rating(s)")
+        // log.info("flushing \(self.ratings.count, privacy: .public) cached rating(s)")
         ratings.removeAll()
         requestedRatingCodes.removeAll()
     }
@@ -528,8 +527,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// Force re-queries a single code's rating (bypassing the session cache, since the user just
     /// changed its feedback) and replaces its cached value with the fresh server result.
     private func refreshRating(forRawCode rawCode: String) {
-        guard CheatWorksConfig.isClientTokenConfigured,
-              let document = gameDocument,
+        guard let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let system = CheatWorksConfig.system(for: document.systemPlugin.systemIdentifier),
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
@@ -537,7 +535,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
         // Keep it marked requested so a plain filter change doesn't redundantly re-fetch it.
         requestedRatingCodes.insert(rawCode)
-        log.info("refreshing rating after feedback for code: \(rawCode, privacy: .public)")
+        // log.info("refreshing rating after feedback for code: \(rawCode, privacy: .public)")
 
         Task { [weak self] in
             do {
@@ -550,16 +548,16 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                 guard let self else { return }
                 if let rating = fetched.first {
                     self.ratings[rawCode] = rating
-                    log.info("rating updated \(rawCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
+                    // log.info("rating updated \(rawCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
                 } else {
                     // Server returned nothing for it; keep a base-colour "none" circle rather than
                     // dropping it, so a successful refresh never blanks a code out.
                     self.ratings[rawCode] = Self.noRatingPlaceholder(for: rawCode)
-                    log.info("rating update for \(rawCode, privacy: .public): no rating returned")
+                    // log.info("rating update for \(rawCode, privacy: .public): no rating returned")
                 }
                 self.reloadRatingColumn()
             } catch {
-                log.error("rating refresh failed for \(rawCode, privacy: .public): \(String(describing: error), privacy: .public)")
+                // log.error("rating refresh failed for \(rawCode, privacy: .public): \(String(describing: error), privacy: .public)")
             }
         }
     }

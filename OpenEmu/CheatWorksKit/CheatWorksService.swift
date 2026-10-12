@@ -28,7 +28,7 @@
 import Foundation
 import os.log
 
-private let log = Logger(subsystem: "org.cheatworks.sdk", category: "Service")
+// private let log = Logger(subsystem: "org.cheatworks.sdk", category: "Service")
 
 // MARK: - Public models
 
@@ -217,24 +217,24 @@ public final class CheatWorksService: Sendable {
         switch http.statusCode {
         case 202:
             let decoded = try JSONDecoder().decode(FeedbackResponseBody.self, from: data)
-            log.info("feedback \(decoded.status, privacy: .public): \(feedback.system.rawValue, privacy: .public)/\(feedback.emulator.code, privacy: .public) \(feedback.status.rawValue, privacy: .public) [\(feedback.cheatCode, privacy: .public)] warnings=[\((decoded.warnings ?? []).joined(separator: ", "), privacy: .public)]")
+            // log.info("feedback \(decoded.status, privacy: .public): \(feedback.system.rawValue, privacy: .public)/\(feedback.emulator.code, privacy: .public) \(feedback.status.rawValue, privacy: .public) [\(feedback.cheatCode, privacy: .public)] warnings=[\((decoded.warnings ?? []).joined(separator: ", "), privacy: .public)]")
             return CheatWorksFeedbackResult(status: decoded.status, warnings: decoded.warnings ?? [])
         case 401:
-            log.notice("feedback rejected (401): installation revoked")
+            // log.notice("feedback rejected (401): installation revoked")
             // Installation token rejected — revocation is terminal, so stop reporting.
             await authClient.markRevoked()
             throw CheatWorksAuthError.installationRevoked
         case 429:
             let retryAfter = Self.retryAfter(from: http)
-            log.notice("feedback rate-limited (429), retry-after=\(retryAfter ?? -1, privacy: .public)s")
+            // log.notice("feedback rate-limited (429), retry-after=\(retryAfter ?? -1, privacy: .public)s")
             throw CheatWorksServiceError.rateLimited(retryAfter: retryAfter)
         case 422:
             let message = Self.errorMessage(from: data)
-            log.error("feedback invalid (422): \(message ?? "", privacy: .public)")
+            // log.error("feedback invalid (422): \(message ?? "", privacy: .public)")
             throw CheatWorksServiceError.invalidRequest(message: message)
         default:
             let message = Self.errorMessage(from: data)
-            log.error("feedback unexpected status \(http.statusCode, privacy: .public): \(message ?? "", privacy: .public)")
+            // log.error("feedback unexpected status \(http.statusCode, privacy: .public): \(message ?? "", privacy: .public)")
             throw CheatWorksServiceError.unexpectedStatus(statusCode: http.statusCode, message: message)
         }
     }
@@ -308,19 +308,19 @@ public final class CheatWorksService: Sendable {
         case 200:
             let decoded = try JSONDecoder().decode(RatingsResponseBody.self, from: data)
             let ratings = decoded.ratings.map(\.model)
-            log.info("ratings ok: \(system.rawValue, privacy: .public)/\(emulatorCode, privacy: .public) queried=\(cheatCodes.count, privacy: .public) returned=\(ratings.count, privacy: .public)")
+            // log.info("ratings ok: \(system.rawValue, privacy: .public)/\(emulatorCode, privacy: .public) queried=\(cheatCodes.count, privacy: .public) returned=\(ratings.count, privacy: .public)")
             return ratings
         case 429:
             let retryAfter = Self.retryAfter(from: http)
-            log.notice("ratings rate-limited (429), retry-after=\(retryAfter ?? -1, privacy: .public)s")
+            // log.notice("ratings rate-limited (429), retry-after=\(retryAfter ?? -1, privacy: .public)s")
             throw CheatWorksServiceError.rateLimited(retryAfter: retryAfter)
         case 422:
             let message = Self.errorMessage(from: data)
-            log.error("ratings invalid (422): \(message ?? "", privacy: .public)")
+            // log.error("ratings invalid (422): \(message ?? "", privacy: .public)")
             throw CheatWorksServiceError.invalidRequest(message: message)
         default:
             let message = Self.errorMessage(from: data)
-            log.error("ratings unexpected status \(http.statusCode, privacy: .public): \(message ?? "", privacy: .public)")
+            // log.error("ratings unexpected status \(http.statusCode, privacy: .public): \(message ?? "", privacy: .public)")
             throw CheatWorksServiceError.unexpectedStatus(statusCode: http.statusCode, message: message)
         }
     }

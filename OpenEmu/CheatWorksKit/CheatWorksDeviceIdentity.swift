@@ -50,7 +50,7 @@ public struct CheatWorksHardwareDeviceIdentity: CheatWorksDeviceIdentity {
     public func externalID() -> String? {
         let machine = CheatWorksHardware.platformUUID() ?? UUID().uuidString
         let digest = SHA256.hash(data: Data("cheatworks-installation:\(machine)".utf8))
-        let hex = digest.prefix(4).map { String(format: "%02x", $0) }.joined()
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
         return prefix + hex
     }
 }
@@ -69,8 +69,8 @@ enum CheatWorksHardware {
             port = kIOMasterPortDefault
         }
         let service = IOServiceGetMatchingService(port, IOServiceMatching("IOPlatformExpertDevice"))
-        defer { IOObjectRelease(service) }
         guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
         return IORegistryEntryCreateCFProperty(
             service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, 0
         )?.takeRetainedValue() as? String

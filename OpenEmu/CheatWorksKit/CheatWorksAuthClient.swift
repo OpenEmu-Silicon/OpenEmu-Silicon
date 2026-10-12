@@ -28,7 +28,7 @@
 import Foundation
 import os.log
 
-private let log = Logger(subsystem: "org.cheatworks.sdk", category: "Auth")
+// private let log = Logger(subsystem: "org.cheatworks.sdk", category: "Auth")
 
 public enum CheatWorksAuthError: Error {
     /// The configured client access token is empty.
@@ -71,6 +71,12 @@ public actor CheatWorksAuthClient {
     /// network round-trip instead of each enrolling.
     private var enrollTask: Task<String, Error>?
 
+    /// After a failed enrollment, retries are suppressed until this time so a misbehaving or
+    /// unreachable backend isn't re-POSTed on every queued submission. In-memory: resets on relaunch.
+    private var enrollmentCooldownUntil: Date?
+    private var lastEnrollmentError: Error?
+    private static let enrollmentCooldown: TimeInterval = 300
+
     public init(configuration: CheatWorksConfiguration,
                 storage: (any CheatWorksStorage)? = nil,
                 deviceIdentity: (any CheatWorksDeviceIdentity)? = nil,
@@ -108,10 +114,22 @@ public actor CheatWorksAuthClient {
         if let inFlight = enrollTask {
             return try await inFlight.value
         }
+        if let until = enrollmentCooldownUntil, until > Date() {
+            throw lastEnrollmentError ?? CheatWorksAuthError.invalidResponse
+        }
         let task = Task { try await self.enroll() }
         enrollTask = task
         defer { enrollTask = nil }
-        return try await task.value
+        do {
+            let token = try await task.value
+            enrollmentCooldownUntil = nil
+            lastEnrollmentError = nil
+            return token
+        } catch {
+            lastEnrollmentError = error
+            enrollmentCooldownUntil = Date().addingTimeInterval(Self.enrollmentCooldown)
+            throw error
+        }
     }
 
     private func enroll() async throws -> String {
@@ -131,11 +149,15 @@ public actor CheatWorksAuthClient {
             throw CheatWorksAuthError.invalidResponse
         }
         guard http.statusCode == 201 else {
-            log.error("CheatWorks installation enrollment failed: HTTP \(http.statusCode, privacy: .public)")
+            // log.error("CheatWorks installation enrollment failed: HTTP \(http.statusCode, privacy: .public)")
             throw CheatWorksAuthError.enrollmentFailed(statusCode: http.statusCode)
         }
 
         let enrolled = try JSONDecoder().decode(InstallationResponse.self, from: data)
+        guard !enrolled.installationToken.isEmpty else {
+            // log.error("CheatWorks installation enrollment returned an empty installation token")
+            throw CheatWorksAuthError.invalidResponse
+        }
         storage.setString(enrolled.installationToken, forKey: Self.tokenKey)
         return enrolled.installationToken
     }

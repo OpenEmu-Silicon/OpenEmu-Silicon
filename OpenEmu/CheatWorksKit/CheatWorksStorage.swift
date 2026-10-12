@@ -36,10 +36,12 @@ public protocol CheatWorksStorage: Sendable {
     func setString(_ value: String?, forKey key: String)
 }
 
-/// Default storage: an AES-GCM-encrypted JSON file under Application Support. The encryption key
-/// is derived (HKDF-SHA256) from the Mac's hardware UUID and the app bundle id, so it is stable
-/// per machine+app and is never itself stored. This avoids the Keychain's code-signature
-/// re-authorization prompts that recur on every app update.
+/// Default storage: an AES-GCM-encoded JSON file under Application Support. The key is derived
+/// (HKDF-SHA256) from the Mac's hardware UUID and the app bundle id — both locally readable, so
+/// this is obfuscation-at-rest, not a confidentiality guarantee: a local process that can read the
+/// file can also re-derive the key. It keeps the token off disk in plaintext and avoids the
+/// Keychain's code-signature re-authorization prompts that recur on every app update; it is not a
+/// defense against a local attacker.
 public final class CheatWorksFileStorage: CheatWorksStorage, @unchecked Sendable {
 
     private let fileURL: URL
@@ -81,8 +83,10 @@ public final class CheatWorksFileStorage: CheatWorksStorage, @unchecked Sendable
 
     // MARK: - Crypto + IO
 
-    /// Derives the AES-GCM key from stable, non-secret inputs; the raw hardware UUID never leaves
-    /// the device and the key is never persisted.
+    /// Derives the AES-GCM key from stable but locally-readable inputs (hardware UUID + bundle id).
+    /// The raw hardware UUID never leaves the device and the key is never persisted, but the inputs
+    /// are reconstructible on-device — this obfuscates the stored token, it does not keep it secret
+    /// from a local reader.
     private func encryptionKey() -> SymmetricKey {
         let uuid = CheatWorksHardware.platformUUID() ?? "unknown-machine"
         let bundleID = Bundle.main.bundleIdentifier ?? "org.cheatworks.client"

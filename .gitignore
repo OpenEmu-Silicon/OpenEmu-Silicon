@@ -2,6 +2,9 @@
 .DS_Store
 OEBuildVersion.h
 build/
+
+# Merge/rebase artifacts
+*.orig
 *.pbxuser
 !default.pbxuser
 *.mode1v3
