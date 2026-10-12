@@ -79,6 +79,9 @@ final class BrowseOnlineCheatsWindowController: NSWindowController, NSWindowDele
         window?.makeKeyAndOrderFront(sender)
         pauseEmulationIfNeeded()
         browseViewController?.fetchOnlineCheats()
+        // On reopen the cheat list is already loaded (so fetchOnlineCheats early-returns), but the
+        // previous close flushed the ratings; re-query them for the visible rows. No-op on first open.
+        browseViewController?.fetchRatingsForVisibleCheats()
     }
 
     func windowDidBecomeKey(_ notification: Notification) {

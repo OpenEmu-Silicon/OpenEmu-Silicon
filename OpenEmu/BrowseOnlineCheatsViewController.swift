@@ -413,9 +413,10 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
     /// Queries CheatWorks for the ratings of the codes currently shown in the table (the capped
     /// subset the user sees), skipping any already requested this session. Fires on the initial load
-    /// and on every filter change; results are cached in `ratings` until the window closes and drive
+    /// and on every filter change (and on window reopen, after the previous close flushed them);
+    /// results are cached in `ratings` until the window closes and drive
     /// the rating column's circles and tooltips.
-    private func fetchRatingsForVisibleCheats() {
+    func fetchRatingsForVisibleCheats() {
         guard let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
