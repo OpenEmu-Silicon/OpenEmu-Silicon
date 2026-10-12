@@ -775,6 +775,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>不清楚</string>
 	<key>Set Status</key>
 	<string>设置状态</string>
+	<key>No Ratings</key>
+	<string>暂无评分</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>评分：%1$d 个有效，%2$d 个无效，%3$d 个不确定</string>
 	<key>It works for me</key>
 	<string>对我有效</string>
 	<key>It does not work for me</key>

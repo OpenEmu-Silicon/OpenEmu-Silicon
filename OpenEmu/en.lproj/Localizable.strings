@@ -786,6 +786,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>I don't know</string>
 	<key>Set Status</key>
 	<string>Set Status</string>
+	<key>No Ratings</key>
+	<string>No Ratings</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Ratings: %1$d works, %2$d do not, %3$d not sure</string>
 	<key>It works for me</key>
 	<string>It works for me</string>
 	<key>It does not work for me</key>

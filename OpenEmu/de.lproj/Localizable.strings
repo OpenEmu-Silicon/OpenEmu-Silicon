@@ -774,6 +774,10 @@ Du kannst die Tastenbelegung in den Einstellungen unter „Steuerung“ überpr�
 	<string>Weiß ich nicht</string>
 	<key>Set Status</key>
 	<string>Status festlegen</string>
+	<key>No Ratings</key>
+	<string>Keine Bewertungen</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Bewertungen: %1$d funktioniert, %2$d nicht, %3$d unsicher</string>
 	<key>It works for me</key>
 	<string>Funktioniert bei mir</string>
 	<key>It does not work for me</key>

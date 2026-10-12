@@ -776,6 +776,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>Не знаю</string>
 	<key>Set Status</key>
 	<string>Указать статус</string>
+	<key>No Ratings</key>
+	<string>Нет оценок</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Оценки: %1$d работает, %2$d не работает, %3$d не уверены</string>
 	<key>It works for me</key>
 	<string>У меня работает</string>
 	<key>It does not work for me</key>
