@@ -722,8 +722,10 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
     NSManagedObjectContext *context = [game managedObjectContext];
     if(context == nil) return nil;
 
+    // Genesis has no stored header/serial, so identifying the ROM means reading its file. Only do that for
+    // games whose name or file path mentions Knuckles, not for every Genesis game on each right-click.
     NSFetchRequest *request = [OEDBGame fetchRequest];
-    request.predicate = [NSPredicate predicateWithFormat:@"system == %@", game.system];
+    request.predicate = [NSPredicate predicateWithFormat:@"system == %@ AND (name CONTAINS[c] %@ OR SUBQUERY(roms, $r, $r.location CONTAINS[c] %@ OR $r.header CONTAINS[c] %@ OR $r.serial CONTAINS[c] %@).@count > 0)", game.system, @"knuckles", @"knuckles", @"SONIC & KNUCKLES", @"MK-1563"];
     NSArray<OEDBGame *> *games = [context executeFetchRequest:request error:nil];
     for(OEDBGame *candidate in games)
     {
