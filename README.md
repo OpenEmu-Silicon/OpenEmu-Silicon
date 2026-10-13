@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/OpenEmu-Silicon/OpenEmu-Silicon?style=for-the-badge&label=release"></a>
-  <a href="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/OpenEmu-Silicon/OpenEmu-Silicon/total?style=for-the-badge&label=downloads"></a>
+  <a href="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/latest"><img alt="Downloads of the latest release" src="https://img.shields.io/github/downloads/OpenEmu-Silicon/OpenEmu-Silicon/latest/total?style=for-the-badge&label=latest%20release%20downloads"></a>
   <a href="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/OpenEmu-Silicon/OpenEmu-Silicon?style=for-the-badge"></a>
 </p>
 
@@ -117,18 +117,15 @@ Start with [`CONTRIBUTING.md`](.github/CONTRIBUTING.md). It covers dev setup, br
 
 ## About This Project
 
-The original OpenEmu is still an amazing piece of Mac software. [stuartcarnie](https://github.com/stuartcarnie) brought Metal rendering to the app in 2019. [MaddTheSane](https://github.com/MaddTheSane) ported the emulation cores to ARM64 starting in 2021. [cyco](https://github.com/cyco), [clobber](https://github.com/clobber), [J-rg](https://github.com/J-rg), and the rest of the OpenEmu team built the application, the plugin architecture, and the library experience over more than a decade. That work is the foundation everything here stands on.
+OpenEmu is still some of the best software on the Mac. [stuartcarnie](https://github.com/stuartcarnie) brought Metal rendering in 2019, [MaddTheSane](https://github.com/MaddTheSane) started porting the cores to ARM64 in 2021, and [cyco](https://github.com/cyco), [clobber](https://github.com/clobber), [J-rg](https://github.com/J-rg), and the OpenEmu team built the app, plugin system, and library over more than a decade. Everything here builds on their work.
 
-The original project went quiet around 2024 after the last release. By then the original team had already done significant work on the ARM64 cores. That work was real and substantial, but it was never assembled into a release: the last official binary (December 2023) was Intel-only. [bazley82](https://github.com/bazley82) published a downloadable ARM64 build in early 2026, pulling together the ARM64-capable core submodules the original team had prepared into a single repo and release. This fork continued from there: RetroAchievements shipped across 9+ cores; a Libretro Bridge was built to load RetroArch cores directly inside OpenEmu (since removed in favor of native cores); ScreenScraper cover art was integrated; Dreamcast was migrated from Reicast to Flycast; save persistence, system detection, and the core update pipeline were all fixed; and the app was hardened for macOS 26 (Tahoe).
+The original project went quiet around 2024, and its last official release (December 2023) was Intel-only. [bazley82](https://github.com/bazley82) assembled the team's ARM64 core work into a downloadable build in early 2026. This fork picks up from there, adding RetroAchievements, ScreenScraper cover art, Flycast for Dreamcast, fixes to saves, system detection and core updates, and macOS 26 support.
 
-**Lineage:**
-- [OpenEmu/OpenEmu](https://github.com/OpenEmu/OpenEmu): the original project
-- [bazley82/OpenEmuARM64](https://github.com/bazley82/OpenEmuARM64): ARM64 build, built on the original team's core work and what this fork started from
-- **This repo:** continued development and maintenance by [@nickybmon](https://github.com/nickybmon) and others.
+**Lineage:** [OpenEmu/OpenEmu](https://github.com/OpenEmu/OpenEmu) (original) → [bazley82/OpenEmuARM64](https://github.com/bazley82/OpenEmuARM64) (ARM64 build) → this repo, maintained by [@nickybmon](https://github.com/nickybmon) and contributors.
 
-### A Note on AI-Assisted Development
+### AI-Assisted Development
 
-The vast majority of the code in this repo is still from the original developers. I have not changed the underlying architecture or approach for the app (apart from having it in a single repo to make it easier for a small team to maintain). It is still the same work done by an exceptional team of engineers. I work on this project with AI-assisted development practices. These tools help me write and debug code I couldn't write alone. That said, I review every change, test everything, and make all the calls about direction and quality. I'm transparent about this because honesty with the community matters more than maintaining an illusion of expertise I don't have. The goal is to keep something good alive and make it genuinely usable for players.
+Most of the code here is still the original team's, and the architecture is unchanged. I use AI tools to help write and debug code. I review and test every change and make the final calls on direction and quality.
 
 ---
 
