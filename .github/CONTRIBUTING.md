@@ -90,53 +90,73 @@ You don't have to write code to help. One of the most useful things you can do i
 
 ### Steps
 
-Run these in Terminal. Replace `739` with the PR number you're testing.
+Each block below is meant to be pasted into Terminal as is. Only the lines marked `CHANGE THIS` need editing.
+
+**Step 1: One-time setup.** Skip this if you already cloned the repo and set it up for development.
 
 ```bash
-# 1. One time only: clone with submodules and create the credential stubs
-#    (already cloned for dev setup above? Skip the clone and cd into that folder)
 git clone --recursive https://github.com/OpenEmu-Silicon/OpenEmu-Silicon.git
 cd OpenEmu-Silicon
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
 cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+```
 
-# 2. Every time: start from a clean, current checkout, then switch to the PR
-#    (if git complains about local changes, stash or discard them first)
+**Step 2: Switch to the PR you want to test.** Do this every time. First, in the repo folder, change the PR number on the first line to the one you're testing (it's in the PR's title, like `#123`). If git complains about local changes, stash or discard them first.
+
+```bash
+PR=REPLACE_WITH_PR_NUMBER   # CHANGE THIS, for example PR=123
 git checkout main && git pull
-gh pr checkout 739 --repo OpenEmu-Silicon/OpenEmu-Silicon
-# No GitHub CLI? Use: git fetch origin pull/739/head:pr-739 && git checkout pr-739
+gh pr checkout $PR --repo OpenEmu-Silicon/OpenEmu-Silicon
+```
 
-# 3. Build (the first build takes a while)
+No GitHub CLI (`gh`)? Use this instead of the `gh pr checkout` line, keeping the `PR=` line from above:
+
+```bash
+PR=REPLACE_WITH_PR_NUMBER   # CHANGE THIS, for example PR=123
+git checkout main && git pull
+git fetch origin pull/$PR/head:pr-$PR && git checkout pr-$PR
+```
+
+**Step 3: Build.** The first build takes a while. If it fails, copy the last 30 lines of output into your report.
+
+```bash
 ./Scripts/verify.sh
+```
 
-# 4. Launch the build you just made
+**Step 4: Launch the build you just made.** This refuses to open an out-of-date build, which prevents the most common mistake: testing an old version by accident.
+
+```bash
 ./Scripts/launch-debug.sh
 ```
 
-`launch-debug.sh` refuses to open an out-of-date build, which prevents the most common mistake: testing an old version by accident. If the build fails, copy the last 30 lines of output into your report.
+**When you're done**, switch back to the main branch:
 
-When you're done, switch back with `git checkout main`.
+```bash
+git checkout main
+```
 
 These steps use the repo's helper scripts because they are the simplest and safest path for testers. If you're writing a PR and need a "How to test locally" section for it, follow the format in [`AGENTS.md`](../AGENTS.md) instead.
 
 ### If the PR changes a core
 
-Check the PR's "Which cores or systems are affected?" section. If it names a core (for example Flycast or Dolphin), build and install that core too. The main app build does not include it, and OpenEmu keeps using your old installed core until you replace it.
+Check the PR's "Which cores or systems are affected?" section. If it names a core (for example Flycast or Dolphin), build and install that core too. The main app build does not include it, and OpenEmu keeps using your old installed core until you replace it. Do this after Step 2 and before Step 4. Change the core name on the first line.
 
 ```bash
-./Scripts/verify.sh --core Flycast       # builds the core and installs it correctly
-./Scripts/verify-core-installed.sh Flycast   # must print OK before you test
-./Scripts/launch-debug.sh
+CORE=REPLACE_WITH_CORE_NAME   # CHANGE THIS, for example CORE=Flycast
+./Scripts/verify.sh --core $CORE
+./Scripts/verify-core-installed.sh $CORE
 ```
 
-Never copy a core into place by hand with `cp -R`. macOS merges the folders instead of replacing them, and you end up testing the old code. If `verify-core-installed.sh` doesn't print `OK`, your result isn't valid yet.
+The last command must print `OK`. If it doesn't, your result isn't valid yet. Then run Step 4 to launch.
+
+Never copy a core into place by hand with `cp -R`. macOS merges the folders instead of replacing them, and you end up testing the old code.
 
 ### Using an AI assistant to do this for you
 
 If you'd rather not run the commands yourself, you can have an AI coding assistant (Claude Code, Cursor, Codex, or similar) do it from inside the cloned repo. This prompt works well:
 
 ```text
-I want to test pull request #739 of OpenEmu-Silicon on my Mac before it is merged.
+I want to test pull request number REPLACE_WITH_PR_NUMBER of OpenEmu-Silicon on my Mac before it is merged.
 Read AGENTS.md and .github/CONTRIBUTING.md in this repo first.
 
 Then:
