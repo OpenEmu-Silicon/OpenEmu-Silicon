@@ -2,7 +2,7 @@
   <img width="301" height="91" alt="OpenEmu-Silicon logo" src="https://github.com/user-attachments/assets/e4c7ee8d-b526-4fa7-bf61-153dc1594372" />
 </p>
 
-<h3 align="center">OpenEmu, rebuilt to run natively on Apple Silicon.</h3>
+<h3 align="center">OpenEmu, updated to run natively on Apple Silicon.</h3>
 
 <p align="center">
   The classic Mac emulator, actively maintained for M-series Macs. Fast, native, no Rosetta.
@@ -77,15 +77,15 @@ Requires an Apple Silicon Mac (M1, M2, M3, M4) running macOS 11.0 or later. Comi
 
 ## Community
 
-<p align="center">
-  <a href="https://discord.gg/HvWfVkMUK"><img alt="Join the Discord" src="https://img.shields.io/badge/Join%20the%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
-</p>
-
 The Discord is the best place to get help, follow development, try early builds, and talk to the people working on the project. You don't need to write code to be part of it.
 
 - **Testers:** try new builds and cores before release and report what breaks.
 - **Contributors:** talk through a fix or feature before you open a PR.
 - **Players:** ask questions, share setups, and tell us which systems you want improved.
+
+<p align="center">
+  <a href="https://discord.gg/HvWfVkMUK"><img alt="Join the Discord" src="https://img.shields.io/badge/Join%20the%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+</p>
 
 ## Contributing
 
