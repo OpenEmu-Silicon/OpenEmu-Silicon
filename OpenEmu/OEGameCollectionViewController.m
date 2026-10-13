@@ -680,11 +680,27 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
 
 - (BOOL)OE_isSonicKnucklesROM:(OEDBRom *)rom
 {
-    // Metadata only: this runs while the context menu is built, so it must not touch the disk.
+    if(![rom filesAvailable]) return NO;
+
     NSString *header = [rom header] ?: @"";
     NSString *serial = [rom serial] ?: @"";
-    return [header rangeOfString:@"SONIC & KNUCKLES" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-           [serial rangeOfString:@"MK-1563" options:NSCaseInsensitiveSearch].location != NSNotFound;
+    if([header rangeOfString:@"SONIC & KNUCKLES" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+       [serial rangeOfString:@"MK-1563" options:NSCaseInsensitiveSearch].location != NSNotFound)
+        return YES;
+
+    NSURL *url = [rom URL];
+    NSFileHandle *handle = url != nil ? [NSFileHandle fileHandleForReadingFromURL:url error:nil] : nil;
+    if(handle != nil)
+    {
+        [handle seekToFileOffset:0x120];
+        NSData *data = [handle readDataOfLength:16];
+        [handle closeFile];
+        NSString *romHeader = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
+        if([romHeader rangeOfString:@"SONIC & KNUCKLES" options:NSCaseInsensitiveSearch].location != NSNotFound)
+            return YES;
+    }
+
+    return NO;
 }
 
 - (BOOL)OE_isSonicKnucklesGame:(OEDBGame *)game
@@ -706,14 +722,14 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
     NSManagedObjectContext *context = [game managedObjectContext];
     if(context == nil) return nil;
 
-    // Let the database narrow candidates so we don't load and inspect every Genesis game on each right-click.
+    // Genesis has no stored header/serial, so identifying the ROM means reading its file. Only do that for
+    // games whose name or file path mentions Knuckles, not for every Genesis game on each right-click.
     NSFetchRequest *request = [OEDBGame fetchRequest];
-    request.predicate = [NSPredicate predicateWithFormat:@"system == %@ AND (SUBQUERY(roms, $r, $r.header CONTAINS[c] %@ OR $r.serial CONTAINS[c] %@).@count > 0)", game.system, @"SONIC & KNUCKLES", @"MK-1563"];
+    request.predicate = [NSPredicate predicateWithFormat:@"system == %@ AND (name CONTAINS[c] %@ OR SUBQUERY(roms, $r, $r.location CONTAINS[c] %@ OR $r.header CONTAINS[c] %@ OR $r.serial CONTAINS[c] %@).@count > 0)", game.system, @"knuckles", @"knuckles", @"SONIC & KNUCKLES", @"MK-1563"];
     NSArray<OEDBGame *> *games = [context executeFetchRequest:request error:nil];
     for(OEDBGame *candidate in games)
     {
         if(candidate == game || ![self OE_isSonicKnucklesGame:candidate]) continue;
-        if(![[candidate defaultROM] filesAvailable]) continue;
         return candidate;
     }
     return nil;
