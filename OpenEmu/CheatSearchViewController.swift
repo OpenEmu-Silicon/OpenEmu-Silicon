@@ -878,8 +878,16 @@ final class CheatSearchViewController: NSViewController {
         let enabled = enableCheck.state == .on
 
         // Derive addressBytes/minDataBytes from the region that contains this address
-        let addressBytes = memoryRegions.first.map { $0.addressBytes } ?? 2
-        let dataBytes = memoryRegions.first.map { $0.minDataBytes } ?? 1
+        let hitAddress = UInt32(address, radix: 16)
+        let region = hitAddress.flatMap { hit in
+            memoryRegions.first { region in
+                let start = UInt32(region.address)
+                return hit >= start && hit - start < UInt32(region.data.count)
+            }
+        } ?? memoryRegions.first
+
+        let addressBytes = region.map { $0.addressBytes } ?? 2
+        let dataBytes = region.map { $0.minDataBytes } ?? 1
 
         let converted = OEGameDocument.convertCheatSearchCode(
             rawCode,
