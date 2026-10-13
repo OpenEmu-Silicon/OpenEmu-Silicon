@@ -30,8 +30,6 @@
   <img width="2276" height="1550" alt="OpenEmu-Silicon game library" src="https://github.com/user-attachments/assets/3797ba95-3e8c-49f6-9d3d-ab1cca6e70b9" />
 </p>
 
----
-
 ## Overview
 
 OpenEmu-Silicon is a community-maintained fork of [OpenEmu](https://github.com/OpenEmu/OpenEmu) for M-series Macs. You get the same library-first experience Mac users loved: drop in your games, get cover art, pick a system, and play. It now runs natively on Apple Silicon, with new cores, fixes, and features added on top.
@@ -72,8 +70,6 @@ Requires an Apple Silicon Mac (M1, M2, M3, M4) running macOS 11.0 or later. Comi
 - **Save state compatibility.** Save states from certain older cores are incompatible with current ARM64 builds and will crash if loaded. On launch, the app detects these and shows a warning. **Back up your save states before your first launch.** See [Migrating from OpenEmu](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/wiki/Migrating-from-OpenEmu) for the list and instructions.
 - Input Monitoring permission may need to be granted manually in System Settings → Privacy & Security.
 - A few cores have quirks on Apple Silicon that are still being investigated. See the [open issues](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues).
-
----
 
 ## Community
 
