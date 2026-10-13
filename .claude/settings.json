@@ -18,7 +18,6 @@
       "Bash(git clean -f*)",
       "Bash(git branch -D*)",
       "Bash(rm -rf*)",
-      "Bash(gh pr merge*)",
       "Bash(gh pr close*)",
       "Bash(git push upstream*)",
       "Bash(gh release edit*--draft=false*)"
@@ -51,11 +50,10 @@
     ],
     "soft_deny": [
       "$defaults",
-      "gh pr merge",
       "gh pr close",
       "gh pr edit",
       "gh release edit",
-      "Publishing, merging, or closing GitHub resources — always the user's action"
+      "Publishing or closing GitHub resources — always the user's action. Merging a PR is allowed only when the user asks for it in that same request."
     ],
     "hard_deny": []
   }
