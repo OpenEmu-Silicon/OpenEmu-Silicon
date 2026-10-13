@@ -42,7 +42,7 @@ It runs on macOS 11.0 (Big Sur) and later, and has been tested on macOS Sequoia 
 
 - **Native Apple Silicon.** ARM64 build with Metal rendering. No Rosetta required.
 - **30+ systems.** NES, SNES, Game Boy, GBA, N64, Nintendo DS, PlayStation, Dreamcast, GameCube/Wii, and more. See [Supported Systems](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/wiki/Supported-Systems).
-- **RetroAchievements.** Earn achievements across 9+ cores.
+- **RetroAchievements.** Earn achievements on 9 cores, covering NES, SNES, Game Boy, GBA, Genesis, N64, PlayStation, and more.
 - **Automatic cover art.** Box art and metadata pulled in through ScreenScraper.
 - **Save states and persistent saves.** Pick up where you left off.
 - **Controller support.** Mapping for the controllers Mac players actually use.

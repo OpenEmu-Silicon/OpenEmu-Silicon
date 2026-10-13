@@ -85,6 +85,7 @@ You don't have to write code to help. One of the most useful things you can do i
 
 - **Back up first.** A test build uses the same settings and library as your normal OpenEmu. If the PR touches the library, save states, or settings, copy `~/Library/Application Support/OpenEmu` somewhere safe before you launch it.
 - **Installed cores are shared.** The build you make here is just the app. Cores (the emulators) load from `~/Library/Application Support/OpenEmu/Cores/`. Install the latest release from the [README](../README.md#install) once so your cores are in place. If the PR changes a core, see "If the PR changes a core" below.
+- **Quit your game first.** `launch-debug.sh` closes any running OpenEmu, including your normal copy, so save your game and quit before you run it.
 - **Same requirements as above:** Apple Silicon Mac, Xcode with the Metal toolchain, and the one-time setup in [Setting Up Your Dev Environment](#setting-up-your-dev-environment).
 
 ### Steps
@@ -93,12 +94,14 @@ Run these in Terminal. Replace `739` with the PR number you're testing.
 
 ```bash
 # 1. One time only: clone with submodules and create the credential stubs
+#    (already cloned for dev setup above? Skip the clone and cd into that folder)
 git clone --recursive https://github.com/OpenEmu-Silicon/OpenEmu-Silicon.git
 cd OpenEmu-Silicon
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
 cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 
 # 2. Every time: start from a clean, current checkout, then switch to the PR
+#    (if git complains about local changes, stash or discard them first)
 git checkout main && git pull
 gh pr checkout 739 --repo OpenEmu-Silicon/OpenEmu-Silicon
 # No GitHub CLI? Use: git fetch origin pull/739/head:pr-739 && git checkout pr-739
@@ -113,6 +116,8 @@ gh pr checkout 739 --repo OpenEmu-Silicon/OpenEmu-Silicon
 `launch-debug.sh` refuses to open an out-of-date build, which prevents the most common mistake: testing an old version by accident. If the build fails, copy the last 30 lines of output into your report.
 
 When you're done, switch back with `git checkout main`.
+
+These steps use the repo's helper scripts because they are the simplest and safest path for testers. If you're writing a PR and need a "How to test locally" section for it, follow the format in [`AGENTS.md`](../AGENTS.md) instead.
 
 ### If the PR changes a core
 
@@ -143,7 +148,8 @@ Then:
    try in the app, in plain language.
 4. After I tell you what happened, help me write a test report.
 
-Do not push, comment on the PR, or change any files in the repo.
+Creating the credential stub files and building are fine. Do not push, comment on the
+PR, or edit any tracked files in the repo.
 ```
 
 You still do the actual clicking and playing. The assistant gets the right build running and helps you describe what you saw.
