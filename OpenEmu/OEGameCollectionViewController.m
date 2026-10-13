@@ -680,27 +680,11 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
 
 - (BOOL)OE_isSonicKnucklesROM:(OEDBRom *)rom
 {
-    if(![rom filesAvailable]) return NO;
-
+    // Metadata only: this runs while the context menu is built, so it must not touch the disk.
     NSString *header = [rom header] ?: @"";
     NSString *serial = [rom serial] ?: @"";
-    if([header rangeOfString:@"SONIC & KNUCKLES" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-       [serial rangeOfString:@"MK-1563" options:NSCaseInsensitiveSearch].location != NSNotFound)
-        return YES;
-
-    NSURL *url = [rom URL];
-    NSFileHandle *handle = url != nil ? [NSFileHandle fileHandleForReadingFromURL:url error:nil] : nil;
-    if(handle != nil)
-    {
-        [handle seekToFileOffset:0x120];
-        NSData *data = [handle readDataOfLength:16];
-        [handle closeFile];
-        NSString *romHeader = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
-        if([romHeader rangeOfString:@"SONIC & KNUCKLES" options:NSCaseInsensitiveSearch].location != NSNotFound)
-            return YES;
-    }
-
-    return NO;
+    return [header rangeOfString:@"SONIC & KNUCKLES" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+           [serial rangeOfString:@"MK-1563" options:NSCaseInsensitiveSearch].location != NSNotFound;
 }
 
 - (BOOL)OE_isSonicKnucklesGame:(OEDBGame *)game
@@ -722,12 +706,14 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
     NSManagedObjectContext *context = [game managedObjectContext];
     if(context == nil) return nil;
 
+    // Let the database narrow candidates so we don't load and inspect every Genesis game on each right-click.
     NSFetchRequest *request = [OEDBGame fetchRequest];
-    request.predicate = [NSPredicate predicateWithFormat:@"system == %@", game.system];
+    request.predicate = [NSPredicate predicateWithFormat:@"system == %@ AND (SUBQUERY(roms, $r, $r.header CONTAINS[c] %@ OR $r.serial CONTAINS[c] %@).@count > 0)", game.system, @"SONIC & KNUCKLES", @"MK-1563"];
     NSArray<OEDBGame *> *games = [context executeFetchRequest:request error:nil];
     for(OEDBGame *candidate in games)
     {
         if(candidate == game || ![self OE_isSonicKnucklesGame:candidate]) continue;
+        if(![[candidate defaultROM] filesAvailable]) continue;
         return candidate;
     }
     return nil;
