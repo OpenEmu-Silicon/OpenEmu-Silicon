@@ -778,6 +778,10 @@ Puoi andare nelle Preferenze Controlli per verificare quali impostazioni sono st
 	<string>Non lo so</string>
 	<key>Set Status</key>
 	<string>Imposta stato</string>
+	<key>No Ratings</key>
+	<string>Nessuna valutazione</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Valutazioni: %1$d funziona, %2$d non funziona, %3$d non sicuro</string>
 	<key>It works for me</key>
 	<string>Per me funziona</string>
 	<key>It does not work for me</key>

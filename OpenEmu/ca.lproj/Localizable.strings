@@ -776,6 +776,10 @@ Podeu anar a les preferències dels controls per comprovar quines associacions s
 	<string>No ho sé</string>
 	<key>Set Status</key>
 	<string>Estableix l'estat</string>
+	<key>No Ratings</key>
+	<string>Sense valoracions</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Valoracions: %1$d funcionen, %2$d no funcionen, %3$d no n'estan segurs</string>
 	<key>It works for me</key>
 	<string>A mi em funciona</string>
 	<key>It does not work for me</key>

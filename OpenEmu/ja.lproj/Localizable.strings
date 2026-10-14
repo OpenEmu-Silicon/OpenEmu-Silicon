@@ -771,6 +771,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>わからない</string>
 	<key>Set Status</key>
 	<string>ステータスを設定</string>
+	<key>No Ratings</key>
+	<string>評価なし</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>評価: 動作 %1$d件、非動作 %2$d件、不明 %3$d件</string>
 	<key>It works for me</key>
 	<string>動作しました</string>
 	<key>It does not work for me</key>

@@ -746,6 +746,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>لا أعرف</string>
 	<key>Set Status</key>
 	<string>تحديد الحالة</string>
+	<key>No Ratings</key>
+	<string>لا توجد تقييمات</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>التقييمات: %1$d تعمل، %2$d لا تعمل، %3$d غير متأكد</string>
 	<key>It works for me</key>
 	<string>تعمل معي</string>
 	<key>It does not work for me</key>

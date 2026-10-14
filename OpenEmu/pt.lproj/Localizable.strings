@@ -776,6 +776,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>Não sei</string>
 	<key>Set Status</key>
 	<string>Definir status</string>
+	<key>No Ratings</key>
+	<string>Sem avaliações</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Avaliações: %1$d funcionam, %2$d não funcionam, %3$d não têm certeza</string>
 	<key>It works for me</key>
 	<string>Funciona para mim</string>
 	<key>It does not work for me</key>

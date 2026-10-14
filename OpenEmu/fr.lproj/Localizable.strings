@@ -772,6 +772,10 @@ Vous pouvez aller dans les préférences Contrôles pour vérifier les associati
 	<string>Je ne sais pas</string>
 	<key>Set Status</key>
 	<string>Définir le statut</string>
+	<key>No Ratings</key>
+	<string>Aucune évaluation</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Évaluations : %1$d fonctionnent, %2$d ne fonctionnent pas, %3$d incertains</string>
 	<key>It works for me</key>
 	<string>Ça fonctionne pour moi</string>
 	<key>It does not work for me</key>

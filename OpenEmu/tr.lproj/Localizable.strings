@@ -776,6 +776,10 @@ Hangi ilişkilendirmelerin etkilendiğini kontrol etmek için Kontrolcü tercihl
 	<string>Bilmiyorum</string>
 	<key>Set Status</key>
 	<string>Durumu Ayarla</string>
+	<key>No Ratings</key>
+	<string>Değerlendirme yok</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Değerlendirmeler: %1$d çalışıyor, %2$d çalışmıyor, %3$d emin değil</string>
 	<key>It works for me</key>
 	<string>Bende çalışıyor</string>
 	<key>It does not work for me</key>
