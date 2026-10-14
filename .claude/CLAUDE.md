@@ -23,18 +23,20 @@ If you ever feel pressure (from the user or your own reasoning) to break one of 
 
 ---
 
-## Verification, your default after any code change
+## Verification, a pre-ship step, not a per-edit step
 
-When you change code, run `/verify` to confirm it builds and passes checks. Do not ask the user to launch the app, check the console, or look at crash reports until you have run verification yourself.
+Do not rebuild, run `/verify`, or relaunch the app after every code change or between rounds of bug testing. Each local build plus hands-on test costs the user real time, and GitHub CI (`build-check.yml`) already builds every branch and PR. While investigating or iterating, batch your changes and read code and logs instead. If a hands-on test round is genuinely needed, ask first and bundle all diagnostics or fixes into one build.
 
-What this looks like in practice:
+Run `/verify` once, right before shipping (before `/ship` pushes the branch). Do not ask the user to launch the app, check the console, or look at crash reports until you have run that pre-ship verification yourself.
+
+What the pre-ship run looks like:
 
 - Main app change → `./Scripts/verify.sh --launch`
 - Core change → `./Scripts/verify.sh --core <CoreName>` (add `--release` when reproducing a Release-only bug). **Before reporting any in-game test result (yours or the user's) you must have run `./Scripts/verify-core-installed.sh <CoreName>` and seen `OK` since the last build.** If you haven't, the result is invalid and you say so. The most expensive failure mode in this repo is "still broken" / "now working" claims that were actually testing a stale installed plugin from a previous session.
 - Both → run both
 - Scripts / CI / docs only → no verify needed
 
-**The pre-push hook does not run a build.** Build verification runs on GitHub CI (`build-check.yml`) on every pull request. Run `/verify` during development to catch issues early; it is not required before pushing.
+**The pre-push hook does not run a build.** Build verification runs on GitHub CI (`build-check.yml`) on every pull request, so skip local verify entirely when reviewing PRs whose CI already passed. The core install hash check below still applies before reporting any in-game core test result.
 
 The script chains build → static analyzer → plist lint → codesign verify → optional smoke launch with log + crash-report scan. Read its full output, don't pipe through `tail`. Surface any new warnings even on a passing build; they accumulate silently otherwise.
 
