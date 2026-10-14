@@ -4,7 +4,18 @@
   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>GenesisPlus</title>
-                                    <item>
+                                        <item>
+      <title>GenesisPlus 1.7.5.9</title>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/download/cores-v1.6.0/GenesisPlus.oecoreplugin.zip"
+        sparkle:version="1.7.5.9"
+        sparkle:shortVersionString="1.7.5.9"
+        length="651576"
+        sparkle:edSignature="ljTg8BqPL7vK6Edq9nNI57JL+dnepDJSCRpnkrj6QczLCtT3LZz2fRkZgnOpQ7kiAHsCxzAxcaeeEsgiOO4iDQ=="
+        type="application/octet-stream" />
+    </item>
+<item>
       <title>GenesisPlus 1.7.5.8</title>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
       <enclosure
