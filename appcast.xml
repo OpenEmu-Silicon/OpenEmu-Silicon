@@ -5,7 +5,52 @@
     <link>https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases</link>
     <description>Most recent changes with links to updates.</description>
     <language>en</language>
-                                                                <item>
+                                                                    <item>
+      <title>OpenEmu-Silicon 1.4.0</title>
+      <description>
+        <![CDATA[
+        <h2>OpenEmu-Silicon 1.4.0</h2>
+        <h3>What's New in 1.4.0</h3>
+        <ul>
+        <li><strong>Cheat codes and cheat search on more systems.</strong> Atari 5200, Atari 7800, ColecoVision, MSX, Odyssey 2, Pokémon Mini, PSP, Sega 32X, Vectrex, and Watara Supervision now support cheat codes and cheat search. These arrive as core updates in Preferences > Cores. (thanks @leocck, #680)</li>
+        <li><strong>RetroAchievements on more systems.</strong> Achievements now work on Atari 7800, ColecoVision, MSX, Odyssey 2, Pokémon Mini, PSP, Sega 32X, Vectrex, and Watara Supervision. (thanks @leocck, #680)</li>
+        <li><strong>More cheats in Browse Online Cheats.</strong> The Libretro cheat database now covers Atari Lynx, Neo Geo Pocket, PC Engine and PC Engine CD, PC-FX, Sega Saturn, Virtual Boy, and WonderSwan. (thanks @leocck, #725)</li>
+        <li><strong>Community cheat ratings.</strong> Browse Online Cheats now shows how well each cheat has worked for other players, and you can share your own "works / does not work" ratings. This uses CheatWorks, a community service. It is on by default. To turn it off, open Preferences > Gameplay and clear "Show and share cheat ratings (CheatWorks)". When it is off, OpenEmu never contacts CheatWorks. The privacy policy explains what is shared. (thanks @leocck, #741)</li>
+        <li><strong>Nintendo Switch Online N64 controller</strong> now works over Bluetooth. (thanks @abarbarich, #732)</li>
+        <li><strong>Switch controllers connect more reliably</strong> when other software, such as Chrome, is also talking to the controller. (thanks @abarbarich, #736)</li>
+        <li><strong>Jaguar games</strong> now open in the correct landscape shape. (thanks @CamberwelK, #703)</li>
+        </ul>
+        <h3>Bug Fixes</h3>
+        <ul>
+        <li>Right-clicking a Genesis game no longer freezes for 10 seconds or more. (thanks @bloodstrike, #734)</li>
+        <li>Sega CD achievements can now unlock. (thanks @KriTaeCotus, #742)</li>
+        <li>Changing the library location no longer leaves the ROMs folder pointing at the old drive. If the ROMs folder is on an external drive that is unplugged, OpenEmu now keeps that setting for when the drive comes back. (thanks @KriTaeCotus, #729)</li>
+        <li>Adding a cheat from Cheat Search now uses the right address size on systems with more than one memory region.</li>
+        </ul>
+        <h3>Changes You Should Know About</h3>
+        <ul>
+        <li><strong>macOS 12 (Monterey) or later is now required.</strong></li>
+        <li><strong>RetroArch core support has been removed.</strong> It was less reliable than OpenEmu's own cores and could not support achievements. Leftover RetroArch plug-ins are cleaned up automatically the first time you launch. Save states made with a RetroArch core can't be restored. The Libretro cheat database and box art are not affected and still work.</li>
+        <li><strong>Commodore 64</strong> stays in the system list but has no playable core for now. A native Apple Silicon version is planned (#546).</li>
+        </ul>
+        <h3>Known Issues</h3>
+        <ul>
+        <li>On macOS 27, Bluetooth controllers such as the DualSense and Switch Pro Controller can be detected but send no input in games. USB works. Fixes are being tested (#730).</li>
+        <li>The Sonic & Knuckles lock-on menu item only appears for games with "Knuckles" in the name or file path.</li>
+        </ul>
+        ]]>
+      </description>
+      <pubDate>Wed, 14 Oct 2026 20:08:35 +0000</pubDate>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/download/v1.4.0/OpenEmu-Silicon.dmg"
+        sparkle:version="23"
+        sparkle:shortVersionString="1.4.0"
+        sparkle:edSignature="BCPQTUVt4GRgsWKWiyRZJlm/vC1mpg9m11IfBmNyfhISXQab9ABMnjq9VXtg8EAuO34cnPum6K9DACTij1sVDQ=="
+        length="49151311"
+        type="application/octet-stream"/>
+    </item>
+<item>
       <title>OpenEmu-Silicon 1.3.0</title>
       <description>
         <![CDATA[
