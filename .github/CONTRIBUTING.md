@@ -24,7 +24,7 @@ Not sure where to start? Join the [Discord](https://discord.gg/HvWfVkMUK) and sa
 
 ### Requirements
 
-- macOS 11.0 (Big Sur) or later, macOS 14 (Sonoma) or later recommended
+- macOS 12.0 (Monterey) or later, macOS 14 (Sonoma) or later recommended
 - Xcode with the latest stable toolchain, including the Metal toolchain
 - Apple Silicon Mac (M1 or later), this fork does not target Intel
 - No additional Homebrew dependencies required for the main app
@@ -136,7 +136,7 @@ git fetch origin pull/$PR/head:pr-$PR && git checkout pr-$PR
 git checkout main
 ```
 
-These steps use the repo's helper scripts because they are the simplest and safest path for testers. If you're writing a PR and need a "How to test locally" section for it, follow the format in [`AGENTS.md`](../AGENTS.md) instead.
+These steps use the repo's helper scripts because they are the simplest and safest path for testers. If you're writing a PR and need a "How to test locally" section for it, use the "How to test locally" block in [`.github/PULL_REQUEST_TEMPLATE.md`](PULL_REQUEST_TEMPLATE.md) instead.
 
 ### If the PR changes a core
 

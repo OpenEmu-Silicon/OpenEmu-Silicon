@@ -167,7 +167,7 @@ Thanks to everyone who contributed to this release: @[HANDLE_1] and @[HANDLE_2] 
 
 #### Installation
 
-Download the `.dmg` or `.zip` from the assets below. Requires macOS 11.0 or later on Apple Silicon.
+Download the `.dmg` or `.zip` from the assets below. Requires macOS 12.0 or later on Apple Silicon.
 
 For installation help, see the [Wiki](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/wiki) or open a [Discussion](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/discussions).
 
