@@ -153,7 +153,7 @@ final class PrefGameplayController: NSViewController {
         cheatWorksCheckbox.action = #selector(toggleCheatWorks(_:))
         cheatWorksCheckbox.state = CheatWorksConfig.isEnabled ? .on : .off
 
-        let note = NSTextField(wrappingLabelWithString: "When on, Browse Online Cheats shows how well each cheat has worked for other players, and your \"works / does not work\" ratings are shared with CheatWorks, a community service. When off, OpenEmu does not contact CheatWorks. Your ratings stay on this Mac.")
+        let note = NSTextField(wrappingLabelWithString: "Show and share cheat ratings. When off, OpenEmu never contacts CheatWorks.")
         note.font = .systemFont(ofSize: 11)
         note.textColor = .secondaryLabelColor
         note.preferredMaxLayoutWidth = 300
@@ -171,7 +171,8 @@ final class PrefGameplayController: NSViewController {
         label.font = .systemFont(ofSize: NSFont.systemFontSize)
 
         let row = gridView.addRow(with: [label, stack])
-        row.topPadding = 12
+        // The pane's bottom margin is a weak constraint, so the last row supplies its own spacing.
+        row.bottomPadding = 20
         row.cell(at: 0).yPlacement = .top
     }
 

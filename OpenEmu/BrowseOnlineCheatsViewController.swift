@@ -527,7 +527,8 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// Force re-queries a single code's rating (bypassing the session cache, since the user just
     /// changed its feedback) and replaces its cached value with the fresh server result.
     private func refreshRating(forRawCode rawCode: String) {
-        guard let document = gameDocument,
+        guard CheatWorksConfig.isEnabled,
+              let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
         else { return }
