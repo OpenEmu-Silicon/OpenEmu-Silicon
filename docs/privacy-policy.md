@@ -120,7 +120,7 @@ CheatWorks was created by a contributor to OpenEmu-Silicon. It is a separate ser
 
 The app does not contact CheatWorks just because you play a game.
 
-This feature is built into official releases and is on by default. To turn it off, open **Preferences → Gameplay** and clear **Community cheat ratings (CheatWorks)** under Cheats. When it is off, the app does not contact CheatWorks at all, you do not see ratings in Browse Online Cheats, and your ratings stay on your Mac. If you turn it back on, any ratings that have not been uploaded yet, including ones you gave while it was off, are uploaded. Builds made from source without a CheatWorks access token do not upload ratings or register an installation ID, but they still look up ratings when you open Browse Online Cheats.
+This feature is built into official releases and is on by default. To turn it off, open **Preferences → Gameplay** and clear **Show and share cheat ratings (CheatWorks)** under Cheats. When it is off, the app does not contact CheatWorks at all, you do not see ratings in Browse Online Cheats, and your ratings stay on your Mac. If you turn it back on, any ratings that have not been uploaded yet, including ones you gave while it was off, are uploaded. Builds made from source without a CheatWorks access token do not upload ratings or register an installation ID, but they still look up ratings when you open Browse Online Cheats.
 
 ### What is sent to CheatWorks
 

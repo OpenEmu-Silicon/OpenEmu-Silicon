@@ -141,7 +141,7 @@ final class PrefGameplayController: NSViewController {
 
     // MARK: - Cheat settings
 
-    private let cheatWorksCheckbox = NSButton(checkboxWithTitle: "Community cheat ratings (CheatWorks)", target: nil, action: nil)
+    private let cheatWorksCheckbox = NSButton(checkboxWithTitle: "Show and share cheat ratings (CheatWorks)", target: nil, action: nil)
 
     private static let cheatWorksPrivacyURL = URL(string: "https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/blob/main/docs/privacy-policy.md#cheatworks-community-cheat-ratings")!
 
@@ -153,7 +153,7 @@ final class PrefGameplayController: NSViewController {
         cheatWorksCheckbox.action = #selector(toggleCheatWorks(_:))
         cheatWorksCheckbox.state = CheatWorksConfig.isEnabled ? .on : .off
 
-        let note = NSTextField(wrappingLabelWithString: "Show and share cheat ratings. When off, OpenEmu never contacts CheatWorks.")
+        let note = NSTextField(wrappingLabelWithString: "Ratings appear in Browse Online Cheats. When off, OpenEmu never contacts CheatWorks.")
         note.font = .systemFont(ofSize: 11)
         note.textColor = .secondaryLabelColor
         note.preferredMaxLayoutWidth = 300

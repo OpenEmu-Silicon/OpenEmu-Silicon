@@ -192,6 +192,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
         // Re-fetch a code's rating once the user's own feedback for it has landed on CheatWorks.
         NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksFeedbackDidSubmit(_:)), name: .cheatWorksFeedbackDidSubmit, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksEnabledDidChange(_:)), name: CheatWorksConfig.enabledDidChangeNotification, object: nil)
     }
 
     // MARK: - Results Table
@@ -510,6 +511,16 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         guard rowCount > 0 else { return }
         tableView.reloadData(forRowIndexes: IndexSet(integersIn: 0..<rowCount),
                              columnIndexes: IndexSet(integer: columnIndex))
+    }
+
+    /// The user switched CheatWorks on or off in Preferences while this window is open: show or hide
+    /// the ratings column, and fetch ratings again when it comes back on.
+    @objc private func cheatWorksEnabledDidChange(_ notification: Notification) {
+        let enabled = CheatWorksConfig.isEnabled
+        resultsTableView?.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("rating"))?.isHidden = !enabled
+        ratings.removeAll()
+        requestedRatingCodes.removeAll()
+        if enabled { fetchRatingsForVisibleCheats() }
     }
 
     /// Fired after the user's own feedback for a code reaches CheatWorks. Re-fetches just that code's
