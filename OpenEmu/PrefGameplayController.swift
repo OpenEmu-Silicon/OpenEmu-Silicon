@@ -36,6 +36,7 @@ final class PrefGameplayController: NSViewController {
     private var saturationLabel:  NSTextField?
     private var gammaSlider:      NSSlider?
     private var gammaLabel:       NSTextField?
+    private var settingsGridView: NSGridView?
 
     // MARK: - Lifecycle
     
@@ -44,6 +45,7 @@ final class PrefGameplayController: NSViewController {
 
         loadShaderMenu()
         addSliders()
+        addCheatSettings()
 
         token = NotificationCenter.default.addObserver(forName: .shaderModelCustomShadersDidChange, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
@@ -71,6 +73,7 @@ final class PrefGameplayController: NSViewController {
         var ancestor: NSView? = globalDefaultShaderSelection
         while let parent = ancestor?.superview, parent !== view { ancestor = parent }
         guard let gridView = ancestor as? NSGridView else { return }
+        settingsGridView = gridView
 
         // ── Build Saturation row ──────────────────────────────────────────
         let satLabel = NSTextField(labelWithString: "Saturation:")
@@ -134,6 +137,58 @@ final class PrefGameplayController: NSViewController {
         saturationLabel  = satPct
         gammaSlider      = gamSlider
         gammaLabel       = gamPct
+    }
+
+    // MARK: - Cheat settings
+
+    private let cheatWorksCheckbox = NSButton(checkboxWithTitle: "Community cheat ratings (CheatWorks)", target: nil, action: nil)
+
+    private static let cheatWorksPrivacyURL = URL(string: "https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/blob/main/docs/privacy-policy.md#cheatworks-community-cheat-ratings")!
+
+    /// Adds a "Cheats" row below the existing settings, with the CheatWorks on/off switch.
+    private func addCheatSettings() {
+        guard let gridView = settingsGridView else { return }
+
+        cheatWorksCheckbox.target = self
+        cheatWorksCheckbox.action = #selector(toggleCheatWorks(_:))
+        cheatWorksCheckbox.state = CheatWorksConfig.isEnabled ? .on : .off
+
+        let note = NSTextField(wrappingLabelWithString: "When on, Browse Online Cheats shows how well each cheat has worked for other players, and your \"works / does not work\" ratings are shared with CheatWorks, a community service. When off, OpenEmu does not contact CheatWorks. Your ratings stay on this Mac.")
+        note.font = .systemFont(ofSize: 11)
+        note.textColor = .secondaryLabelColor
+        note.preferredMaxLayoutWidth = 300
+
+        let privacyButton = NSButton(title: "What is shared?", target: self, action: #selector(openCheatWorksPrivacyDetails(_:)))
+        privacyButton.bezelStyle = .inline
+        privacyButton.controlSize = .small
+
+        let stack = NSStackView(views: [cheatWorksCheckbox, note, privacyButton])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 4
+
+        let label = NSTextField(labelWithString: "Cheats:")
+        label.font = .systemFont(ofSize: NSFont.systemFontSize)
+
+        let row = gridView.addRow(with: [label, stack])
+        row.topPadding = 12
+        row.cell(at: 0).yPlacement = .top
+    }
+
+    @objc private func toggleCheatWorks(_ sender: NSButton) {
+        let enabled = sender.state == .on
+        CheatWorksConfig.isEnabled = enabled
+
+        // Turning it back on: share any ratings given while it was off.
+        if enabled {
+            Task.detached(priority: .utility) {
+                await CheatFeedbackService.shared.syncToCheatWorks()
+            }
+        }
+    }
+
+    @objc private func openCheatWorksPrivacyDetails(_ sender: Any?) {
+        NSWorkspace.shared.open(Self.cheatWorksPrivacyURL)
     }
 
     // MARK: - Slider actions

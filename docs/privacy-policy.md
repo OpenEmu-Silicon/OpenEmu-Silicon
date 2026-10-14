@@ -15,7 +15,7 @@ The app only connects to external services for features you use, or for optional
 - **RetroAchievements** — optional achievements, leaderboards, and Rich Presence.
 - **Google Drive Save Sync** — optional save-state and battery-save backup/sync.
 - **Sentry crash reporting** — optional crash and hang diagnostics.
-- **CheatWorks** (community cheat ratings): used when you open Browse Online Cheats or rate a cheat. Unlike the features above, it is on by default in official releases and has no setting to turn it off. See [CheatWorks community cheat ratings](#cheatworks-community-cheat-ratings).
+- **CheatWorks** (community cheat ratings): used when you open Browse Online Cheats or rate a cheat. Unlike the features above, it is on by default in official releases. You can turn it off in **Preferences → Gameplay**. See [CheatWorks community cheat ratings](#cheatworks-community-cheat-ratings).
 
 OpenEmu-Silicon does not operate its own account server, telemetry backend, or analytics service.
 
@@ -120,7 +120,7 @@ CheatWorks was created by a contributor to OpenEmu-Silicon. It is a separate ser
 
 The app does not contact CheatWorks just because you play a game.
 
-This feature is built into official releases and is on by default. There is currently no setting to turn it off. If this matters to you, [open an issue](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues). Builds made from source without a CheatWorks access token do not upload ratings or register an installation ID, but they still look up ratings when you open Browse Online Cheats.
+This feature is built into official releases and is on by default. To turn it off, open **Preferences → Gameplay** and clear **Community cheat ratings (CheatWorks)** under Cheats. When it is off, the app does not contact CheatWorks at all, and your ratings stay on your Mac. If you turn it back on, ratings you gave while it was off are uploaded. Builds made from source without a CheatWorks access token do not upload ratings or register an installation ID, but they still look up ratings when you open Browse Online Cheats.
 
 ### What is sent to CheatWorks
 

@@ -417,7 +417,8 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// results are cached in `ratings` until the window closes and drive
     /// the rating column's circles and tooltips.
     func fetchRatingsForVisibleCheats() {
-        guard let document = gameDocument,
+        guard CheatWorksConfig.isEnabled,
+              let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
         else { return }

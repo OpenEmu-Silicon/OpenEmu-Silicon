@@ -323,7 +323,7 @@ final class CheatFeedbackService: @unchecked Sendable {
     /// of the queue. No client-side cap or retry limit: the server owns the pacing. Call off the main
     /// thread.
     func syncToCheatWorks() async {
-        guard CheatWorksConfig.isClientTokenConfigured else { return }
+        guard CheatWorksConfig.isEnabled, CheatWorksConfig.isClientTokenConfigured else { return }
 
         let files = collectFeedbackFiles()
         // log.info("CheatWorks sync: \(files.count) feedback file(s) to scan")
@@ -441,7 +441,8 @@ final class CheatFeedbackService: @unchecked Sendable {
     private func submitToCheatWorks(status: CheatFeedbackStatus, code: String, rawCode: String?, md5: String,
                                     systemIdentifier: String, coreIdentifier: String, coreVersion: String,
                                     gameName: String?, provider: String?) {
-        guard CheatWorksConfig.isClientTokenConfigured,
+        guard CheatWorksConfig.isEnabled,
+              CheatWorksConfig.isClientTokenConfigured,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: coreIdentifier),
               let url = fileURL(md5: md5, systemIdentifier: systemIdentifier)
         else { return }
