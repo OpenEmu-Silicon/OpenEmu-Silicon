@@ -24,6 +24,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$REPO_ROOT"
 
+# Personal agent rules (gitignored) don't exist in a fresh worktree. Copy them
+# over from the main checkout so sessions here behave the same way.
+MAIN_CHECKOUT="$(git worktree list --porcelain | awk '/^worktree /{print substr($0,10); exit}')"
+if [ -n "$MAIN_CHECKOUT" ] && [ "$MAIN_CHECKOUT" != "$REPO_ROOT" ] \
+   && [ -f "$MAIN_CHECKOUT/CLAUDE.local.md" ] && [ ! -f "$REPO_ROOT/CLAUDE.local.md" ]; then
+  cp "$MAIN_CHECKOUT/CLAUDE.local.md" "$REPO_ROOT/CLAUDE.local.md"
+fi
+
 WORKSPACE="OpenEmu-metal.xcworkspace"
 SCHEME="${1:-OpenEmu}"
 
