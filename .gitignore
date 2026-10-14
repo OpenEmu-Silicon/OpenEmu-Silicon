@@ -52,8 +52,10 @@ vice_build.log
 # Compiled test binaries
 test_dlopen
 
-# Claude Code local config
-.claude/settings.json
+# Claude Code personal config (shared rules live in AGENTS.md)
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
 
 # Cursor IDE config — local user settings stay out of git, but project hooks
 # are checked in so every contributor (and AI session) gets the same automated
