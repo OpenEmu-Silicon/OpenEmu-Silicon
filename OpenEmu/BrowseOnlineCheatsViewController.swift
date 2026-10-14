@@ -192,6 +192,7 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
         // Re-fetch a code's rating once the user's own feedback for it has landed on CheatWorks.
         NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksFeedbackDidSubmit(_:)), name: .cheatWorksFeedbackDidSubmit, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksEnabledDidChange(_:)), name: CheatWorksConfig.enabledDidChangeNotification, object: nil)
     }
 
     // MARK: - Results Table
@@ -244,6 +245,9 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                 tableColumn.maxWidth = width
                 tableColumn.resizingMask = []
             }
+
+            // With CheatWorks switched off there are no ratings to show, so drop the column too.
+            if identifier == "rating" { tableColumn.isHidden = !CheatWorksConfig.isEnabled }
 
             tableView.addTableColumn(tableColumn)
             columnAlignments[tableColumn.identifier] = alignment
@@ -417,7 +421,8 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// results are cached in `ratings` until the window closes and drive
     /// the rating column's circles and tooltips.
     func fetchRatingsForVisibleCheats() {
-        guard let document = gameDocument,
+        guard CheatWorksConfig.isEnabled,
+              let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
         else { return }
@@ -508,6 +513,16 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                              columnIndexes: IndexSet(integer: columnIndex))
     }
 
+    /// The user switched CheatWorks on or off in Preferences while this window is open: show or hide
+    /// the ratings column, and fetch ratings again when it comes back on.
+    @objc private func cheatWorksEnabledDidChange(_ notification: Notification) {
+        let enabled = CheatWorksConfig.isEnabled
+        resultsTableView?.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("rating"))?.isHidden = !enabled
+        ratings.removeAll()
+        requestedRatingCodes.removeAll()
+        if enabled { fetchRatingsForVisibleCheats() }
+    }
+
     /// Fired after the user's own feedback for a code reaches CheatWorks. Re-fetches just that code's
     /// rating if it belongs to the game/core this window is showing.
     @objc private func cheatWorksFeedbackDidSubmit(_ notification: Notification) {
@@ -526,7 +541,8 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// Force re-queries a single code's rating (bypassing the session cache, since the user just
     /// changed its feedback) and replaces its cached value with the fresh server result.
     private func refreshRating(forRawCode rawCode: String) {
-        guard let document = gameDocument,
+        guard CheatWorksConfig.isEnabled,
+              let document = gameDocument,
               let md5 = document.rom.md5Hash,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
         else { return }

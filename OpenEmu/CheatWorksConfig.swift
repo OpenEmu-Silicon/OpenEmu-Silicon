@@ -48,6 +48,22 @@ enum CheatWorksConfig {
     // The property is declared there as an extension on this type.
     // static let clientAccessToken: String — defined in CheatWorksSecrets.swift
 
+    /// UserDefaults key for the user's CheatWorks on/off choice (Preferences > Cheats).
+    static let enabledDefaultsKey = "OECheatWorksEnabled"
+
+    /// Whether the user allows OpenEmu to contact CheatWorks (rating lookups and uploads).
+    /// On unless the user has switched it off.
+    static var isEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: enabledDefaultsKey) as? Bool ?? true }
+        set {
+            UserDefaults.standard.set(newValue, forKey: enabledDefaultsKey)
+            NotificationCenter.default.post(name: enabledDidChangeNotification, object: nil)
+        }
+    }
+
+    /// Posted (on the thread that changed it) after `isEnabled` is set, so open windows can update.
+    static let enabledDidChangeNotification = Notification.Name("OECheatWorksEnabledDidChange")
+
     /// `true` once a real client token has been supplied (i.e. not the template placeholder).
     static var isClientTokenConfigured: Bool {
         !clientAccessToken.isEmpty && clientAccessToken != placeholderClientAccessToken
