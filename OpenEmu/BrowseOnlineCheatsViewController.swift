@@ -245,6 +245,9 @@ final class BrowseOnlineCheatsViewController: NSViewController {
                 tableColumn.resizingMask = []
             }
 
+            // With CheatWorks switched off there are no ratings to show, so drop the column too.
+            if identifier == "rating" { tableColumn.isHidden = !CheatWorksConfig.isEnabled }
+
             tableView.addTableColumn(tableColumn)
             columnAlignments[tableColumn.identifier] = alignment
         }
