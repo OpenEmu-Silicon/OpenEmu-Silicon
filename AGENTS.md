@@ -1,79 +1,75 @@
-# AGENTS.md — OpenEmu-Silicon
+# AGENTS.md: OpenEmu-Silicon
 
-Instructions for AI coding agents (Claude Code, Cursor, Copilot, etc.) working in this repository.
-
----
-
-## Read First
-
-Before doing any work, read this file fully. It is the authoritative source for how this project is structured and how changes should be made.
+Shared instructions for AI coding agents (Claude Code, Cursor, Copilot, Codex, and others) and for people working in this repository. Vocabulary lives in [`CONTEXT.md`](CONTEXT.md). Contributor setup lives in [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 
 ---
 
 ## About This Project
 
-OpenEmu-Silicon is a community-maintained fork of OpenEmu, rebuilt to run natively on Apple Silicon (arm64) without Rosetta. It descends from:
+OpenEmu-Silicon is a community-maintained fork of [OpenEmu](https://github.com/OpenEmu/OpenEmu), rebuilt to run natively on Apple Silicon (arm64) without Rosetta. It builds on the foundational ARM64 port at [bazley82/OpenEmuARM64](https://github.com/bazley82/OpenEmuARM64).
 
-- [OpenEmu/OpenEmu](https://github.com/OpenEmu/OpenEmu) — the original project
-- [bazley82/OpenEmuARM64](https://github.com/bazley82/OpenEmuARM64) — the foundational ARM64 port
+The goal is to keep the original OpenEmu spirit (a beautifully designed, native macOS emulation frontend) while making it work reliably on M-series Macs with modern macOS and Swift.
 
-The goal is to honor the original OpenEmu spirit — a beautifully designed, first-class native macOS game emulation frontend — while making it work reliably on M-series Macs with modern macOS and Swift.
-
-**The maintainer is not a professional developer.** If you are writing explanations, commit messages, or comments, please use plain language. Avoid jargon where a plain word works just as well.
+The maintainer is not a professional developer. Write commit messages, PR descriptions, and explanations in plain language. Use a plain word where one works.
 
 ---
 
 ## Ground Rules
 
-1. **Never commit directly to `main`.** All work goes through feature branches → PRs → `main`.
-2. **Branch from `main`, open PRs against `main`.** There is no staging branch.
-3. **Build before committing.** Run an `xcodebuild` check on any Swift/ObjC changes before staging a commit.
-4. **Don't rewrite files wholesale.** This is a large, complex Xcode project. Make surgical changes. Rewriting `.pbxproj` or large ObjC files without understanding them will break the build.
-5. **Respect the flattened architecture.** Submodule directories (`Nestopia/`, `BSNES/`, etc.) are regular directories — do not attempt to re-initialize them as git submodules.
-6. **Do not commit build artifacts.** No `.o` files, derived data, `.app` bundles, build logs, or compiled executables.
+1. **Contributors work on a branch and open a PR against `main`.** There is no staging branch. The maintainer may push small docs, script, and chore changes straight to `main`.
+2. **Make surgical changes.** This is a large, complex Xcode project. Do not rewrite `project.pbxproj` or large ObjC files wholesale.
+3. **Core directories are regular directories.** `Nestopia/`, `BSNES/`, and the others are flattened. Do not turn them back into git submodules.
+4. **Never commit secrets or build output.** No `.o` files, DerivedData, `.app` bundles, logs, binaries, or the real credential files listed below.
+5. **Never publish a GitHub Release.** Drafts are fine. Going live is the maintainer's action.
+6. **Keep copyright headers** on every file you touch (see License Rules).
 
 ---
 
 ## Language and Tooling
 
-- **Swift 6.3.2** — strict concurrency is enforced. Use `@MainActor`, `Sendable`, and structured concurrency correctly.
-- **Objective-C** — many core files are ObjC. Bridge headers are in place. Don't break them.
-- **Xcode 26.5** — use `xcodebuild` for CLI builds. The primary workspace is `OpenEmu-metal.xcworkspace`.
-- **No package manager** — no SPM, no CocoaPods, no Carthage. Dependencies are vendored or flattened submodules.
+- **Swift 6.3.2** with strict concurrency. Use `@MainActor`, `Sendable`, and structured concurrency correctly.
+- **Objective-C**: many core files are ObjC, with bridge headers in place. Do not break them.
+- **Xcode 26.5**, built with `xcodebuild`. The primary workspace is `OpenEmu-metal.xcworkspace`.
+- **No package manager.** No SPM, CocoaPods, or Carthage. Dependencies are vendored or flattened.
 
 ---
 
-## Build Command
+## Build and Verify
 
-The canonical verification floor is `Scripts/verify.sh`. It builds, runs the static analyzer, validates Info.plist and entitlements, and checks codesign — a stricter floor than a bare `xcodebuild build`.
+`Scripts/verify.sh` is the local check. It builds, runs the static analyzer, validates Info.plist and entitlements, and checks codesign.
 
 ```bash
 ./Scripts/verify.sh                 # build + analyze + plist + codesign
-./Scripts/verify.sh --launch        # above + 5s smoke launch with crash check
-./Scripts/verify.sh --test          # above + run OpenEmuTests unit target
+./Scripts/verify.sh --launch        # above + 5s smoke launch with log and crash-report scan
+./Scripts/verify.sh --test          # above + run the OpenEmuTests unit target
+./Scripts/verify.sh --core <Name>   # build, install, and check one core (add --release for Release-only bugs)
 ```
 
-A bare build check is acceptable for quick iteration:
+Read the whole output and note any new warnings even on a passing build. GitHub CI (`build-check.yml`) rebuilds every PR, including every core the PR touches, so a local build is a way to catch problems early, not the only gate.
 
-```bash
-xcodebuild \
-  -workspace OpenEmu-metal.xcworkspace \
-  -scheme OpenEmu \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  build 2>&1 | tail -30
-```
+To launch the debug app, use `./Scripts/launch-debug.sh` instead of `open <path>`. It picks the build that matches your current branch and refuses to launch a stale one.
 
-**A clean `verify.sh` run is the definition of "passing."** Run it before every push touching source files. The pre-push git hook in `.githooks/pre-push` enforces this mechanically — install it once per clone with `./Scripts/install-hooks.sh`.
+### Credentials stubs (first build only)
 
-### Setup and Credentials Pre-Requisites
+Generate the gitignored local files from their templates:
 
-Before compiling for the first time, you must generate the local gitignored secrets/credentials files from their templates:
 ```bash
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
 cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 ```
+
+---
+
+## Working on a core (read this before testing any core change)
+
+OpenEmu loads cores from `~/Library/Application Support/OpenEmu/Cores/`, **not** from the build folder. Building a core does not change what the app runs. The most expensive mistake in this repo is reporting "still broken" or "now working" after testing an old installed copy.
+
+1. Build the core's own scheme. The main `OpenEmu` scheme does not build cores. (`verify.sh --core <Name>` does steps 1 and 2.)
+2. Install with `./Scripts/install-core.sh <Name>`. It quits OpenEmu and copies the binary and Info.plist correctly. **Never use `cp -R` or `cp -Rf` on a plugin.** macOS merges bundle folders instead of replacing them, so old files stay.
+3. Run `./Scripts/verify-core-installed.sh <Name>` and confirm it prints `OK` before you report any in-game result.
+
+Working in a git worktree? Use `Scripts/build-for-worktree.sh` or `verify.sh --worktree`, and run the three-way hash check. Both are explained in [`docs/worktree-workflow.md`](docs/worktree-workflow.md).
 
 ---
 
@@ -148,119 +144,54 @@ For any other multi-core system (e.g. ColecoVision — JollyCV / CrabEmu / blueM
 
 ---
 
-## Branch and PR Rules
+---
 
-These rules exist because AI-assisted sessions have previously created orphaned branches, duplicate issues, and commits without PRs. Follow them exactly.
+## Branches and Pull Requests
 
-**Branches:**
-
-| Rule | Why |
-|------|-----|
-| Always branch from `main` | Prevents tangled history |
-| One branch = one concern | Keeps PRs focused and reviewable |
-| Never reuse a merged branch | New commits on a merged branch have no PR — invisible |
-| Branch name must match content | If scope changes, start a new branch |
-| Delete local branch after merge | `git branch -d` immediately after syncing main |
-
-**PRs:**
-
-- **Target branch:** `main` on `OpenEmu-Silicon/OpenEmu-Silicon`
-- **Push and open a PR in the same step — never push without immediately opening a PR**
-- **PR title format:** `fix: description` / `feat: description` / `chore: description`
-- **Use the PR template** — `.github/PULL_REQUEST_TEMPLATE.md` auto-populates. Fill every section.
-- Each PR addresses one issue or one logical change — no bundled unrelated fixes
-- Reference the issue with `Fixes #N` in the commit body (auto-closes on merge) or `Related to #N` (soft link)
-- For core-specific fixes, note which systems are affected
-
-**Every PR description must include a "How to test locally" section** with exact copy-paste commands.
-
-**If the PR only touches main app code** (`OpenEmu/`, `OpenEmuKit/`, `OpenEmu-SDK/`):
-
-```
-## How to test locally
-
-# 1. Check out this PR
-gh pr checkout <N> --repo OpenEmu-Silicon/OpenEmu-Silicon
-
-# 2. Build
-xcodebuild \
-  -workspace OpenEmu-metal.xcworkspace \
-  -scheme OpenEmu \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  build 2>&1 | tail -20
-
-# 3. Launch
-open ~/Library/Developer/Xcode/DerivedData/OpenEmu-metal-*/Build/Products/Debug/OpenEmu.app
-```
-
-**If the PR touches a core plugin** (anything inside `Dolphin/`, `Flycast/`, etc.):
-
-```
-## How to test locally
-
-# 1. Check out this PR
-gh pr checkout <N> --repo OpenEmu-Silicon/OpenEmu-Silicon
-
-# 2. Build the core scheme (the main OpenEmu scheme does not build core plugins)
-xcodebuild \
-  -workspace OpenEmu-metal.xcworkspace \
-  -scheme <CoreName> \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  build 2>&1 | tail -20
-
-# 3. Install the core (quits OpenEmu automatically, then copies binary + Info.plist)
-./Scripts/install-core.sh <CoreName>
-
-# 4. Launch
-open ~/Library/Developer/Xcode/DerivedData/OpenEmu-metal-*/Build/Products/Debug/OpenEmu.app
-```
-
-**Never use `cp -Rf` to install a core plugin.** macOS merges bundle directories rather than replacing them — old files silently stay in place. Always use `./Scripts/install-core.sh` or `cp -f` on individual files. Always quit OpenEmu before installing — the helper process holds the binary open while running.
-
-Replace `<N>` with the actual PR number and `<CoreName>` with the scheme name (e.g. `Dolphin`, `Flycast`). Add any PR-specific setup steps below — which ROM or system to test, any BIOS files required, any permissions to revoke first, or specific behaviors to verify from the QA spec.
+- Branch from `main` and open the PR against `main` on `OpenEmu-Silicon/OpenEmu-Silicon`.
+- Name the branch for its content (`fix/short-description`, `feat/...`, `chore/...`). Do not reuse a merged branch.
+- PR title: `fix: description`, `feat: description`, or `chore: description`.
+- Fill in `.github/PULL_REQUEST_TEMPLATE.md`, including its "How to test locally" block. Keep that block as written and fill in only the placeholders (PR number, core name).
+- Link issues with `Fixes #N` in the PR body (closes on merge) or `Related to #N`.
+- Keep a PR to one theme. Several small related fixes in one PR are fine. Unrelated changes are not.
+- Always pass `--repo OpenEmu-Silicon/OpenEmu-Silicon` to `gh` commands. Forks exist.
 
 ---
 
-## Issue Tracker
+## Issues
 
-The issue tracker at `OpenEmu-Silicon/OpenEmu-Silicon` is the primary place for bug reports, feature requests, core integration work, and release checklists.
+Use the issue templates (`bug_report`, `feature_request`, `core_integration`, `checklist`).
 
-**Issue templates** — always use the appropriate template:
+1. **Search before opening.** `gh issue list --repo OpenEmu-Silicon/OpenEmu-Silicon --state open`. If it is already tracked, comment instead of opening a duplicate.
+2. **No type prefixes in titles.** Labels carry the type. Good: `PokeMini: OpenEmuBase header missing in standalone build`. Bad: `note: PokeMini needs workspace integration`.
+3. **One issue per concern.** Same root cause and same fix means one issue.
+4. **Only one open checklist per milestone.** Update it instead of opening another.
 
-| Template | Use when |
-|----------|----------|
-| `bug_report` | Runtime crash, wrong behavior |
-| `feature_request` | New core, new capability |
-| `core_integration` | Core fails to build, missing from workspace, needs ARM64 porting |
-| `checklist` | Release milestone tracking — one open checklist per milestone max |
+---
 
-**Issue hygiene rules (non-negotiable):**
+## Working with an AI agent on this repo
 
-1. **Search before opening.** Run `gh issue list --repo OpenEmu-Silicon/OpenEmu-Silicon --state open` first. If the problem is already tracked, comment — don't open a duplicate.
-2. **No type prefixes in titles.** Never write `note:`, `fix:`, `feat:`, `bug:` in the issue title. Labels carry the type. The title describes the problem.
-   - Good: `PokeMini — OpenEmuBase header missing in standalone build`
-   - Bad: `note: PokeMini — needs workspace integration`
-3. **One issue per concern.** Same root cause + same fix = one issue covering both.
-4. **Close resolved issues immediately.** The moment a fix is committed, run: `gh issue close #N --repo OpenEmu-Silicon/OpenEmu-Silicon --comment "Resolved in <sha>."` Do not leave issues open for a later cleanup pass.
-5. **Close superseded issues immediately.** If you open a more comprehensive issue that replaces an older one, close the old one in the same session.
-6. **Only one checklist per milestone.** If one is already open, update it.
+What has worked well here:
+
+- **Point the agent at this file first**, then at `CONTEXT.md` so it uses the right words.
+- **Let the agent build and check its own work** with `verify.sh` before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
+- **Do core testing through the scripts above.** The stale-plugin mistake is the one agents make most.
+- **Ask for plain-language summaries.** The maintainer and most testers are not developers.
+- **Say in the PR that AI helped** (the template asks). Nobody minds. Transparency is the point.
+- **Review the diff yourself** before you push. Agents are confident when wrong.
 
 ---
 
 ## What NOT to Do
 
-- Do not modify `project.pbxproj` manually unless you know exactly what you're changing — it's a large generated file and merge conflicts are painful
-- Do not add new dependencies without discussion — the project intentionally has no package manager
-- Do not remove or rename existing core directories — they are referenced by the Xcode project
-- Do not commit the `build_*.log` files that exist at root — they are legacy artifacts
-- Do not change `MACOSX_DEPLOYMENT_TARGET` below `11.0` — this is the ARM64 baseline
-- Do not commit secrets (like `OEGoogleDriveSecrets.swift` or `ScreenScraperDevCredentials.swift`) — they are gitignored for a reason; they hold real OAuth credentials or API keys
-- Do not add debug `+load` / `+initialize` methods that write to `/tmp` or hardcode local paths
-- Do not commit large binaries (`.zip`, `.tar.gz`, compiled executables) — these belong in GitHub Releases
-- Do not commit directly to `main` under any circumstances
-- Do not declare a core test result without running `./Scripts/verify-core-installed.sh <CoreName>` since the last build — testing against a stale installed plugin is the single most expensive failure mode in this repo
+- Do not edit `project.pbxproj` by hand unless you know exactly what you are changing.
+- Do not add dependencies without discussion. The project intentionally has no package manager.
+- Do not remove or rename core directories. The Xcode project references them.
+- Do not change `MACOSX_DEPLOYMENT_TARGET` below `12.0`.
+- Do not commit real credentials (`OEGoogleDriveSecrets.swift`, `ScreenScraperDevCredentials.swift`, `CheatWorksSecrets.swift`). Use the templates.
+- Do not add debug `+load` / `+initialize` methods that write to `/tmp` or hardcode local paths.
+- Do not commit large binaries (`.zip`, `.tar.gz`, executables). Those belong in GitHub Releases.
+- Do not report a core test result without running `verify-core-installed.sh` since the last build.
 
 ---
 
@@ -300,130 +231,3 @@ The main app is **BSD 2-Clause**. Emulator cores are mostly **GPL v2**. Key rule
    ```
 3. **picodrive is non-commercial** — never charge for a build that includes it
 4. **No CLA** — your contributions are covered by the license of the files you touch
-
----
-
-## Testing PRs Locally Before Merging
-
-> **Core plugin work has a process gate.**
->
-> OpenEmu loads cores from `~/Library/Application Support/OpenEmu/Cores/`, **not** from the build directory. Building a core does *not* affect what OpenEmu loads. Before claiming any test result on a core change:
->
-> 1. Build the core scheme (or run `./Scripts/verify.sh --core <CoreName>` which does this for you, with `--release` if testing a Release-only behavior).
-> 2. Run `./Scripts/install-core.sh <CoreName>` (use `--release` for Release builds). This is automatic when you use `verify.sh --core`.
-> 3. Run `./Scripts/verify-core-installed.sh <CoreName>` and confirm `OK`. If it prints `FAIL`, the installed plugin doesn't match the build and your test result is invalid.
->
-> The most common silent failure is testing against a stale installed plugin from a previous session. The preflight script catches this in under a second; run it before reporting any "still broken" or "now working" result.
->
-> Cursor users: a project-level hook at `.cursor/hooks/post-edit-core.sh` automatically reminds the agent of these steps after every edit to a core source file, and surfaces the live preflight status. Do not work around the hook — if it tells you the install is stale, fix it before claiming a result.
-
-Before merging any PR, check it out locally, build, and verify the behaviors described in the PR's test plan.
-
-**When reviewing a PR, always provide:**
-1. The exact `gh pr checkout` command for that PR number
-2. Any PR-specific setup (e.g. BIOS files needed, permissions to revoke first)
-3. The specific behaviors to verify from the PR's test plan
-
-### Check out a PR branch
-
-```bash
-# gh looks up the branch name automatically
-gh pr checkout <PR_NUMBER> --repo OpenEmu-Silicon/OpenEmu-Silicon
-
-# Example
-gh pr checkout 54 --repo OpenEmu-Silicon/OpenEmu-Silicon
-```
-
-### Build
-
-For main app changes:
-
-```bash
-xcodebuild \
-  -workspace OpenEmu-metal.xcworkspace \
-  -scheme OpenEmu \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  build 2>&1 | tail -30
-```
-
-For core plugin changes, use the core's own scheme (e.g. `Dolphin`, `Flycast`):
-
-```bash
-xcodebuild \
-  -workspace OpenEmu-metal.xcworkspace \
-  -scheme Dolphin \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  build 2>&1 | tail -30
-```
-
-The main `OpenEmu` scheme does not build core plugins. Building the wrong scheme means you're testing old code.
-
-### Install a core plugin after building
-
-Use the install script — it quits OpenEmu first and copies files correctly:
-
-```bash
-./Scripts/install-core.sh Dolphin
-```
-
-**Never use `cp -Rf` to install a core plugin.** macOS merges bundle directories rather than replacing them, so old files silently stay in place. Always use the script or `cp -f` on individual files. Always quit OpenEmu before installing — the helper process holds the binary open while running and `cp` will silently fail to replace it.
-
-### Launch the built app
-
-```bash
-open ~/Library/Developer/Xcode/DerivedData/OpenEmu-metal-*/Build/Products/Debug/OpenEmu.app
-```
-
-Or launch from Spotlight — after a Debug build the app is registered and findable by name.
-
-### Test multiple PRs in isolation (worktrees)
-
-```bash
-# Create an isolated copy of the repo on a PR branch
-git worktree add ../openemu-pr54 fix/flycast-input-crash
-
-# Build and run from that directory
-cd ../openemu-pr54
-xcodebuild -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu \
-  -configuration Debug -destination 'platform=macOS,arch=arm64' build
-
-# Clean up when done
-git worktree remove ../openemu-pr54
-```
-
-### Return to main
-
-```bash
-git checkout main
-```
-
----
-
-## Quick Reference
-
-```bash
-# Open in Xcode
-open OpenEmu-metal.xcworkspace
-
-# --- Start of every new piece of work ---
-git checkout main
-git fetch origin && git merge origin/main
-
-# Create a feature branch
-git checkout -b fix/your-description
-
-# Build check before committing
-xcodebuild -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu \
-  -configuration Debug -destination 'platform=macOS,arch=arm64' \
-  build 2>&1 | tail -10
-
-# Stage and commit
-git add -p
-git commit -m "fix: description"
-
-# Push and open a PR — always in the same step, never one without the other
-git push -u origin fix/your-description
-gh pr create --repo OpenEmu-Silicon/OpenEmu-Silicon --base main --title "fix: your-description" --body "..."
-```

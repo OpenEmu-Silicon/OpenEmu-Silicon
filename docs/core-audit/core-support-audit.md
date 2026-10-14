@@ -4,7 +4,7 @@ _Last updated: 2026-06-08_
 
 This document explains what OpenEmu-Silicon currently supports, what appears to be missing from upstream OpenEmu history, and what work should be prioritized next.
 
-It is **not** a release-process document. For the current core release mechanics, use `.claude/commands/release-core.md` and the scripts it references.
+It is **not** a release-process document. For the current core release mechanics, use the `/release-core` command (maintainer-only) and the scripts under `Scripts/`.
 
 Supporting evidence:
 
