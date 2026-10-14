@@ -323,12 +323,17 @@ final class CheatFeedbackService: @unchecked Sendable {
     /// of the queue. No client-side cap or retry limit: the server owns the pacing. Call off the main
     /// thread.
     func syncToCheatWorks() async {
-        guard CheatWorksConfig.isClientTokenConfigured else { return }
+        guard CheatWorksConfig.isEnabled, CheatWorksConfig.isClientTokenConfigured,
+              beginCheatWorksSync()
+        else { return }
+        defer { endCheatWorksSync() }
 
         let files = collectFeedbackFiles()
         // log.info("CheatWorks sync: \(files.count) feedback file(s) to scan")
         var index = 0
-        while index < files.count {
+        // Re-checked each pass, so switching CheatWorks off (or a Retry-After pause ending after it
+        // was switched off) stops the upload instead of finishing the queue.
+        while index < files.count, CheatWorksConfig.isEnabled {
             let fileURL = files[index]
             switch await syncFile(at: fileURL) {
             case .next:
@@ -351,6 +356,25 @@ final class CheatFeedbackService: @unchecked Sendable {
             }
         }
         // log.info("CheatWorks sync finished")
+    }
+
+    /// Only one backlog sync may run at a time (launch sync, or the one started by turning CheatWorks
+    /// back on); a second would upload the same entries twice.
+    private let cheatWorksSyncLock = NSLock()
+    private var cheatWorksSyncInProgress = false
+
+    private func beginCheatWorksSync() -> Bool {
+        cheatWorksSyncLock.lock()
+        defer { cheatWorksSyncLock.unlock() }
+        if cheatWorksSyncInProgress { return false }
+        cheatWorksSyncInProgress = true
+        return true
+    }
+
+    private func endCheatWorksSync() {
+        cheatWorksSyncLock.lock()
+        cheatWorksSyncInProgress = false
+        cheatWorksSyncLock.unlock()
     }
 
     /// The feedback files to sync, in order. Snapshotted once so a `Retry-After` pause can resume by
@@ -378,6 +402,7 @@ final class CheatFeedbackService: @unchecked Sendable {
         guard let file = loadFile(at: fileURL) else { return .next }
 
         for entry in file.entries {
+            guard CheatWorksConfig.isEnabled else { return .stop }
             guard let status = entry.status, entry.cheatWorksSynced != true,
                   let emulatorCode = CheatWorksConfig.emulatorCode(for: entry.coreIdentifier)
             else { continue }
@@ -441,7 +466,8 @@ final class CheatFeedbackService: @unchecked Sendable {
     private func submitToCheatWorks(status: CheatFeedbackStatus, code: String, rawCode: String?, md5: String,
                                     systemIdentifier: String, coreIdentifier: String, coreVersion: String,
                                     gameName: String?, provider: String?) {
-        guard CheatWorksConfig.isClientTokenConfigured,
+        guard CheatWorksConfig.isEnabled,
+              CheatWorksConfig.isClientTokenConfigured,
               let emulatorCode = CheatWorksConfig.emulatorCode(for: coreIdentifier),
               let url = fileURL(md5: md5, systemIdentifier: systemIdentifier)
         else { return }
@@ -458,6 +484,7 @@ final class CheatFeedbackService: @unchecked Sendable {
             provider: provider)
 
         Task {
+            guard CheatWorksConfig.isEnabled else { return }
             do {
                 _ = try await CheatWorksConfig.service.submitFeedback(feedback)
                 self.markSynced(code: code, coreIdentifier: coreIdentifier, coreVersion: coreVersion, status: status, at: url)

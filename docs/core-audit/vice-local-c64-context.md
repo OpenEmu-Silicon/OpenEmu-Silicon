@@ -17,7 +17,7 @@
 14. `OpenEmu/OpenEmu.xcodeproj/project.pbxproj` (grep around lines 351, 361, 1479-1483, 2656, 3323-3339, 4202) - C64 system plugin is wired into app build, but only as a system plugin.
 15. `Scripts/check-core-feed-urls.sh` (lines 1-89) - any future native core plist with `OEGameCoreClass` must include a valid local `SUFeedURL`.
 16. `Scripts/package-core.sh` (lines 1-125), `Scripts/install-core.sh` (lines 1-140), `Scripts/update_core_appcast.py` (lines 1-180) - native-core release/install mechanics and appcast version/signing checks.
-17. `README.md` (lines 50-59) and root `appcast.xml` (grep lines 141-143, 176, 310-312) - public release notes from before v1.3.1 describe C64 working via VICE-libretro; that path has since been removed.
+17. `README.md` (lines 50-59) and root `appcast.xml` (grep lines 141-143, 176, 310-312) - public release notes from before v1.4.0 describe C64 working via VICE-libretro; that path has since been removed.
 
 ## Key Code
 
@@ -75,7 +75,7 @@ typedef enum
 
 ### Current support path: none
 
-RetroArch core support was removed in v1.3.1. Until a native VICE core lands (#546),
+RetroArch core support was removed in v1.4.0. Until a native VICE core lands (#546),
 Commodore 64 ships as a system plugin with no core, the same as PlayStation 2 and
 Sega VMU: the system appears in the library and its controls are configurable, but
 no core is available to run a game.
@@ -106,7 +106,7 @@ OpenEmu separates:
 1. **System plugin** (`OpenEmu/SystemPlugins/Commodore 64`) - makes C64 visible in the UI and defines controls/file types.
 2. **Native core plugin** (missing for C64) - would subclass `OEGameCore`, implement `OEC64SystemResponderClient`, ship as `<Core>.oecoreplugin`, and carry `Info.plist` metadata including `OEGameCoreClass`, `OESystemIdentifiers`, and `SUFeedURL`.
 3. **Updater/install metadata** (missing for C64 native) - native cores need `oecores.xml` registry entry plus matching `Appcasts/<core>.xml` and per-core `SUFeedURL`.
-4. **Core** (missing entirely) - RetroArch core support was removed in v1.3.1, so there is no interim path. A native port is the only route (#546).
+4. **Core** (missing entirely) - RetroArch core support was removed in v1.4.0, so there is no interim path. A native port is the only route (#546).
 
 Do not reintroduce in-tree libretro binaries or a per-core bridge directory. A native VICE core should be a real source tree like every other core this fork ships.
 
