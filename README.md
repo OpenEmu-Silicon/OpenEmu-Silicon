@@ -16,7 +16,7 @@
 
 <p align="center">
   <img alt="Apple Silicon native" src="https://img.shields.io/badge/Apple%20Silicon-native-000000?style=for-the-badge&logo=apple&logoColor=white">
-  <img alt="macOS 11 and later" src="https://img.shields.io/badge/macOS-11%2B-0A84FF?style=for-the-badge&logo=apple&logoColor=white">
+  <img alt="macOS 12 and later" src="https://img.shields.io/badge/macOS-12%2B-0A84FF?style=for-the-badge&logo=apple&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause%20%2B%20core%20licenses-blue?style=for-the-badge"></a>
 </p>
 
@@ -34,7 +34,7 @@
 
 OpenEmu-Silicon is a community-maintained fork of [OpenEmu](https://github.com/OpenEmu/OpenEmu) for M-series Macs. You get the same library-first experience Mac users loved: drop in your games, get cover art, pick a system, and play. It now runs natively on Apple Silicon, with new cores, fixes, and features added on top.
 
-It runs on macOS 11.0 (Big Sur) and later, and has been tested on macOS Sequoia and macOS 26 (Tahoe). The installer is signed and notarized, so there is no Gatekeeper workaround.
+It runs on macOS 12.0 (Monterey) and later, and has been tested on macOS Sequoia and macOS 26 (Tahoe). The installer is signed and notarized, so there is no Gatekeeper workaround.
 
 ## Features
 
@@ -59,7 +59,7 @@ brew tap OpenEmu-Silicon/OpenEmu-Silicon https://github.com/OpenEmu-Silicon/Open
 brew install --cask openemu-silicon
 ```
 
-Requires an Apple Silicon Mac (M1, M2, M3, M4) running macOS 11.0 or later. Coming from the original OpenEmu? Read [Migrating from OpenEmu](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/wiki/Migrating-from-OpenEmu) first.
+Requires an Apple Silicon Mac (M1, M2, M3, M4) running macOS 12.0 or later. Coming from the original OpenEmu? Read [Migrating from OpenEmu](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/wiki/Migrating-from-OpenEmu) first.
 
 ## Supported Systems
 

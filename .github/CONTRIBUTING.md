@@ -24,7 +24,7 @@ Not sure where to start? Join the [Discord](https://discord.gg/HvWfVkMUK) and sa
 
 ### Requirements
 
-- macOS 11.0 (Big Sur) or later, macOS 14 (Sonoma) or later recommended
+- macOS 12.0 (Monterey) or later, macOS 14 (Sonoma) or later recommended
 - Xcode with the latest stable toolchain, including the Metal toolchain
 - Apple Silicon Mac (M1 or later), this fork does not target Intel
 - No additional Homebrew dependencies required for the main app
