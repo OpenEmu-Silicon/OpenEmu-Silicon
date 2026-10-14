@@ -19,7 +19,7 @@ OpenEmu-Silicon is **not missing many classic OpenEmu cores**. Most of the old O
 The important gaps are narrower:
 
 1. **Arcade / MAME** — user-provided Apple Silicon port exists and has been tested, but it still needs first-class repo/release integration.
-2. **Commodore 64** — UI/system plugin exists, but no core ships at all since RetroArch core support was removed in v1.3.1; `OpenEmu/VICE-Core` is the best native lead to investigate (#546).
+2. **Commodore 64** — UI/system plugin exists, but no core ships at all since RetroArch core support was removed in v1.4.0; `OpenEmu/VICE-Core` is the best native lead to investigate (#546).
 3. **PlayStation 2 / VMU** — system plugins exist, but these should not be treated as near-term native-core work.
 4. **Metadata drift** — a few appcast / plist / `oecores.xml` mismatches should be cleaned up or intentionally documented.
 

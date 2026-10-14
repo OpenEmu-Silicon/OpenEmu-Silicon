@@ -157,7 +157,7 @@ There is currently no native C64 release metadata:
 - no `Appcasts/vice.xml`;
 - no VICE entry in `oecores.xml`.
 
-There is no C64 core at all: RetroArch core support was removed in v1.3.1, and no native VICE source tree has been ported yet (#546).
+There is no C64 core at all: RetroArch core support was removed in v1.4.0, and no native VICE source tree has been ported yet (#546).
 
 ## Input and runtime risks
 
@@ -205,7 +205,7 @@ A native VICE core would need the same release plumbing as other shipped cores:
 7. `Scripts/install-core.sh` / `Scripts/package-core.sh` compatibility.
 8. Runtime validation with C64 cartridge, disk, tape, and PRG samples if possible.
 
-Do **not** revive the old in-tree `VICE-Bridge/` libretro binary pattern. Those bridge directories were testing-only and removed, as was the libretro bridge itself in v1.3.1.
+Do **not** revive the old in-tree `VICE-Bridge/` libretro binary pattern. Those bridge directories were testing-only and removed, as was the libretro bridge itself in v1.4.0.
 
 ## Recommendation
 
