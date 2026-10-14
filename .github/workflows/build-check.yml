@@ -8,7 +8,7 @@ on:
   # Docs-only and bookkeeping pushes are skipped. This filter is on push only,
   # so it never affects the required checks on pull requests.
   push:
-    branches: [main]
+    branches: [main, 'ci-test/**']
     paths-ignore:
       - '**.md'
       - 'docs/**'
