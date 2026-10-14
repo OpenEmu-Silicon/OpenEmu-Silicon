@@ -169,7 +169,7 @@ v[VERSION] — [ONE-LINE SUMMARY]
 [None / list with issue links]
 
 ## Installation
-Download the `.dmg` from the assets below. Requires macOS 11.0 or later on Apple Silicon.
+Download the `.dmg` from the assets below. Requires macOS 12.0 or later on Apple Silicon.
 
 Full details in the [Month Year Progress Report](LINK_PLACEHOLDER — fill in after publishing the Discussion).
 ```
