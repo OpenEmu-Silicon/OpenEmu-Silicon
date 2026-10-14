@@ -27,7 +27,7 @@ Fixes #
 The PR number below is filled in automatically — just paste the whole block. For Flycast use `-scheme "OpenEmu + Flycast"` with `clean build`; for Mednafen use `-scheme "OpenEmu + Mednafen" -configuration Release`.
 
 ```bash
-cd ~/Documents/Cursor/Open\ Emu
+cd <path to your OpenEmu-Silicon clone>
 gh pr checkout NUMBER --repo OpenEmu-Silicon/OpenEmu-Silicon
 ./Scripts/verify.sh
 ./Scripts/launch-debug.sh
