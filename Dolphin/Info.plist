@@ -30,6 +30,8 @@
 		<dict>
 			<key>OEGameCoreHasGlitches</key>
 			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 		</dict>
 		<key>openemu.system.wii</key>
 		<dict>

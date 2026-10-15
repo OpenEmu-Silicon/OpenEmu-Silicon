@@ -22,6 +22,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0DOLF0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0DOLF0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0DOLF0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0DOLF0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0DOLF0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0DOLF0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		3E0A56EE1FAF7EDC00D755B8 /* VideoConfig.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3E3D75E31C82B2DE00091C4D /* VideoConfig.cpp */; };
 		3E0BD1281F8E89D30037C92D /* Core.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3E3D71AA1C82B0F800091C4D /* Core.cpp */; };
 		3E1DDEC81D74AC1E00BB8009 /* OEWiiSystemController.m in Sources */ = {isa = PBXBuildFile; fileRef = 3E22178A1D74A83E00C55942 /* OEWiiSystemController.m */; };
@@ -1673,6 +1676,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		OE0DOLF0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0DOLF0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0DOLF0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0DOLF0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		0AB74F25F8044E96B632EF77 /* libvideosoftware-dol.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libvideosoftware-dol.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		125948FD17D5434DA13C8293 /* libUICommon-dol.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libUICommon-dol.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DB9EC0F64AC4815A7E27952 /* libvideocommon-dol.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "libvideocommon-dol.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -8377,6 +8384,10 @@
 				8355D4E21A653B6600E73302 /* DolphinGameCore.h */,
 				8355D4E31A653B6600E73302 /* DolphinGameCore.mm */,
 				3E3D76751C83477F00091C4D /* DolHost.mm */,
+				OE0DOLF0FILEREF000000001 /* rcheevos_build.c */,
+				OE0DOLF0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0DOLF0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0DOLF0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				8355D4951A6538FD00E73302 /* Supporting Files */,
 			);
 			name = "Dolphin-Core";
@@ -11274,6 +11285,9 @@
 				EE8DD2BA224A7A99005E1AF5 /* Platform.cpp in Sources */,
 				EE04F45822512FFC00105B1E /* OpenEmuController.mm in Sources */,
 				3E3D76761C83477F00091C4D /* DolHost.mm in Sources */,
+				OE0DOLF0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0DOLF0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0DOLF0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -14350,6 +14364,9 @@
 					$SRCROOT/dolphin/Externals/mbedtls/include,
 					$SRCROOT/dolphin/Externals/glslang,
 					$SRCROOT/dolphin/Externals/implot/implot,
+					$SRCROOT/../Vendor/rcheevos/include,
+					$SRCROOT/../Vendor/rcheevos/src,
+					$SRCROOT/../OpenEmuKit/Source,
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -14426,6 +14443,9 @@
 					$SRCROOT/dolphin/Externals/mbedtls/include,
 					$SRCROOT/dolphin/Externals/glslang,
 					$SRCROOT/dolphin/Externals/implot/implot,
+					$SRCROOT/../Vendor/rcheevos/include,
+					$SRCROOT/../Vendor/rcheevos/src,
+					$SRCROOT/../OpenEmuKit/Source,
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";

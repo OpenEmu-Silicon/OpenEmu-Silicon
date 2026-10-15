@@ -39,8 +39,10 @@
 #import "DolphinGameCore.h"
 #include "DolHost.h"
 #include "AudioCommon/SoundStream.h"
+#include "Core/Core.h"
 #include "Core/State.h"
 #include "Core/System.h"
+#include "Core/HW/Memmap.h"
 #include "OpenEmuAudioStream.h"
 #include "UICommon/UICommon.h"
 #include <stdatomic.h>
@@ -48,6 +50,14 @@
 #import <AppKit/AppKit.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
+
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+#include <rc_consoles.h>
+#include <rc_hash.h>
+
+#include "DiscIO/Blob.h"
+#include <memory>
 
 #define OpenEmu 1
 
@@ -58,6 +68,98 @@
 DolphinGameCore *_current = 0;
 
 // g_sound_stream was removed in Dolphin 26.03; access via Core::System::GetInstance().GetSoundStream()
+
+// rcheevos addresses GameCube RAM from 0; Dolphin maps the 24 MB main RAM at 0x80000000.
+// GetPointerForRange validates the range and returns nullptr outside mapped memory, and the
+// Running-state gate keeps reads from touching memory before boot or during teardown.
+static uint32_t dolphin_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                       uint32_t num_bytes, rc_client_t *client)
+{
+    auto &system = Core::System::GetInstance();
+    if (Core::GetState(system) != Core::State::Running)
+        return 0;
+
+    const u32 gcAddress = 0x80000000u + address;
+    const u8 *ptr = system.GetMemory().GetPointerForRange(gcAddress, num_bytes);
+    if (ptr == nullptr)
+        return 0;
+
+    memcpy(buffer, ptr, num_bytes);
+    return num_bytes;
+}
+
+#pragma mark - Disc hash file reader (RetroAchievements identification)
+
+// rcheevos identifies a GameCube game by reading the raw disc image (magic at 0x1C, then the
+// filesystem). Its default file reader only understands a plain .iso, so compressed formats
+// (.rvz/.gcz/.wia/.ciso) fail with "hash generation failed". Dolphin's DiscIO blob reader
+// decompresses any supported format on demand, so we route identification through it and
+// present the decompressed disc image — producing the same hash a plain .iso would.
+namespace {
+struct DolphinHashFile {
+    std::unique_ptr<DiscIO::BlobReader> blob;
+    uint64_t pos;
+    uint64_t size;
+};
+}
+
+static void *dolphin_hash_open(const char *path)
+{
+    std::unique_ptr<DiscIO::BlobReader> blob = DiscIO::CreateBlobReader(path);
+    if (!blob)
+        return nullptr;
+
+    DolphinHashFile *f = new DolphinHashFile{std::move(blob), 0, 0};
+    f->size = f->blob->GetDataSize();
+    return f;
+}
+
+static void dolphin_hash_seek(void *handle, int64_t offset, int origin)
+{
+    DolphinHashFile *f = static_cast<DolphinHashFile *>(handle);
+    if (!f)
+        return;
+
+    int64_t base = 0;
+    switch (origin) {
+        case SEEK_SET: base = 0; break;
+        case SEEK_CUR: base = (int64_t)f->pos; break;
+        case SEEK_END: base = (int64_t)f->size; break;
+        default: return;
+    }
+    int64_t newPos = base + offset;
+    f->pos = (newPos < 0) ? 0 : (uint64_t)newPos;
+}
+
+static int64_t dolphin_hash_tell(void *handle)
+{
+    DolphinHashFile *f = static_cast<DolphinHashFile *>(handle);
+    return f ? (int64_t)f->pos : -1;
+}
+
+static size_t dolphin_hash_read(void *handle, void *buffer, size_t requested)
+{
+    DolphinHashFile *f = static_cast<DolphinHashFile *>(handle);
+    if (!f || f->pos >= f->size)
+        return 0;
+
+    const uint64_t remain = f->size - f->pos;
+    if (requested > remain)
+        requested = (size_t)remain;
+    if (requested == 0)
+        return 0;
+
+    if (!f->blob->Read(f->pos, requested, (uint8_t *)buffer))
+        return 0;
+
+    f->pos += requested;
+    return requested;
+}
+
+static void dolphin_hash_close(void *handle)
+{
+    delete static_cast<DolphinHashFile *>(handle);
+}
 
 @implementation DolphinGameCore
 {
@@ -75,6 +177,8 @@ DolphinGameCore *_current = 0;
 
     id<MTLTexture> _dolMetalTexture;
     CAMetalLayer  *_dolMetalLayer;
+
+    OERetroAchievementsBridge *_raBridge;
 }
 
 - (instancetype)init
@@ -90,8 +194,32 @@ DolphinGameCore *_current = 0;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     delete dol_host;
     free(_soundBuffer);
+}
+
+# pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 # pragma mark - Execution
@@ -116,6 +244,27 @@ DolphinGameCore *_current = 0;
 
     dol_host->Init([[self supportDirectoryPath] fileSystemRepresentation], [path fileSystemRepresentation] );
 
+    // GameCube only for now; the RA bridge logs in and hashes off the ROM path here.
+    // markROMReady is deferred to -startEmulation, once Dolphin has booted and RAM is mapped.
+    if (!_isWii)
+    {
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                           memoryReader:dolphin_rc_read_memory
+                                                              consoleID:(uint32_t)RC_CONSOLE_GAMECUBE];
+        [_raBridge startWithROMPath:path];
+
+        // Let rcheevos hash compressed disc images (.rvz/.gcz/.wia/.ciso) by reading them
+        // through DiscIO, which presents the decompressed disc the GameCube hasher expects.
+        static const rc_hash_filereader_t dolphinHashFileReader = {
+            dolphin_hash_open,
+            dolphin_hash_seek,
+            dolphin_hash_tell,
+            dolphin_hash_read,
+            dolphin_hash_close,
+        };
+        [_raBridge setHashFileReader:&dolphinHashFileReader];
+    }
+
     usleep(5000);
     return YES;
 }
@@ -129,6 +278,9 @@ DolphinGameCore *_current = 0;
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     _isInitialized = false;
     
     dol_host->RequestStop();
@@ -147,7 +299,9 @@ DolphinGameCore *_current = 0;
             _isInitialized = true;
         
         _frameInterval = dol_host->GetFrameInterval();
-        
+
+        // Dolphin has booted and GameCube RAM is mapped; let rcheevos read it during -doFrame.
+        [_raBridge markROMReady];
     }
     [super startEmulation];
 
@@ -158,6 +312,7 @@ DolphinGameCore *_current = 0;
 - (void)resetEmulation
 {
      dol_host->Reset();
+     [_raBridge reset];
 }
 
 - (void)executeFrame
@@ -169,6 +324,8 @@ DolphinGameCore *_current = 0;
         }
     
       dol_host->UpdateFrame();
+
+      [_raBridge doFrame];
     }
 }
 
