@@ -4,6 +4,10 @@ OpenEmu has a built-in Cheat Code and Cheat Search manager. You can enter codes 
 
 OpenEmu also bundles a small database of verified cheats for some popular games. When you load one of those games, the built-in cheats appear automatically in the cheats menu — no typing required.
 
+OpenEmu can also look up cheats for many popular games from online **cheat code databases** and let you import them with a single click — no typing, no hunting for the right format. This is done through the **Browse Online Cheats** window (see below).
+
+Huge shoutout to @leocck for all their hard work on these features
+
 ---
 
 ## How to Add and Use Cheat Codes
@@ -57,6 +61,54 @@ If your N64 code is 16 characters per line (e.g. `031A5344 00004320`), it won't 
 
 ---
 
+## Browse Online Cheats
+
+Browse Online Cheats finds cheats for the game you're playing from built-in **cheat code databases** and lets you import them with one click. Because OpenEmu already knows your system and core, the codes it imports are always in the correct format.
+
+### Opening it
+
+1. Launch a game in OpenEmu.
+2. Move the mouse over the game window to reveal the HUD bar.
+3. Expand the **Cheats** context from the Options menu on the HUD.
+4. Click **Browse Online Cheats…**
+
+The item only appears for systems that have a cheat database available. The window opens alongside the game and lists every cheat found for your loaded ROM (matched by its MD5 hash). Along the top you'll see the **Game**, **MD5**, **System**, **Core**, and **Version** it matched against.
+
+### The cheat list
+
+| Column | What it does |
+|----------|-------------|
+| **Cheat Name** | What the cheat does. |
+| **Provider** | Which database the cheat came from. |
+| **Status** | Your personal "does it work" mark. Click to set **Working**, **Not Working**, **I Don't Know**, or leave it unset. |
+| **Code** | Click to view the raw code, there's a **Copy** button if you want to share or edit it. |
+| **Notes** | Click to add your own notes. The dialog also lets you optionally record whether the cheat worked. |
+| **Action** | **Import** adds the cheat to the game's Cheats menu. Already-imported cheats show **Remove** instead. If the same code is already in your list from another source, Import is disabled and shows "Code already used". |
+
+### Filtering
+
+Use the **Name** box and the **Status** filter (**All**, **Working**, **Not Working**, **Not set**) to narrow a long list.
+
+### After importing
+
+Imported cheats appear in the Cheats menu with a small database icon next to them, grouped below your own cheats. An imported cheat:
+
+- **Toggles on/off** like any other cheat — expand it and click **Enabled**.
+- **Can't be edited** (it comes from a database), but you can **Remove** it.
+- Has a **Set Status** submenu (**Working** / **Not Working** / **I don't know**) so you can record whether it worked for you right from the menu.
+
+When you remove an imported cheat, OpenEmu may ask "Did this cheat code work for you?" — your answer helps track which database cheats are reliable, and in the future could be used to consolidate feedback and give you ratings for existing codes.
+
+### Cheat Feedback
+
+Status marks and notes are saved on your machine, per game, so they're still there next time you come back to that game.
+
+They are also shared to CheatWorks.org, an open cheat feedback consolidation platform that helps figuring out if cheat codes work or not. The Browse Online Cheats window will show the global cheat ratings on the left side, if enough users already gave feeback for the codes on screen.
+
+You are still free to test all cheat codes - a cheat code that did not work for another user might still work for you.
+
+---
+
 ## Cheat Search
 
 Cheat Search lets you scan a game's memory to find cheat codes yourself — no external databases needed. It works by searching for values in RAM and narrowing the results as values change in-game.
@@ -96,12 +148,14 @@ Click **Reset** to clear all results and start a fresh scan.
 
 ## Supported systems
 
-Cheat Codes / Search is available for the following systems.
+Cheat Codes / Search are available for the following systems.
 
 | System | Core |
 |--------|------|
 | Arcade | MAME |
 | Atari 2600 | Stella |
+| Atari 5200 | Atari800 |
+| Atari 7800 | ProSystem |
 | Atari Lynx | Mednafen |
 | ColecoVision | CrabEmu |
 | Famicom Disk System | Nestopia |
@@ -111,22 +165,29 @@ Cheat Codes / Search is available for the following systems.
 | Game Gear | GenesisPlus |
 | Genesis / Mega Drive | GenesisPlus |
 | Master System | GenesisPlus |
+| MSX | blueMSX |
 | Neo Geo Pocket | Mednafen |
 | NES / Famicom | FCEU |
 | NES / Famicom | Nestopia |
 | Nintendo 64 | Mupen64Plus |
 | Nintendo DS | DeSmuME |
+| Odyssey² | O2EM |
 | PC Engine / TurboGrafx-16 | Mednafen |
 | PC Engine CD / TurboGrafx-CD | Mednafen |
 | PC-FX | Mednafen |
 | PlayStation | Mednafen |
-| Saturn | Mednafen |
+| Playstation Portable | PPSSPP |
+| Pokemon Mini | PokeMini |
+| Sega 32X | picodrive |
 | Sega CD | GenesisPlus |
+| Sega Saturn | Mednafen |
 | SG-1000 | GenesisPlus |
 | SNES / Super Famicom | BSNES |
 | SNES / Super Famicom | SNES9x |
+| Vectrex | VecXGL |
 | Virtual Boy | Mednafen |
-| WonderSwan | Mednafen |
+| Watara Supervision | Potator-Core |
+| WonderSwan / WonderSwan Color | Mednafen |
 
 ---
 
@@ -137,35 +198,25 @@ The following systems do not have a cheat menu in OpenEmu-Silicon (yet). The **C
 | System |
 |--------|
 | 3DO |
-| Atari 5200 |
-| Atari 7800 |
 | Atari 8-bit |
 | Atari Jaguar |
 | Dreamcast |
 | GameCube |
 | Intellivision |
-| Odyssey² |
-| MSX |
-| PlayStation Portable |
-| Pokemon Mini |
-| Sega 32X |
 | Sega Dreamcast |
-| Vectrex |
-| Watara Supervision |
 | Wii |
 
 ---
 
-## Where to Find Cheat Codes
+## Where to Find More Cheat Codes
 
-Different systems have different reliable sources. Here's what works well for OpenEmu:
+Besides the **Browse Online Cheats** menu, you have still alternatives to find cheat codes. Different systems have different reliable sources. Here's what works well for OpenEmu:
 
 | System | Recommended source |
 |--------|--------------------|
 | **Nintendo 64** | [GameGenie.com — N64 GameShark codes](https://gamegenie.com/cheats/gameshark/n64/index.html). Every code on the site is in the 12-character format that works in OpenEmu. |
 | **NES, SNES, Genesis, Game Boy, GBA, etc.** | [GameFAQs](https://www.gamefaqs.gamespot.com) — search your game title, then look for the Cheats section. Most older-system codes from GameFAQs work as-is. |
 | **All systems (debug modes, dev cheats)** | [TCRF (The Cutting Room Floor)](https://tcrf.net) — debug menus, developer cheats, and unused content |
-| **Built-in cheats** | OpenEmu ships with a small cheat database for many popular games. If a game has built-in cheats, they appear in the Cheats menu automatically. These are always in the correct format. We plan to increase this database as part of [Issue #663](https://github.com/nickybmon/OpenEmu-Silicon/issues/663). |
 
 When using any external source, make sure you're using codes for the correct **region** of your ROM (USA, EUR, JPN) and the **correct format** for your system. A code that works on the USA version of a game won't necessarily work on the European version.
 
@@ -183,28 +234,9 @@ When using any external source, make sure you're using codes for the correct **r
 
 ---
 
-## Arcade (MAME) Built-In Cheats
-
-On top of OpenEmu's Cheat Code and Cheat Search support, MAME comes with a built-in cheat engine and a bundled cheat database covering thousands of arcade games.
-
-### How to see built-in cheats
-
-1. Launch an arcade game in OpenEmu.
-2. Open the Cheats menu (Configure button > Cheats).
-3. If your game has entries in the MAME cheat database, they appear as toggleable options — just like OpenEmu's built-in cheats for other systems.
-4. Toggle any cheat on or off. Effects are immediate.
-
-### Notes
-
-- The bundled cheat database is included with the MAME core and updated alongside it.
-- You do not need to download or configure anything extra — cheats are available out of the box for supported games.
-- Not every arcade game has cheat entries. Coverage is limited to the embedded version of the MAME cheat database (0.255). You can still use OpenEmu's Add Cheat and/or Cheat Search if your game does not come with a bundled cheat code.
-
----
-
 ## Reporting Problems
 
-If a cheat that should work doesn't, or you think a built-in cheat is broken, please [open an issue](https://github.com/nickybmon/OpenEmu-Silicon/issues/new/choose) and include:
+If a cheat that should work doesn't, or you think a built-in cheat feature is broken, please [open an issue](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/new/choose) and include:
 
 - The system and game name (with region)
 - The exact code you tried
