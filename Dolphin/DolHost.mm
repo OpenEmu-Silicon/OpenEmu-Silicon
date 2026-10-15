@@ -331,7 +331,21 @@ bool DolHost::SaveState(std::string saveStateFile)
 
 bool DolHost::LoadState(std::string saveStateFile)
 {
-    State::LoadAs(Core::System::GetInstance(), saveStateFile);
+    auto &system = Core::System::GetInstance();
+
+    // State::LoadAs applies the save via Core::RunOnCPUThread, which only hands DoState to the CPU
+    // thread once the core is fully Running (s_state == Running). OpenEmu can auto-load while the
+    // boot is still in the Starting phase — _isInitialized is set as soon as LoadFileAtPath returns,
+    // before the CPU thread is operational — in which case RunOnCPUThread runs DoState inline on
+    // this thread and trips DVDThread::WaitUntilIdle's IsCPUThread() assertion. Wait (capped) for
+    // the CPU thread to come up, and skip the load rather than crash if it never does.
+    for (int i = 0; i < 3000 && !Core::IsRunning(system); ++i)
+        usleep(1000);
+
+    if (!Core::IsRunning(system))
+        return false;
+
+    State::LoadAs(system, saveStateFile);
     
     if (DiscIO::IsWii(_gameType))
     {

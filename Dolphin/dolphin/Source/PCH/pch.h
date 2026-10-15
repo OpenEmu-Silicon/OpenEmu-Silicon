@@ -22,6 +22,11 @@
 
 #endif
 
+// This prefix header is C++-only (it pulls in <algorithm>, <vector>, etc.). The OpenEmu
+// RetroAchievements sources added to this target are C/Objective-C, so skip the body for
+// non-C++ translation units to keep their forced-prefix precompile from failing.
+#ifdef __cplusplus
+
 #include <algorithm>
 #include <array>
 #include <assert.h>
@@ -99,3 +104,5 @@
 
 #include "Common/Common.h"
 #include "Common/Thread.h"
+
+#endif // __cplusplus
