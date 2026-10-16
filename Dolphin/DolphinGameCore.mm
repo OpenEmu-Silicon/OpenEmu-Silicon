@@ -69,9 +69,10 @@ DolphinGameCore *_current = 0;
 
 // g_sound_stream was removed in Dolphin 26.03; access via Core::System::GetInstance().GetSoundStream()
 
-// rcheevos addresses GameCube RAM from 0; Dolphin maps the 24 MB main RAM at 0x80000000.
-// GetPointerForRange validates the range and returns nullptr outside mapped memory, and the
-// Running-state gate keeps reads from touching memory before boot or during teardown.
+// rcheevos addresses GameCube/Wii RAM from a flat space; Dolphin maps MEM1 at 0x80000000 and
+// (Wii only) MEM2 at 0x90000000. GetPointerForRange validates the range and returns nullptr
+// outside mapped memory (so a GameCube game never resolves a MEM2 address), and the Running-state
+// gate keeps reads from touching memory before boot or during teardown.
 static uint32_t dolphin_rc_read_memory(uint32_t address, uint8_t *buffer,
                                        uint32_t num_bytes, rc_client_t *client)
 {
@@ -79,8 +80,18 @@ static uint32_t dolphin_rc_read_memory(uint32_t address, uint8_t *buffer,
     if (Core::GetState(system) != Core::State::Running)
         return 0;
 
-    const u32 gcAddress = 0x80000000u + address;
-    const u8 *ptr = system.GetMemory().GetPointerForRange(gcAddress, num_bytes);
+    // Translate the rcheevos address to a real GC/Wii bus address (see consoleinfo.c):
+    //   MEM1 (GC + Wii): RA 0x00000000-0x017FFFFF -> 0x80000000
+    //   MEM2 (Wii only): RA 0x10000000-0x13FFFFFF -> 0x90000000
+    u32 realAddress;
+    if (address < 0x01800000u)
+        realAddress = 0x80000000u + address;
+    else if (address >= 0x10000000u && address < 0x14000000u)
+        realAddress = 0x90000000u + (address - 0x10000000u);
+    else
+        return 0;
+
+    const u8 *ptr = system.GetMemory().GetPointerForRange(realAddress, num_bytes);
     if (ptr == nullptr)
         return 0;
 
@@ -90,14 +101,16 @@ static uint32_t dolphin_rc_read_memory(uint32_t address, uint8_t *buffer,
 
 #pragma mark - Disc hash file reader (RetroAchievements identification)
 
-// rcheevos identifies a GameCube game by reading the raw disc image (magic at 0x1C, then the
-// filesystem). Its default file reader only understands a plain .iso, so compressed formats
-// (.rvz/.gcz/.wia/.ciso) fail with "hash generation failed". Dolphin's DiscIO blob reader
-// decompresses any supported format on demand, so we route identification through it and
-// present the decompressed disc image — producing the same hash a plain .iso would.
+// rcheevos identifies a GameCube/Wii game by reading the raw disc image (or, for WiiWare, the raw
+// .wad). Its default file reader only understands a plain .iso, so compressed disc formats
+// (.rvz/.gcz/.wia/.ciso/.wbfs) fail with "hash generation failed". Dolphin's DiscIO blob reader
+// decompresses any supported disc format on demand, so we route identification through it and
+// present the decompressed disc image — producing the same hash a plain .iso would. A .wad is not
+// a disc blob (CreateBlobReader returns null), so fall back to raw file I/O for those.
 namespace {
 struct DolphinHashFile {
-    std::unique_ptr<DiscIO::BlobReader> blob;
+    std::unique_ptr<DiscIO::BlobReader> blob;  // disc images; null in raw mode
+    FILE *fp;                                  // raw mode (e.g. WiiWare .wad)
     uint64_t pos;
     uint64_t size;
 };
@@ -105,12 +118,25 @@ struct DolphinHashFile {
 
 static void *dolphin_hash_open(const char *path)
 {
-    std::unique_ptr<DiscIO::BlobReader> blob = DiscIO::CreateBlobReader(path);
-    if (!blob)
-        return nullptr;
+    DolphinHashFile *f = new DolphinHashFile{nullptr, nullptr, 0, 0};
 
-    DolphinHashFile *f = new DolphinHashFile{std::move(blob), 0, 0};
-    f->size = f->blob->GetDataSize();
+    std::unique_ptr<DiscIO::BlobReader> blob = DiscIO::CreateBlobReader(path);
+    if (blob) {
+        f->size = blob->GetDataSize();
+        f->blob = std::move(blob);
+        return f;
+    }
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        delete f;
+        return nullptr;
+    }
+    fseeko(fp, 0, SEEK_END);
+    const off_t end = ftello(fp);
+    fseeko(fp, 0, SEEK_SET);
+    f->fp = fp;
+    f->size = (end > 0) ? (uint64_t)end : 0;
     return f;
 }
 
@@ -149,8 +175,14 @@ static size_t dolphin_hash_read(void *handle, void *buffer, size_t requested)
     if (requested == 0)
         return 0;
 
-    if (!f->blob->Read(f->pos, requested, (uint8_t *)buffer))
-        return 0;
+    if (f->blob) {
+        if (!f->blob->Read(f->pos, requested, (uint8_t *)buffer))
+            return 0;
+    } else {
+        if (fseeko(f->fp, (off_t)f->pos, SEEK_SET) != 0)
+            return 0;
+        requested = fread(buffer, 1, requested, f->fp);
+    }
 
     f->pos += requested;
     return requested;
@@ -158,7 +190,10 @@ static size_t dolphin_hash_read(void *handle, void *buffer, size_t requested)
 
 static void dolphin_hash_close(void *handle)
 {
-    delete static_cast<DolphinHashFile *>(handle);
+    DolphinHashFile *f = static_cast<DolphinHashFile *>(handle);
+    if (f && f->fp)
+        fclose(f->fp);
+    delete f;
 }
 
 @implementation DolphinGameCore
@@ -244,26 +279,24 @@ static void dolphin_hash_close(void *handle)
 
     dol_host->Init([[self supportDirectoryPath] fileSystemRepresentation], [path fileSystemRepresentation] );
 
-    // GameCube only for now; the RA bridge logs in and hashes off the ROM path here.
-    // markROMReady is deferred to -startEmulation, once Dolphin has booted and RAM is mapped.
-    if (!_isWii)
-    {
-        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
-                                                           memoryReader:dolphin_rc_read_memory
-                                                              consoleID:(uint32_t)RC_CONSOLE_GAMECUBE];
-        [_raBridge startWithROMPath:path];
+    // The RA bridge logs in and hashes off the ROM path here; markROMReady is deferred to
+    // -startEmulation, once Dolphin has booted and RAM is mapped.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:dolphin_rc_read_memory
+                                                          consoleID:(uint32_t)(_isWii ? RC_CONSOLE_WII : RC_CONSOLE_GAMECUBE)];
+    [_raBridge startWithROMPath:path];
 
-        // Let rcheevos hash compressed disc images (.rvz/.gcz/.wia/.ciso) by reading them
-        // through DiscIO, which presents the decompressed disc the GameCube hasher expects.
-        static const rc_hash_filereader_t dolphinHashFileReader = {
-            dolphin_hash_open,
-            dolphin_hash_seek,
-            dolphin_hash_tell,
-            dolphin_hash_read,
-            dolphin_hash_close,
-        };
-        [_raBridge setHashFileReader:&dolphinHashFileReader];
-    }
+    // Let rcheevos hash compressed disc images (.rvz/.gcz/.wia/.ciso/.wbfs) by reading them
+    // through DiscIO, which presents the decompressed disc the hasher expects; WiiWare .wad
+    // files fall through to raw file I/O inside the reader.
+    static const rc_hash_filereader_t dolphinHashFileReader = {
+        dolphin_hash_open,
+        dolphin_hash_seek,
+        dolphin_hash_tell,
+        dolphin_hash_read,
+        dolphin_hash_close,
+    };
+    [_raBridge setHashFileReader:&dolphinHashFileReader];
 
     usleep(5000);
     return YES;
