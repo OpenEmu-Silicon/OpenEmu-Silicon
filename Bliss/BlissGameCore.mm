@@ -38,6 +38,12 @@
 #import "drivers/intv/HandController.h"
 #import "drivers/intv/ECSKeyboard.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 #define INTV_IMAGE_WIDTH	(160)
 #define INTV_IMAGE_HEIGHT	(192)
 
@@ -112,6 +118,7 @@ public:
 	Rip				*currentRip;
 
 	NSMutableData	*_stateData;
+	OERetroAchievementsBridge *_raBridge;
 }
 - (int)blissButtonForIntellivisionButton:(OEIntellivisionButton)button player:(NSUInteger)player;
 @end
@@ -124,6 +131,35 @@ static BlissController _controller[2] = {0};
 static uint64_t _keyboard = 0;
 static uint8_t _keyboardDownCount = 0;
 static uint8_t _keyboardShiftCount = 0;
+
+static Emulator *s_blissEmu = nullptr;
+
+// rcheevos Intellivision map (consoleinfo rc_memory_regions_intellivision): RA address =
+// intvWordAddr*4 + 0x80, with each 16-bit word exposed as a 32-bit little-endian value (the
+// FreeIntv layout the achievement sets are authored against). The first 0x80 bytes are
+// video-RAM padding, and the high 16 bits of every word are always 0.
+static uint32_t bliss_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                     uint32_t num_bytes, rc_client_t *client)
+{
+    if (s_blissEmu == nullptr)
+        return 0;
+
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        const uint32_t a = address + i;
+        uint8_t value = 0;
+        if (a >= 0x80) {
+            const uint32_t off  = a - 0x80;
+            const uint32_t word = off >> 2;   // Intellivision 16-bit address
+            const uint32_t sub  = off & 3;    // byte within the 32-bit LE value
+            if (word <= 0xFFFF && sub < 2) {
+                const UINT16 w = s_blissEmu->PeekMemory((UINT16)word);
+                value = (sub == 0) ? (uint8_t)(w & 0xFF) : (uint8_t)((w >> 8) & 0xFF);
+            }
+        }
+        buffer[i] = value;
+    }
+    return num_bytes;
+}
 
 #pragma mark - OpenEmu Core
 
@@ -153,6 +189,10 @@ static uint8_t _keyboardShiftCount = 0;
 {
     DLog(@"releasing/deallocating Bliss memory");
 
+	[_raBridge shutdown];
+	_raBridge = nil;
+	s_blissEmu = nullptr;
+
 	delete _videoBus;
 	_videoBus = NULL;
 	delete _audioMixer;
@@ -173,6 +213,8 @@ static uint8_t _keyboardShiftCount = 0;
 
 	// flush the audio
 	currentEmu->FlushAudio();
+
+	[_raBridge doFrame];
 }
 
 #pragma mark - Bliss Core Helpers
@@ -429,16 +471,29 @@ static uint8_t _keyboardShiftCount = 0;
 	// finally, run everything
 	currentEmu->Reset();
 
+    // RAM is initialized after Reset; start RA (login + whole-file hash) and mark ready.
+    s_blissEmu = currentEmu;
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:bliss_rc_read_memory
+                                                          consoleID:RC_CONSOLE_INTELLIVISION];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
+
     return YES;
 }
 
 - (void)resetEmulation
 {
 	currentEmu->Reset();
+	[_raBridge reset];
 }
 
 - (void)stopEmulation
 {
+	[_raBridge shutdown];
+	_raBridge = nil;
+	s_blissEmu = nullptr;
+
 	if(currentEmu)
 	{
 		currentEmu->SetRip(NULL);
@@ -454,6 +509,27 @@ static uint8_t _keyboardShiftCount = 0;
 	}
 
     [super stopEmulation];
+}
+
+#pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 - (OEIntSize)bufferSize
