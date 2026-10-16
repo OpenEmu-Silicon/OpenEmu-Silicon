@@ -1466,7 +1466,12 @@ final class OEGameDocument: NSDocument {
             return
         }
         
+        // Switching cores tears down the session and restarts the game (progress is lost, as the
+        // alert warns), so the hardcore anti-cheat pause protection doesn't apply here. Bypass it
+        // so the confirmation pause isn't blocked, which would otherwise abort the switch.
+        retroAchievementsHardcorePausePreflightSatisfied = true
         isEmulationPaused = true
+        retroAchievementsHardcorePausePreflightSatisfied = false
         guard isEmulationPaused else { return }
         
         let alert = OEAlert()
