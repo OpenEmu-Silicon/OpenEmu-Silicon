@@ -44,8 +44,15 @@
 #include "ui/gui.h"
 #include "rend/gles/gles.h"
 #include "hw/mem/addrspace.h"
+#include "hw/sh4/sh4_mem.h"
 #include "oslib/oslib.h"
 #include "wsi/osx.h"
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #include <OpenGL/gl3.h>
 #include <mach/mach_time.h>
@@ -133,10 +140,29 @@ static OpenEmuAudioBackend openEmuAudioBackend;
     BOOL _isInitialized;
     BOOL _emuInitialized;
     double _frameInterval;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
 __weak FlycastGameCore *_current;
+
+// Mirrors Flycast's own RA reader (Achievements::clientReadMemory): rcheevos addresses the
+// 16 MB Dreamcast system RAM from 0; it lives at SH4 0x0C000000. Read through the SH4 bus.
+static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                       uint32_t num_bytes, rc_client_t *client)
+{
+    if (address + num_bytes > RAM_SIZE)
+        return 0;
+    address += 0x0C000000;
+    switch (num_bytes)
+    {
+        case 1: *buffer = ReadMem8_nommu(address); break;
+        case 2: *(u16 *)buffer = ReadMem16_nommu(address); break;
+        case 4: *(u32 *)buffer = ReadMem32_nommu(address); break;
+        default: return 0;
+    }
+    return num_bytes;
+}
 
 @implementation FlycastGameCore
 
@@ -156,12 +182,24 @@ __weak FlycastGameCore *_current;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     _current = nil;
 }
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     _romPath = [path copy];
+
+    // Start the RA bridge now (login + disc hashing run off the ROM path, independent of
+    // emulation state). markROMReady is deferred to -executeFrame, once the game has loaded
+    // and Dreamcast RAM is mapped.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:flycast_rc_read_memory
+                                                          consoleID:(uint32_t)RC_CONSOLE_DREAMCAST];
+    [_raBridge startWithROMPath:path];
+
     return YES;
 }
 
@@ -216,6 +254,9 @@ __weak FlycastGameCore *_current;
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     if (_isInitialized) {
         emu.stop();
         emu.unloadGame();
@@ -236,6 +277,29 @@ __weak FlycastGameCore *_current;
     if (_isInitialized) {
         emu.requestReset();
     }
+    [_raBridge reset];
+}
+
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Frame Execution
@@ -258,6 +322,9 @@ __weak FlycastGameCore *_current;
             emu.start();
             gui_setState(GuiState::Closed);
             _isInitialized = YES;
+
+            // Dreamcast RAM is mapped now; let rcheevos read it during -doFrame.
+            [_raBridge markROMReady];
         } catch (const std::exception &e) {
             NSLog(@"[Flycast] Error loading game: %s", e.what());
             return;
@@ -268,6 +335,8 @@ __weak FlycastGameCore *_current;
     }
 
     emu.render();
+
+    [_raBridge doFrame];
 }
 
 #pragma mark - Video

@@ -77,6 +77,8 @@
 					<integer>131072</integer>
 				</dict>
 			</array>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 		</dict>
 	</dict>
 	<key>OEGameCorePlayerCount</key>
