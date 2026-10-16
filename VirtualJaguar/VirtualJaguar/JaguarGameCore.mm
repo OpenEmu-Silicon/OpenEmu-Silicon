@@ -13,16 +13,35 @@
 #include "joystick.h"
 #include "dac.h"
 
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+#include <rc_consoles.h>
+
 @interface JaguarGameCore () <OEJaguarSystemResponderClient>
 {
     int videoWidth, videoHeight;
     double sampleRate;
     uint32_t *buffer;
+
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 @implementation JaguarGameCore
 
 static JaguarGameCore *current;
+
+// rcheevos addresses Jaguar RAM from 0 across the 2 MB main RAM; jaguarMainRAM points at that
+// block (jagMemSpace + 0x000000). The bridge gates reads for ROM-ready and shutdown.
+static uint32_t jaguar_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                      uint32_t num_bytes, rc_client_t *client)
+{
+    if (address >= 0x200000)
+        return 0;
+    if (address + num_bytes > 0x200000)
+        num_bytes = 0x200000 - address;
+    memcpy(buffer, jaguarMainRAM + address, num_bytes);
+    return num_bytes;
+}
 
 - (id)init
 {
@@ -66,6 +85,14 @@ static JaguarGameCore *current;
 	SET32(jaguarMainRAM, 0, 0x00200000);                      // set up stack
 	JaguarLoadFile((char *)[path UTF8String]);                // load rom
 	JaguarReset();
+
+    // RAM is allocated by JaguarInit and the ROM is loaded; start RA (login + whole-file hash)
+    // and mark ready so rcheevos can read memory during -doFrame.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:jaguar_rc_read_memory
+                                                          consoleID:(uint32_t)RC_CONSOLE_ATARI_JAGUAR];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
     
     return YES;
     
@@ -77,6 +104,8 @@ static JaguarGameCore *current;
     
     SDLSoundCallback(NULL, sampleBuffer, 2048*2);
     [[current ringBufferAtIndex:0] write:sampleBuffer maxLength:2048*2];
+
+    [_raBridge doFrame];
 }
 
 - (void)initVideo
@@ -98,6 +127,9 @@ static JaguarGameCore *current;
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     JaguarDone();
 
     [super stopEmulation];
@@ -106,12 +138,37 @@ static JaguarGameCore *current;
 - (void)resetEmulation
 {
     JaguarReset();
+    [_raBridge reset];
 }
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(buffer);
     free(sampleBuffer);
+}
+
+#pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 - (OEIntRect)screenRect
