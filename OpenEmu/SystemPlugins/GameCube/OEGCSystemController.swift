@@ -28,8 +28,8 @@ import OpenEmuSystem
 class OEGCSystemController: OESystemController {
     // Read header to detect GameCube ISO, GCM & CISO.
     override func canHandle(_ file: OEFile) -> OEFileSupport {
-        // Handle gcm file and return early
-        if ["gcm", "gcz", "rvz"].contains(file.fileExtension) {
+        // gcm/gcz are GameCube-only container formats.
+        if ["gcm", "gcz"].contains(file.fileExtension) {
             return .yes
         }
 
@@ -38,6 +38,12 @@ class OEGCSystemController: OESystemController {
         // Handle ciso file and set the offset for the Magicword in compressed iso.
         if file.fileExtension == "ciso" {
             dataRange.location = 0x801C
+        }
+        // RVZ/WIA keep the disc's first 0x80 bytes uncompressed in WIAHeader2 (file 0x58), so the
+        // GameCube magic sits at disc offset 0x1C -> file 0x74. Reading it tells a GameCube .rvz
+        // apart from a Wii .rvz, which the old blanket extension match could not.
+        else if file.fileExtension == "rvz" {
+            dataRange.location = 0x74
         }
 
         let dataBuffer = file.readData(in: dataRange)

@@ -33,8 +33,8 @@
 // Read header to detect Wii ISO, WBFS & CISO
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
-        // Handle wbfs file and return early
-        if([file.fileExtension isEqualToString:@"wbfs"] || [file.fileExtension isEqualToString:@"wad"] || [file.fileExtension isEqualToString:@"rvz"])
+        // wbfs/wad are Wii-only container formats.
+        if([file.fileExtension isEqualToString:@"wbfs"] || [file.fileExtension isEqualToString:@"wad"])
             return OEFileSupportYes;
 
     NSRange dataRange = NSMakeRange(0x018, 4);
@@ -42,6 +42,11 @@
     // Handle ciso file and set the offset for the Magicword in compressed iso.
     if ([file.fileExtension isEqualToString:@"ciso"])
         dataRange.location = 0x8018;
+    // RVZ/WIA keep the disc's first 0x80 bytes uncompressed in WIAHeader2 (file 0x58), so the
+    // Wii magic sits at disc offset 0x18 -> file 0x70. Reading it tells a Wii .rvz apart from a
+    // GameCube .rvz, which the old blanket extension match could not.
+    else if ([file.fileExtension isEqualToString:@"rvz"])
+        dataRange.location = 0x70;
 
     // Wii Magicword 0x5D1C9EA3
     NSData *dataBuffer = [file readDataInRange:dataRange];

@@ -272,7 +272,9 @@ void DolHost::RequestStop()
 
 void DolHost::Reset()
 {
-	Core::System::GetInstance().GetProcessorInterface().PowerButton_Tap();
+    // ResetButton_Tap is the actual reset line. PowerButton_Tap only fires an IOS power-button
+    // notify, which GameCube (no IOS) ignores — so the reset button did nothing on GC.
+	Core::System::GetInstance().GetProcessorInterface().ResetButton_Tap();
 }
 
 void DolHost::UpdateFrame()
