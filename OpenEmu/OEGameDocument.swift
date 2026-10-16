@@ -822,6 +822,10 @@ final class OEGameDocument: NSDocument {
                     return
                 }
                 
+                // The window title embeds the core name (see displayName); corePlugin just
+                // changed, so refresh the title AppKit cached from the previous core.
+                self.windowControllers.forEach { $0.synchronizeWindowTitleWithDocumentName() }
+                
                 completionHandler()
             }
         }
