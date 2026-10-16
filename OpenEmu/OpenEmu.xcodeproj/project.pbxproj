@@ -258,6 +258,8 @@
 		5AFD06BD2058893B00DFE765 /* GameScannerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFD06BC2058893B00DFE765 /* GameScannerViewController.swift */; };
 		652650A1DBD8666E615946FC /* Supervision.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 837964E11A6149C000A8DE5C /* Supervision.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		6DAB96D7C11047B4AA72206A /* Controller-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = 68416A57049F48B997026285 /* Controller-Mappings.plist */; };
+		7D53E617F8A0CD43FF346D6C /* OENGPSystemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B1068D60937C6664D82F920 /* OENGPSystemController.swift */; };
+		8092D6A0AAA7B94A4AAA5AF5 /* OpenEmuSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A9D4EDBFE2CB2A39034557 /* OpenEmuSmokeUITests.swift */; };
 		8227756B1489471A00B19E27 /* OEGGSystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = 8227755C1489471A00B19E27 /* OEGGSystemResponder.m */; };
 		82C2909114840024007C0214 /* OENGPSystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = 820EB7571483F9D3008EC398 /* OENGPSystemResponder.m */; };
 		7D53E617F8A0CD43FF346D6C /* OENGPSystemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B1068D60937C6664D82F920 /* OENGPSystemController.swift */; };
@@ -591,6 +593,14 @@
 		94DEA000171896AE00073397 /* NDS.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 94D7E8C915073BA000FBDD85 /* NDS.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		94E6C304166DB15900082F27 /* Controller-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = 94E6C303166DB15900082F27 /* Controller-Mappings.plist */; };
 		9ACAEF142DD44E2AACFFB26F /* OEWiiSystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C5E668B27CE43FF88AE57AF /* OEWiiSystemResponder.m */; };
+		A762CC388165B471235296CB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 38F89E810430637386DA95E8 /* Cocoa.framework */; };
+		AA0000011000000100000002 /* CheatDatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000001 /* CheatDatabaseService.swift */; };
+		AA0000011000000100000004 /* LibretroCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000003 /* LibretroCheatProvider.swift */; };
+		AA0000011000000100000006 /* OpenEmuCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000005 /* OpenEmuCheatProvider.swift */; };
+		AA0000011000000100000008 /* CheatCodeValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000007 /* CheatCodeValidator.swift */; };
+		AA0000011000000100000012 /* CheatFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000011 /* CheatFeedbackService.swift */; };
+		AA0000011000000100000014 /* PugsyCheatFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000013 /* PugsyCheatFile.swift */; };
+		AA0000011000000100000016 /* PugsyCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000015 /* PugsyCheatProvider.swift */; };
 		B0AE59BFF66F969F8E586EBA /* Jaguar.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 943C80121708A62E00D8D93E /* Jaguar.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		C0D2C87DC8E70B924B0364B8 /* ArtworkFolderMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5948C5F42D3088794677A8C0 /* ArtworkFolderMatcher.swift */; };
 		C6252DAC14E752E300350A13 /* Controller-Preferences.plist in Resources */ = {isa = PBXBuildFile; fileRef = C6252DAA14E752E300350A13 /* Controller-Preferences.plist */; };
@@ -676,6 +686,10 @@
 		CC00CW00STOR000000000002 /* CheatWorksStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00STOR000000000001 /* CheatWorksStorage.swift */; };
 		CC00CW00IDEN000000000002 /* CheatWorksDeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00IDEN000000000001 /* CheatWorksDeviceIdentity.swift */; };
 		CC00CW00SECR000000000002 /* CheatWorksSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00SECR000000000001 /* CheatWorksSecrets.swift */; };
+		CC00CW00STOR000000000002 /* CheatWorksStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00STOR000000000001 /* CheatWorksStorage.swift */; };
+		CC00CW00SVC0000000000002 /* CheatWorksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00SVC0000000000001 /* CheatWorksService.swift */; };
+		CC00CW00SYST000000000002 /* CheatWorksSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00SYST000000000001 /* CheatWorksSystem.swift */; };
+		CE47B0C12A00000000000002 /* CheatWorksEmulatorCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000001 /* CheatWorksEmulatorCodeTests.swift */; };
 		CEA508990AF842369046D92D /* OEFolderBackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9964A7D7B3C4438D9BE62654 /* OEFolderBackupManager.swift */; };
 		D3360575D5430005882E67D6 /* ArtworkImportReviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44117B42E921F7FC91F8889D /* ArtworkImportReviewViewController.swift */; };
 		DEAAB8E598494A97A260F43C84A6B563 /* Dreamcast.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 87DF04FE1BCE2D100060E2C2 /* Dreamcast.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -706,6 +720,8 @@
 		OE0RA0APPBUILDFILE0000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0RA0FILEREF00000000001 /* OERetroAchievementsTransport.m */; };
 		OE0RC0APPBUILDFILE0000002 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0RC0FILEREF00000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1"; }; };
 		OE0RALOGIN0BUILDFILE0002 /* OERetroAchievementsLoginClient.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0RALOGIN0FILEREF0002 /* OERetroAchievementsLoginClient.m */; };
+		OE0RC0APPBUILDFILE0000002 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0RC0FILEREF00000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1"; }; };
+		OE0RC0BUILDFILE0000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0RC0FILEREF00000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1"; }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -981,6 +997,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 94D7E8C815073BA000FBDD85;
 			remoteInfo = NDS;
+		};
+		E0B52064B3BFACC617706A54 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2A37F4A9FDCFA73011CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8D15AC270486D014006FF6A4;
+			remoteInfo = OpenEmu;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -1351,6 +1374,7 @@
 		68416A57049F48B997026285 /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
 		6F74677D2124A2E934C10038 /* OESaveSyncManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OESaveSyncManager.swift; sourceTree = "<group>"; };
 		6FAD47F297164AD6B87C99DF /* OECoreMigration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OECoreMigration.swift; sourceTree = "<group>"; };
+		7477EF479ACE06E7ADE90A88 /* OpenEmuUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenEmuUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7699EC921D6303EB005BC437 /* ca */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ca; path = ca.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		7699EC931D6303EC005BC437 /* ca */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ca; path = ca.lproj/Localizable.strings; sourceTree = "<group>"; };
 		7699EC941D6303EC005BC437 /* ca */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ca; path = ca.lproj/ControlLabels.strings; sourceTree = "<group>"; };
@@ -1513,6 +1537,7 @@
 		87FBC0A31C0798C000AECF5A /* Controller-Preferences.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Preferences.plist"; sourceTree = "<group>"; };
 		87FBC0A51C07996B00AECF5A /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
 		89A4F213D38948F389303F60 /* Wii-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Wii-Info.plist"; sourceTree = "<group>"; };
+		8B1068D60937C6664D82F920 /* OENGPSystemController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OENGPSystemController.swift; sourceTree = "<group>"; };
 		8CBD3AA017D23AA80022399B /* OEGridGameCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEGridGameCell.h; sourceTree = "<group>"; };
 		8CBD3AA117D23AA80022399B /* OEGridGameCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEGridGameCell.m; sourceTree = "<group>"; };
 		8D15AC370486D014006FF6A4 /* OpenEmu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenEmu.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1859,6 +1884,13 @@
 		99574CB1B5EE4AE89B192EBD /* OEWiiSystemResponder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiSystemResponder.h; sourceTree = "<group>"; };
 		9964A7D7B3C4438D9BE62654 /* OEFolderBackupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEFolderBackupManager.swift; sourceTree = "<group>"; };
 		9BAF3ECDABF5A2D068218C7F /* OEGoogleDriveConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEGoogleDriveConfig.swift; sourceTree = "<group>"; };
+		AA0000011000000100000001 /* CheatDatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatDatabaseService.swift; sourceTree = "<group>"; };
+		AA0000011000000100000003 /* LibretroCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibretroCheatProvider.swift; sourceTree = "<group>"; };
+		AA0000011000000100000005 /* OpenEmuCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenEmuCheatProvider.swift; sourceTree = "<group>"; };
+		AA0000011000000100000007 /* CheatCodeValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatCodeValidator.swift; sourceTree = "<group>"; };
+		AA0000011000000100000011 /* CheatFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatFeedbackService.swift; sourceTree = "<group>"; };
+		AA0000011000000100000013 /* PugsyCheatFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PugsyCheatFile.swift; sourceTree = "<group>"; };
+		AA0000011000000100000015 /* PugsyCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PugsyCheatProvider.swift; sourceTree = "<group>"; };
 		AC6CB8F335B64A48AE857C59 /* Wii.oesystemplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Wii.oesystemplugin; sourceTree = BUILT_PRODUCTS_DIR; };
 		AEF58A5A63D543529C6A8983 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		BD51C12166464EADB02A6758 /* Controller-Preferences.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Preferences.plist"; sourceTree = "<group>"; };
@@ -1940,7 +1972,11 @@
 		CC00CW00STOR000000000001 /* CheatWorksStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksStorage.swift; sourceTree = "<group>"; };
 		CC00CW00IDEN000000000001 /* CheatWorksDeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksDeviceIdentity.swift; sourceTree = "<group>"; };
 		CC00CW00SECR000000000001 /* CheatWorksSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksSecrets.swift; sourceTree = "<group>"; };
+		CC00CW00STOR000000000001 /* CheatWorksStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksStorage.swift; sourceTree = "<group>"; };
+		CC00CW00SVC0000000000001 /* CheatWorksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksService.swift; sourceTree = "<group>"; };
+		CC00CW00SYST000000000001 /* CheatWorksSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksSystem.swift; sourceTree = "<group>"; };
 		CC00CW00TMPL000000000001 /* CheatWorksSecrets.template.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheatWorksSecrets.template.swift; sourceTree = "<group>"; };
+		CE47B0C12A00000000000001 /* CheatWorksEmulatorCodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksEmulatorCodeTests.swift; sourceTree = "<group>"; };
 		DBFF44DC2E9D79C700B30F0A /* OENESSystemResponderClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OENESSystemResponderClient.h; sourceTree = "<group>"; };
 		DBFF44DD2E9D79D400B30F0A /* OEFDSSystemResponderClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OEFDSSystemResponderClient.h; sourceTree = "<group>"; };
 		ED2D0AB7012BE11642E384A3 /* CheatSearchWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheatSearchWindowController.swift; sourceTree = "<group>"; };
@@ -1952,6 +1988,7 @@
 		F1A2C86D1AAD0B3A00A17C80 /* fr */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		F1A2C86E1AAD0B3B00A17C80 /* fr */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		F1A2C86F1AAD0B3B00A17C80 /* fr */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/ControlLabels.strings; sourceTree = "<group>"; };
+		F7A9D4EDBFE2CB2A39034557 /* OpenEmuSmokeUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpenEmuSmokeUITests.swift; sourceTree = "<group>"; };
 		FEB66251187B62CA00D14713 /* OEMSXSystemController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEMSXSystemController.swift; sourceTree = "<group>"; };
 		FEB66253187B751700D14713 /* OEMSXSystemResponder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEMSXSystemResponder.h; sourceTree = "<group>"; };
 		FEB66254187B751700D14713 /* OEMSXSystemResponder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEMSXSystemResponder.m; sourceTree = "<group>"; };
@@ -1967,6 +2004,7 @@
 		OE0RC0FILEREF00000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
 		OE0RALOGIN0FILEREF0001 /* OERetroAchievementsLoginClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsLoginClient.h; path = ../OpenEmuKit/Source/OERetroAchievementsLoginClient.h; sourceTree = SOURCE_ROOT; };
 		OE0RALOGIN0FILEREF0002 /* OERetroAchievementsLoginClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsLoginClient.m; path = ../OpenEmuKit/Source/OERetroAchievementsLoginClient.m; sourceTree = SOURCE_ROOT; };
+		OE0RC0FILEREF00000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2039,6 +2077,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				277CBA3719DE54200059A2C1 /* OpenEmuSystem.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3264662336840A55153645F1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A762CC388165B471235296CB /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2690,6 +2736,7 @@
 				8F94DEBA250EC701003A1F33 /* OpenEmuQLThumbnail.appex */,
 				8F94DECF250ED838003A1F33 /* OpenEmuQLPreview.appex */,
 				8F7C2948288A2A2200A16C09 /* OECoreListUpdater */,
+				7477EF479ACE06E7ADE90A88 /* OpenEmuUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -2816,6 +2863,7 @@
 				2A37F4C3FDCFA73011CA2CEA /* Frameworks */,
 				19C28FB0FE9D524F11CA2CBB /* Products */,
 				B8396A2616B1FF9F2C6C8029 /* OpenEmu */,
+				EE5BB13B31BE63D3D33141F5 /* OpenEmuUITests */,
 			);
 			indentWidth = 4;
 			name = OpenEmu;
@@ -4359,6 +4407,29 @@
 			name = "Supporting Files";
 			sourceTree = "<group>";
 		};
+		CC00CW00KIT0000000000001 /* CheatWorksKit */ = {
+			isa = PBXGroup;
+			children = (
+				CC00CW00CFGN000000000001 /* CheatWorksConfiguration.swift */,
+				CC00CW00AUTH000000000001 /* CheatWorksAuthClient.swift */,
+				CC00CW00SVC0000000000001 /* CheatWorksService.swift */,
+				CC00CW00SYST000000000001 /* CheatWorksSystem.swift */,
+				CC00CW00EMUL000000000001 /* CheatWorksEmulatorCode.swift */,
+				CC00CW00STOR000000000001 /* CheatWorksStorage.swift */,
+				CC00CW00IDEN000000000001 /* CheatWorksDeviceIdentity.swift */,
+			);
+			path = CheatWorksKit;
+			sourceTree = "<group>";
+		};
+		EE5BB13B31BE63D3D33141F5 /* OpenEmuUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F7A9D4EDBFE2CB2A39034557 /* OpenEmuSmokeUITests.swift */,
+			);
+			name = OpenEmuUITests;
+			path = OpenEmuUITests;
+			sourceTree = "<group>";
+		};
 		FEB6624D187B624E00D14713 /* MSX */ = {
 			isa = PBXGroup;
 			children = (
@@ -5219,6 +5290,24 @@
 			productReference = AC6CB8F335B64A48AE857C59 /* Wii.oesystemplugin */;
 			productType = "com.apple.product-type.bundle";
 		};
+		AB444A3C8F9227C908DCDB36 /* OpenEmuUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9D98DA9B1F350DCFAF8A546D /* Build configuration list for PBXNativeTarget "OpenEmuUITests" */;
+			buildPhases = (
+				5B56035CC46A252A2E184876 /* Sources */,
+				3264662336840A55153645F1 /* Frameworks */,
+				0795FDBD6604B45642A7C1C5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				23682EBD9C4BAC0FE84B2793 /* PBXTargetDependency */,
+			);
+			name = OpenEmuUITests;
+			productName = OpenEmuUITests;
+			productReference = 7477EF479ACE06E7ADE90A88 /* OpenEmuUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C646574713771F12002A4F70 /* GameBoy Advance */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C646575113771F12002A4F70 /* Build configuration list for PBXNativeTarget "GameBoy Advance" */;
@@ -5474,6 +5563,7 @@
 				05DB72A02532681B0098459D /* OpenEmuTests */,
 				012148042537C6D6007F3C84 /* OESystemPluginPostInstall */,
 				8F7C2947288A2A2200A16C09 /* OECoreListUpdater */,
+				AB444A3C8F9227C908DCDB36 /* OpenEmuUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -5496,6 +5586,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		05DB729F2532681B0098459D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0795FDBD6604B45642A7C1C5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -6227,6 +6324,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5B56035CC46A252A2E184876 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8092D6A0AAA7B94A4AAA5AF5 /* OpenEmuSmokeUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		820EB73C1483F9A2008EC398 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -6802,6 +6907,12 @@
 			isa = PBXTargetDependency;
 			target = 8D15AC270486D014006FF6A4 /* OpenEmu */;
 			targetProxy = 05DB72A62532681B0098459D /* PBXContainerItemProxy */;
+		};
+		23682EBD9C4BAC0FE84B2793 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = OpenEmu;
+			target = 8D15AC270486D014006FF6A4 /* OpenEmu */;
+			targetProxy = E0B52064B3BFACC617706A54 /* PBXContainerItemProxy */;
 		};
 		820EB7631483FBEF008EC398 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -8368,6 +8479,25 @@
 			};
 			name = Release;
 		};
+		AC973F01B33634D2F43EBE78 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = OpenEmu;
+			};
+			name = Debug;
+		};
 		C05733C808A9546B00998B17 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 8F22764629D301FC001FB9F8 /* Config.xcconfig */;
@@ -8709,6 +8839,25 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.$(PRODUCT_NAME:rfc1034identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = oesystemplugin;
+			};
+			name = Release;
+		};
+		DEC46C77E1EFB9E3740486E0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = OpenEmu;
 			};
 			name = Release;
 		};
@@ -9172,6 +9321,15 @@
 			buildConfigurations = (
 				6820EAA40683463A8A3F2109 /* Debug */,
 				45D6A596D4BB41DE9CEA1D61 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9D98DA9B1F350DCFAF8A546D /* Build configuration list for PBXNativeTarget "OpenEmuUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DEC46C77E1EFB9E3740486E0 /* Release */,
+				AC973F01B33634D2F43EBE78 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
