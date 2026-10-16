@@ -28,4 +28,24 @@
 
 @implementation OEDCSystemController
 
+- (OEFileSupport)canHandleFile:(__kindof OEFile *)file
+{
+    // gdi/cdi are Dreamcast-exclusive container formats.
+    if ([file.fileExtension isEqualToString:@"gdi"] || [file.fileExtension isEqualToString:@"cdi"])
+        return OEFileSupportYes;
+
+    // cue is shared with other CD systems — disambiguate by the Dreamcast IP.BIN signature,
+    // which sits at offset 0x10 in a MODE1/2352 data track (or 0x0 if the dump is cooked).
+    if (![file isKindOfClass:[OEDiscDescriptor class]])
+        return OEFileSupportNo;
+
+    if ([[file readASCIIStringInRange:NSMakeRange(0, 16)] isEqualToString:@"SEGA SEGAKATANA "])
+        return OEFileSupportYes;
+
+    if ([[file readASCIIStringInRange:NSMakeRange(0x10, 16)] isEqualToString:@"SEGA SEGAKATANA "])
+        return OEFileSupportYes;
+
+    return OEFileSupportNo;
+}
+
 @end
