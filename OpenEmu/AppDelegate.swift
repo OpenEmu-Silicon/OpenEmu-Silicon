@@ -1384,6 +1384,23 @@ extension AppDelegate: NSMenuDelegate {
         preferencesWindowController.showWindow(with: notification)
     }
     
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let backupManager = OEFolderBackupManager.shared
+        guard backupManager.backupFolderURL != nil else { return .terminateNow }
+
+        var timeout: Timer?
+        let reply = {
+            guard let timer = timeout else { return }
+            timer.invalidate()
+            timeout = nil
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        timeout = Timer(timeInterval: 10, repeats: false) { _ in reply() }
+        RunLoop.main.add(timeout!, forMode: .common)
+        backupManager.flush(completion: reply)
+        return .terminateLater
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         
         for window in sender.windows {
