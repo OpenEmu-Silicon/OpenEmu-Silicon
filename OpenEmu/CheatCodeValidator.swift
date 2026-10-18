@@ -146,6 +146,11 @@ enum CheatCodeValidator {
             // Mednafen (vb module): no named format, only raw WRAM address:value (8 hex address + 2 hex value)
             return isRawAddressValue(code, addressHexChars: 8, valueHexChars: 2)
 
+        case OESystemIdentifierJaguar:
+            // VirtualJaguar: raw poke into the 2 MB main RAM (68000 address 0x000000-0x1FFFFF).
+            // Up to 6 hex address digits (24-bit) and up to 4 bytes of value.
+            return isRawAddressValue(code, maxAddressHexChars: 6, maxValueHexChars: 8)
+
         case OESystemIdentifierArcade:
             // MAME (Pugsy cheats): raw ADDRESS:VALUE hex pokes, joined with '+'. Address up to
             // 32-bit and value up to 4 bytes; the value's hex width encodes the poke size.
