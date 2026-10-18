@@ -1980,6 +1980,18 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), addressHexChars: 8, valueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierJaguar:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. 1CC80B:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Atari Jaguar"),
+                validationHint: NSLocalizedString("Atari Jaguar codes must be a hex address plus a hex value (max 6 and 8 hex digits), e.g. 1CC80B:05. Addresses target the 2 MB main RAM (000000-1FFFFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari Jaguar"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 6, maxValueHexChars: 8) }
+                }
+            )
         case OESystemIdentifierPSP:
             return CheatFormat(
                 placeholder: NSLocalizedString("CwCheat code, e.g. _L 0x2024DA44 0x3F800000. Paste the whole code, including every _L line.", comment: "Add Cheat dialog placeholder, PSP"),
