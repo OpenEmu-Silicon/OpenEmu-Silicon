@@ -74,6 +74,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierAtari2600: "Atari - 2600",
         OESystemIdentifier5200:      "Atari - 5200",
         OESystemIdentifier7800:      "Atari - 7800",
+        OESystemIdentifierJaguar:    "Atari - Jaguar",
         OESystemIdentifierSMS:       "Sega - Master System - Mark III",
         OESystemIdentifierNES:       "Nintendo - Nintendo Entertainment System",
         OESystemIdentifierFDS:       "Nintendo - Family Computer Disk System",
@@ -731,6 +732,8 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             return normalizeSaturnCode(code)
         case OESystemIdentifierMSX:
             return normalizeMSXCode(code)
+        case OESystemIdentifierJaguar:
+            return normalizeJaguarCode(code)
         default:
             return code
         }
@@ -867,6 +870,21 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             if !pairs.isEmpty { return pairs.joined(separator: "+") }
         }
         return code
+    }
+
+    private func normalizeJaguarCode(_ code: String) -> String {
+        // libretro's Jaguar cht codes zero-pad the address to 8 hex digits (e.g. 001CC80B), which
+        // overflows the 24-bit (≤ 6 hex) RAM range the validator and poke expect. Strip only those
+        // positional leading zeros from each part's address; the value is kept exactly as published,
+        // because its hex width is the write size (e.g. 000F423F is a real 32-bit value, not padding).
+        code.split(separator: "+").map { part -> String in
+            let halves = part.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard halves.count == 2,
+                  halves[0].allSatisfy(\.isHexDigit),
+                  let address = UInt32(halves[0], radix: 16)
+            else { return String(part) }
+            return String(format: "%X:%@", address, String(halves[1]).uppercased())
+        }.joined(separator: "+")
     }
 
     private func normalizeGenesisCode(_ code: String) -> String {
