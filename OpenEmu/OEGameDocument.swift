@@ -2000,6 +2000,14 @@ final class OEGameDocument: NSDocument {
                     CheatCodeValidator.isCWCheatCode(code)
                 }
             )
+        case OESystemIdentifierDreamcast:
+            return CheatFormat(
+                placeholder: NSLocalizedString("GameShark/Action Replay code, e.g. 0C68E07C 00000009. Paste every line of the code.", comment: "Add Cheat dialog placeholder, Dreamcast"),
+                validationHint: NSLocalizedString("Dreamcast codes use the GameShark/Action Replay format: one or more 8 hex digit words, e.g. 0C68E07C 00000009. Paste the code exactly as published, including every line — don't add 0x prefixes or '+' separators.", comment: "Add Cheat validation hint, Dreamcast"),
+                validator: { code in
+                    CheatCodeValidator.isDreamcastGameSharkCode(code)
+                }
+            )
         default:
             return defaultCheatFormat
         }
@@ -2027,6 +2035,8 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToSaturnAR(code), type: OECheatTypeActionReplay)
         case OESystemIdentifierPSP:
             return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeCWCheat)
+        case OESystemIdentifierDreamcast:
+            return ConvertedCheat(code: Self.convertToGameSharkDreamcast(code), type: OECheatTypeGameShark)
         default:
             return ConvertedCheat(code: Self.convertToRaw(code, addressBytes: addressBytes, minDataBytes: minDataBytes), type: OECheatTypeRaw)
         }
@@ -2097,6 +2107,36 @@ final class OEGameDocument: NSDocument {
                 lines.append(line(type: 0x2, address: address, value: chunk))
             }
             return lines.joined(separator: " ")
+        }
+    }
+
+    // MARK: Dreamcast GameShark/Action Replay (00/01/02 AAAAAA VVVVVVVV)
+
+    /// Cheat-search addresses are plain 24-bit RAM offsets (the search region is based at 0, which
+    /// matches the GameShark address field). The code's top byte is the write type: 00 = 8-bit,
+    /// 01 = 16-bit, 02 = 32-bit. Values up to 4 bytes fit a single write.
+    private static func convertToGameSharkDreamcast(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let address = (UInt32(addressPart, radix: 16) ?? 0) & 0x00FF_FFFF
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        func line(op: UInt32, value: UInt32) -> String {
+            String(format: "%08X %08X", (op << 24) | address, value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(op: 0x00, value: UInt32(value & 0xFF))
+        case 2:
+            return line(op: 0x01, value: UInt32(value & 0xFFFF))
+        default:
+            // 3- and 4-byte values both ride in a single 32-bit write (a 3-byte value keeps a zero
+            // high byte). Wider values aren't produced by the search for this system.
+            return line(op: 0x02, value: UInt32(value & 0xFFFF_FFFF))
         }
     }
 

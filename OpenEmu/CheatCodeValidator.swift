@@ -38,6 +38,12 @@ enum CheatCodeValidator {
         if systemIdentifier == OESystemIdentifierPSP {
             return isCWCheatCode(code)
         }
+        // Dreamcast (Flycast GameShark/Action Replay): whitespace/newline-separated 8-hex words.
+        // Whitespace is structural between words and a code can span several lines, so validate the
+        // raw token stream instead of space-stripping and '+'-splitting like the other systems.
+        if systemIdentifier == OESystemIdentifierDreamcast {
+            return isDreamcastGameSharkCode(code)
+        }
         let normalized = code.replacingOccurrences(of: " ", with: "")
         // NDS: each '+'-separated part must be a 16-hex AR line (already normalized by provider)
         if systemIdentifier == OESystemIdentifierNDS {
@@ -188,6 +194,18 @@ enum CheatCodeValidator {
         var hex = token
         if hex.hasPrefix("0x") || hex.hasPrefix("0X") { hex = hex.dropFirst(2) }
         return !hex.isEmpty && hex.count <= 8 && hex.allSatisfy(\.isHexDigit)
+    }
+
+    /// Dreamcast GameShark/Action Replay code: a whitespace/newline-separated stream of hex words.
+    /// Flycast's parser consumes hex digits and splits every 8, throwing if a run ends on a non-8
+    /// boundary, so each token must be all-hex with a length that's a positive multiple of 8 (a 0x
+    /// prefix is rejected, matching the core). At least one token is required.
+    static func isDreamcastGameSharkCode(_ code: String) -> Bool {
+        let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" })
+        guard !tokens.isEmpty else { return false }
+        return tokens.allSatisfy { token in
+            !token.isEmpty && token.count % 8 == 0 && token.allSatisfy(\.isHexDigit)
+        }
     }
 
     /// Raw address:value hex format. Accepts optional exact or max size constraints.
