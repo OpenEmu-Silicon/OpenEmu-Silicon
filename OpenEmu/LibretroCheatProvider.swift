@@ -67,7 +67,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     private static let chtBaseURL = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
 
     // Disc-based systems use redump DATs instead of no-intro
-    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD, OESystemIdentifierSaturn, OESystemIdentifierPCFX]
+    private static let redumpSystems: Set<String> = [OESystemIdentifierPSX, OESystemIdentifierSegaCD, OESystemIdentifierPCECD, OESystemIdentifierSaturn, OESystemIdentifierPCFX, OESystemIdentifierDreamcast]
 
     // OpenEmu system ID → Libretro directory/DAT name
     private let systemMap: [String: String] = [
@@ -100,6 +100,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierVB:        "Nintendo - Virtual Boy",
         OESystemIdentifierWS:        "Bandai - WonderSwan",
         OESystemIdentifierPCFX:      "NEC - PC-FX",
+        OESystemIdentifierDreamcast: "Sega - Dreamcast",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -242,6 +243,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
             gameNames.append(gameName)
             gameNames += compoundRegionVariants(for: gameName)
             if useRegionFallback { gameNames += regionVariants(for: gameName) }
+        }
+
+        // Dreamcast cht files drop the region tag for the primary (USA) release (e.g. "Crazy
+        // Taxi.cht"), while OpenEmu's library name may carry a "(USA)" tag — try the bare title too.
+        if systemIdentifier == OESystemIdentifierDreamcast {
+            for stripped in gameNames.compactMap(regionStrippedName(for:)) where !gameNames.contains(stripped) {
+                gameNames.append(stripped)
+            }
         }
 
         let (allCheats, sources) = try await downloadCandidates(gameNames: gameNames, libretroSystem: resolvedSystem, systemIdentifier: systemIdentifier)
@@ -457,6 +466,14 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         return inside.split(separator: ",").map { "\(base) (\($0.trimmingCharacters(in: .whitespaces)))" }
     }
 
+    /// Strips a single trailing "(...)" region/version tag to recover the bare title. Used for
+    /// Dreamcast, whose cht filenames drop the tag on the primary release.
+    private func regionStrippedName(for gameName: String) -> String? {
+        guard gameName.hasSuffix(")"), let openParen = gameName.lastIndex(of: "(") else { return nil }
+        let base = String(gameName[..<openParen]).trimmingCharacters(in: .whitespaces)
+        return base.isEmpty ? nil : base
+    }
+
     private func loadCachedCheats(md5: String, systemIdentifier: String) -> LibretroCachedCheatFile? {
         guard let url = cacheFileURL(md5: md5, systemIdentifier: systemIdentifier),
               let data = try? Data(contentsOf: url),
@@ -625,6 +642,33 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 guard !seenCodes.contains(dedupKey) else { continue }
                 seenCodes.insert(dedupKey)
                 cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: code, rawCode: raw))
+                continue
+            }
+
+            // Dreamcast (Flycast GameShark): every cht entry is Format-B (empty `code`) with a
+            // decimal address/value and a memory_search_size that picks the write width. Synthesize
+            // the code Flycast's decoder expects — "0X AAAAAA VVVVVVVV", op 00/01/02 = 8/16/32-bit.
+            // Verified against Crazy Taxi "Max Cash" (addr 2016456, value 9999999, size 5 →
+            // 021EC4C8 0098967F). repeat_count is always 1 here, so a single write covers every file.
+            if systemIdentifier == OESystemIdentifierDreamcast {
+                guard fields["cheat_type"] == nil || fields["cheat_type"] == "1",
+                      let addrStr = fields["address"], let valStr = fields["value"],
+                      let addr = UInt32(addrStr), let value = UInt64(valStr)
+                else { continue }
+                let sizeCode = Int(fields["memory_search_size"] ?? "4") ?? 4
+                let op: UInt32, mask: UInt64
+                switch sizeCode {
+                case ...3:  (op, mask) = (0x00, 0xFF)
+                case 4:     (op, mask) = (0x01, 0xFFFF)
+                default:    (op, mask) = (0x02, 0xFFFF_FFFF)
+                }
+                let word0 = (op << 24) | (addr & 0x00FF_FFFF)
+                let code = String(format: "%08X %08X", word0, UInt32(value & mask))
+                // Format B has no upstream `code`; key rawCode off the verbatim fields for feedback.
+                let rawCode = "address=\(addrStr);value=\(valStr);size=\(sizeCode)"
+                guard !seenCodes.contains(code) else { continue }
+                seenCodes.insert(code)
+                cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: code, rawCode: rawCode))
                 continue
             }
 
