@@ -89,6 +89,11 @@ enum CheatCodeValidator {
             // Max 4 (not 3) hex digits so zero-padded addresses like 0032:19 still validate.
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
 
+        case OESystemIdentifierIntellivision:
+            // Bliss: raw poke into the CP1610 16-bit word address space (scratchpad RAM 0100-01EF,
+            // system RAM 0200-035F). Address and value are each a 16-bit word (up to 4 hex digits).
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 4)
+
         case OESystemIdentifierNES, OESystemIdentifierFDS:
             // FCEU: raw XXXX:XX, XXXX?XX:XX, NES Game Genie — no Pro Action Rocky
             if coreIdentifier == "org.openemu.FCEU" {

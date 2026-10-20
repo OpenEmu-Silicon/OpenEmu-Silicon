@@ -104,17 +104,23 @@ final class CheatSearchViewController: NSViewController {
     /// size, relative = absolute − user RAM base) — so it lines up with published `_L` codes. This is
     /// display only; the absolute `result.address` still drives the actual code conversion.
     private func displayAddress(_ address: UInt32) -> String {
-        guard gameDocument?.systemIdentifier == OESystemIdentifierPSP else {
+        switch gameDocument?.systemIdentifier {
+        case OESystemIdentifierPSP:
+            let relative = (address >= 0x0880_0000 ? address - 0x0880_0000 : address) & 0x0FFF_FFFF
+            let typeNibble: UInt32
+            switch selectedDataSize {
+            case 1: typeNibble = 0
+            case 2: typeNibble = 1
+            default: typeNibble = 2
+            }
+            return String(format: "%01X%07X", typeNibble, relative)
+        case OESystemIdentifierIntellivision:
+            // The region exposes 16-bit words as 2 bytes with the base doubled, so the raw hit
+            // address is twice the real CP1610 word address. Show the true word address.
+            return String(format: "%04X", address / 2)
+        default:
             return String(format: addressFormatString, address)
         }
-        let relative = (address >= 0x0880_0000 ? address - 0x0880_0000 : address) & 0x0FFF_FFFF
-        let typeNibble: UInt32
-        switch selectedDataSize {
-        case 1: typeNibble = 0
-        case 2: typeNibble = 1
-        default: typeNibble = 2
-        }
-        return String(format: "%01X%07X", typeNibble, relative)
     }
 
     private var minDataBytes: Int {
