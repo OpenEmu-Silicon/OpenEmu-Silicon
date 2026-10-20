@@ -2190,8 +2190,9 @@ final class OEGameDocument: NSDocument {
 
     /// Converts a cheat-search hit into the native Intellivision raw code. The search exposes each
     /// 16-bit word as 2 bytes with the region base doubled, so the hit's byte address is exactly
-    /// twice the real CP1610 word address; halving recovers it. Emits WWWW:VVVV (word address, word
-    /// value), the same raw form the Bliss core's setCheat parses and the manual Add Cheat dialog uses.
+    /// twice the real CP1610 word address; halving recovers it. A value wider than one word (a 4-byte
+    /// search) spans consecutive words little-endian — the same way the search read them — so emit one
+    /// WWWW:VVVV poke per word, joined with '+', which the Bliss core's setCheat applies in turn.
     private static func convertToIntellivision(_ code: String) -> String {
         guard let colonIdx = code.firstIndex(of: ":") else { return code }
         let addressPart = String(code[code.startIndex..<colonIdx])
@@ -2199,8 +2200,16 @@ final class OEGameDocument: NSDocument {
 
         let byteAddress = UInt32(addressPart, radix: 16) ?? 0
         let wordAddress = byteAddress / 2
-        let value = UInt32(valuePart, radix: 16) ?? 0
-        return String(format: "%04X:%04X", wordAddress & 0xFFFF, value & 0xFFFF)
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+        let wordCount = max(1, (byteCount + 1) / 2)
+
+        var codes: [String] = []
+        for i in 0..<wordCount {
+            let word = UInt32((value >> (UInt64(i) * 16)) & 0xFFFF)
+            codes.append(String(format: "%04X:%04X", (wordAddress &+ UInt32(i)) & 0xFFFF, word))
+        }
+        return codes.joined(separator: "+")
     }
 
     // MARK: Game Boy GameShark (01VVLLHH)
