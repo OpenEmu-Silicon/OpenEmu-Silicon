@@ -1968,6 +1968,18 @@ final class OEGameDocument: NSDocument {
             return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),
                 hint: NSLocalizedString("MSX codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C123:05. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, MSX"))
+        case OESystemIdentifierIntellivision:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex word address + hex value, e.g. 015B:02. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Intellivision"),
+                validationHint: NSLocalizedString("Intellivision codes must be a hex word address plus a hex value (max 4 and 4 hex digits), e.g. 015B:02. Addresses target the 16-bit RAM (0100-01EF scratchpad, 0200-035F system RAM). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Intellivision"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 4) }
+                }
+            )
         case OESystemIdentifierVB:
             return CheatFormat(
                 placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
@@ -2037,6 +2049,8 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeCWCheat)
         case OESystemIdentifierDreamcast:
             return ConvertedCheat(code: Self.convertToGameSharkDreamcast(code), type: OECheatTypeGameShark)
+        case OESystemIdentifierIntellivision:
+            return ConvertedCheat(code: Self.convertToIntellivision(code), type: OECheatTypeRaw)
         default:
             return ConvertedCheat(code: Self.convertToRaw(code, addressBytes: addressBytes, minDataBytes: minDataBytes), type: OECheatTypeRaw)
         }
@@ -2170,6 +2184,23 @@ final class OEGameDocument: NSDocument {
             codes.append("\(addrStr):\(valStr)")
         }
         return codes.joined(separator: "+")
+    }
+
+    // MARK: Intellivision raw word address:value (WWWW:VVVV)
+
+    /// Converts a cheat-search hit into the native Intellivision raw code. The search exposes each
+    /// 16-bit word as 2 bytes with the region base doubled, so the hit's byte address is exactly
+    /// twice the real CP1610 word address; halving recovers it. Emits WWWW:VVVV (word address, word
+    /// value), the same raw form the Bliss core's setCheat parses and the manual Add Cheat dialog uses.
+    private static func convertToIntellivision(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let byteAddress = UInt32(addressPart, radix: 16) ?? 0
+        let wordAddress = byteAddress / 2
+        let value = UInt32(valuePart, radix: 16) ?? 0
+        return String(format: "%04X:%04X", wordAddress & 0xFFFF, value & 0xFFFF)
     }
 
     // MARK: Game Boy GameShark (01VVLLHH)

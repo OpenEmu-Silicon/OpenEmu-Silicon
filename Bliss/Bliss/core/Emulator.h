@@ -76,6 +76,10 @@ class Emulator : public Peripheral
         // OpenEmu: read a 16-bit word through the memory bus (RetroAchievements memory inspection).
         UINT16 PeekMemory(UINT16 location) { return memoryBus.peek(location); }
 
+        // OpenEmu: write a 16-bit word through the memory bus (cheat support). Routes to whatever
+        // RAM is mapped at the location; harmlessly no-ops on ROM/unmapped addresses.
+        void PokeMemory(UINT16 location, UINT16 value) { memoryBus.poke(location, value); }
+
         virtual BOOL SaveStateBuffer(void* outBuffer, size_t bufferSize) = 0;
         virtual BOOL LoadStateBuffer(const void* inBuffer, size_t bufferSize) = 0;
 

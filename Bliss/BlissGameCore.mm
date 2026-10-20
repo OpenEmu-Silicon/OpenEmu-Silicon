@@ -27,6 +27,7 @@
 #import "BlissGameCore.h"
 #import <IOKit/hid/IOHIDLib.h>
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "OEIntellivisionSystemResponderClient.h"
 
@@ -119,6 +120,7 @@ public:
 
 	NSMutableData	*_stateData;
 	OERetroAchievementsBridge *_raBridge;
+	NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 - (int)blissButtonForIntellivisionButton:(OEIntellivisionButton)button player:(NSUInteger)player;
 @end
@@ -180,6 +182,7 @@ static uint32_t bliss_rc_read_memory(uint32_t address, uint8_t *buffer,
 		_videoBus = new BlissVideoBus;
 
 		_stateData = [NSMutableData dataWithLength:sizeof(IntellivisionState)];
+		_cheatList = [[NSMutableDictionary alloc] init];
     }
 
     return self;
@@ -207,6 +210,23 @@ static uint32_t bliss_rc_read_memory(uint32_t address, uint8_t *buffer,
 
 	// run the emulation
 	currentEmu->Run();
+
+	// Reassert cheats every frame: the emulated CPU overwrites these RAM words during Run(),
+	// and Bliss has no persistent patch engine, so the pokes must be reapplied continuously.
+	if (_cheatList.count) {
+		for (NSString *key in _cheatList) {
+			if (![_cheatList[key] boolValue]) continue;
+			for (NSString *singleCode in [key componentsSeparatedByString:@"+"]) {
+				NSRange colonRange = [singleCode rangeOfString:@":"];
+				if (colonRange.location == NSNotFound) continue;
+				unsigned int addr = 0, val = 0;
+				if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+				if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+				if (addr > 0xFFFF) continue;
+				currentEmu->PokeMemory((UINT16)addr, (UINT16)val);
+			}
+		}
+	}
 
 	// render and display the video
 	currentEmu->Render();
@@ -530,6 +550,55 @@ static uint32_t bliss_rc_read_memory(uint32_t address, uint8_t *buffer,
 - (void)retroAchievementsDeserializeProgress:(NSData *)data
 {
     [_raBridge deserializeProgress:data];
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [[NSMutableDictionary alloc] init];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [[code stringByReplacingOccurrencesOfString:@" " withString:@""] uppercaseString];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (currentEmu == NULL)
+        return @[];
+
+    // Intellivision RAM is 16-bit word-addressed. Each word is exposed as 2 bytes (little-endian)
+    // and the region base address is the word address doubled, so a cheat-search hit's byte address
+    // is exactly twice the real CP1610 word address (halved back app-side in displayAddress /
+    // convertCheatSearchCode). This keeps the search unit one full 16-bit word.
+    struct { UINT16 base; UINT16 count; const char *name; } ramBanks[] = {
+        { 0x0100, 0x00F0, "Scratchpad RAM" }, // 8-bit system RAM (0x0100-0x01EF)
+        { 0x0200, 0x0160, "System RAM" },     // 16-bit system RAM (0x0200-0x035F)
+    };
+
+    NSMutableArray<OEMemoryRegionDescriptor *> *regions = [NSMutableArray array];
+    for (int b = 0; b < 2; b++) {
+        NSMutableData *data = [NSMutableData dataWithLength:ramBanks[b].count * 2];
+        uint8_t *bytes = (uint8_t *)data.mutableBytes;
+        for (UINT16 i = 0; i < ramBanks[b].count; i++) {
+            UINT16 w = currentEmu->PeekMemory((UINT16)(ramBanks[b].base + i));
+            bytes[i * 2]     = (uint8_t)(w & 0xFF);
+            bytes[i * 2 + 1] = (uint8_t)((w >> 8) & 0xFF);
+        }
+        [regions addObject:[OEMemoryRegionDescriptor descriptorWithName:[NSString stringWithUTF8String:ramBanks[b].name]
+                                                                address:(uint32_t)ramBanks[b].base * 2
+                                                           addressBytes:2
+                                                           minDataBytes:2
+                                                                   data:data]];
+    }
+
+    return regions;
 }
 
 - (OEIntSize)bufferSize
