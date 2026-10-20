@@ -89,6 +89,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierSG1000:    "Sega - SG-1000",
         OESystemIdentifierGB:        "Nintendo - Game Boy",
         OESystemIdentifierColecoVision: "Coleco - ColecoVision",
+        OESystemIdentifierIntellivision: "Mattel - Intellivision",
         OESystemIdentifierMSX:       "Microsoft - MSX",
         OESystemIdentifierPSX:       "Sony - PlayStation",
         OESystemIdentifierPSP:       "Sony - PlayStation Portable",
@@ -666,6 +667,29 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 let code = String(format: "%08X %08X", word0, UInt32(value & mask))
                 // Format B has no upstream `code`; key rawCode off the verbatim fields for feedback.
                 let rawCode = "address=\(addrStr);value=\(valStr);size=\(sizeCode)"
+                guard !seenCodes.contains(code) else { continue }
+                seenCodes.insert(code)
+                cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: code, rawCode: rawCode))
+                continue
+            }
+
+            // Intellivision (Bliss): every cht entry is Format-B (empty `code`) with a decimal byte
+            // address and value. FreeIntv's system RAM stores each 16-bit word as 4 bytes, so the
+            // libretro address is wordAddr*4 — divide by 4 to recover the CP1610 word address. These
+            // all target 8-bit scratchpad RAM (memory_search_size 3); a size of 4 would be a 16-bit
+            // word. Emits WWWW:VV (or WWWW:VVVV), the native raw form the Bliss core's setCheat parses.
+            // Verified: Pitfall addr 1388 → 1388/4 = 347 = 015B, value 2 → 015B:02.
+            if systemIdentifier == OESystemIdentifierIntellivision {
+                guard fields["cheat_type"] == nil || fields["cheat_type"] == "1",
+                      let addrStr = fields["address"], let valStr = fields["value"],
+                      let addr = UInt32(addrStr), let value = UInt32(valStr)
+                else { continue }
+                let wordAddr = addr / 4
+                let sizeCode = Int(fields["memory_search_size"] ?? "3") ?? 3
+                let valWidth = sizeCode >= 4 ? 4 : 2
+                let mask: UInt32 = sizeCode >= 4 ? 0xFFFF : 0xFF
+                let code = String(format: "%04X:%0\(valWidth)X", wordAddr & 0xFFFF, value & mask)
+                let rawCode = "address=\(addrStr);value=\(valStr)"
                 guard !seenCodes.contains(code) else { continue }
                 seenCodes.insert(code)
                 cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: code, rawCode: rawCode))
