@@ -44,10 +44,10 @@ enum CheatCodeValidator {
         if systemIdentifier == OESystemIdentifierDreamcast {
             return isDreamcastGameSharkCode(code)
         }
-        // GameCube (Dolphin Action Replay): "address value" 8-hex word pairs, or encrypted
+        // GameCube / Wii (Dolphin Action Replay): "address value" 8-hex word pairs, or encrypted
         // XXXX-XXXX-XXXXX lines, which may span several lines or be '+'-joined. Validate the raw
         // token stream before space-stripping/'+'-splitting.
-        if systemIdentifier == OESystemIdentifierGameCube {
+        if systemIdentifier == OESystemIdentifierGameCube || systemIdentifier == OESystemIdentifierWii {
             return isActionReplayCodeGC(code)
         }
         let normalized = code.replacingOccurrences(of: " ", with: "")
