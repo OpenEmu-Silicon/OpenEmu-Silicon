@@ -3,7 +3,7 @@ name: Build Check
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, feat/ps2-core]
   # Direct pushes to main (small maintainer changes) get the same build.
   # Docs-only and bookkeeping pushes are skipped. This filter is on push only,
   # so it never affects the required checks on pull requests.
