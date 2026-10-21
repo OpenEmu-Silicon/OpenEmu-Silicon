@@ -53,6 +53,7 @@
 
 #import "OERetroAchievementsTransport.h"
 #import "OERetroAchievementsBridge.h"
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #include <rc_consoles.h>
 #include <rc_hash.h>
 
@@ -652,5 +653,35 @@ static void dolphin_hash_close(void *handle)
 - (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
 {
     dol_host->SetCheat([code UTF8String], [type UTF8String], enabled);
+}
+
+// Cheat search reads a snapshot of MEM1, the 24 MB GameCube main RAM mapped at 0x80000000.
+// The buffer is stored big-endian (PowerPC), which the search's little-endian multi-byte reads
+// account for app-side when converting a found value into a Gecko write code.
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (!_isInitialized || _isWii)
+        return @[];
+
+    auto &system = Core::System::GetInstance();
+    if (Core::GetState(system) == Core::State::Uninitialized)
+        return @[];
+
+    auto &memory = system.GetMemory();
+    const uint32_t size = memory.GetRamSizeReal();
+    if (size == 0)
+        return @[];
+
+    const uint8_t *ram = memory.GetPointerForRange(0x80000000u, size);
+    if (ram == nullptr)
+        return @[];
+
+    NSData *data = [NSData dataWithBytes:ram length:size];
+    OEMemoryRegionDescriptor *mem1 =
+        [OEMemoryRegionDescriptor descriptorWithName:@"MEM1"
+                                             address:0x80000000u
+                                        addressBytes:4
+                                                data:data];
+    return @[mem1];
 }
 @end

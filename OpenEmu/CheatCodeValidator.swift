@@ -44,6 +44,12 @@ enum CheatCodeValidator {
         if systemIdentifier == OESystemIdentifierDreamcast {
             return isDreamcastGameSharkCode(code)
         }
+        // GameCube (Dolphin Action Replay): "address value" 8-hex word pairs, or encrypted
+        // XXXX-XXXX-XXXXX lines, which may span several lines or be '+'-joined. Validate the raw
+        // token stream before space-stripping/'+'-splitting.
+        if systemIdentifier == OESystemIdentifierGameCube {
+            return isActionReplayCodeGC(code)
+        }
         let normalized = code.replacingOccurrences(of: " ", with: "")
         // NDS: each '+'-separated part must be a 16-hex AR line (already normalized by provider)
         if systemIdentifier == OESystemIdentifierNDS {
@@ -211,6 +217,28 @@ enum CheatCodeValidator {
         return tokens.allSatisfy { token in
             !token.isEmpty && token.count % 8 == 0 && token.allSatisfy(\.isHexDigit)
         }
+    }
+
+    /// GameCube Action Replay code: either decrypted "address value" word pairs (an even, non-empty
+    /// sequence of 8-hex-digit words) or encrypted `XXXX-XXXX-XXXXX` lines. Words/lines are separated
+    /// by whitespace, newlines or '+'. A 0x prefix is rejected.
+    static func isActionReplayCodeGC(_ code: String) -> Bool {
+        let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" || $0 == "+" })
+        guard !tokens.isEmpty else { return false }
+
+        // Encrypted AR lines: XXXX-XXXX-XXXXX (4-4-5 hex, dash-separated).
+        if tokens.contains(where: { $0.contains("-") }) {
+            return tokens.allSatisfy { token in
+                let parts = token.split(separator: "-", omittingEmptySubsequences: false)
+                guard parts.count == 3, parts[0].count == 4, parts[1].count == 4, parts[2].count == 5
+                else { return false }
+                return parts.allSatisfy { $0.allSatisfy(\.isHexDigit) }
+            }
+        }
+
+        // Decrypted AR: even number of 8-hex-digit words (address/value pairs).
+        guard tokens.count % 2 == 0 else { return false }
+        return tokens.allSatisfy { $0.count == 8 && $0.allSatisfy(\.isHexDigit) }
     }
 
     /// Raw address:value hex format. Accepts optional exact or max size constraints.

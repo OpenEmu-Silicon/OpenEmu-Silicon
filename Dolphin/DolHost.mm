@@ -365,138 +365,102 @@ bool DolHost::LoadState(std::string saveStateFile)
 }
 
 # pragma mark - Cheats
+// OpenEmu stores GameCube cheats as Action Replay codes: one or more 8-hex "address value" word
+// pairs (e.g. `003CC531 00000050`), or encrypted `XXXX-XXXX-XXXXX` lines. A multi-part code may be
+// joined with '+' or span several lines. We register them with Dolphin's Action Replay engine; the
+// per-frame PatchEngine::ApplyFramePatches → ActionReplay::RunAllActive path (running once
+// MAIN_ENABLE_CHEATS is set) applies them, and ApplyCodes filters to the codes whose `enabled`
+// flag is set.
 void DolHost::SetCheat(std::string code, std::string type, bool enabled)
 {
-    gcode.codes.clear();
-    gcode.enabled = enabled;
     arcode.ops.clear();
     arcode.enabled = enabled;
-    
-    Gecko::GeckoCode::Code gcodecode;
-    uint32_t cmd_addr, cmd_value;
-    
-    std::vector<std::string> arcode_encrypted_lines;
-    
-    //Get the code sent and sanitize it.
-    NSString* nscode = [NSString stringWithUTF8String:code.c_str()];
-    
-    //Remove whitespace
-    nscode = [nscode stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    
-    // Remove any spaces and dashes
-    nscode = [nscode stringByReplacingOccurrencesOfString:@" " withString:@""];
-    nscode = [nscode stringByReplacingOccurrencesOfString:@"-" withString:@""];
-    
-    //Check if it is a valid Gecko or ActionReplay code
-    NSString *singleCode;
-    NSArray *multipleCodes = [nscode componentsSeparatedByString:@"+"];
-    
-    for (singleCode in multipleCodes)
+
+    NSString *nscode = [[NSString stringWithUTF8String:code.c_str()] uppercaseString];
+
+    // Encrypted AR codes use the form XXXX-XXXX-XXXXX, so '-' is part of a token, not a separator.
+    NSMutableCharacterSet *separators = [[NSCharacterSet whitespaceAndNewlineCharacterSet] mutableCopy];
+    [separators addCharactersInString:@"+,"];
+    NSArray<NSString *> *tokens = [nscode componentsSeparatedByCharactersInSet:separators];
+
+    bool hasEncrypted = false;
+    for (NSString *token in tokens)
     {
-        if ([singleCode length] == 16) // Gecko code
+        if (token.length > 0 && [token containsString:@"-"])
         {
-            NSString *address = [singleCode substringWithRange:NSMakeRange(0, 8)];
-            NSString *value = [singleCode substringWithRange:NSMakeRange(8, 8)];
-            
-            bool success_addr = TryParse(std::string("0x") + [address UTF8String], &cmd_addr);
-            bool success_val = TryParse(std::string("0x") + [value UTF8String], &cmd_value);
-            
-            if (!success_addr || !success_val)
-                return;
-            
-            gcodecode.address = cmd_addr;
-            gcodecode.data = cmd_value;
-            gcode.codes.push_back(gcodecode);
+            hasEncrypted = true;
+            break;
         }
-        else if ([singleCode length] == 13) // Encrypted AR code
+    }
+
+    if (hasEncrypted)
+    {
+        std::vector<std::string> encryptedLines;
+        for (NSString *token in tokens)
         {
-            // Add the code to list encrypted lines
-            arcode_encrypted_lines.emplace_back([singleCode UTF8String]);
+            if (token.length == 0)
+                continue;
+            auto parsed = ActionReplay::DeserializeLine([token UTF8String]);
+            auto *line = std::get_if<ActionReplay::EncryptedLine>(&parsed);
+            if (line == nullptr)
+                return; // not a valid encrypted AR line
+            encryptedLines.push_back(*line);
         }
-        else
-        {
-            // Not a good code
+        if (encryptedLines.empty())
             return;
-        }
+        ActionReplay::DecryptARCode(encryptedLines, &arcode.ops);
     }
-    
-    if (arcode_encrypted_lines.size())
+    else
     {
-        DecryptARCode(arcode_encrypted_lines,  &arcode.ops);
+        std::vector<uint32_t> words;
+        for (NSString *token in tokens)
+        {
+            if (token.length == 0)
+                continue;
+            uint32_t word;
+            if (token.length != 8 || !TryParse(std::string("0x") + [token UTF8String], &word))
+                return; // not an 8-hex AR word
+            words.push_back(word);
+        }
+        // AR codes are address/value word pairs, so a valid code has a non-zero even word count.
+        if (words.empty() || (words.size() % 2) != 0)
+            return;
+        for (size_t i = 0; i + 1 < words.size(); i += 2)
+            arcode.ops.push_back(ActionReplay::AREntry(words[i], words[i + 1]));
     }
-    
+
+    if (arcode.ops.empty())
+        return;
+
     bool exists = false;
-    
-    //Check to make sure the Gecko codes are not already in the list
-    //  cycle through the codes in our Gecko vector
-    for (Gecko::GeckoCode& gcompare : gcodes)
+
+    // Update the matching code's enabled state if we already have it; otherwise add it.
+    for (ActionReplay::ARCode &compare : arcodes)
     {
-        //If the code being modified is the same size as one in the vector, check each value
-        if (gcompare.codes.size() == gcode.codes.size())
+        if (compare.ops.size() != arcode.ops.size())
+            continue;
+
+        bool same = true;
+        for (size_t i = 0; i < arcode.ops.size(); ++i)
         {
-            for(int i = 0; i < gcode.codes.size() ;i++)
+            if (!(compare.ops[i] == arcode.ops[i]))
             {
-                if (gcompare.codes[i].address == gcode.codes[i].address && gcompare.codes[i].data == gcode.codes[i].data)
-                {
-                    exists = true;
-                }
-                else
-                {
-                    exists = false;
-                    // If it's not the same, no need to look through all the codes
-                    break;
-                }
+                same = false;
+                break;
             }
         }
-        if(exists)
+        if (same)
         {
-            gcompare.enabled = enabled;
-            // If it exists, enable it, and we don't need to look at the rest of the codes
+            compare.enabled = enabled;
+            exists = true;
             break;
         }
     }
-    
-    if(!exists)
-        gcodes.push_back(gcode);
-    
-    Gecko::SetActiveCodes(gcodes, _gameID, 0);
-    
-    
-    //Check to make sure the ARcode is not already in the list
-    //  cycle through the codes in our AR vector
-    for (ActionReplay::ARCode& acompare : arcodes)
-    {
-        if (acompare.ops.size() == arcode.ops.size())
-        {
-            for(int i = 0; i < arcode.ops.size() ;i++)
-            {
-                if (acompare.ops[i].cmd_addr == arcode.ops[i].cmd_addr && acompare.ops[i].value == arcode.ops[i].value)
-                {
-                    exists = true;
-                }
-                else
-                {
-                    exists = false;
-                    // If it's not the same, no need to look through all the codes
-                    break;
-                }
-            }
-        }
-        if(exists)
-        {
-            acompare.enabled = enabled;
-            // If it exists, enable it, and we don't need to look at the rest of the codes
-            break;
-        }
-    }
-    
-    if(!exists)
+
+    if (!exists)
         arcodes.push_back(arcode);
-    
-    {
-        Core::CPUThreadGuard cpu_guard(Core::System::GetInstance());
-        ActionReplay::RunAllActive(cpu_guard);
-    }
+
+    ActionReplay::ApplyCodes(arcodes, _gameID, 0);
 }
 
 # pragma mark - Controls
