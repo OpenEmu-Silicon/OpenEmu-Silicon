@@ -1820,7 +1820,15 @@ final class OEGameDocument: NSDocument {
                 }
             }
 
-            let cheatType = systemPlugin.systemIdentifier == OESystemIdentifierPSP ? OECheatTypeCWCheat : OECheatTypeGameShark
+            let cheatType: String
+            switch systemPlugin.systemIdentifier {
+            case OESystemIdentifierPSP:
+                cheatType = OECheatTypeCWCheat
+            case OESystemIdentifierGameCube:
+                cheatType = OECheatTypeActionReplay
+            default:
+                cheatType = OECheatTypeGameShark
+            }
             let cheat = Cheat(code: code, type: cheatType, name: name)
 
             if shouldEnable {
@@ -1884,6 +1892,12 @@ final class OEGameDocument: NSDocument {
                 placeholder: NSLocalizedString("Game Genie or raw hex (XXXX:YY). Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, NES"),
                 validationHint: "",
                 validator: nil
+            )
+        case OESystemIdentifierGameCube:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Action Replay code (pairs of 8 hex chars), e.g. 003CC531 00000050. Paste the whole code; join lines with a newline or '+'.", comment: "Add Cheat dialog placeholder, GameCube"),
+                validationHint: NSLocalizedString("GameCube cheats use the Action Replay format: one or more pairs of 8 hex characters (address then value), or encrypted XXXX-XXXX-XXXXX lines. Enter the entire code — multi-line codes are supported; separate lines with a newline or '+'.", comment: "Add Cheat validation hint, GameCube"),
+                validator: { code in CheatCodeValidator.isActionReplayCodeGC(code) }
             )
         case OESystemIdentifierSNES:
             return CheatFormat(
@@ -2049,6 +2063,8 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeCWCheat)
         case OESystemIdentifierDreamcast:
             return ConvertedCheat(code: Self.convertToGameSharkDreamcast(code), type: OECheatTypeGameShark)
+        case OESystemIdentifierGameCube:
+            return ConvertedCheat(code: Self.convertToActionReplayGC(code), type: OECheatTypeActionReplay)
         case OESystemIdentifierIntellivision:
             return ConvertedCheat(code: Self.convertToIntellivision(code), type: OECheatTypeRaw)
         default:
@@ -2151,6 +2167,46 @@ final class OEGameDocument: NSDocument {
             // 3- and 4-byte values both ride in a single 32-bit write (a 3-byte value keeps a zero
             // high byte). Wider values aren't produced by the search for this system.
             return line(op: 0x02, value: UInt32(value & 0xFFFF_FFFF))
+        }
+    }
+
+    // MARK: GameCube Action Replay write (0tXXXXXX VVVVVVVV)
+
+    /// Converts a cheat-search hit into an Action Replay RAM-write code. The search already reads
+    /// MEM1 big-endian (GameCube is big-endian), so the value is in the console's natural byte order
+    /// and is written as-is — matching how published Action Replay codes store it. The AR first word
+    /// is `(size << 25) | (offset & 0x01FFFFFF)` with the base address 0x80000000 implied; size 0/1/2
+    /// selects an 8/16/32-bit write. Sizes other than 1/2/4 are emitted as consecutive 8-bit writes.
+    private static func convertToActionReplayGC(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let offset = (UInt32(addressPart, radix: 16) ?? 0) & 0x01FF_FFFF
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        func line(size: UInt32, offset: UInt32, value: UInt32) -> String {
+            String(format: "%08X %08X", (size << 25) | (offset & 0x01FF_FFFF), value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(size: 0, offset: offset, value: UInt32(value & 0xFF))
+        case 2:
+            return line(size: 1, offset: offset, value: UInt32(value & 0xFFFF))
+        case 4:
+            return line(size: 2, offset: offset, value: UInt32(value & 0xFFFF_FFFF))
+        default:
+            // No native 3-byte (or wider) write: emit one 8-bit write per memory byte, most
+            // significant first (big-endian), so the bytes land in the console's natural order.
+            var codes: [String] = []
+            for i in 0..<byteCount {
+                let shift = UInt64((byteCount - 1 - i) * 8)
+                let byte = UInt32((value >> shift) & 0xFF)
+                codes.append(line(size: 0, offset: offset &+ UInt32(i), value: byte))
+            }
+            return codes.joined(separator: "+")
         }
     }
 
