@@ -359,6 +359,11 @@ static void dolphin_hash_close(void *handle)
     
       dol_host->UpdateFrame();
 
+      // Apply a deferred auto-load once the CPU thread is up; LoadState returns false (a no-op)
+      // while the core is still booting, so retry each frame until it takes.
+      if (autoLoadStatefileName && dol_host->LoadState([autoLoadStatefileName UTF8String]))
+          autoLoadStatefileName = nil;
+
       [_raBridge doFrame];
     }
 }
@@ -524,31 +529,13 @@ static void dolphin_hash_close(void *handle)
 
 - (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
-    if (!_isInitialized)
+    if (!_isInitialized || !dol_host->LoadState([fileName UTF8String]))
     {
-        // Core not yet running — defer until initialization completes.
-        autoLoadStatefileName = fileName;
-        [NSThread detachNewThreadSelector:@selector(autoloadWaitThread) toTarget:self withObject:nil];
-        block(YES, nil);
+        // CPU thread isn't servicing jobs yet (boot still in the Starting phase). Queue the load
+        // for -executeFrame, which retries it every frame until the core reaches Running.
+        autoLoadStatefileName = [fileName copy];
     }
-    else
-    {
-        // State::LoadAs runs synchronously on the CPU thread via RunOnCPUThread,
-        // so by the time LoadState returns the state has been applied.
-        dol_host->LoadState([fileName UTF8String]);
-        block(YES, nil);
-    }
-}
-
-- (void)autoloadWaitThread
-{
-    @autoreleasepool
-    {
-        while (!_isInitialized)
-            usleep(100);
-
-        dol_host->LoadState([autoLoadStatefileName UTF8String]);
-    }
+    block(YES, nil);
 }
 
 # pragma mark - Input GC

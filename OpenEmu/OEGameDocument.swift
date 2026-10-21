@@ -2034,8 +2034,8 @@ final class OEGameDocument: NSDocument {
             )
         case OESystemIdentifierDreamcast:
             return CheatFormat(
-                placeholder: NSLocalizedString("GameShark/Action Replay code, e.g. 0C68E07C 00000009. Paste every line of the code.", comment: "Add Cheat dialog placeholder, Dreamcast"),
-                validationHint: NSLocalizedString("Dreamcast codes use the GameShark/Action Replay format: one or more 8 hex digit words, e.g. 0C68E07C 00000009. Paste the code exactly as published, including every line — don't add 0x prefixes or '+' separators.", comment: "Add Cheat validation hint, Dreamcast"),
+                placeholder: NSLocalizedString("GameShark/Action Replay code, e.g. 021EC4C8 0098967F. Paste every line of the code.", comment: "Add Cheat dialog placeholder, Dreamcast"),
+                validationHint: NSLocalizedString("Dreamcast codes use the GameShark/Action Replay format: one or more 8 hex digit words, e.g. 021EC4C8 0098967F. The leading byte is the write type (00/01/02 = 8/16/32-bit); enable-only codes (e.g. 0C…) are accepted but have no effect. Paste the code exactly as published, including every line — don't add 0x prefixes or '+' separators.", comment: "Add Cheat validation hint, Dreamcast"),
                 validator: { code in
                     CheatCodeValidator.isDreamcastGameSharkCode(code)
                 }

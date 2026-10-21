@@ -162,6 +162,11 @@ final class DolphinCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         }
         guard let address = hex(address), let value = hex(value) else { return nil }
 
+        // An Action Replay address is a 25-bit offset from 0x80000000, so it can only reach MEM1
+        // (0x80000000–0x81FFFFFF). A MEM2 patch (0x90000000+) or any other region can't be expressed
+        // as an AR write — drop it rather than masking the base and writing to the wrong address.
+        guard (address & 0xFE00_0000) == 0x8000_0000 else { return nil }
+
         let size: UInt32
         switch type.trimmingCharacters(in: .whitespaces).lowercased() {
         case "byte":  size = 0
