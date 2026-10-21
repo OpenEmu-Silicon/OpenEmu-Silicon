@@ -1,11 +1,7 @@
-Core plugin versions built from commit 661948b70
+Core plugin versions built from commit 740c0db30
 
-Picodrive 1.93.1
-Potator 0.1.1
-VecXGL 1.2.3
-PokeMini 0.6.1
-PPSSPP 1.14.9
-blueMSX 2.9.1294
-O2EM 1.18.2
-CrabEmu 0.2.1.271
-ProSystem 1.5.3
+Bliss 2.1.3
+Dolphin 5.0.16211.2
+Flycast 2.4.3
+JollyCV 1.0.3
+VirtualJaguar 2.1.2
