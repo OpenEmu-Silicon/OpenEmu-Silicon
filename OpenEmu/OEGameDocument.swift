@@ -1692,9 +1692,15 @@ final class OEGameDocument: NSDocument {
         // BSNES is the only core that reads the cheat type — it strips ':' from raw
         // address:value codes only when tagged Raw/Action Replay. Everyone else ignores
         // the type or strips the colon itself, so the code shape is all we need.
-        let type = systemPlugin.systemIdentifier == OESystemIdentifierPSP
-            ? OECheatTypeCWCheat
-            : (code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark)
+        let type: String
+        switch systemPlugin.systemIdentifier {
+        case OESystemIdentifierPSP:
+            type = OECheatTypeCWCheat
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            type = OECheatTypeActionReplay
+        default:
+            type = code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark
+        }
         let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode)
         cheat.isEnabled = true
         setCheat(cheat)
