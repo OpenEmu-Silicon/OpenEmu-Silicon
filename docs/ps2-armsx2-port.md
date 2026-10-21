@@ -94,6 +94,14 @@ All items live as checkboxes in one tracker issue, so there is one place to look
 8. **Compatibility and speed matrix.** Run a list of games (light and demanding) and record fps and problems. Good for contributors with their own game libraries. Done when: a table of results is in the tracker.
 9. **Packaging and Experimental release.** Bundle the linked libraries (SDL3, libpng, libjpeg, libwebp, zstd, lz4, freetype) inside the plugin, sign, add the appcast and credits (GPL notice, ARMSX2 and PCSX2). A maintainer cuts the release. Done when: a clean install picks up the core from the appcast.
 
+## Branching
+
+All PS2 work lands on the long-lived integration branch `feat/ps2-core`, not on `main`. The core takes time and is not releasable until it works end to end. When it is ready, one PR merges `feat/ps2-core` into `main`, and a maintainer decides when.
+
+- Branch from `feat/ps2-core` and open your PR against `feat/ps2-core`.
+- Keep `feat/ps2-core` current with `main` (`git fetch origin && git merge origin/main`), so the final merge stays small.
+- Never ship or release from `feat/ps2-core`. Release only from `main`.
+
 ## Ground rules
 
 - Pin to a commit. Do not track ARMSX2 nightlies.

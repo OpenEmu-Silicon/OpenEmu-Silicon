@@ -29,6 +29,7 @@ Replace the PCSX2 plan with a native core built on ARMSX2. Reuse the existing Op
 - Do not use ARMSX2's libretro target. The libretro bridge is being removed.
 - Do not copy the old bridge's forked copies of engine files (Metal device, SPU2 mixer, `Pad.cpp`). They are stale against ARMSX2. Patch ARMSX2's own files with small, flagged changes instead.
 - Pin ARMSX2 to a specific commit, never a branch or the nightly channel.
+- Develop on a long-lived integration branch, `feat/ps2-core`, and merge it into `main` in one PR once the core works end to end. This is an exception to the usual "no long-lived branches" habit, because the core cannot be released in pieces.
 - Ship as Experimental first.
 
 The full map and work breakdown are in [`docs/ps2-armsx2-port.md`](../ps2-armsx2-port.md).
