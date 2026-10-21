@@ -24,6 +24,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0FLYC0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0FLYC0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1 -Dmd5_init=rc_md5_init -Dmd5_append=rc_md5_append -Dmd5_finish=rc_md5_finish -Dmd5_process=rc_md5_process"; }; };
+		OE0FLYC0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0FLYC0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0FLYC0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0FLYC0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		0035CB801FBBAAB533004538 /* flycast/core/hw/mem/addrspace.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D6E8F6D59369A7F2DA8C5651 /* flycast/core/hw/mem/addrspace.cpp */; };
 		0077D43299B114EFBC0B71D5 /* flycast/core/imgread/isofs.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DA50FCF93A601EE572C79B3E /* flycast/core/imgread/isofs.cpp */; };
 		019586AA12CFE6DAC547AF8A /* flycast/core/audio/audiobackend_coreaudio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5140B257C4092F1DC95A49F5 /* flycast/core/audio/audiobackend_coreaudio.cpp */; };
@@ -515,6 +518,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		OE0FLYC0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0FLYC0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0FLYC0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0FLYC0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		002DB2CA70276D9A167C5FE4 /* flycast/core/deps/libzip/lib/zip_source_stat.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = flycast/core/deps/libzip/lib/zip_source_stat.c; sourceTree = SOURCE_ROOT; };
 		006CF0455EC4516C296D095F /* flycast/core/reios/reios_elf.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = flycast/core/reios/reios_elf.cpp; sourceTree = SOURCE_ROOT; };
 		00832AFAECAFBFBB6E8CC05D /* flycast/core/deps/libzip/lib/zip_algorithm_zstd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = flycast/core/deps/libzip/lib/zip_algorithm_zstd.c; sourceTree = SOURCE_ROOT; };
@@ -1159,6 +1166,10 @@
 				54A87E76D29E3EEF7F41ABDC /* flycast/core/deps/nowide/src/filebuf.cpp */,
 				0DCBAAF6347F6AA8D2869201 /* flycast/core/hw/flashrom/flashrom.cpp */,
 				58CAF6EDD2FC9A4A0D718B0B /* OpenEmu/FlycastGameCore.mm */,
+				OE0FLYC0FILEREF000000001 /* rcheevos_build.c */,
+				OE0FLYC0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0FLYC0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0FLYC0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				FE0BF19A98E54E489398F180911453B6 /* OpenEmu/flycast_platform_stubs.cpp */,
 				76A384E7E78BEE3CEAD0E316 /* flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c */,
 				1D3FB7541EEECFF38DB60932 /* flycast/core/ui/game_scanner.cpp */,
@@ -1627,6 +1638,9 @@
 				719835B49263F0B99DA82D1A /* flycast/core/deps/nowide/src/filebuf.cpp in Sources */,
 				27D4D9264B1361463CBDE41E /* flycast/core/hw/flashrom/flashrom.cpp in Sources */,
 				46A14332C34E6C4ACDE82607 /* OpenEmu/FlycastGameCore.mm in Sources */,
+				OE0FLYC0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0FLYC0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0FLYC0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				51DB143EB47C431B9651C2F3511BDB7B /* OpenEmu/flycast_platform_stubs.cpp in Sources */,
 				4B54CAAEFCE97A0414C5DD16 /* flycast/core/deps/libchdr/deps/zstd-1.5.6/lib/common/fse_decompress.c in Sources */,
 				2F00AABB39D018193C25654D /* flycast/core/ui/game_scanner.cpp in Sources */,
@@ -2109,6 +2123,9 @@
 					"$(SRCROOT)/flycast/core/deps/libzip/lib",
 					"$(SRCROOT)/flycast/core/deps/libelf/include",
 					"$(SRCROOT)/flycast/core/deps/glad/include",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 					"$(SRCROOT)/flycast/core/deps/rcheevos/include",
 					"$(SRCROOT)/flycast/core/deps/websocketpp",
 					"$(SRCROOT)/flycast/core/khronos",
@@ -2318,6 +2335,9 @@
 					"$(SRCROOT)/flycast/core/deps/libzip/lib",
 					"$(SRCROOT)/flycast/core/deps/libelf/include",
 					"$(SRCROOT)/flycast/core/deps/glad/include",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 					"$(SRCROOT)/flycast/core/deps/rcheevos/include",
 					"$(SRCROOT)/flycast/core/deps/websocketpp",
 					"$(SRCROOT)/flycast/core/khronos",

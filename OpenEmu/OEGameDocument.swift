@@ -822,6 +822,10 @@ final class OEGameDocument: NSDocument {
                     return
                 }
                 
+                // The window title embeds the core name (see displayName); corePlugin just
+                // changed, so refresh the title AppKit cached from the previous core.
+                self.windowControllers.forEach { $0.synchronizeWindowTitleWithDocumentName() }
+                
                 completionHandler()
             }
         }
@@ -1466,7 +1470,12 @@ final class OEGameDocument: NSDocument {
             return
         }
         
+        // Switching cores tears down the session and restarts the game (progress is lost, as the
+        // alert warns), so the hardcore anti-cheat pause protection doesn't apply here. Bypass it
+        // so the confirmation pause isn't blocked, which would otherwise abort the switch.
+        retroAchievementsHardcorePausePreflightSatisfied = true
         isEmulationPaused = true
+        retroAchievementsHardcorePausePreflightSatisfied = false
         guard isEmulationPaused else { return }
         
         let alert = OEAlert()
@@ -1683,9 +1692,15 @@ final class OEGameDocument: NSDocument {
         // BSNES is the only core that reads the cheat type — it strips ':' from raw
         // address:value codes only when tagged Raw/Action Replay. Everyone else ignores
         // the type or strips the colon itself, so the code shape is all we need.
-        let type = systemPlugin.systemIdentifier == OESystemIdentifierPSP
-            ? OECheatTypeCWCheat
-            : (code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark)
+        let type: String
+        switch systemPlugin.systemIdentifier {
+        case OESystemIdentifierPSP:
+            type = OECheatTypeCWCheat
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            type = OECheatTypeActionReplay
+        default:
+            type = code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark
+        }
         let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode)
         cheat.isEnabled = true
         setCheat(cheat)
@@ -1811,7 +1826,15 @@ final class OEGameDocument: NSDocument {
                 }
             }
 
-            let cheatType = systemPlugin.systemIdentifier == OESystemIdentifierPSP ? OECheatTypeCWCheat : OECheatTypeGameShark
+            let cheatType: String
+            switch systemPlugin.systemIdentifier {
+            case OESystemIdentifierPSP:
+                cheatType = OECheatTypeCWCheat
+            case OESystemIdentifierGameCube, OESystemIdentifierWii:
+                cheatType = OECheatTypeActionReplay
+            default:
+                cheatType = OECheatTypeGameShark
+            }
             let cheat = Cheat(code: code, type: cheatType, name: name)
 
             if shouldEnable {
@@ -1875,6 +1898,12 @@ final class OEGameDocument: NSDocument {
                 placeholder: NSLocalizedString("Game Genie or raw hex (XXXX:YY). Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, NES"),
                 validationHint: "",
                 validator: nil
+            )
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Action Replay code (pairs of 8 hex chars), e.g. 003CC531 00000050. Paste the whole code; join lines with a newline or '+'.", comment: "Add Cheat dialog placeholder, GameCube/Wii"),
+                validationHint: NSLocalizedString("GameCube and Wii cheats use the Action Replay format: one or more pairs of 8 hex characters (address then value), or encrypted XXXX-XXXX-XXXXX lines. Enter the entire code — multi-line codes are supported; separate lines with a newline or '+'.", comment: "Add Cheat validation hint, GameCube/Wii"),
+                validator: { code in CheatCodeValidator.isActionReplayCodeGC(code) }
             )
         case OESystemIdentifierSNES:
             return CheatFormat(
@@ -1959,6 +1988,18 @@ final class OEGameDocument: NSDocument {
             return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),
                 hint: NSLocalizedString("MSX codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C123:05. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, MSX"))
+        case OESystemIdentifierIntellivision:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex word address + hex value, e.g. 015B:02. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Intellivision"),
+                validationHint: NSLocalizedString("Intellivision codes must be a hex word address plus a hex value (max 4 and 4 hex digits), e.g. 015B:02. Addresses target the 16-bit RAM (0100-01EF scratchpad, 0200-035F system RAM). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Intellivision"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 4) }
+                }
+            )
         case OESystemIdentifierVB:
             return CheatFormat(
                 placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
@@ -1971,12 +2012,32 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), addressHexChars: 8, valueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierJaguar:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. 1CC80B:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Atari Jaguar"),
+                validationHint: NSLocalizedString("Atari Jaguar codes must be a hex address plus a hex value (max 6 and 8 hex digits), e.g. 1CC80B:05. Addresses target the 2 MB main RAM (000000-1FFFFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari Jaguar"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 6, maxValueHexChars: 8) }
+                }
+            )
         case OESystemIdentifierPSP:
             return CheatFormat(
                 placeholder: NSLocalizedString("CwCheat code, e.g. _L 0x2024DA44 0x3F800000. Paste the whole code, including every _L line.", comment: "Add Cheat dialog placeholder, PSP"),
                 validationHint: NSLocalizedString("PSP codes use the CwCheat/TempAR format: one or more _L (or _M) lines, each followed by two hex words, e.g. _L 0x2024DA44 0x3F800000. Paste the code exactly as published — don't strip the _L tags or split multi-line codes.", comment: "Add Cheat validation hint, PSP"),
                 validator: { code in
                     CheatCodeValidator.isCWCheatCode(code)
+                }
+            )
+        case OESystemIdentifierDreamcast:
+            return CheatFormat(
+                placeholder: NSLocalizedString("GameShark/Action Replay code, e.g. 021EC4C8 0098967F. Paste every line of the code.", comment: "Add Cheat dialog placeholder, Dreamcast"),
+                validationHint: NSLocalizedString("Dreamcast codes use the GameShark/Action Replay format: one or more 8 hex digit words, e.g. 021EC4C8 0098967F. The leading byte is the write type (00/01/02 = 8/16/32-bit); enable-only codes (e.g. 0C…) are accepted but have no effect. Paste the code exactly as published, including every line — don't add 0x prefixes or '+' separators.", comment: "Add Cheat validation hint, Dreamcast"),
+                validator: { code in
+                    CheatCodeValidator.isDreamcastGameSharkCode(code)
                 }
             )
         default:
@@ -2006,6 +2067,12 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToSaturnAR(code), type: OECheatTypeActionReplay)
         case OESystemIdentifierPSP:
             return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeCWCheat)
+        case OESystemIdentifierDreamcast:
+            return ConvertedCheat(code: Self.convertToGameSharkDreamcast(code), type: OECheatTypeGameShark)
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            return ConvertedCheat(code: Self.convertToActionReplayGC(code), type: OECheatTypeActionReplay)
+        case OESystemIdentifierIntellivision:
+            return ConvertedCheat(code: Self.convertToIntellivision(code), type: OECheatTypeRaw)
         default:
             return ConvertedCheat(code: Self.convertToRaw(code, addressBytes: addressBytes, minDataBytes: minDataBytes), type: OECheatTypeRaw)
         }
@@ -2079,6 +2146,76 @@ final class OEGameDocument: NSDocument {
         }
     }
 
+    // MARK: Dreamcast GameShark/Action Replay (00/01/02 AAAAAA VVVVVVVV)
+
+    /// Cheat-search addresses are plain 24-bit RAM offsets (the search region is based at 0, which
+    /// matches the GameShark address field). The code's top byte is the write type: 00 = 8-bit,
+    /// 01 = 16-bit, 02 = 32-bit. Values up to 4 bytes fit a single write.
+    private static func convertToGameSharkDreamcast(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let address = (UInt32(addressPart, radix: 16) ?? 0) & 0x00FF_FFFF
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        func line(op: UInt32, value: UInt32) -> String {
+            String(format: "%08X %08X", (op << 24) | address, value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(op: 0x00, value: UInt32(value & 0xFF))
+        case 2:
+            return line(op: 0x01, value: UInt32(value & 0xFFFF))
+        default:
+            // 3- and 4-byte values both ride in a single 32-bit write (a 3-byte value keeps a zero
+            // high byte). Wider values aren't produced by the search for this system.
+            return line(op: 0x02, value: UInt32(value & 0xFFFF_FFFF))
+        }
+    }
+
+    // MARK: GameCube Action Replay write (0tXXXXXX VVVVVVVV)
+
+    /// Converts a cheat-search hit into an Action Replay RAM-write code. The search already reads
+    /// MEM1 big-endian (GameCube is big-endian), so the value is in the console's natural byte order
+    /// and is written as-is — matching how published Action Replay codes store it. The AR first word
+    /// is `(size << 25) | (offset & 0x01FFFFFF)` with the base address 0x80000000 implied; size 0/1/2
+    /// selects an 8/16/32-bit write. Sizes other than 1/2/4 are emitted as consecutive 8-bit writes.
+    private static func convertToActionReplayGC(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let offset = (UInt32(addressPart, radix: 16) ?? 0) & 0x01FF_FFFF
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        func line(size: UInt32, offset: UInt32, value: UInt32) -> String {
+            String(format: "%08X %08X", (size << 25) | (offset & 0x01FF_FFFF), value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(size: 0, offset: offset, value: UInt32(value & 0xFF))
+        case 2:
+            return line(size: 1, offset: offset, value: UInt32(value & 0xFFFF))
+        case 4:
+            return line(size: 2, offset: offset, value: UInt32(value & 0xFFFF_FFFF))
+        default:
+            // No native 3-byte (or wider) write: emit one 8-bit write per memory byte, most
+            // significant first (big-endian), so the bytes land in the console's natural order.
+            var codes: [String] = []
+            for i in 0..<byteCount {
+                let shift = UInt64((byteCount - 1 - i) * 8)
+                let byte = UInt32((value >> shift) & 0xFF)
+                codes.append(line(size: 0, offset: offset &+ UInt32(i), value: byte))
+            }
+            return codes.joined(separator: "+")
+        }
+    }
+
     // MARK: Raw format (ADDRESS:VALUE with padding and multi-byte splitting)
 
     private static func convertToRaw(_ code: String, addressBytes: UInt8, minDataBytes: UInt8) -> String {
@@ -2107,6 +2244,32 @@ final class OEGameDocument: NSDocument {
             let addrStr = String(format: "%0\(hexDigits)llX", addr)
             let valStr = String(format: "%0\(Int(minDataBytes) * 2)X", chunk)
             codes.append("\(addrStr):\(valStr)")
+        }
+        return codes.joined(separator: "+")
+    }
+
+    // MARK: Intellivision raw word address:value (WWWW:VVVV)
+
+    /// Converts a cheat-search hit into the native Intellivision raw code. The search exposes each
+    /// 16-bit word as 2 bytes with the region base doubled, so the hit's byte address is exactly
+    /// twice the real CP1610 word address; halving recovers it. A value wider than one word (a 4-byte
+    /// search) spans consecutive words little-endian — the same way the search read them — so emit one
+    /// WWWW:VVVV poke per word, joined with '+', which the Bliss core's setCheat applies in turn.
+    private static func convertToIntellivision(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let byteAddress = UInt32(addressPart, radix: 16) ?? 0
+        let wordAddress = byteAddress / 2
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+        let wordCount = max(1, (byteCount + 1) / 2)
+
+        var codes: [String] = []
+        for i in 0..<wordCount {
+            let word = UInt32((value >> (UInt64(i) * 16)) & 0xFFFF)
+            codes.append(String(format: "%04X:%04X", (wordAddress &+ UInt32(i)) & 0xFFFF, word))
         }
         return codes.joined(separator: "+")
     }
