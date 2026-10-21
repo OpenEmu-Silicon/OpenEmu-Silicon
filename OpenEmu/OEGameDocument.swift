@@ -1824,7 +1824,7 @@ final class OEGameDocument: NSDocument {
             switch systemPlugin.systemIdentifier {
             case OESystemIdentifierPSP:
                 cheatType = OECheatTypeCWCheat
-            case OESystemIdentifierGameCube:
+            case OESystemIdentifierGameCube, OESystemIdentifierWii:
                 cheatType = OECheatTypeActionReplay
             default:
                 cheatType = OECheatTypeGameShark
@@ -1893,10 +1893,10 @@ final class OEGameDocument: NSDocument {
                 validationHint: "",
                 validator: nil
             )
-        case OESystemIdentifierGameCube:
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
             return CheatFormat(
-                placeholder: NSLocalizedString("Action Replay code (pairs of 8 hex chars), e.g. 003CC531 00000050. Paste the whole code; join lines with a newline or '+'.", comment: "Add Cheat dialog placeholder, GameCube"),
-                validationHint: NSLocalizedString("GameCube cheats use the Action Replay format: one or more pairs of 8 hex characters (address then value), or encrypted XXXX-XXXX-XXXXX lines. Enter the entire code — multi-line codes are supported; separate lines with a newline or '+'.", comment: "Add Cheat validation hint, GameCube"),
+                placeholder: NSLocalizedString("Action Replay code (pairs of 8 hex chars), e.g. 003CC531 00000050. Paste the whole code; join lines with a newline or '+'.", comment: "Add Cheat dialog placeholder, GameCube/Wii"),
+                validationHint: NSLocalizedString("GameCube and Wii cheats use the Action Replay format: one or more pairs of 8 hex characters (address then value), or encrypted XXXX-XXXX-XXXXX lines. Enter the entire code — multi-line codes are supported; separate lines with a newline or '+'.", comment: "Add Cheat validation hint, GameCube/Wii"),
                 validator: { code in CheatCodeValidator.isActionReplayCodeGC(code) }
             )
         case OESystemIdentifierSNES:
@@ -2063,7 +2063,7 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeCWCheat)
         case OESystemIdentifierDreamcast:
             return ConvertedCheat(code: Self.convertToGameSharkDreamcast(code), type: OECheatTypeGameShark)
-        case OESystemIdentifierGameCube:
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
             return ConvertedCheat(code: Self.convertToActionReplayGC(code), type: OECheatTypeActionReplay)
         case OESystemIdentifierIntellivision:
             return ConvertedCheat(code: Self.convertToIntellivision(code), type: OECheatTypeRaw)

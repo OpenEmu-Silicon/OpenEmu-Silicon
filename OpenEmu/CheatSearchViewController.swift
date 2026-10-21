@@ -127,11 +127,12 @@ final class CheatSearchViewController: NSViewController {
         memoryRegions.map { Int($0.minDataBytes) }.max() ?? 1
     }
 
-    /// GameCube (PowerPC) stores memory big-endian, so multi-byte search values must be read
+    /// GameCube and Wii (PowerPC) store memory big-endian, so multi-byte search values must be read
     /// MSB-first for the displayed/compared value to match the console's real value. Every other
     /// supported system is read little-endian.
     private var isBigEndian: Bool {
         gameDocument?.systemIdentifier == OESystemIdentifierGameCube
+            || gameDocument?.systemIdentifier == OESystemIdentifierWii
     }
 
     // MARK: - Table View

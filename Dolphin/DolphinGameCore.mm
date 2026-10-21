@@ -655,12 +655,13 @@ static void dolphin_hash_close(void *handle)
     dol_host->SetCheat([code UTF8String], [type UTF8String], enabled);
 }
 
-// Cheat search reads a snapshot of MEM1, the 24 MB GameCube main RAM mapped at 0x80000000.
-// The buffer is stored big-endian (PowerPC), which the search's little-endian multi-byte reads
-// account for app-side when converting a found value into a Gecko write code.
+// Cheat search reads a snapshot of MEM1, the 24 MB main RAM mapped at 0x80000000 (GameCube and
+// Wii alike). The buffer is stored big-endian (PowerPC), which the app-side search reads
+// big-endian when converting a found value into an Action Replay write code. Only MEM1 is exposed:
+// an Action Replay address is a 25-bit offset from 0x80000000, so it can't reach the Wii's MEM2.
 - (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
 {
-    if (!_isInitialized || _isWii)
+    if (!_isInitialized)
         return @[];
 
     auto &system = Core::System::GetInstance();
