@@ -219,9 +219,13 @@ enum CheatCodeValidator {
         }
     }
 
-    /// GameCube Action Replay code: either decrypted "address value" word pairs (an even, non-empty
-    /// sequence of 8-hex-digit words) or encrypted `XXXX-XXXX-XXXXX` lines. Words/lines are separated
-    /// by whitespace, newlines or '+'. A 0x prefix is rejected.
+    /// GameCube / Wii Action Replay code: either decrypted "address value" word pairs (an even,
+    /// non-empty sequence of 8-hex-digit words) or encrypted `XXXX-XXXX-XXXXX` lines. Words/lines are
+    /// separated by whitespace, newlines or '+'. A 0x prefix is rejected.
+    ///
+    /// Gecko is intentionally NOT accepted: the Dolphin core applies Action Replay only (see
+    /// DolHost::SetCheat), so a contiguous 16-hex Gecko line is correctly rejected rather than
+    /// silently stored as an inert code.
     static func isActionReplayCodeGC(_ code: String) -> Bool {
         let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" || $0 == "+" })
         guard !tokens.isEmpty else { return false }

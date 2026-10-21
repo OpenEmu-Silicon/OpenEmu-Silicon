@@ -336,14 +336,10 @@ bool DolHost::LoadState(std::string saveStateFile)
     auto &system = Core::System::GetInstance();
 
     // State::LoadAs applies the save via Core::RunOnCPUThread, which only hands DoState to the CPU
-    // thread once the core is fully Running (s_state == Running). OpenEmu can auto-load while the
-    // boot is still in the Starting phase — _isInitialized is set as soon as LoadFileAtPath returns,
-    // before the CPU thread is operational — in which case RunOnCPUThread runs DoState inline on
-    // this thread and trips DVDThread::WaitUntilIdle's IsCPUThread() assertion. Wait (capped) for
-    // the CPU thread to come up, and skip the load rather than crash if it never does.
-    for (int i = 0; i < 3000 && !Core::IsRunning(system); ++i)
-        usleep(1000);
-
+    // thread once the core is fully Running (s_state == Running). The Starting->Running flip happens
+    // asynchronously on the EmuThread, so a load requested right after boot would otherwise run
+    // DoState inline on this thread and trip DVDThread::WaitUntilIdle's IsCPUThread() assertion.
+    // Return false (not loaded) until the CPU thread is up; the caller retries on the next frame.
     if (!Core::IsRunning(system))
         return false;
 
@@ -371,6 +367,12 @@ bool DolHost::LoadState(std::string saveStateFile)
 // per-frame PatchEngine::ApplyFramePatches → ActionReplay::RunAllActive path (running once
 // MAIN_ENABLE_CHEATS is set) applies them, and ApplyCodes filters to the codes whose `enabled`
 // flag is set.
+//
+// Gecko support is INTENTIONALLY dropped (an earlier revision routed 16-hex lines to
+// Gecko::SetActiveCodes). Reasons: GameCube gameplay cheats are overwhelmingly Action Replay; the
+// Wii Gecko codes in Dolphin's database are mostly visual/netplay hacks that lean on MEM2 and ASM
+// injection we don't want to apply; and a decrypted AR line and a Gecko line are indistinguishable
+// by shape, so committing to one engine avoids mis-routing. Only AR is accepted/applied here.
 void DolHost::SetCheat(std::string code, std::string type, bool enabled)
 {
     arcode.ops.clear();
