@@ -1,0 +1,3 @@
+OpenEmu-Silicon/fbneo commit: b42f3c264338d01a344be18201aec22622daf980
+branch: fbneo-headless
+source: https://github.com/OpenEmu-Silicon/fbneo.git
