@@ -62,6 +62,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
     static let providerName = "Libretro"
     var name: String { Self.providerName }
 
+    /// Libretro's arcade (FBNeo) cht files are FBNeo-address-based, so they only apply to the FBNeo
+    /// core — not MAME, which uses Pugsy's. This is the FBNeo core's bundle id.
+    static let fbneoCoreIdentifier = "org.openemu.FBNeo"
+
     private static let datBaseURLNoIntro = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/no-intro/"
     private static let datBaseURLRedump = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/redump/"
     private static let chtBaseURL = "https://raw.githubusercontent.com/libretro/libretro-database/master/cht/"
@@ -99,6 +103,7 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         OESystemIdentifierVB:        "Nintendo - Virtual Boy",
         OESystemIdentifierWS:        "Bandai - WonderSwan",
         OESystemIdentifierPCFX:      "NEC - PC-FX",
+        OESystemIdentifierArcade:    "FBNeo - Arcade Games",
     ]
 
     // Systems where a single system ID maps to multiple Libretro DAT/CHT directories
@@ -147,6 +152,9 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
 
     func cheats(forMD5 md5: String, serial: String?, gameName: String?, romURL: URL?, systemIdentifier: String, coreIdentifier: String) async throws -> [DatabaseCheat] {
         guard let libretroSystem = systemMap[systemIdentifier] else { return [] }
+
+        // Arcade cht files are FBNeo-address-based, so only the FBNeo core gets them (MAME uses Pugsy's).
+        if systemIdentifier == OESystemIdentifierArcade, coreIdentifier != Self.fbneoCoreIdentifier { return [] }
 
         // 1. Check local cache
         if let cached = loadCachedCheats(md5: md5, systemIdentifier: systemIdentifier) {
@@ -212,6 +220,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         if systemIdentifier == OESystemIdentifierPSP {
             return try await discoverCheatsPSP(serial: serial, libretroSystem: libretroSystem)
         }
+        // Arcade (FBNeo) matches by romset short name — the cht file is named after the ROM zip.
+        if systemIdentifier == OESystemIdentifierArcade {
+            return try await discoverCheatsArcade(romURL: romURL, gameName: gameName, libretroSystem: libretroSystem)
+        }
         // Resolve game name via DAT (try MD5 first, then serial). For disc systems, OpenEmu's stored
         // MD5 hashes the .cue playlist file, not the disc data, so it never matches Libretro's
         // per-track MD5s — resolveDATName recomputes the data track's MD5 when possible.
@@ -251,6 +263,20 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
         }
 
         return DiscoveredCheats(sources: sources, cheats: dedup(allCheats), resolvedGameName: lookup?.name)
+    }
+
+    // MARK: - Arcade (romset-named)
+
+    /// Arcade discovery (FBNeo): cht files are named by romset short name — the ROM zip's basename,
+    /// e.g. "mslug.cht" — and fetched directly. No DAT/MD5/serial resolution, and the cht address is
+    /// already the RAM-relative offset the FBNeo core pokes.
+    private func discoverCheatsArcade(romURL: URL?, gameName: String?, libretroSystem: String) async throws -> DiscoveredCheats? {
+        guard let romset = romURL?.deletingPathExtension().lastPathComponent ?? gameName, !romset.isEmpty else { return nil }
+        let filename = "\(romset).cht"
+        guard let result = try await downloadCHT(chtFileName: filename, libretroSystem: libretroSystem, systemIdentifier: OESystemIdentifierArcade, existingETag: nil),
+              !result.cheats.isEmpty else { return nil }
+        return DiscoveredCheats(sources: [LibretroCachedSource(chtFileName: filename, libretroSystem: libretroSystem, etag: result.etag)],
+                                cheats: dedup(result.cheats), resolvedGameName: romset)
     }
 
     // MARK: - PSP (serial-indexed)
@@ -624,6 +650,27 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 guard !seenCodes.contains(dedupKey) else { continue }
                 seenCodes.insert(dedupKey)
                 cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: code, rawCode: raw))
+                continue
+            }
+
+            // FBNeo arcade: Format-B only (decimal address + value). The address is already the
+            // RAM-relative offset the core pokes; size the value by memory_search_size so multi-byte
+            // cheats keep their width (big_endian is always false for FBNeo's host-order RAM).
+            if systemIdentifier == OESystemIdentifierArcade {
+                let cheatType = fields["cheat_type"]
+                guard cheatType == nil || cheatType == "1",
+                      let addrStr = fields["address"], let valStr = fields["value"],
+                      let addr = UInt32(addrStr), let val = UInt32(valStr) else { continue }
+                let valueHexChars: Int
+                switch fields["memory_search_size"] {
+                case "4": valueHexChars = 4  // 16-bit
+                case "5": valueHexChars = 8  // 32-bit
+                default:  valueHexChars = 2  // 8-bit or sub-byte
+                }
+                let fbCode = String(format: "%X:%0\(valueHexChars)X", addr, val)
+                guard !seenCodes.contains(fbCode) else { continue }
+                seenCodes.insert(fbCode)
+                cheats.append(LibretroCachedCheat(name: Self.decodingHTMLEntities(desc), code: fbCode, rawCode: "address=\(addrStr);value=\(valStr)"))
                 continue
             }
 
