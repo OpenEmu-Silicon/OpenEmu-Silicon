@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Prepare the FBNeo (FinalBurn Neo) source used by FBNeo/FBNeo.xcodeproj.
 #
-# This checks out the OpenEmu-Silicon/fbneo fork's `fbneo-headless` branch, which
+# This checks out a pinned revision of the OpenEmu-Silicon/fbneo fork, which
 # carries our headless burner interface. Unlike the MAME core there is no separate
-# local patch file: all OpenEmu-specific changes live on that branch, so updating
-# upstream means merging finalburnneo/FBNeo master into fbneo-headless and bumping
-# the revision below.
+# local patch file: all OpenEmu-specific changes live on the branch, so updating
+# means merging finalburnneo/FBNeo master into that branch and bumping the
+# revision below.
 
 set -euo pipefail
 
@@ -17,7 +17,7 @@ SRC_DIR="$DEPS_DIR/fbneo"
 REMOTE="https://github.com/OpenEmu-Silicon/fbneo.git"
 BRANCH="fbneo-headless"
 # Keep in sync with FBNeo/deps-fbneo-revision.txt.
-REVISION="b42f3c264338d01a344be18201aec22622daf980"
+REVISION="cd62b592c67946136e1b731c40441d7d41452262"
 
 mkdir -p "$DEPS_DIR"
 

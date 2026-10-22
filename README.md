@@ -129,4 +129,4 @@ Most of the code here is still the original team's, and the architecture is unch
 
 This project is a derivative of [OpenEmu](https://github.com/OpenEmu/OpenEmu). Most of the main app and SDK still carries the OpenEmu Team's original **BSD 3-Clause** copyright header, which is what actually governs those files. See [`LICENSE`](LICENSE) for the full text and how it applies. Individual emulation cores carry their own licenses (GPL v2, MPL 2.0, LGPL 2.1, and others). See each core's directory for details.
 
-Note: [picodrive](https://github.com/notaz/picodrive) includes a non-commercial clause. This project is and will remain free.
+Note: [picodrive](https://github.com/notaz/picodrive) and [FBNeo](https://github.com/finalburnneo/FBNeo) include non-commercial clauses (FBNeo also inherits the MAME license). This project is and will remain free.
