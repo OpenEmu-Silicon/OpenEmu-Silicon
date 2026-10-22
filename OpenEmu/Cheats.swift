@@ -37,17 +37,21 @@ final class Cheat: Codable {
     var rawCode: String?
     /// Set at runtime; not persisted. False when the current core can't handle this code format.
     var isCompatibleWithCore = true
+    /// Core that created this cheat. Only persisted for cores whose cheats are per-core
+    /// (OEGameCoreCheatsArePerCore); nil for shared-cheat systems and legacy entries.
+    var coreIdentifier: String?
 
     private enum CodingKeys: String, CodingKey {
-        case code, type, name, isEnabled, cheatSource, rawCode
+        case code, type, name, isEnabled, cheatSource, rawCode, coreIdentifier
     }
 
-    init(code: String, type: String, name: String, cheatSource: String? = nil, rawCode: String? = nil) {
+    init(code: String, type: String, name: String, cheatSource: String? = nil, rawCode: String? = nil, coreIdentifier: String? = nil) {
         self.code = code
         self.type = type
         self.name = name
         self.cheatSource = cheatSource
         self.rawCode = rawCode
+        self.coreIdentifier = coreIdentifier
     }
 
     init(from decoder: Decoder) throws {
@@ -58,6 +62,7 @@ final class Cheat: Codable {
         isEnabled = try c.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
         cheatSource = try c.decodeIfPresent(String.self, forKey: .cheatSource)
         rawCode = try c.decodeIfPresent(String.self, forKey: .rawCode)
+        coreIdentifier = try c.decodeIfPresent(String.self, forKey: .coreIdentifier)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -68,5 +73,6 @@ final class Cheat: Codable {
         try c.encode(isEnabled, forKey: .isEnabled)
         try c.encodeIfPresent(cheatSource, forKey: .cheatSource)
         try c.encodeIfPresent(rawCode, forKey: .rawCode)
+        try c.encodeIfPresent(coreIdentifier, forKey: .coreIdentifier)
     }
 }

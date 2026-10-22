@@ -26,6 +26,7 @@
 #import "FBNeoGameCore.h"
 
 #import <OpenEmuBase/OEAudioBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import <os/log.h>
 
@@ -57,6 +58,8 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
     int _aspectY;
     double _frameInterval;
     OERetroAchievementsBridge *_raBridge;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList; // code -> enabled
+    int _cheatsBigEndian;                                    // main CPU multibyte order
 }
 
 + (void)initialize
@@ -113,6 +116,15 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
         _aspectY = _height;
     }
 
+    // Cache the main-CPU multibyte order for cheat writes (from the first RAM region).
+    _cheatsBigEndian = 0;
+    if (FBHeadlessGetMemoryRegionCount() > 0) {
+        unsigned int rs = 0, rl = 0;
+        int be = 0;
+        FBHeadlessGetMemoryRegion(0, &rs, &rl, &be);
+        _cheatsBigEndian = be;
+    }
+
     // RAM is valid once the driver is initialized; arcade hashing uses the file name.
     _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
                                                        memoryReader:fbneo_rc_read_memory
@@ -146,6 +158,8 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 - (void)executeFrame
 {
     FBHeadlessRunFrame(1);
+
+    [self applyCheats];
 
     const unsigned char *src = FBHeadlessGetVideoBuffer();
     if (src != NULL && _videoBuffer != NULL) {
@@ -263,6 +277,90 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 - (oneway void)didReleaseArcadeButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
 {
     [self setState:NO ofButton:button forPlayer:player];
+}
+
+#pragma mark - Cheats
+
+// Cheats operate on the same flat RAM map as achievements/search, so a value found
+// in the search window can be written back by address. Codes are ADDRESS:VALUE hex
+// (multi-part joined with '+'); the game overwrites RAM, so enabled codes are
+// re-applied every frame.
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (_cheatList == nil) {
+        _cheatList = [NSMutableDictionary dictionary];
+    }
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+    code = [code stringByReplacingOccurrencesOfString:@"=" withString:@":"];
+    if (enabled) {
+        _cheatList[code] = @YES;
+    } else {
+        [_cheatList removeObjectForKey:code];
+    }
+}
+
+- (void)applyCheats
+{
+    if (_cheatList.count == 0) {
+        return;
+    }
+    int littleEndian = _cheatsBigEndian ? 0 : 1;
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) {
+            continue;
+        }
+        for (NSString *single in [key componentsSeparatedByString:@"+"]) {
+            NSRange colon = [single rangeOfString:@":"];
+            if (colon.location == NSNotFound) {
+                continue;
+            }
+            unsigned int addr = 0, value = 0;
+            if (![[NSScanner scannerWithString:[single substringToIndex:colon.location]] scanHexInt:&addr]) {
+                continue;
+            }
+            NSString *valueStr = [single substringFromIndex:colon.location + 1];
+            if (![[NSScanner scannerWithString:valueStr] scanHexInt:&value]) {
+                continue;
+            }
+            int size = (int)((valueStr.length + 1) / 2);
+            if (size < 1) size = 1;
+            if (size > 4) size = 4;
+            FBHeadlessWriteAchievementMemory(addr, value, size, littleEndian);
+        }
+    }
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    int count = FBHeadlessGetMemoryRegionCount();
+    if (count <= 0) {
+        return @[];
+    }
+    NSMutableArray<OEMemoryRegionDescriptor *> *result = [NSMutableArray arrayWithCapacity:count];
+    for (int i = 0; i < count; i++) {
+        unsigned int start = 0, length = 0;
+        int bigEndian = 0;
+        if (!FBHeadlessGetMemoryRegion(i, &start, &length, &bigEndian) || length == 0) {
+            continue;
+        }
+        void *bytes = malloc(length);
+        if (bytes == NULL) {
+            continue;
+        }
+        FBHeadlessReadAchievementMemory(start, (unsigned char *)bytes, length);
+        NSData *data = [NSData dataWithBytesNoCopy:bytes length:length freeWhenDone:YES];
+
+        unsigned int maxAddress = start + length - 1;
+        uint8_t addrBytes = (maxAddress > 0xFFFF) ? 4 : (maxAddress > 0xFF) ? 3 : 2;
+        uint8_t minDataBytes = bigEndian ? 2 : 1;
+        [result addObject:[OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                               address:start
+                                                          addressBytes:addrBytes
+                                                          minDataBytes:minDataBytes
+                                                                  data:data]];
+    }
+    return result;
 }
 
 #pragma mark - RetroAchievements

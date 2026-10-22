@@ -1185,7 +1185,7 @@ final class OEGameDocument: NSDocument {
             self.emulationStatus = .playing
             // Cheats are disabled in hardcore mode (RA spec).
             if HardcoreModePolicy.allows(.cheats, hardcoreEnabled: self.isHardcoreModeEnabled) {
-                self.cheats.filter(\.isEnabled).forEach { self.setCheat($0) }
+                self.visibleCheats.filter(\.isEnabled).forEach { self.setCheat($0) }
             }
             (self.gameWindowController as? GameWindowController)?.gameDidStartPlaying()
         }
@@ -1352,7 +1352,7 @@ final class OEGameDocument: NSDocument {
                         // setHardcoreEnabled(true) blocks the document's setCheat guard,
                         // but core cheat lists persist across a reset — they must be
                         // cleared first so the restarted session is clean (#447).
-                        self.cheats.filter(\.isEnabled).forEach {
+                        self.visibleCheats.filter(\.isEnabled).forEach {
                             self.gameCoreManager?.setCheat($0.code, withType: $0.type, enabled: false)
                         }
                         self.gameCoreManager?.setHardcoreEnabled(true)
@@ -1667,7 +1667,7 @@ final class OEGameDocument: NSDocument {
     }
 
     func addCheatFromSearch(code: String, type: String, name: String, enabled: Bool) {
-        let cheat = Cheat(code: code, type: type, name: name)
+        let cheat = Cheat(code: code, type: type, name: name, coreIdentifier: cheatCoreIdentifierForNewCheat)
         if enabled {
             cheat.isEnabled = true
             setCheat(cheat)
@@ -1686,7 +1686,7 @@ final class OEGameDocument: NSDocument {
         let type = systemPlugin.systemIdentifier == OESystemIdentifierPSP
             ? OECheatTypeCWCheat
             : (code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark)
-        let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode)
+        let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode, coreIdentifier: cheatCoreIdentifierForNewCheat)
         cheat.isEnabled = true
         setCheat(cheat)
         cheats.append(cheat)
@@ -1726,6 +1726,34 @@ final class OEGameDocument: NSDocument {
                 code: cheat.code, systemIdentifier: systemID, coreIdentifier: coreID
             )
         }
+    }
+
+    /// True when the running core keeps its cheats private to itself for this system
+    /// (OEGameCoreCheatsArePerCore, e.g. arcade MAME vs FBNeo).
+    private var systemUsesPerCoreCheats: Bool {
+        corePlugin.cheatsArePerCore(forSystemIdentifier: systemPlugin.systemIdentifier)
+    }
+
+    /// coreIdentifier to stamp on a newly created cheat: the running core when cheats are
+    /// per-core for this system, otherwise nil (shared across the system's cores).
+    private var cheatCoreIdentifierForNewCheat: String? {
+        systemUsesPerCoreCheats ? corePlugin.bundleIdentifier : nil
+    }
+
+    /// Whether a cheat should be shown/applied under the current core. Shared systems: always.
+    /// Per-core systems: the cheat's owner must match. A legacy arcade cheat (nil owner) is
+    /// treated as MAME, the only arcade core that existed before this split.
+    private func cheatBelongsToCurrentCore(_ cheat: Cheat) -> Bool {
+        guard systemUsesPerCoreCheats else { return true }
+        let legacyOwner = systemPlugin.systemIdentifier == OESystemIdentifierArcade ? "org.openemu.MAME" : corePlugin.bundleIdentifier
+        let owner = cheat.coreIdentifier ?? legacyOwner
+        return owner.caseInsensitiveCompare(corePlugin.bundleIdentifier) == .orderedSame
+    }
+
+    /// Cheats visible/applicable under the current core. For per-core systems this hides
+    /// other cores' cheats; the full `cheats` array is still used for persistence.
+    var visibleCheats: [Cheat] {
+        cheats.filter(cheatBelongsToCurrentCore)
     }
 
     // MARK: - User Cheat Persistence
@@ -1812,7 +1840,7 @@ final class OEGameDocument: NSDocument {
             }
 
             let cheatType = systemPlugin.systemIdentifier == OESystemIdentifierPSP ? OECheatTypeCWCheat : OECheatTypeGameShark
-            let cheat = Cheat(code: code, type: cheatType, name: name)
+            let cheat = Cheat(code: code, type: cheatType, name: name, coreIdentifier: cheatCoreIdentifierForNewCheat)
 
             if shouldEnable {
                 cheat.isEnabled = true
