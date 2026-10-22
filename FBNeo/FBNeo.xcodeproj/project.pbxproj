@@ -26,6 +26,9 @@
 		0510AA1F23008294002028C1 /* fbneo_headless.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 0510AA1D2300825D002028C1 /* fbneo_headless.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		D00A068E1763763000C99008 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D00A068D1763763000C99008 /* Cocoa.framework */; };
 		D00A06A617637E9100C99008 /* FBNeoGameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = D00A06A517637E9100C99008 /* FBNeoGameCore.mm */; };
+		OE0FBNE0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0FBNE0FILEREF0000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0FBNE0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0FBNE0FILEREF0000000002 /* OERetroAchievementsTransport.m */; };
+		OE0FBNE0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0FBNE0FILEREF0000000003 /* OERetroAchievementsBridge.m */; };
 		D0AADE31176382F900759E26 /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0AADE30176382F900759E26 /* OpenEmuBase.framework */; };
 /* End PBXBuildFile section */
 
@@ -65,6 +68,10 @@
 		D00A06A417637E9100C99008 /* FBNeoGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FBNeoGameCore.h; sourceTree = "<group>"; };
 		D00A06A517637E9100C99008 /* FBNeoGameCore.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = FBNeoGameCore.mm; sourceTree = "<group>"; };
 		D00A06A717637EB500C99008 /* OEArcadeSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEArcadeSystemResponderClient.h; path = ../OpenEmu/SystemPlugins/Arcade/OEArcadeSystemResponderClient.h; sourceTree = "<group>"; };
+		OE0FBNE0FILEREF0000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0FBNE0FILEREF0000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0FBNE0FILEREF0000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0FBNE0FILEREF0000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		D0AADE30176382F900759E26 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0AADE331763838A00759E26 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		D0AADE341763838A00759E26 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
@@ -139,6 +146,10 @@
 				D00A06A717637EB500C99008 /* OEArcadeSystemResponderClient.h */,
 				D00A06A417637E9100C99008 /* FBNeoGameCore.h */,
 				D00A06A517637E9100C99008 /* FBNeoGameCore.mm */,
+				OE0FBNE0FILEREF0000000001 /* rcheevos_build.c */,
+				OE0FBNE0FILEREF0000000002 /* OERetroAchievementsTransport.m */,
+				OE0FBNE0FILEREF0000000003 /* OERetroAchievementsBridge.m */,
+				OE0FBNE0FILEREF0000000004 /* OERetroAchievementsBridge.h */,
 				D0BA5A9517645D630033A910 /* osd */,
 			);
 			name = Classes;
@@ -268,6 +279,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				D00A06A617637E9100C99008 /* FBNeoGameCore.mm in Sources */,
+				OE0FBNE0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0FBNE0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0FBNE0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -400,12 +414,15 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1.0.0.0;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_INPUT_FILETYPE = sourcecode.cpp.objcpp;
+				GCC_INPUT_FILETYPE = automatic;
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../OpenEmu/SystemPlugins/Arcade\"",
 					"$(SRCROOT)/deps/fbneo/src/burner/headless",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -427,12 +444,15 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1.0.0.0;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_INPUT_FILETYPE = sourcecode.cpp.objcpp;
+				GCC_INPUT_FILETYPE = automatic;
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../OpenEmu/SystemPlugins/Arcade\"",
 					"$(SRCROOT)/deps/fbneo/src/burner/headless",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";

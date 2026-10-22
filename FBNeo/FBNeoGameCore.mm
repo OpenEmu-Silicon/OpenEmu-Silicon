@@ -31,7 +31,22 @@
 
 #include "fbheadless.h"
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 static os_log_t OE_CORE_LOG;
+
+// FBNeo arcade achievement sets are authored against the flat main-RAM buffer
+// (CpsRamFF for CPS, "68K RAM" for Neo Geo, etc.) that FBHeadlessReadAchievementMemory
+// exposes — not the CPU hardware address space. The bridge gates this for
+// ROM-readiness and shutdown.
+static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t num_bytes, rc_client_t *client)
+{
+    return FBHeadlessReadAchievementMemory(address, buffer, num_bytes);
+}
 
 @implementation FBNeoGameCore
 {
@@ -41,6 +56,7 @@ static os_log_t OE_CORE_LOG;
     int _aspectX;
     int _aspectY;
     double _frameInterval;
+    OERetroAchievementsBridge *_raBridge;
 }
 
 + (void)initialize
@@ -97,18 +113,34 @@ static os_log_t OE_CORE_LOG;
         _aspectY = _height;
     }
 
+    // RAM is valid once the driver is initialized; arcade hashing uses the file name.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:fbneo_rc_read_memory
+                                                          consoleID:RC_CONSOLE_ARCADE];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
+
     return YES;
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     FBHeadlessReset();
 }
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
     FBHeadlessExit();
     [super stopEmulation];
+}
+
+- (void)dealloc
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
 }
 
 - (void)executeFrame
@@ -126,6 +158,8 @@ static os_log_t OE_CORE_LOG;
         id<OEAudioBuffer> buf = [self audioBufferAtIndex:0];
         [buf write:abuf maxLength:(NSUInteger)frames * 2 * sizeof(int16_t)];
     }
+
+    [_raBridge doFrame];
 }
 
 - (NSTimeInterval)frameInterval
@@ -229,6 +263,28 @@ static os_log_t OE_CORE_LOG;
 - (oneway void)didReleaseArcadeButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
 {
     [self setState:NO ofButton:button forPlayer:player];
+}
+
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 @end
