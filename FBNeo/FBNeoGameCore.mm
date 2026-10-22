@@ -1,0 +1,206 @@
+// Copyright (c) 2026, OpenEmu Team
+// Author: Leonardo Kasperavičius
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//     * Redistributions of source code must retain the above copyright
+//       notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above copyright
+//       notice, this list of conditions and the following disclaimer in the
+//       documentation and/or other materials provided with the distribution.
+//     * Neither the name of the OpenEmu Team nor the
+//       names of its contributors may be used to endorse or promote products
+//       derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY OpenEmu Team ''AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL OpenEmu Team BE LIABLE FOR ANY
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#import "FBNeoGameCore.h"
+
+#import <OpenEmuBase/OEAudioBuffer.h>
+#import <OpenGL/gl.h>
+#import <os/log.h>
+
+#include "fbheadless.h"
+
+static os_log_t OE_CORE_LOG;
+
+@implementation FBNeoGameCore
+{
+    uint32_t *_videoBuffer; // OpenEmu-provided frame buffer (the "hint")
+    int _width;
+    int _height;
+    int _aspectX;
+    int _aspectY;
+    double _frameInterval;
+}
+
++ (void)initialize
+{
+    OE_CORE_LOG = os_log_create("org.openemu.FBNeo", "");
+}
+
+- (instancetype)init
+{
+    if (self = [super init]) {
+        _width = 384;
+        _height = 224;
+        _aspectX = 4;
+        _aspectY = 3;
+        _frameInterval = 60.0;
+    }
+    return self;
+}
+
+#pragma mark - Lifecycle
+
+- (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
+{
+    FBHeadlessInit();
+
+    NSString *romDir = [path stringByDeletingLastPathComponent];
+    FBHeadlessSetRomPath(romDir.fileSystemRepresentation);
+
+    // FBNeo identifies a set by its short name (the zip filename without extension).
+    NSString *shortName = [[path lastPathComponent] stringByDeletingPathExtension];
+    os_log_info(OE_CORE_LOG, "loading FBNeo driver %{public}@ from %{public}@", shortName, romDir);
+
+    if (FBHeadlessLoadDriver(shortName.UTF8String) != 0) {
+        os_log_error(OE_CORE_LOG, "failed to load FBNeo driver %{public}@", shortName);
+        if (error) {
+            *error = [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadROMError userInfo:@{
+                NSLocalizedDescriptionKey: @"Unable to load ROM.",
+                NSLocalizedRecoverySuggestionErrorKey: [NSString stringWithFormat:@"\"%@\" is not a recognized FinalBurn Neo set, or required ROM files are missing. The ROMs must be from an FBNeo-compatible set.", shortName],
+            }];
+        }
+        return NO;
+    }
+
+    _width = FBHeadlessGetVideoWidth();
+    _height = FBHeadlessGetVideoHeight();
+
+    int fps = FBHeadlessGetFrameRate(); // frames * 100
+    _frameInterval = fps > 0 ? fps / 100.0 : 60.0;
+
+    _aspectX = FBHeadlessGetAspectX();
+    _aspectY = FBHeadlessGetAspectY();
+    if (_aspectX <= 0 || _aspectY <= 0) {
+        _aspectX = _width;
+        _aspectY = _height;
+    }
+
+    return YES;
+}
+
+- (void)resetEmulation
+{
+    FBHeadlessReset();
+}
+
+- (void)stopEmulation
+{
+    FBHeadlessExit();
+    [super stopEmulation];
+}
+
+- (void)executeFrame
+{
+    FBHeadlessRunFrame(1);
+
+    const unsigned char *src = FBHeadlessGetVideoBuffer();
+    if (src != NULL && _videoBuffer != NULL) {
+        memcpy(_videoBuffer, src, (size_t)_width * (size_t)_height * 4);
+    }
+
+    int frames = FBHeadlessGetAudioFrames();
+    const short *abuf = FBHeadlessGetAudioBuffer();
+    if (frames > 0 && abuf != NULL) {
+        id<OEAudioBuffer> buf = [self audioBufferAtIndex:0];
+        [buf write:abuf maxLength:(NSUInteger)frames * 2 * sizeof(int16_t)];
+    }
+}
+
+- (NSTimeInterval)frameInterval
+{
+    return _frameInterval;
+}
+
+#pragma mark - Video
+
+- (const void *)getVideoBufferWithHint:(void *)hint
+{
+    _videoBuffer = (uint32_t *)hint;
+    return _videoBuffer;
+}
+
+- (OEIntSize)bufferSize
+{
+    return OEIntSizeMake(_width, _height);
+}
+
+- (OEIntRect)screenRect
+{
+    return OEIntRectMake(0, 0, _width, _height);
+}
+
+- (OEIntSize)aspectSize
+{
+    return OEIntSizeMake(_aspectX, _aspectY);
+}
+
+- (GLenum)pixelFormat
+{
+    return GL_BGRA;
+}
+
+- (GLenum)pixelType
+{
+    return GL_UNSIGNED_INT_8_8_8_8_REV;
+}
+
+#pragma mark - Audio
+
+- (double)audioSampleRate
+{
+    return FBHeadlessGetAudioSampleRate();
+}
+
+- (NSUInteger)channelCount
+{
+    return 2;
+}
+
+#pragma mark - Input
+
+// OEArcadeButton values (Up..Service) align with FBHeadlessButton; the fork maps
+// them to the active driver's inputs.
+- (void)setState:(BOOL)pressed ofButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
+{
+    if (player == 0 || player > 4) {
+        return;
+    }
+    if (button >= OEArcadeUIConfigure) {
+        return; // UI command, not a game input
+    }
+    FBHeadlessSetInput((int)(player - 1), (int)button, pressed ? 1 : 0);
+}
+
+- (oneway void)didPushArcadeButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
+{
+    [self setState:YES ofButton:button forPlayer:player];
+}
+
+- (oneway void)didReleaseArcadeButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
+{
+    [self setState:NO ofButton:button forPlayer:player];
+}
+
+@end
