@@ -178,6 +178,34 @@ static os_log_t OE_CORE_LOG;
     return 2;
 }
 
+#pragma mark - Save States
+
+- (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
+{
+    BOOL success = FBHeadlessSaveState(fileName.fileSystemRepresentation) == 0;
+    if (success) {
+        block(YES, nil);
+    } else {
+        block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotSaveStateError userInfo:@{
+            NSLocalizedDescriptionKey: @"Save state failed.",
+            NSLocalizedRecoverySuggestionErrorKey: @"FinalBurn Neo could not write a save state for this game.",
+        }]);
+    }
+}
+
+- (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
+{
+    BOOL success = FBHeadlessLoadState(fileName.fileSystemRepresentation) == 0;
+    if (success) {
+        block(YES, nil);
+    } else {
+        block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadStateError userInfo:@{
+            NSLocalizedDescriptionKey: @"Load state failed.",
+            NSLocalizedRecoverySuggestionErrorKey: @"This save state could not be loaded, possibly because it was made with a different game or core version.",
+        }]);
+    }
+}
+
 #pragma mark - Input
 
 // OEArcadeButton values (Up..Service) align with FBHeadlessButton; the fork maps
