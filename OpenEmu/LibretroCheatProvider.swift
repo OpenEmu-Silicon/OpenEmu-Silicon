@@ -661,6 +661,10 @@ final class LibretroCheatProvider: CheatDatabaseProvider, @unchecked Sendable {
                 guard cheatType == nil || cheatType == "1",
                       let addrStr = fields["address"], let valStr = fields["value"],
                       let addr = UInt32(addrStr), let val = UInt32(valStr) else { continue }
+                // memory_search_size is RetroArch's bit-width index, NOT a byte count:
+                // 0=1-bit, 1=2-bit, 2=4-bit, 3=8-bit, 4=16-bit, 5=32-bit
+                // (libretro/RetroArch managers/cheat_manager.h). So only 4/5 are multi-byte;
+                // sub-byte sizes (0/1/2) and 8-bit (3) are a single byte.
                 let valueHexChars: Int
                 switch fields["memory_search_size"] {
                 case "4": valueHexChars = 4  // 16-bit

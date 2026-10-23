@@ -1697,7 +1697,8 @@ final class OEGameDocument: NSDocument {
     /// Only removes a cheat that was itself imported, so a matching manual/Cheat Search entry is never touched.
     func removeImportedCheat(code: String) {
         let key = CheatFeedbackService.key(for: code)
-        guard let index = cheats.firstIndex(where: { $0.cheatSource != nil && CheatFeedbackService.key(for: $0.code) == key })
+        // Scope to the current core so a per-core system doesn't remove another core's imported cheat on a code match.
+        guard let index = cheats.firstIndex(where: { $0.cheatSource != nil && self.cheatBelongsToCurrentCore($0) && CheatFeedbackService.key(for: $0.code) == key })
         else { return }
 
         let cheat = cheats[index]
@@ -1728,10 +1729,13 @@ final class OEGameDocument: NSDocument {
         }
     }
 
-    /// True when the running core keeps its cheats private to itself for this system
-    /// (OEGameCoreCheatsArePerCore, e.g. arcade MAME vs FBNeo).
+    /// True when cheats are kept private per core for this system (OEGameCoreCheatsArePerCore,
+    /// e.g. arcade MAME vs FBNeo). Decided from *any* installed core for the system, not just the
+    /// running one, so isolation still applies when another arcade core (e.g. MAME) is an older
+    /// build whose plist predates the flag.
     private var systemUsesPerCoreCheats: Bool {
-        corePlugin.cheatsArePerCore(forSystemIdentifier: systemPlugin.systemIdentifier)
+        let systemID = systemPlugin.systemIdentifier
+        return OECorePlugin.allPlugins.contains { $0.cheatsArePerCore(forSystemIdentifier: systemID) }
     }
 
     /// coreIdentifier to stamp on a newly created cheat: the running core when cheats are
@@ -2302,7 +2306,7 @@ final class OEGameDocument: NSDocument {
 
             guard let currentIndex = cheats.firstIndex(where: { $0 === cheat }) else { return }
 
-            let edited = Cheat(code: newCode, type: cheat.type, name: alert.otherStringValue)
+            let edited = Cheat(code: newCode, type: cheat.type, name: alert.otherStringValue, cheatSource: cheat.cheatSource, rawCode: cheat.rawCode, coreIdentifier: cheat.coreIdentifier)
             edited.isEnabled = cheat.isEnabled
 
             if cheat.isEnabled {

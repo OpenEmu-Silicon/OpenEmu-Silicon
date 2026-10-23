@@ -100,6 +100,8 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
                 NSLocalizedRecoverySuggestionErrorKey: [NSString stringWithFormat:@"\"%@\" is not a recognized FinalBurn Neo set, or required ROM files are missing. The ROMs must be from an FBNeo-compatible set.", shortName],
             }];
         }
+        // Undo FBHeadlessInit so global state doesn't leak and a retry starts clean.
+        FBHeadlessExit();
         return NO;
     }
 
@@ -163,6 +165,9 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
     const unsigned char *src = FBHeadlessGetVideoBuffer();
     if (src != NULL && _videoBuffer != NULL) {
+        // Safe: OpenEmu allocates _videoBuffer via bufferSize/getVideoBufferWithHint in
+        // setupEmulation, which runs only after loadFileAtPath has set _width/_height to the
+        // driver's real size, so the destination is always sized for this copy.
         memcpy(_videoBuffer, src, (size_t)_width * (size_t)_height * 4);
     }
 

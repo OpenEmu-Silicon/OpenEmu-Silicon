@@ -39,6 +39,9 @@ final class Cheat: Codable {
     var isCompatibleWithCore = true
     /// Core that created this cheat. Only persisted for cores whose cheats are per-core
     /// (OEGameCoreCheatsArePerCore); nil for shared-cheat systems and legacy entries.
+    /// Forward/backward compatible via decodeIfPresent/encodeIfPresent. The only edge is a
+    /// *downgrade*: a pre-FBNeo build reads these entries fine but, lacking the per-core filter,
+    /// shows FBNeo cheats under MAME. Accepted — old shipped code can't be changed; updating fixes it.
     var coreIdentifier: String?
 
     private enum CodingKeys: String, CodingKey {
