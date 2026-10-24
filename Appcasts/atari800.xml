@@ -4,7 +4,18 @@
   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>Atari800</title>
-                    <item>
+                        <item>
+      <title>Atari800 3.1.5</title>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/download/cores-v1.6.0/Atari800.oecoreplugin.zip"
+        sparkle:version="3.1.5"
+        sparkle:shortVersionString="3.1.5"
+        length="166169"
+        sparkle:edSignature="gvZd+TyDL5UQFV64PM5pimYqnPzcP33JIUtyZubuJ0yZ9N0SYkpIiha1i3sa9vZXsnN6UmZFk/uo2x/deebtDw=="
+        type="application/octet-stream" />
+    </item>
+<item>
       <title>Atari800 3.1.4</title>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
       <enclosure

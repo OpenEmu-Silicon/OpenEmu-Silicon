@@ -185,7 +185,7 @@ def main():
     sig_attr = f'\n        sparkle:edSignature="{ed_sig}"' if ed_sig else ''
     new_item = f"""    <item>
       <title>{args.core_name} {args.version}</title>
-      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
       <enclosure
         url="{args.download_url}"
         sparkle:version="{args.version}"

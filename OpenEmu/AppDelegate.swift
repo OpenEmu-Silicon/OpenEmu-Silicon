@@ -234,6 +234,12 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             // so the cached cheat databases on disk still reflect whatever produced the existing
             // feedback entries, before this session gets a chance to refresh them.
             CheatFeedbackService.shared.migrateIfNeeded()
+
+            // Push any locally stored feedback not yet synced to CheatWorks (e.g. reports made
+            // offline). Network-bound and non-blocking, so it runs in the background after migration.
+            Task.detached(priority: .utility) {
+                await CheatFeedbackService.shared.syncToCheatWorks()
+            }
             
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: .libraryDidLoad, object: OELibraryDatabase.default!)
@@ -1378,6 +1384,23 @@ extension AppDelegate: NSMenuDelegate {
         preferencesWindowController.showWindow(with: notification)
     }
     
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let backupManager = OEFolderBackupManager.shared
+        guard backupManager.backupFolderURL != nil else { return .terminateNow }
+
+        var timeout: Timer?
+        let reply = {
+            guard let timer = timeout else { return }
+            timer.invalidate()
+            timeout = nil
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        timeout = Timer(timeInterval: 10, repeats: false) { _ in reply() }
+        RunLoop.main.add(timeout!, forMode: .common)
+        backupManager.flush(completion: reply)
+        return .terminateLater
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         
         for window in sender.windows {

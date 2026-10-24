@@ -4,6 +4,21 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+  # Direct pushes to main (small maintainer changes) get the same build.
+  # Docs-only and bookkeeping pushes are skipped. This filter is on push only,
+  # so it never affects the required checks on pull requests.
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'Appcasts/**'
+      - 'appcast.xml'
+      - 'oecores.xml'
+      - 'Casks/**'
+      - 'Releases/**'
+      - '.claude/**'
+      - '.cursor/**'
 
 jobs:
   core-sources:
@@ -55,12 +70,21 @@ jobs:
           # array — macOS's default /bin/bash is 3.2 and doesn't have them.)
           core_dirs_json='{"Potator":"Potator-Core","Picodrive":"picodrive"}'
 
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            # Manual workflow_dispatch run has no PR base to diff against — build everything.
-            echo "Not a pull_request event — building all core schemes"
+          # Work out what to diff against: the PR base for a pull request, or the
+          # previous tip of main for a direct push. Anything else (manual run,
+          # first push, missing history) builds everything.
+          base=""
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            base="${{ github.event.before }}"
+          fi
+
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "No usable diff base (event: ${{ github.event_name }}) - building all core schemes"
             cores="$all_cores"
           else
-            changed=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")
+            changed=$(git diff --name-only "$base" "${{ github.sha }}")
             echo "Changed files:"
             echo "$changed"
 
@@ -114,6 +138,7 @@ jobs:
         run: |
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
           cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
       - name: Build ${{ matrix.core }} (arm64)
         run: |
@@ -161,6 +186,7 @@ jobs:
         run: |
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
           cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
       - name: Test DualSense Bluetooth report decoding
         run: |

@@ -54,6 +54,19 @@
 static SN76489*    sn76489;
 static R800*       r800;
 
+static UInt8*      colecoRam = NULL;
+static UInt32      colecoRamSize = 0;
+
+UInt8* colecoGetRam(void)
+{
+    return colecoRam;
+}
+
+UInt32 colecoGetRamSize(void)
+{
+    return colecoRamSize;
+}
+
 
 // ---------------------------------------------
 // SG-1000 Joystick and PSG handler
@@ -406,7 +419,7 @@ int colecoCreate(Machine* machine,
         cartridgeSetSlotInfo(i, machine->cart[i].slot, 0);
     }
 
-    success = machineInitialize(machine, NULL, NULL, NULL);
+    success = machineInitialize(machine, &colecoRam, &colecoRamSize, NULL);
 
     for (i = 0; i < 8; i++) {
         slotMapRamPage(0, 0, i);

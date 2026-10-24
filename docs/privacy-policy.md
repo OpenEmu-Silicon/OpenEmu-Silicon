@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **App:** OpenEmu-Silicon
-**Last updated:** May 17, 2026
+**Last updated:** October 14, 2026
 **Contact:** [Open an issue](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues)
 
 ---
@@ -10,11 +10,12 @@
 
 OpenEmu-Silicon is a macOS game emulator. Most gameplay and library features run locally on your computer.
 
-The app only connects to external services for optional features you choose to use, or for optional crash reporting if you consent:
+The app only connects to external services for features you use, or for optional crash reporting if you consent:
 
 - **RetroAchievements** — optional achievements, leaderboards, and Rich Presence.
 - **Google Drive Save Sync** — optional save-state and battery-save backup/sync.
 - **Sentry crash reporting** — optional crash and hang diagnostics.
+- **CheatWorks** (community cheat ratings): used when you open Browse Online Cheats or rate a cheat. Unlike the features above, it is on by default in official releases. You can turn it off in **Preferences → Gameplay**. See [CheatWorks community cheat ratings](#cheatworks-community-cheat-ratings).
 
 OpenEmu-Silicon does not operate its own account server, telemetry backend, or analytics service.
 
@@ -102,6 +103,58 @@ Crash reports do **not** intentionally include:
 Sentry events are sent to Sentry's hosted service. The current project configuration uses Sentry's US ingest endpoint (`ingest.us.sentry.io`). OpenEmu-Silicon does not operate Sentry's servers.
 
 You can decline crash reporting when prompted. If you previously opted in and want to stop future reports, open an issue for help resetting the local crash-reporting preference while a user-facing toggle is being added.
+
+---
+
+## CheatWorks community cheat ratings
+
+CheatWorks is a community service that collects "works" or "doesn't work" reports for cheat codes, so other players can see how well a code has worked. OpenEmu-Silicon uses it to show a rating next to each cheat in **Browse Online Cheats**, and to share your own ratings.
+
+CheatWorks was created by a contributor to OpenEmu-Silicon. It is a separate service. OpenEmu-Silicon does not operate CheatWorks servers.
+
+### When the app contacts CheatWorks
+
+- When you open **Browse Online Cheats**, to look up ratings for the cheats listed.
+- When you rate a cheat as "Works", "Doesn't work", or "Not sure".
+- At launch, to upload ratings you gave earlier that were not yet uploaded. If you have never rated a cheat, nothing is uploaded.
+
+The app does not contact CheatWorks just because you play a game.
+
+This feature is built into official releases and is on by default. To turn it off, open **Preferences → Gameplay** and clear **Show and share cheat ratings (CheatWorks)** under Cheats. When it is off, the app does not contact CheatWorks at all, you do not see ratings in Browse Online Cheats, and your ratings stay on your Mac. If you turn it back on, any ratings that have not been uploaded yet, including ones you gave while it was off, are uploaded. Builds made from source without a CheatWorks access token do not upload ratings or register an installation ID, but they still look up ratings when you open Browse Online Cheats.
+
+### What is sent to CheatWorks
+
+When you open Browse Online Cheats (rating lookup):
+
+- A fingerprint of the game file (an MD5 hash). Not the game file itself.
+- The identifier of the emulator core you are using (for example `genesisplus`).
+- The cheat codes shown in the list, up to 100 at a time.
+
+No installation ID is sent for this lookup.
+
+When you rate a cheat, or when an earlier rating is uploaded:
+
+- The game fingerprint (MD5 hash) and, if known, the game's name.
+- The cheat code you rated, your rating, and the cheat provider's name if the code came from one.
+- The emulator core identifier and version, and the OpenEmu-Silicon version.
+- An installation ID (see below).
+
+As with any internet request, CheatWorks' servers can also see your IP address.
+
+### The installation ID
+
+The first time a rating is uploaded, the app registers an installation ID with CheatWorks. The ID is a one-way hash (SHA-256) of your Mac's hardware identifier combined with a fixed label. Your raw hardware identifier is never sent.
+
+The ID stays the same on this Mac, including after you reinstall OpenEmu-Silicon, and you cannot reset it. CheatWorks uses it to stop one installation from submitting repeated ratings for the same cheat. It is not your name or an account, but it does identify this Mac to CheatWorks over time.
+
+### What is stored locally
+
+- The access token CheatWorks issues to your installation, in an encrypted file at `~/Library/Application Support/<app bundle ID>/CheatWorks/.cheatworks_store`. The encryption key is derived from your Mac's hardware identifier, so this protects the file from casual reading but not from software running on your Mac.
+- Your cheat ratings, kept in OpenEmu-Silicon's local cheat feedback files, so they can be uploaded later and shown in the app.
+
+### Data controlled by CheatWorks
+
+OpenEmu-Silicon does not control what CheatWorks does with the data it receives, how long it keeps it, or whether it can be deleted. For questions about that, refer to CheatWorks directly at [cheatworks.org](https://cheatworks.org).
 
 ---
 

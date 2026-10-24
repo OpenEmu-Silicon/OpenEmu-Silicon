@@ -2,6 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>A MAME cheat file has already been imported. Do you want to replace it with this one?</key>
+	<string>A MAME cheat file has already been imported. Do you want to replace it with this one?</string>
+	<key>Keep Existing</key>
+	<string>Keep Existing</string>
+	<key>Replace</key>
+	<string>Replace</string>
+	<key>Replace existing MAME cheat file?</key>
+	<string>Replace existing MAME cheat file?</string>
+	<key>Cheat File Scanner</key>
+	<string>Cheat File Scanner</string>
+	<key>Importing %1$ld of %2$ld</key>
+	<string>Importing %1$ld of %2$ld</string>
+	<key>Copying File</key>
+	<string>Copying File</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>No MAME cheat file imported yet.</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>"%1$@" in %2$@</string>
 	<key>%@ copy</key>
@@ -766,6 +786,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>I don't know</string>
 	<key>Set Status</key>
 	<string>Set Status</string>
+	<key>No Ratings</key>
+	<string>No Ratings</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>Ratings: %1$d works, %2$d do not, %3$d not sure</string>
 	<key>It works for me</key>
 	<string>It works for me</string>
 	<key>It does not work for me</key>

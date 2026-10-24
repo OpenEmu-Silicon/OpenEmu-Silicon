@@ -34,5 +34,8 @@ int msxCreate(Machine* machine,
               VdpSyncMode vdpSyncMode,
               BoardInfo* boardInfo);
 
+UInt8* msxGetRamData(void);
+UInt32 msxGetRamSize(void);
+
 #endif /* MSX_H */
 

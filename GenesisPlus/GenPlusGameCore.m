@@ -140,7 +140,10 @@ typedef NS_ENUM(NSInteger, MultiTapType)
 // rcheevos uses a normalized address space, not the 68000/Z80 bus addresses.
 // Mapping (from Vendor/rcheevos/src/rcheevos/consoleinfo.c):
 //
-//   Genesis / Mega CD  — RC 0x000000–0x00FFFF → work_ram[] (64 KB 68K RAM)
+//   Genesis            — RC 0x000000–0x00FFFF → work_ram[] (64 KB 68K RAM)
+//   Mega CD / Sega CD  — RC 0x000000–0x00FFFF → work_ram[] (64 KB 68K RAM)
+//                        RC 0x010000–0x08FFFF → scd.prg_ram[] (512 KB CD PRG RAM)
+//                        RC 0x090000–0x0AFFFF → Word RAM (128 KB, as mapped at $200000)
 //   SMS / GG / SG-1000 — RC 0x000000–0x001FFF → work_ram[] (8 KB RAM at real C000)
 //
 static uint32_t genplus_rc_read_memory(uint32_t address, uint8_t *buffer,
@@ -148,7 +151,23 @@ static uint32_t genplus_rc_read_memory(uint32_t address, uint8_t *buffer,
 {
     for (uint32_t i = 0; i < num_bytes; i++) {
         uint32_t addr = address + i;
-        if ((system_hw & SYSTEM_PBC) == SYSTEM_MD || system_hw == SYSTEM_MCD) {
+        if (system_hw == SYSTEM_MCD) {
+            if (addr <= 0x00FFFF) {
+                buffer[i] = work_ram[addr];
+            } else if (addr <= 0x08FFFF) {
+                buffer[i] = scd.prg_ram[addr - 0x010000];
+            } else if (addr <= 0x0AFFFF) {
+                // Word RAM is banked (1M mode) or linear (2M mode); read it through the
+                // main 68K's own memory map so the view matches what the game sees.
+                uint32_t offset = addr - 0x090000;
+                const uint8_t *base = m68k.memory_map[scd.cartridge.boot + 0x20 + (offset >> 16)].base;
+                if (base == NULL)
+                    return i;
+                buffer[i] = base[offset & 0xFFFF];
+            } else {
+                return i;
+            }
+        } else if ((system_hw & SYSTEM_PBC) == SYSTEM_MD) {
             if (addr <= 0x00FFFF)
                 buffer[i] = work_ram[addr];
             else

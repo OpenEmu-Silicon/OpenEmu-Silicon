@@ -2,6 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>A MAME cheat file has already been imported. Do you want to replace it with this one?</key>
+	<string>تم استيراد ملف غش MAME بالفعل. هل تريد استبداله بهذا الملف؟</string>
+	<key>Keep Existing</key>
+	<string>الإبقاء على الحالي</string>
+	<key>Replace</key>
+	<string>استبدال</string>
+	<key>Replace existing MAME cheat file?</key>
+	<string>هل تريد استبدال ملف غش MAME الحالي؟</string>
+	<key>Cheat File Scanner</key>
+	<string>ماسح ملف الغش</string>
+	<key>Importing %1$ld of %2$ld</key>
+	<string>استيراد %1$ld من %2$ld</string>
+	<key>Copying File</key>
+	<string>جارٍ نسخ الملف</string>
+	<key>Download cheat.7z from %@ and drag it onto the OpenEmu library window.</key>
+	<string>نزّل cheat.7z من %@ واسحبه إلى نافذة مكتبة OpenEmu.</string>
+	<key>No MAME cheat file imported yet.</key>
+	<string>لم يتم استيراد أي ملف غش MAME بعد.</string>
+	<key>Pugsy's MAME Cheats</key>
+	<string>Pugsy's MAME Cheats</string>
 	<key>"%@" in %@</key>
 	<string>ملف "%1$@" موجود في جهاز %2$@</string>
 	<key>%@ copy</key>
@@ -726,6 +746,10 @@ You can go to the Controls preferences to check which associations were affected
 	<string>لا أعرف</string>
 	<key>Set Status</key>
 	<string>تحديد الحالة</string>
+	<key>No Ratings</key>
+	<string>لا توجد تقييمات</string>
+	<key>Ratings: %1$d works, %2$d do not, %3$d not sure</key>
+	<string>التقييمات: %1$d تعمل، %2$d لا تعمل، %3$d غير متأكد</string>
 	<key>It works for me</key>
 	<string>تعمل معي</string>
 	<key>It does not work for me</key>

@@ -30,7 +30,14 @@
 
 #import <OpenEmuBase/OEGameCoreController.h>
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #include "ProSystem.h"
 #include "Database.h"
@@ -49,9 +56,25 @@
     uint8_t _inputState[17];
     int _videoWidth, _videoHeight;
     BOOL _isLightgunEnabled;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 - (void)setPalette32;
 @end
+
+// rcheevos maps the 7800's real CPU address space 1:1 (see rc_memory_regions_atari7800),
+// so no rebasing is needed here unlike Stella's Atari 2600 reader.
+static uint32_t prosystem_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                          uint32_t num_bytes, rc_client_t *client)
+{
+    uint32_t i;
+    for (i = 0; i < num_bytes; i++) {
+        if (address + i > 0xFFFF)
+            return i;
+        buffer[i] = memory_ram[address + i];
+    }
+    return num_bytes;
+}
 
 @implementation ProSystemGameCore
 
@@ -68,8 +91,32 @@
 
 - (void)dealloc
 {
+    // Drain the RA serial queue before freeing buffers no in-flight read touches them.
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(_videoBuffer);
     free(_soundBuffer);
+}
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Execution
@@ -125,6 +172,12 @@
         _inputState[LEFT_DIFF_SWITCH] = cartridge_left_switch;
         _inputState[RIGHT_DIFF_SWITCH] = cartridge_right_switch;
 
+        _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                            memoryReader:prosystem_rc_read_memory
+                                                               consoleID:RC_CONSOLE_ATARI_7800];
+        [_raBridge startWithROMPath:path];
+        [_raBridge markROMReady];
+
         return YES;
     }
 
@@ -134,6 +187,23 @@
 - (void)executeFrame
 {
 	prosystem_ExecuteFrame(_inputState);
+
+    // Direct RAM pokes (mempatch style): re-applied every frame since nothing else
+    // preserves them across the emulated CPU's own writes to the same addresses.
+    for (NSString *key in _cheatList) {
+        if (![_cheatList[key] boolValue]) continue;
+        NSArray<NSString *> *codes = [key componentsSeparatedByString:@"+"];
+        for (NSString *singleCode in codes) {
+            NSRange colonRange = [singleCode rangeOfString:@":"];
+            if (colonRange.location != NSNotFound) {
+                unsigned int addr = 0, val = 0;
+                if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+                if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+                if (addr > 0xFFFF) continue;
+                memory_Write((uint16_t)addr, (uint8_t)val);
+            }
+        }
+    }
 
     _videoWidth  = ((maria_displayArea.right - maria_displayArea.left) + 1);
     _videoHeight = ((maria_visibleArea.bottom - maria_visibleArea.top) + 1);
@@ -157,16 +227,26 @@
 
     int length = sound_Store(_soundBuffer);
     [[self audioBufferAtIndex:0] write:_soundBuffer maxLength:length];
+
+    [_raBridge doFrame];
 }
 
 - (void)resetEmulation
 {
+    [_raBridge reset];
     prosystem_Reset();
 }
 
 - (NSTimeInterval)frameInterval
 {
     return cartridge_region == REGION_NTSC ? 60 : 50;
+}
+
+- (void)stopEmulation
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
+    [super stopEmulation];
 }
 
 #pragma mark - Video
@@ -278,6 +358,34 @@
     }
 
     return NO;
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [NSMutableDictionary dictionary];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [code stringByReplacingOccurrencesOfString:@" " withString:@""];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    // Per the 7800 hardware map (78map.txt): 0x1800-0x27FF is System RAM; below
+    // that is hardware I/O (TIA/RIOT/MARIA), above is mirrored RAM/cart ROM/RAM.
+    NSData *data = [NSData dataWithBytes:memory_ram + 0x1800 length:0x1000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"RAM"
+                                                                                address:0x1800
+                                                                           addressBytes:2
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 #pragma mark - Input

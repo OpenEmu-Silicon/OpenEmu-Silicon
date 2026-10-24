@@ -455,16 +455,36 @@ final class OELibraryDatabase: NSObject {
         {
             if !urlString.contains("file://") {
                 return URL(string: urlString, relativeTo: databaseFolderURL)
-            } else {
-                return URL(string: urlString)
+            } else if let absoluteURL = URL(string: urlString) {
+                if (try? absoluteURL.checkResourceIsReachable()) == true {
+                    return absoluteURL
+                }
+                // The folder is on an external drive or network share that is not mounted right
+                // now. Keep the saved location so it works again when the drive comes back, instead
+                // of repairing it to a new folder inside the library.
+                if Self.isOnUnmountedVolume(absoluteURL) {
+                    return absoluteURL
+                }
             }
-        } else {
-            let result = databaseFolderURL.appendingPathComponent("roms", isDirectory: true)
-            try? FileManager.default.createDirectory(at: result, withIntermediateDirectories: true)
-            setRomsFolderURL(result)
-            
-            return result
+            // Stored path is an absolute file:// URL that no longer resolves, most likely
+            // because the library was moved to a different volume. "Change Library Location"
+            // only updates where the library itself lives, not this stored metadata, so it
+            // keeps pointing at the old, now-missing volume. Fall through and repair it below.
         }
+
+        let result = databaseFolderURL.appendingPathComponent("roms", isDirectory: true)
+        try? FileManager.default.createDirectory(at: result, withIntermediateDirectories: true)
+        setRomsFolderURL(result)
+
+        return result
+    }
+    
+    /// `true` when `url` is under `/Volumes/<name>` and that volume is not currently mounted.
+    private static func isOnUnmountedVolume(_ url: URL) -> Bool {
+        let components = url.standardizedFileURL.pathComponents
+        guard components.count > 2, components[1] == "Volumes" else { return false }
+        let volume = URL(fileURLWithPath: "/Volumes").appendingPathComponent(components[2], isDirectory: true)
+        return !FileManager.default.fileExists(atPath: volume.path)
     }
     
     func setRomsFolderURL(_ url: URL) {

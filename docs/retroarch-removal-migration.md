@@ -1,7 +1,7 @@
 # RetroArch core support removal — migration behavior
 
 Reference for what happens on a user's machine when they upgrade into the release
-that removed RetroArch core support (1.3.1), and what to tell someone who reports
+that removed RetroArch core support (1.4.0), and what to tell someone who reports
 a problem related to it.
 
 Background on why the feature was removed is in the pull request; this file covers

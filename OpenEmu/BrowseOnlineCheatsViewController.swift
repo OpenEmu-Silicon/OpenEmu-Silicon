@@ -25,9 +25,10 @@
 
 import Cocoa
 import OpenEmuKit
-// import os.log
+import OpenEmuBase
+import os.log
 
-// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsViewController")
+// private let log = Logger(subsystem: "org.openemu.OpenEmu", category: "BrowseOnlineCheatsRatings")
 
 final class BrowseOnlineCheatsViewController: NSViewController {
 
@@ -81,6 +82,14 @@ final class BrowseOnlineCheatsViewController: NSViewController {
     /// User-reported status for the current core build, keyed by normalized code.
     private var statuses: [String: CheatFeedbackStatus] = [:]
     private var notes: [String: String] = [:]
+
+    /// CheatWorks ratings fetched this session, keyed by the cheat's raw code. Held until the window
+    /// closes so codes aren't re-queried on every filter change; cleared by ``flushRatings()``.
+    private var ratings: [String: CheatWorksRating] = [:]
+
+    /// Raw codes already sent to the ratings API this session (whether or not a rating came back),
+    /// so a code with no rating on record isn't re-requested on the next filter change.
+    private var requestedRatingCodes: Set<String> = []
 
     /// Normalized codes of cheats already in the user's inventory that came from elsewhere
     /// (manual "Add Cheat" or Cheat Search) — these block Import rather than offering Remove.
@@ -137,6 +146,15 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         emptyLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         emptyLabel.textColor = .secondaryLabelColor
         emptyLabel.alignment = .center
+        emptyLabel.maximumNumberOfLines = 0
+        emptyLabel.lineBreakMode = .byWordWrapping
+        // Selectable + editable attributes make the download link in the empty-state message clickable.
+        emptyLabel.isSelectable = true
+        emptyLabel.allowsEditingTextAttributes = true
+        // Wrap at a fixed width and don't resist compression, so the multi-line message never forces
+        // the window wider than its normal size.
+        emptyLabel.preferredMaxLayoutWidth = 320
+        emptyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         emptyLabel.isHidden = true
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyLabel)
@@ -162,10 +180,19 @@ final class BrowseOnlineCheatsViewController: NSViewController {
 
             emptyLabel.centerXAnchor.constraint(equalTo: resultsScrollView.centerXAnchor),
             emptyLabel.centerYAnchor.constraint(equalTo: resultsScrollView.centerYAnchor),
+            emptyLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
         ])
 
         updateGameInfo()
         updateResultsCountLabel()
+
+        // Refresh when the user imports the Pugsy cheat archive while this window is open (or was
+        // left open), otherwise it keeps showing the "download the file" empty state.
+        NotificationCenter.default.addObserver(self, selector: #selector(pugsyDatabaseWasImported), name: .didImportPugsyCheatFile, object: nil)
+
+        // Re-fetch a code's rating once the user's own feedback for it has landed on CheatWorks.
+        NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksFeedbackDidSubmit(_:)), name: .cheatWorksFeedbackDidSubmit, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(cheatWorksEnabledDidChange(_:)), name: CheatWorksConfig.enabledDidChangeNotification, object: nil)
     }
 
     // MARK: - Results Table
@@ -185,11 +212,14 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         }
         tableView.headerView = header
         tableView.style = .fullWidth
-        tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        // Sequential (not first-column-only) autoresizing so the one flexible column is always the
+        // Cheat Name column wherever it sits — the thin rating column is pinned leftmost and fixed.
+        tableView.columnAutoresizingStyle = .sequentialColumnAutoresizingStyle
         // Fixed, and does not grow for taller cell views — buttons and badges need this room.
         tableView.rowHeight = 28
 
         let columns: [(String, String, CGFloat, NSTextAlignment)] = [
+            ("rating", "", 20, .center),
             ("name", NSLocalizedString("Cheat Name", comment: "Browse online cheats table column header"), 362, .left),
             ("provider", NSLocalizedString("Provider", comment: "Browse online cheats table column header"), 100, .left),
             ("status", NSLocalizedString("Status", comment: "Browse online cheats table column header"), 100, .center),
@@ -198,23 +228,26 @@ final class BrowseOnlineCheatsViewController: NSViewController {
             ("action", NSLocalizedString("Action", comment: "Browse online cheats table column header"), 80, .center),
         ]
 
-        for (index, column) in columns.enumerated() {
+        for column in columns {
             let (identifier, title, width, alignment) = column
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             tableColumn.title = title
             tableColumn.width = width
             tableColumn.headerCell.alignment = alignment
 
-            if index == 0 {
+            if identifier == "name" {
                 tableColumn.minWidth = 150
                 tableColumn.maxWidth = .greatestFiniteMagnitude
                 tableColumn.resizingMask = .autoresizingMask
             } else {
-                // Locked so the first column is the only one that absorbs width changes.
+                // Locked so the Cheat Name column is the only one that absorbs width changes.
                 tableColumn.minWidth = width
                 tableColumn.maxWidth = width
                 tableColumn.resizingMask = []
             }
+
+            // With CheatWorks switched off there are no ratings to show, so drop the column too.
+            if identifier == "rating" { tableColumn.isHidden = !CheatWorksConfig.isEnabled }
 
             tableView.addTableColumn(tableColumn)
             columnAlignments[tableColumn.identifier] = alignment
@@ -377,10 +410,220 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         resultsTableView?.reloadData()
         updateResultsCountLabel()
         updateEmptyState()
+        fetchRatingsForVisibleCheats()
+    }
+
+    // MARK: - CheatWorks Ratings
+
+    /// Queries CheatWorks for the ratings of the codes currently shown in the table (the capped
+    /// subset the user sees), skipping any already requested this session. Fires on the initial load
+    /// and on every filter change (and on window reopen, after the previous close flushed them);
+    /// results are cached in `ratings` until the window closes and drive
+    /// the rating column's circles and tooltips.
+    func fetchRatingsForVisibleCheats() {
+        guard CheatWorksConfig.isEnabled,
+              let document = gameDocument,
+              let md5 = document.rom.md5Hash,
+              let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
+        else { return }
+
+        // Only the rows actually displayed (the table caps at `displayLimit`).
+        let shownCodes = visibleCheats.prefix(Self.displayLimit).map(\.rawCode)
+        let codesToFetch = Array(Set(shownCodes).subtracting(requestedRatingCodes))
+        guard !codesToFetch.isEmpty else { return }
+
+        // Mark as requested up front so overlapping filter changes don't re-query the same codes.
+        requestedRatingCodes.formUnion(codesToFetch)
+
+        // log.info("querying ratings for \(codesToFetch.count, privacy: .public) code(s): \(emulatorCode.rawValue, privacy: .public)")
+
+        Task { [weak self] in
+            do {
+                let fetched = try await CheatWorksConfig.service.queryRatings(
+                    gameFingerprint: md5,
+                    emulatorCode: emulatorCode.rawValue,
+                    cheatCodes: codesToFetch)
+
+                guard let self else { return }
+                for rating in fetched {
+                    self.ratings[rating.cheatCode] = rating
+                    // log.info("rating \(rating.cheatCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
+                }
+                // Codes the successful query returned nothing for still get a base-colour circle (a
+                // "none" rating), rather than no circle — only an outright failure leaves them blank.
+                let returnedCodes = Set(fetched.map(\.cheatCode))
+                for code in codesToFetch where !returnedCodes.contains(code) {
+                    self.ratings[code] = Self.noRatingPlaceholder(for: code)
+                }
+                // log.info("ratings cached: \(fetched.count, privacy: .public) of \(codesToFetch.count, privacy: .public) queried code(s) have ratings; \(self.ratings.count, privacy: .public) total cached")
+                self.reloadRatingColumn()
+            } catch {
+                // Read-only, best-effort: log and move on. Codes stay marked requested so a transient
+                // failure doesn't spam the API on every subsequent filter change.
+                // log.error("ratings query failed: \(String(describing: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// Drops every cached rating and the requested-codes set. Called when the window closes (or the
+    /// core changes) so a fresh session re-queries rather than reusing stale, out-of-scope data.
+    func flushRatings() {
+        guard !ratings.isEmpty || !requestedRatingCodes.isEmpty else { return }
+        // log.info("flushing \(self.ratings.count, privacy: .public) cached rating(s)")
+        ratings.removeAll()
+        requestedRatingCodes.removeAll()
+    }
+
+    /// The circle colour for a cheat, or `nil` when there's no cached rating to show (so the circle
+    /// stays hidden). A "none" rating — the server having no feedback on record for the code — is
+    /// cached as a zero placeholder and resolves to the base colour, so only a code never fetched or
+    /// a fetch that outright failed (with nothing cached) shows no circle.
+    private func ratingCircleColor(for cheat: DatabaseCheat) -> NSColor? {
+        guard let rating = ratings[cheat.rawCode] else { return nil }
+        return CheatRatingColor.color(rating: rating.rating, total: rating.feedback.total)
+    }
+
+    /// Localized hover summary of a cheat's rating reports, or `nil` when there's no cached rating.
+    private func ratingTooltip(for cheat: DatabaseCheat) -> String? {
+        guard let rating = ratings[cheat.rawCode] else { return nil }
+        guard rating.feedback.total > 0 else {
+            return NSLocalizedString("No Ratings", comment: "Browse online cheats: rating circle hover tooltip when the code has no reports yet")
+        }
+        let format = NSLocalizedString("Ratings: %1$d works, %2$d do not, %3$d not sure",
+                                       comment: "Browse online cheats: rating circle hover tooltip; %1$d = reports it works, %2$d = reports it does not work, %3$d = not-sure reports")
+        return String(format: format, rating.feedback.works, rating.feedback.doesNotWork, rating.feedback.notSure)
+    }
+
+    /// A zero-feedback rating, cached for codes a successful query returned nothing for so they show
+    /// the base-colour circle rather than a blank. A later refresh overwrites it if data appears.
+    private static func noRatingPlaceholder(for code: String) -> CheatWorksRating {
+        CheatWorksRating(cheatCode: code, rating: 0, confidence: .none,
+                         feedback: CheatWorksRatingFeedback(works: 0, doesNotWork: 0, notSure: 0, total: 0))
+    }
+
+    /// Rebuilds only the rating column's cells so freshly arrived ratings repaint without disturbing
+    /// the rest of each row (selection, any in-progress edit).
+    private func reloadRatingColumn() {
+        guard let tableView = resultsTableView else { return }
+        let columnIndex = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier("rating"))
+        guard columnIndex >= 0 else { return }
+        let rowCount = numberOfRows(in: tableView)
+        guard rowCount > 0 else { return }
+        tableView.reloadData(forRowIndexes: IndexSet(integersIn: 0..<rowCount),
+                             columnIndexes: IndexSet(integer: columnIndex))
+    }
+
+    /// The user switched CheatWorks on or off in Preferences while this window is open: show or hide
+    /// the ratings column, and fetch ratings again when it comes back on.
+    @objc private func cheatWorksEnabledDidChange(_ notification: Notification) {
+        let enabled = CheatWorksConfig.isEnabled
+        resultsTableView?.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("rating"))?.isHidden = !enabled
+        ratings.removeAll()
+        requestedRatingCodes.removeAll()
+        if enabled { fetchRatingsForVisibleCheats() }
+    }
+
+    /// Fired after the user's own feedback for a code reaches CheatWorks. Re-fetches just that code's
+    /// rating if it belongs to the game/core this window is showing.
+    @objc private func cheatWorksFeedbackDidSubmit(_ notification: Notification) {
+        guard let document = gameDocument,
+              let md5 = document.rom.md5Hash,
+              let info = notification.userInfo,
+              info[CheatFeedbackService.cheatWorksSubmissionMD5Key] as? String == md5,
+              info[CheatFeedbackService.cheatWorksSubmissionSystemIdentifierKey] as? String == document.systemPlugin.systemIdentifier,
+              info[CheatFeedbackService.cheatWorksSubmissionCoreIdentifierKey] as? String == document.corePlugin.bundleIdentifier,
+              let rawCode = info[CheatFeedbackService.cheatWorksSubmissionRawCodeKey] as? String
+        else { return }
+
+        refreshRating(forRawCode: rawCode)
+    }
+
+    /// Force re-queries a single code's rating (bypassing the session cache, since the user just
+    /// changed its feedback) and replaces its cached value with the fresh server result.
+    private func refreshRating(forRawCode rawCode: String) {
+        guard CheatWorksConfig.isEnabled,
+              let document = gameDocument,
+              let md5 = document.rom.md5Hash,
+              let emulatorCode = CheatWorksConfig.emulatorCode(for: document.corePlugin.bundleIdentifier)
+        else { return }
+
+        // Keep it marked requested so a plain filter change doesn't redundantly re-fetch it.
+        requestedRatingCodes.insert(rawCode)
+        // log.info("refreshing rating after feedback for code: \(rawCode, privacy: .public)")
+
+        Task { [weak self] in
+            do {
+                let fetched = try await CheatWorksConfig.service.queryRatings(
+                    gameFingerprint: md5,
+                    emulatorCode: emulatorCode.rawValue,
+                    cheatCodes: [rawCode])
+
+                guard let self else { return }
+                if let rating = fetched.first {
+                    self.ratings[rawCode] = rating
+                    // log.info("rating updated \(rawCode, privacy: .public): score=\(rating.rating, privacy: .public) confidence=\(rating.confidence.rawValue, privacy: .public) works=\(rating.feedback.works, privacy: .public) doesNotWork=\(rating.feedback.doesNotWork, privacy: .public) notSure=\(rating.feedback.notSure, privacy: .public) total=\(rating.feedback.total, privacy: .public)")
+                } else {
+                    // Server returned nothing for it; keep a base-colour "none" circle rather than
+                    // dropping it, so a successful refresh never blanks a code out.
+                    self.ratings[rawCode] = Self.noRatingPlaceholder(for: rawCode)
+                    // log.info("rating update for \(rawCode, privacy: .public): no rating returned")
+                }
+                self.reloadRatingColumn()
+            } catch {
+                // log.error("rating refresh failed for \(rawCode, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
+        }
     }
 
     private func updateEmptyState() {
-        emptyStateLabel?.isHidden = isLoading || !visibleCheats.isEmpty
+        let shouldShow = !isLoading && visibleCheats.isEmpty
+        emptyStateLabel?.isHidden = !shouldShow
+        guard shouldShow, let label = emptyStateLabel else { return }
+        if shouldShowPugsyImportMessage {
+            label.attributedStringValue = Self.pugsyImportMessage()
+        } else {
+            label.stringValue = NSLocalizedString("No cheats found", comment: "Browse online cheats empty table")
+        }
+    }
+
+    /// Arcade games get their cheats only from Pugsy's archive, which is MAME-specific; when the MAME
+    /// core is in use and the archive hasn't been imported yet, the empty state points the user to
+    /// download and drop it instead of a bare "No cheats found".
+    private var shouldShowPugsyImportMessage: Bool {
+        guard let document = gameDocument else { return false }
+        return document.systemPlugin.systemIdentifier == OESystemIdentifierArcade
+            && document.corePlugin.bundleIdentifier == PugsyCheatProvider.mameCoreIdentifier
+            && !PugsyCheatFile.isArchiveImported
+    }
+
+    private static func pugsyImportMessage() -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.lineSpacing = 2
+
+        let baseAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: paragraph,
+        ]
+        let linkAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
+            .paragraphStyle: paragraph,
+            .link: URL.pugsyMAMECheats,
+        ]
+
+        let title = NSLocalizedString("No MAME cheat file imported yet.", comment: "Browse online cheats empty state (arcade, no Pugsy archive): title line")
+        let linkText = NSLocalizedString("Pugsy's MAME Cheats", comment: "Browse online cheats: clickable link text to Pugsy's website")
+        let instruction = String(format: NSLocalizedString("Download cheat.7z from %@ and drag it onto the OpenEmu library window.", comment: "Browse online cheats empty state (arcade, no Pugsy archive): instruction; %@ is the website link"), linkText)
+
+        let fullText = "\(title)\n\n\(instruction)"
+        let attributed = NSMutableAttributedString(string: fullText, attributes: baseAttributes)
+        let linkRange = (fullText as NSString).range(of: linkText)
+        if linkRange.location != NSNotFound {
+            attributed.setAttributes(linkAttributes, range: linkRange)
+        }
+        return attributed
     }
 
     /// Reports the match count, and says so plainly when the table is only showing
@@ -739,6 +982,9 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         notes = [:]
         hasLoaded = false
 
+        // Ratings are scoped to the emulator, so a core change invalidates the cached set too.
+        flushRatings()
+
         statusFilter = .all
         nameFilter = ""
         nameFilterField?.stringValue = ""
@@ -759,6 +1005,16 @@ final class BrowseOnlineCheatsViewController: NSViewController {
         refreshStatuses()
         refreshImportedCodeKeys()
         resultsTableView?.reloadData()
+    }
+
+    /// The Pugsy archive was (re)imported. Posted from the import background queue, so hop to main,
+    /// drop the previously-loaded (likely empty) result, and refetch.
+    @objc private func pugsyDatabaseWasImported() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.hasLoaded = false
+            self.fetchOnlineCheats()
+        }
     }
 }
 
@@ -818,6 +1074,23 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
         guard let identifier = tableColumn?.identifier, row < visibleCheats.count else { return nil }
         let cheat = visibleCheats[row]
 
+        if identifier.rawValue == "rating" {
+            let cell = makeRatingCell(in: tableView)
+            if let color = ratingCircleColor(for: cheat) {
+                cell.imageView?.isHidden = false
+                cell.imageView?.contentTintColor = color
+                let tooltip = ratingTooltip(for: cheat)
+                cell.imageView?.toolTip = tooltip
+                cell.imageView?.setAccessibilityLabel(tooltip)
+            } else {
+                // No cached rating (never fetched, or the fetch failed with nothing cached) — hide it.
+                cell.imageView?.isHidden = true
+                cell.imageView?.toolTip = nil
+                cell.imageView?.setAccessibilityLabel(nil)
+            }
+            return cell
+        }
+
         if identifier.rawValue == "action" {
             return makeActionCell(in: tableView, state: importState(for: cheat))
         }
@@ -861,10 +1134,41 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
 
     private func providerIcon(for providerName: String) -> NSImage? {
         switch providerName {
-        case "OpenEmu": return NSImage(named: "cheat_provider_openemu")
-        case "Libretro": return NSImage(named: "cheat_provider_libretro")
+        case OpenEmuCheatProvider.providerName: return NSImage(named: "cheat_provider_openemu")
+        case LibretroCheatProvider.providerName: return NSImage(named: "cheat_provider_libretro")
+        case PugsyCheatProvider.providerName: return NSImage(named: "cheat_provider_pugsy")
         default: return nil
         }
+    }
+
+    private func makeRatingCell(in tableView: NSTableView) -> NSTableCellView {
+        let cellID = NSUserInterfaceItemIdentifier("BrowseOnlineCheatsRatingCell")
+        if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
+            return existing
+        }
+
+        let cell = NSTableCellView()
+        cell.identifier = cellID
+
+        // Sized to match the status icons (SF Symbol at pointSize 14); tinted per row via
+        // `contentTintColor`, so one `circle.fill` serves every rating colour.
+        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+        let imageView = NSImageView()
+        imageView.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config)
+        imageView.imageScaling = .scaleProportionallyDown
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        cell.addSubview(imageView)
+        cell.imageView = imageView
+
+        NSLayoutConstraint.activate([
+            imageView.centerXAnchor.constraint(equalTo: cell.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 16),
+            imageView.heightAnchor.constraint(equalToConstant: 16),
+        ])
+
+        return cell
     }
 
     private func makeProviderCell(in tableView: NSTableView) -> NSTableCellView {
@@ -1369,6 +1673,48 @@ final class NotesCellView: NSView {
 }
 
 // MARK: - Status Cell View
+
+/// Computes the colour of the rating circle in the Browse Online Cheats list. The hue runs from
+/// `negativeColor` (rating -1) through `neutralColor` (0) to `positiveColor` (+1); that hue is then
+/// blended over `baseColor` by how many reports back it, reaching the full hue at
+/// `fullConfidenceCount` reports. The base colours are placeholders, meant to be fine-tuned later.
+enum CheatRatingColor {
+
+    static var negativeColor = NSColor.systemRed
+    static var neutralColor  = NSColor.systemYellow
+    static var positiveColor = NSColor.systemGreen
+    static var baseColor     = NSColor(srgbRed: 0.30, green: 0.30, blue: 0.30, alpha: 1)
+
+    /// Reports at which the hue fully replaces `baseColor`. Changeable later.
+    static var fullConfidenceCount = 3
+
+    /// `rating` is the -1…1 average verdict; `total` is the number of reports behind it.
+    static func color(rating: Double, total: Int) -> NSColor {
+        let hue = hueColor(for: rating)
+        let fraction = fullConfidenceCount > 0
+            ? min(Double(max(total, 0)) / Double(fullConfidenceCount), 1)
+            : 1
+        return blend(from: baseColor, to: hue, fraction: CGFloat(fraction))
+    }
+
+    /// Red → yellow → green across the rating's -1…1 range.
+    private static func hueColor(for rating: Double) -> NSColor {
+        let clamped = min(max(rating, -1), 1)
+        return clamped <= 0
+            ? blend(from: negativeColor, to: neutralColor, fraction: CGFloat(clamped + 1))
+            : blend(from: neutralColor, to: positiveColor, fraction: CGFloat(clamped))
+    }
+
+    /// Linear per-channel interpolation in sRGB; `fraction` 0 returns `from`, 1 returns `to`.
+    private static func blend(from: NSColor, to: NSColor, fraction: CGFloat) -> NSColor {
+        let f = min(max(fraction, 0), 1)
+        guard let a = from.usingColorSpace(.sRGB), let b = to.usingColorSpace(.sRGB) else { return to }
+        return NSColor(srgbRed: a.redComponent + (b.redComponent - a.redComponent) * f,
+                       green:   a.greenComponent + (b.greenComponent - a.greenComponent) * f,
+                       blue:    a.blueComponent + (b.blueComponent - a.blueComponent) * f,
+                       alpha:   a.alphaComponent + (b.alphaComponent - a.alphaComponent) * f)
+    }
+}
 
 /// Three exclusive icon buttons. The filled symbol variant carries the selection
 /// alongside the tint, so the state is still readable without colour.

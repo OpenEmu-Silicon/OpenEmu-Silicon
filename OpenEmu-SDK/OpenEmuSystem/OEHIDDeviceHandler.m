@@ -449,14 +449,10 @@ NS_ASSUME_NONNULL_BEGIN
     }
 }
 
-- (void)setUpCallbacks;
+- (NSArray<NSDictionary<NSString *, id> *> *)inputValueMatchingProperties;
 {
-    // Register for removal
-    IOHIDDeviceRegisterRemovalCallback(_device, OEHandle_DeviceRemovalCallback, (__bridge void *)self);
-
-    // Register for input
     NOTE("If supporting additional HID Usage Pages add them here to whitelist!");
-    NSMutableArray *matching = [@[
+    NSArray *properties = @[
         @{ @kIOHIDElementUsagePageKey: @(kHIDPage_GenericDesktop) },
         @{ @kIOHIDElementUsagePageKey: @(kHIDPage_Consumer) },
         @{ @kIOHIDElementUsagePageKey: @(kHIDPage_Simulation) },
@@ -466,12 +462,21 @@ NS_ASSUME_NONNULL_BEGIN
         @{ @kIOHIDElementUsagePageKey: @(kHIDPage_Button) },
         @{ @kIOHIDElementUsagePageKey: @(kHIDPage_KeyboardOrKeypad) },
         @{ @kIOHIDElementUsagePageKey: @0xFF, @kIOHIDElementUsageKey: @3, }
-    ] mutableCopy];
+    ];
 
-    [self OE_setUpDualSenseBluetoothIfNeeded];
     if(_dualSenseBluetoothElements.count != 0)
-        [matching addObject:@{ @kIOHIDElementUsagePageKey: @0xFF00, @kIOHIDElementUsageKey: @0x3B }];
-    IOHIDDeviceSetInputValueMatchingMultiple(_device, (__bridge CFArrayRef)matching);
+        return [properties arrayByAddingObject:@{ @kIOHIDElementUsagePageKey: @0xFF00, @kIOHIDElementUsageKey: @0x3B }];
+    return properties;
+}
+
+- (void)setUpCallbacks;
+{
+    // Register for removal
+    IOHIDDeviceRegisterRemovalCallback(_device, OEHandle_DeviceRemovalCallback, (__bridge void *)self);
+
+    // Register for input
+    [self OE_setUpDualSenseBluetoothIfNeeded];
+    IOHIDDeviceSetInputValueMatchingMultiple(_device, (__bridge CFArrayRef)[self inputValueMatchingProperties]);
     IOHIDDeviceRegisterInputValueCallback(_device, OEHandle_InputValueCallback, (__bridge void *)self);
 
     // Attach to the runloop

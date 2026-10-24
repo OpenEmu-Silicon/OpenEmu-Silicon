@@ -4,7 +4,18 @@
   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>JollyCV</title>
-        <item>
+            <item>
+      <title>JollyCV 1.0.3</title>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/download/cores-v1.6.0/JollyCV.oecoreplugin.zip"
+        sparkle:version="1.0.3"
+        sparkle:shortVersionString="1.0.3"
+        length="43765"
+        sparkle:edSignature="Lw1DAv0FoILtOZbxvsEcSr/tZvt/Fq0WSj3VPjjhS9XrbJKc4vTUpD2XuVO8WjVL6Q5Ml82zk8ORtBIydH4jDQ=="
+        type="application/octet-stream" />
+    </item>
+<item>
       <title>JollyCV 1.0.2</title>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
       <enclosure

@@ -180,6 +180,11 @@ uint8_t jcv_mem_rd(uint16_t addr) {
     }
 }
 
+// Base system RAM (1K, mirrored every 1K across 0x6000-0x7fff), for cheat pokes
+uint8_t* jcv_get_ram(void) {
+    return cvsys.ram;
+}
+
 // Write a byte to a memory location
 void jcv_mem_wr(uint16_t addr, uint8_t data) {
     /* If the Super Game Module is plugged in and activated, the RAM writes will

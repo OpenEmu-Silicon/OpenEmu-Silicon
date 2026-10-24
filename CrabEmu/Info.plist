@@ -17,7 +17,7 @@
 	<key>CFBundleSignature</key>
 	<string>OpEm</string>
 	<key>CFBundleVersion</key>
-	<string>0.2.1.271</string>
+	<string>0.2.1.272</string>
 	<key>NSPrincipalClass</key>
 	<string>OEGameCoreController</string>
 	<key>OEGameCoreClass</key>
@@ -35,6 +35,8 @@
 			<key>OEGameCoreSupportsCheatCode</key>
 			<true/>
 			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
 			<true/>
 			<key>OEGameCoreSupportsRewinding</key>
 			<true/>

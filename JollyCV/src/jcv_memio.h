@@ -82,6 +82,8 @@ void jcv_io_wr(uint8_t, uint8_t);
 uint8_t jcv_mem_rd(uint16_t);
 void jcv_mem_wr(uint16_t, uint8_t);
 
+uint8_t* jcv_get_ram(void);
+
 void jcv_memio_init(void);
 void jcv_memio_deinit(void);
 

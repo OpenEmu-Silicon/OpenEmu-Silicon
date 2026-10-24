@@ -2,6 +2,9 @@
 .DS_Store
 OEBuildVersion.h
 build/
+
+# Merge/rebase artifacts
+*.orig
 *.pbxuser
 !default.pbxuser
 *.mode1v3
@@ -33,6 +36,7 @@ Releases/
 !Releases/*.md
 OpenEmu/OEGoogleDriveSecrets.swift
 OpenEmu/ScreenScraperDevCredentials.swift
+OpenEmu/CheatWorksSecrets.swift
 
 
 # Misc build artifacts committed to root
@@ -48,8 +52,11 @@ vice_build.log
 # Compiled test binaries
 test_dlopen
 
-# Claude Code local config
+# Claude Code personal config (shared rules live in AGENTS.md)
+CLAUDE.local.md
 .claude/settings.json
+.claude/settings.local.json
+.claude/worktrees/
 
 # Cursor IDE config — local user settings stay out of git, but project hooks
 # are checked in so every contributor (and AI session) gets the same automated
@@ -70,3 +77,6 @@ Flycast/flycast/core/deps/rcheevos/.build/
 
 # RA review DMG build output
 Scripts/retro-achievements/build/
+
+# Python bytecode
+__pycache__/

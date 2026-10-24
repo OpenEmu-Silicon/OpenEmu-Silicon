@@ -485,6 +485,9 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
                 performImportStepCheckDirectory()
                 if shouldExit { return }
                 
+                performImportStepCheckPugsyCheatFile()
+                if shouldExit { return }
+                
                 performImportStepCheckArchiveFile()
                 if shouldExit { return }
                 
@@ -573,6 +576,15 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
             }
             
             exit(with: .success, error: nil)
+        }
+    }
+    
+    /// Recognize a dropped Pugsy MAME cheat archive by filename and import it, before the archive
+    /// step below tries to explore it as an Arcade ROM archive. Recognized files never become games.
+    private func performImportStepCheckPugsyCheatFile() {
+        if PugsyCheatFile.checkIfPugsyCheatFileAndImport(at: url) {
+            DLog("File is Pugsy's MAME cheat archive at \(url)")
+            exit(with: .none, error: nil)
         }
     }
     

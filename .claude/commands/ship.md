@@ -1,61 +1,49 @@
-Run the full git shipping loop for the current branch.
+Ship the current work. Pick the lane, then do the minimum it needs.
 
-1. Confirm the branch name matches the work being done. If not, stop and ask.
-2. **Do not run `./Scripts/verify.sh` here.** The pre-push hook is advisory only and does not run a build. GitHub CI (`build-check.yml`) runs the build check on every PR. Run `/verify` during development if you want a local build confirmation, but it is not required before pushing.
-3. **Adversarial review.** Run this command and show the output:
-   ```bash
-   git diff main...HEAD | wc -l
-   ```
-   If the count is `0`, skip this step — there is nothing to review. **You must show the numeric output before deciding to skip.** If the count is greater than 0, dispatch the `adversarial-reviewer` subagent (`.claude/agents/adversarial-reviewer.md`) once with the full diff and direct caller/callee context for changed symbols. For each `block` finding: fix the code (and re-run `/verify`) or rebut with evidence (the falsifiable_check command + its verbatim output). Hand-check is acceptable on rebuttal — do not auto-re-run the gate after a fix unless the fix itself touches compiled code. `note` findings are surfaced in the PR body but do not gate. If rebuttals or notes exist, append them to the PR body in step 4 under `## Adversarial review` after the canonical template content.
-4. Confirm the commit message uses the correct format: `<type>: <description>` with `Fixes #N` in the body if resolving an issue.
-5. **Compose the PR body — always read the canonical template first, never improvise.**
+## 1. Pick the lane
 
-   Before writing the PR body, run:
-   ```bash
-   cat .github/PULL_REQUEST_TEMPLATE.md
-   ```
+**Straight to `main`** (no branch, no PR) for the maintainer's own:
+- docs, README, `AGENTS.md`, scripts, appcasts, release bookkeeping, chores
+- tiny code fixes: one file, under about 30 lines, not touching a core, input handling, or threading
 
-   The template defines the exact sections and (critically) the bash test block under "How to test locally." That bash block has been hand-stabilized over many fix commits to handle code signing, DerivedData resolution, and core install patterns correctly. **Do not modify or rewrite the bash block** — preserve it verbatim and only fill in the placeholders (PR number, scheme overrides, core name).
+Do not use this lane for `.github/workflows/`, for another contributor's work, or for anything you are unsure about.
 
-   The canonical PR body structure is:
+**Pull request** for everything else. CI is the build gate that matters here. Group related work into one branch and one PR per theme, with every issue listed as `Fixes #N`.
 
-   ```markdown
-   ## What does this PR do?
-   <one or two sentences>
+## 2. Check before shipping
 
-   ## What did you test?
-   <which game(s), system(s), or workflow(s)>
+- Code changed: run `/verify` now if you have not since the last edit.
+- Read `git diff` once. Never commit secrets or build output.
+- Run the adversarial reviewer (`.claude/agents/adversarial-reviewer.md`) only when the diff touches a core, input handling, or threading, or is over about 50 lines of code. Show `git diff main...HEAD | wc -l` first. Skip it for docs, scripts, and small fixes. Fix `block` findings or rebut them with evidence; `note` findings go in the PR body.
 
-   ## Which cores or systems are affected?
-   <list, or "general app change">
+## 3. Commit
 
-   ## Did you use AI tools?
-   <e.g. "Used Claude to draft the fix, reviewed and tested it myself.">
+Format `<type>: <description>` (`fix:`, `feat:`, `chore:`, `docs:`, `refactor:`). Add `Fixes #N` in the body when it resolves an issue.
 
-   ## Linked issues
-   Fixes #N
-   ```
+## 4a. Straight to `main`
 
-   Then the template's `## How to test locally` section follows automatically — that's already in `.github/PULL_REQUEST_TEMPLATE.md` and `gh pr create --body` will inherit it if you pass `--body-file` or pipe through. If you're constructing the body inline with `--body "..."`, copy the test block verbatim from the template.
+```bash
+git switch main && git pull --ff-only
+# apply or cherry-pick the change, commit
+git push origin main
+```
 
-   Push and open the PR, then immediately edit the body to replace `NUMBER` with the real PR number:
-   ```bash
-   # Step 1 — create the PR (NUMBER is a placeholder at this point)
-   PR_URL=$(gh pr create --repo OpenEmu-Silicon/OpenEmu-Silicon --base main --title "<type>: description" --body "...")
-   # Step 2 — extract the number and patch the body
-   PR_NUM=$(echo "$PR_URL" | grep -o '[0-9]*$')
-   gh pr edit "$PR_NUM" --repo OpenEmu-Silicon/OpenEmu-Silicon --body "$(gh pr view "$PR_NUM" --repo OpenEmu-Silicon/OpenEmu-Silicon --json body -q .body | sed "s/NUMBER/$PR_NUM/g")"
-   ```
+If CI runs on pushes to `main`, watch it go green and tell the user if it does not. If not, say the change was not built by CI.
 
-   Always do both steps. The reviewer should never see `NUMBER` in the test block — it must be the real PR number before you report the PR as open.
+## 4b. Pull request
 
-   - If this PR fixes a tracked issue, the PR body **must** include `Fixes #N` (not just the commit). GitHub only auto-closes an issue when the keyword appears in the PR body.
+Read `.github/PULL_REQUEST_TEMPLATE.md` first and keep its test block verbatim. Fill the placeholders only. Push and open the PR in the same step, then replace `NUMBER` with the real PR number:
 
-6. If the PR fixes a tracked issue that was reported by an external user (anyone other than `nickybmon`), post a comment on that issue. The comment must:
-   - Be written in plain English for a non-technical audience — no code, no jargon
-   - Explain what the bug was and why it was happening (brief, accessible)
-   - Explain what was fixed
-   - Tell the user when to expect the fix (i.e. "this will be included in the next release")
-   - Be warm and appreciative of the report
-   Do not post this comment if the issue was opened by `nickybmon` — internal issues don't need public-facing updates.
-7. Report: branch pushed, PR URL, issue comment posted (or not applicable).
+```bash
+PR_URL=$(gh pr create --repo OpenEmu-Silicon/OpenEmu-Silicon --base main --title "<type>: description" --body-file <body>)
+PR_NUM=${PR_URL##*/}
+gh pr edit "$PR_NUM" --repo OpenEmu-Silicon/OpenEmu-Silicon --body "$(gh pr view "$PR_NUM" --repo OpenEmu-Silicon/OpenEmu-Silicon --json body -q .body | sed "s/NUMBER/$PR_NUM/g")"
+```
+
+Put `Fixes #N` in the PR body, since GitHub only auto-closes from there. Never merge unless the user asks for it in that same message.
+
+## 5. Close the loop
+
+- A PR with `Fixes #N` closes the issue when it merges. For a direct push to `main`, close it: `gh issue close N --repo OpenEmu-Silicon/OpenEmu-Silicon --comment "Resolved in <sha>."`
+- If an external reporter filed the issue (not `nickybmon`), leave a short, warm, plain-English comment: what was wrong, what changed, and that it ships in the next release.
+- Report the lane used, the PR URL or commit, and what was or was not verified.

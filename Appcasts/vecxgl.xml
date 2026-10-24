@@ -4,7 +4,18 @@
   xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>VecXGL</title>
-        <item>
+            <item>
+      <title>VecXGL 1.2.4</title>
+      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/releases/download/cores-v1.6.0/VecXGL.oecoreplugin.zip"
+        sparkle:version="1.2.4"
+        sparkle:shortVersionString="1.2.4"
+        length="181312"
+        sparkle:edSignature="zxgcDebL6jFcW34pMMKIWIzbpipkNrSCHIuQiGn5tWCHvlD4X5tVr+D7h5YntC4G/xrhGbaNz5/2gyUSkItGCQ=="
+        type="application/octet-stream" />
+    </item>
+<item>
       <title>VecXGL 1.2.3</title>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
       <enclosure
