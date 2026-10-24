@@ -105,7 +105,7 @@ extension Notification.Name {
             return
         }
         status = .syncing
-        DispatchQueue.global(qos: .utility).async { [weak self] in
+        copyQueue.async { [weak self] in
             self?.performInitialSync()
             DispatchQueue.main.async {
                 self?.status = .idle
@@ -117,6 +117,21 @@ extension Notification.Name {
     @objc func stop() {
         stopFSEventStream()
         if backupFolderURL == nil { status = .noFolderSelected }
+    }
+
+    @objc func flush(completion: @escaping () -> Void) {
+        guard backupFolderURL != nil else {
+            completion()
+            return
+        }
+        // The quit flow can call this from a main queue block and then wait in a nested
+        // run loop that does not drain the main queue, so do not use DispatchQueue.main.
+        let mainRunLoop = CFRunLoopGetMain()
+        copyQueue.async { [weak self] in
+            self?.performInitialSync()
+            CFRunLoopPerformBlock(mainRunLoop, CFRunLoopMode.commonModes.rawValue, completion)
+            CFRunLoopWakeUp(mainRunLoop)
+        }
     }
 
     // MARK: - Folder selection
