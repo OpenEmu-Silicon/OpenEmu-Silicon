@@ -1,11 +1,4 @@
-Core plugin versions built from commit 661948b70
+Core plugin versions built from commit d2a451315
 
-Picodrive 1.93.1
-Potator 0.1.1
-VecXGL 1.2.3
-PokeMini 0.6.1
-PPSSPP 1.14.9
-blueMSX 2.9.1294
-O2EM 1.18.2
-CrabEmu 0.2.1.271
-ProSystem 1.5.3
+FBNeo 1.0.0.0
+MAME

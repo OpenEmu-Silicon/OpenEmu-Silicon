@@ -58,7 +58,7 @@ This file is the source of truth for what each term means *in this codebase*. If
 
 | Term | Meaning |
 |---|---|
-| **Play With…** | The library context-menu submenu that lets the user pick which core to launch a given ROM with. |
+| **Play With…** | The library context-menu submenu that lets the user pick which core to launch a given ROM with. Only an autosave from the selected core is offered for resuming; an autosave from another core is skipped so it cannot override the selection. Normal launches can still resume with the autosave's core. |
 | **RetroAchievements (RA)** | Third-party achievement system. Phase 1 covers the cores listed in the v1.0.7 release notes. The pref pane and HUD live in the host app; the rcheevos C library lives in the helper. |
 | **hardcore mode** | A RetroAchievements concept (no save states or rewind) — *not currently supported* in this repo. Do not claim it in release notes or documentation. |
 | **rewind** | The host-side save-state ring buffer that lets the player step backward. Implemented in the helper, controlled from the host. |

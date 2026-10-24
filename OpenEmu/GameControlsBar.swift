@@ -440,7 +440,7 @@ final class GameControlsBar: NSWindow {
             menu.addItem(browseItem)
         }
 
-        let cheats = gameViewController.document.cheats
+        let cheats = gameViewController.document.visibleCheats
             // Stable sort: manual/Cheat Search entries first, Browse Online Cheats imports after.
             .sorted { ($0.cheatSource != nil ? 1 : 0) < ($1.cheatSource != nil ? 1 : 0) }
         if !cheats.isEmpty {
