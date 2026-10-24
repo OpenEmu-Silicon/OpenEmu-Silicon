@@ -80,6 +80,12 @@ NS_ASSUME_NONNULL_BEGIN
  *     release it in the -dealloc method. */
 @property(readonly) CFRunLoopRef eventRunLoop;
 
+/** The input value matching properties used to whitelist the HID elements
+ *  that deliver reports for this device.
+ *  @discussion Override this method to add usage pages that a specific device
+ *     needs. The default list covers the standard game controller pages. */
+- (NSArray<NSDictionary<NSString *, id> *> *)inputValueMatchingProperties;
+
 /** Registers the callbacks used for receiving HID reports from the device.
  *  @note If you override eventRunLoop, override this method to create
  *     the thread which will receive the events to ensure that the
