@@ -1343,8 +1343,11 @@ extension AppDelegate: NSMenuDelegate {
         // Set up HID support.
         setUpHIDSupport()
         
-        // Start Save Sync Manager
-        OESaveSyncManager.shared.startMonitoring()
+        // Remove any Google Drive token left behind by the old API sign-in.
+        if OECredentialStore.shared.has(.googleDriveRefreshToken) {
+            OECredentialStore.shared.remove(.googleDriveRefreshToken)
+        }
+
         OEFolderBackupManager.shared.start()
 
         // Replace quicksave/quickload items with menus if required.
@@ -1425,18 +1428,6 @@ extension AppDelegate: NSMenuDelegate {
             }
         }
         return false
-    }
-    
-    // NOTE: When using ‘application:openURLs:’, “Document URLs that have an associated NSDocument class
-    // will be opened through NSDocumentController.”, thereby bypassing the startupQueue.
-    // FIXME: Handle ´PluginDocument´s
-    func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls {
-            if url.scheme == "com.openemu.openemu" && url.host == "oauth2callback" {
-                OESaveSyncManager.shared.handleOAuthRedirect(url: url)
-                return
-            }
-        }
     }
     
     func application(_ sender: NSApplication, openFiles filenames: [String]) {

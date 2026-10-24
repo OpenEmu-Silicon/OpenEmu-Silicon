@@ -55,7 +55,6 @@ Generate the gitignored local files from their templates:
 
 ```bash
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 ```
 
@@ -188,7 +187,7 @@ What has worked well here:
 - Do not add dependencies without discussion. The project intentionally has no package manager.
 - Do not remove or rename core directories. The Xcode project references them.
 - Do not change `MACOSX_DEPLOYMENT_TARGET` below `12.0`.
-- Do not commit real credentials (`OEGoogleDriveSecrets.swift`, `ScreenScraperDevCredentials.swift`, `CheatWorksSecrets.swift`). Use the templates.
+- Do not commit real credentials (`ScreenScraperDevCredentials.swift`, `CheatWorksSecrets.swift`). Use the templates.
 - Do not add debug `+load` / `+initialize` methods that write to `/tmp` or hardcode local paths.
 - Do not commit large binaries (`.zip`, `.tar.gz`, executables). Those belong in GitHub Releases.
 - Do not report a core test result without running `verify-core-installed.sh` since the last build.
