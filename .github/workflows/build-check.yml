@@ -97,7 +97,9 @@ jobs:
             echo "No usable diff base (event: ${{ github.event_name }}) - building all core schemes"
             cores="$all_cores"
           else
-            changed=$(git diff --name-only "$base" "${{ github.sha }}")
+            # --no-renames lists both the old and new path of a move; quotePath=false
+            # keeps non-ASCII file names readable instead of octal-escaped.
+            changed=$(git -c core.quotePath=false diff --no-renames --name-only "$base" "${{ github.sha }}")
             echo "Changed files:"
             echo "$changed"
 
@@ -107,10 +109,10 @@ jobs:
             # scheme, or build phase references it, so a script change cannot
             # change what a core compiles. (If a build phase ever starts
             # calling a script, add that script's path here.)
-            # OpenEmuKit/ is included because several cores (Gambatte, FCEU,
-            # GenesisPlus, Mednafen, mGBA, Mupen64Plus, Nestopia, SNES9x, BSNES)
-            # compile .m files directly out of OpenEmuKit/Source/ into their
-            # own plugin targets.
+            # OpenEmuKit/ is included because about 19 cores compile .m files
+            # or import headers directly out of OpenEmuKit/Source/ into their
+            # own plugin targets (Scripts/detect-core-changes.py --print-map
+            # lists them).
             if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/)'; then
               echo "Shared code changed — building all core schemes"
               cores="$all_cores"
@@ -130,8 +132,10 @@ jobs:
             # next to what this job actually builds, so we can compare over a
             # few PRs before it is allowed to skip anything. Never fails the job.
             echo "--- detect-core-changes.py (report only, not used) ---"
-            echo "$changed" | python3 Scripts/detect-core-changes.py --files - || echo "(script failed; ignored)"
+            proposed=$(echo "$changed" | python3 Scripts/detect-core-changes.py --files - || echo "(script failed; ignored)")
+            echo "$proposed"
             echo "--- actually building: $cores ---"
+            echo "::notice title=detect-core-changes (report only)::$proposed"
           fi
 
           echo "Core schemes to build: $cores"

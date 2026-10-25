@@ -4,7 +4,10 @@
     python3 Scripts/test-detect-core-changes.py
 """
 import importlib.util
+import json
 import os
+import subprocess
+import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -52,6 +55,24 @@ class DetectCoreChanges(unittest.TestCase):
     def test_unknown_kit_change_selects_everything(self):
         self.assertEqual(pick("OpenEmuKit/OpenEmuKit.xcodeproj/project.pbxproj"), dcc.ALL_CORES)
         self.assertEqual(pick("OpenEmuKit/Config.xcconfig"), dcc.ALL_CORES)
+
+    def test_vendor_change_selects_everything(self):
+        self.assertEqual(pick("Vendor/rcheevos/src/a.c"), dcc.ALL_CORES)
+
+    def test_nested_and_other_cores_are_mapped(self):
+        got = pick("OpenEmuKit/Source/OERetroAchievementsBridge.m")
+        for core in ("PPSSPP", "Stella", "O2EM"):
+            self.assertIn(core, got)
+
+    def test_empty_change_list_selects_nothing(self):
+        self.assertEqual(pick(), [])
+
+    def test_script_reads_paths_from_stdin(self):
+        out = subprocess.run(
+            [sys.executable, os.path.join(HERE, "detect-core-changes.py"), "--files", "-"],
+            input="Gambatte/GBGameCore.mm\n", capture_output=True, text=True, check=True,
+        ).stdout
+        self.assertEqual(json.loads(out)["cores"], ["Gambatte"])
 
     def test_new_unreferenced_c_file_in_unmapped_dir_selects_everything(self):
         self.assertEqual(pick("OpenEmuKit/NewDir/new.m"), dcc.ALL_CORES)

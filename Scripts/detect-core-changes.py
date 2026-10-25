@@ -9,8 +9,9 @@ Used by .github/workflows/build-check.yml. Reads the list of changed files
 Rules, from most to least conservative:
 
 1. A change under a core's own directory selects that core.
-2. A change to OpenEmu-SDK/ or the workspace selects every core (cores link
-   the OpenEmuBase framework from the SDK, so the dependency is not per-file).
+2. A change to OpenEmu-SDK/, Vendor/ or the workspace selects every core
+   (cores link the OpenEmuBase framework from the SDK, and many compile
+   Vendor/rcheevos, so the dependency is not per-file).
 3. A change under OpenEmuKit/ is narrowed using the cores' Xcode projects:
      - a file a core's project references by path selects that core;
      - a C-family source or header in a directory a core's project puts on
@@ -48,7 +49,8 @@ ALL_CORES = [
     "VirtualJaguar", "blueMSX",
 ]
 
-SHARED_ALL_PREFIXES = ("OpenEmu-SDK/", "OpenEmu-metal.xcworkspace/")
+# Vendor/ (rcheevos) is on many cores' header search paths and source lists.
+SHARED_ALL_PREFIXES = ("OpenEmu-SDK/", "OpenEmu-metal.xcworkspace/", "Vendor/")
 
 # Files a core build could pull in from a header search path.
 CORE_VISIBLE_EXTS = {".h", ".hpp", ".m", ".mm", ".c", ".cc", ".cpp", ".pch", ".inc"}
@@ -59,7 +61,7 @@ KIT = "OpenEmuKit/"
 # A pbxproj mentions the kit as a relative path, e.g. ../OpenEmuKit/Source/X.m
 # or $(SRCROOT)/../OpenEmuKit/Source. Stop at whitespace, quote, ; or ,.
 KIT_REF = re.compile(r"(?:\.\./)+(OpenEmuKit(?:/[^\s\"\\\\;,]*)?)")
-# Kit paths that are not a file or search path (Swift-package style globs etc.)
+# Xcode search paths often end in /** (recursive); strip it to get the folder.
 GLOB_SUFFIX = re.compile(r"/\*+$")
 
 
@@ -136,7 +138,7 @@ def select(changed, cores=ALL_CORES, kit_map=None):
 
 def changed_files(base, head):
     out = subprocess.run(
-        ["git", "diff", "--name-only", base, head],
+        ["git", "-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", base, head],
         cwd=REPO_ROOT, check=True, capture_output=True, text=True,
     ).stdout
     return out.splitlines()
