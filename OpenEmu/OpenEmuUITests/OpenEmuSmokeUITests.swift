@@ -216,6 +216,8 @@ final class OpenEmuSmokeUITests: XCTestCase {
         let start = Date()
         attach(gameWindow, named: "playtest-000s-start")
         var step = 0
+        var shots = 0, blank = 0, changes = 0
+        var previous = Self.fingerprint(gameWindow.screenshot().image)
         while Date().timeIntervalSince(start) < seconds {
             sleep(2)
             var label = "idle"
@@ -225,7 +227,21 @@ final class OpenEmuSmokeUITests: XCTestCase {
                 step += 1
             }
             attach(gameWindow, named: String(format: "playtest-%03ds-%@", Int(Date().timeIntervalSince(start)), label))
+            let now = Self.fingerprint(gameWindow.screenshot().image)
+            shots += 1
+            if Self.isBlank(now) { blank += 1 }
+            if Self.differs(previous, now) { changes += 1 }
+            previous = now
         }
+        // The game's own "Take Screenshot" reads the picture the core rendered, so it works even for cores whose
+        // output a window capture cannot see. It adds one screenshot to the library, hence opt-in.
+        if ProcessInfo.processInfo.environment["OE_PLAYTEST_GAME_SHOT"] == "1" {
+            chooseMenu("Controls", "Take Screenshot")
+            sleep(2)
+        }
+        // Read by Scripts/playtest.sh. "blank" means the picture was one flat colour (black), "changes" how many
+        // times the picture differed from the one before it.
+        print("PLAYTEST-PICTURE screenshots=\(shots) blank=\(blank) changes=\(changes)")
         // Quick Save writes into the player's save slot, so a play test on the real library skips it unless asked.
         if !Self.usesRealLibrary || ProcessInfo.processInfo.environment["OE_PLAYTEST_SAVE"] == "1" {
             chooseMenu("Controls", "Quick Save")
