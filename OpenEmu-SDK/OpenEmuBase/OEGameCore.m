@@ -46,6 +46,9 @@ NSString *const OEGameCoreErrorDomain = @"org.openemu.GameCore.ErrorDomain";
 
 @implementation OEGameCore
 {
+    uint64_t _statsWindowStart, _statsLastFrame;
+    NSUInteger _statsFrames;
+    double _statsWorstGapMs;
     NSThread *_gameCoreThread;
     CFRunLoopRef _gameCoreRunLoop;
 
@@ -427,6 +430,31 @@ static Class GameCoreClass = Nil;
     
     [_renderDelegate didExecute];
     os_signpost_interval_end(OE_LOG_CORE_RUN, OS_SIGNPOST_ID_EXCLUSIVE, "OE_executeFrame");
+    [self OE_recordFrameForStats];
+}
+
+/// Logs one line every few seconds with how many frames ran and how long the slowest gap between frames was,
+/// so a play test can read frame pacing from the log without anyone watching. Cheap: a clock read per frame.
+- (void)OE_recordFrameForStats
+{
+    static const double kReportInterval = 3.0;
+    uint64_t now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+    if (_statsWindowStart == 0) {
+        _statsWindowStart = _statsLastFrame = now;
+        return;
+    }
+    double gapMs = (now - _statsLastFrame) / 1e6;
+    if (gapMs > _statsWorstGapMs) _statsWorstGapMs = gapMs;
+    _statsLastFrame = now;
+    _statsFrames++;
+    double elapsed = (now - _statsWindowStart) / 1e9;
+    if (elapsed >= kReportInterval) {
+        os_log(OE_LOG_CORE_RUN, "frame stats: %lu frames in %.1fs (%.1f fps), worst gap %.1f ms",
+               (unsigned long)_statsFrames, elapsed, _statsFrames / elapsed, _statsWorstGapMs);
+        _statsWindowStart = now;
+        _statsFrames = 0;
+        _statsWorstGapMs = 0;
+    }
 }
 
 - (void)executeFrame

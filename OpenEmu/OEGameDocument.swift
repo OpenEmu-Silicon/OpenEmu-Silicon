@@ -28,6 +28,7 @@ import OpenEmuBase
 import OpenEmuSystem
 import OpenEmuKit
 import UserNotifications
+import os.log
 
 let OEGameVolumeKey = "volume"
 let OEGameCoreDisplayModeKeyFormat = "displayMode.%@"
@@ -1180,8 +1181,11 @@ final class OEGameDocument: NSDocument {
         }
 
         SentryService.addBreadcrumb(message: "Emulation started", category: "emulation")
+        os_log(.info, log: .core, "Starting emulation of '%{public}@' with core '%{public}@'",
+               rom.url?.lastPathComponent ?? "unknown", corePlugin.bundleIdentifier ?? "unknown")
         emulationStatus = .starting
         gameCoreManager?.startEmulation() {
+            os_log(.info, log: .core, "Emulation is playing")
             self.emulationStatus = .playing
             // Cheats are disabled in hardcore mode (RA spec).
             if HardcoreModePolicy.allows(.cheats, hardcoreEnabled: self.isHardcoreModeEnabled) {

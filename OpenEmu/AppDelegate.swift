@@ -29,6 +29,8 @@ import OpenEmuSystem
 import OpenEmuKit
 import OpenEmuBase
 import UserNotifications
+import IOKit.hid
+import os.log
 
 private var appearancePrefChangedKVOContext = 0
 
@@ -195,13 +197,29 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
     
     func loadDatabase() {
         
+        // A unit-test host must never reach the library chooser alert: it is modal, so the test run would wait forever
+        // when the saved library path is missing (for example one left behind by a UI test). Tests that need a library
+        // make their own throwaway one (see ensureTestLibrary in ROMImporterTests).
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil { return }
+        
         let defaults = UserDefaults.standard
         
         let defaultDatabasePath = (defaults.string(forKey: OELibraryDatabase.defaultDatabasePathKey)! as NSString).expandingTildeInPath
-        let databasePath: String
+        var databasePath: String
         if let databasePathDefault = defaults.string(forKey: OELibraryDatabase.databasePathKey) {
             databasePath = (databasePathDefault as NSString).expandingTildeInPath
         } else {
+            databasePath = defaultDatabasePath
+        }
+        
+        // A saved library path inside a temporary folder that no longer exists is a leftover from an automated test run
+        // (older builds saved the test library path). Forget it and use the normal library, so the next launch does not
+        // stop at "library not found". A missing library anywhere else, such as an unmounted drive, still asks.
+        if databasePath != defaultDatabasePath,
+           !FileManager.default.fileExists(atPath: databasePath),
+           ["/var/folders/", "/private/var/folders/", "/private/tmp/", "/tmp/"].contains(where: { databasePath.hasPrefix($0) }) {
+            os_log(.info, log: .library, "Ignoring saved library path %{public}@ (temporary folder is gone)", databasePath)
+            defaults.removeObject(forKey: OELibraryDatabase.databasePathKey)
             databasePath = defaultDatabasePath
         }
         
@@ -1283,6 +1301,11 @@ extension AppDelegate: NSMenuDelegate {
         notificationCenter.addObserver(self, selector: #selector(openPreferencePane), name: PreferencesWindowController.openPaneNotificationName, object: nil)
         
         NSDocumentController.shared.clearRecentDocuments(nil)
+
+        // Keyboards need Input Monitoring; controllers do not. Logging the state makes "keyboard does nothing" diagnosable from the log.
+        let inputAccess = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
+        os_log(.info, log: .input, "Input Monitoring access: %{public}@",
+               inputAccess == kIOHIDAccessTypeGranted ? "granted" : (inputAccess == kIOHIDAccessTypeDenied ? "denied" : "unknown"))
 
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }

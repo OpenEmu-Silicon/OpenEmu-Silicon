@@ -2,9 +2,9 @@
 # check.sh — Drive the real app with UI tests and collect screenshots, results and crash reports.
 #
 # Usage:
-#   ./Scripts/check.sh                               # run every UI test (game test is skipped)
+#   ./Scripts/check.sh                               # run every UI test (game tests play the built-in test ROM)
 #   ./Scripts/check.sh --rom "/path/to/game.sfc"     # also load that ROM, check it draws and moves, quick save, screenshot, quit
-#   ./Scripts/check.sh --test testPreferencesPanesAllOpen   # run one test by name
+#   ./Scripts/check.sh --test testPreferencesPanesAllOpen   # run one test by name (repeat --test for several)
 #
 # The ROM is imported into the throwaway library; the ROM file itself is not modified or copied into the repo.
 # Each test launches the Debug build against a throwaway empty library (see OpenEmuSmokeUITests).
@@ -39,11 +39,18 @@ while [ $# -gt 0 ]; do
       [ -f "${2:-}" ] || { echo "FAIL  --rom needs an existing file" >&2; exit 2; }
       # xcodebuild passes TEST_RUNNER_-prefixed variables to the test runner.
       export TEST_RUNNER_OE_TEST_ROM="$2"; shift 2 ;;
-    --test) ONLY=(-only-testing:"OpenEmuUITests/OpenEmuSmokeUITests/${2:-}"); shift 2 ;;
+    --test) ONLY+=(-only-testing:"OpenEmuUITests/OpenEmuSmokeUITests/${2:-}"); shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
+# Without --rom, play the built-in Game Boy test ROM (written for this repo, always moving, no licensing issues)
+# so the game tests run instead of being skipped. It needs the Gambatte core installed, like any Game Boy game.
+if [ -z "${TEST_RUNNER_OE_TEST_ROM:-}" ]; then
+  python3 "$REPO_ROOT/Scripts/headless/make-test-rom.py" "$OUT_DIR/oetest.gb" && export TEST_RUNNER_OE_TEST_ROM="$OUT_DIR/oetest.gb"
+fi
+
+rm -rf /private/tmp/openemu-ui-* /private/tmp/openemu-ui-backup-* 2>/dev/null  # leftovers from earlier runs (the sandboxed runner cannot always delete them)
 echo "----  building and running UI tests"
 xcodebuild test \
   -workspace OpenEmu-metal.xcworkspace \

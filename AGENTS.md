@@ -73,6 +73,35 @@ Working in a git worktree? Use `Scripts/build-for-worktree.sh` or `verify.sh --w
 
 ---
 
+## Proving a fix (reproduce first, then fix, then show it passes)
+
+A bug is not fixed because the code compiles or the change looks right. It is fixed when a check that failed before now passes, and the output is in the PR. Do this without waiting for the maintainer, and only come back when you have proof or have hit a limit you can name.
+
+1. **Reproduce first.** Write the smallest check that fails for the reason in the issue, and run it. A failing check you cannot get is a finding in itself: say so.
+2. **Fix.** Change the code until that same check passes.
+3. **Show it.** Paste the before and after output into the PR description.
+
+Pick the cheapest check that can really see the bug:
+
+| The bug lives in | Use |
+|------------------|-----|
+| A pure function, parser, or data rule | A unit test in the matching `*Tests` target (`./Scripts/verify.sh --test`) |
+| A core: loading, picture, sound, button input, save states | `./Scripts/headless/gb-checks.sh` for Game Boy, or `./Scripts/headless/run.sh <Core> --rom <file> ...` for any core. It runs the core with no window, so no one has to play the game |
+| The app window, menus, preferences, import, quick save | `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
+| A crash | The crash report plus `./Scripts/collect-diagnostics.sh`. Write the check that triggers it, then fix |
+
+`./Scripts/prove.sh` chains the build, tests, headless checks, and diagnostics and prints one pass or fail line. A change is proven only when it ends with `PROVEN`.
+
+**One-time setup on a Mac (the maintainer does this once).** Debug builds are signed ad hoc, so the signature changes on every rebuild and macOS forgets what the debug app was allowed to do. That shows up two ways: the keyboard dies (Input Monitoring) and unit tests hang until someone clicks Allow on a "read your Documents folder" prompt. Run `./Scripts/setup-debug-signing.sh` once (it asks for the login password), then click Allow once. `./Scripts/prove.sh` tells you when the certificate is missing. An agent must not run that script, because it changes the keychain.
+
+Known gap: `OpenEmuKitTests` does not compile in the workspace today (`OpenEmuKitPrivate` cannot be resolved), so shader-preset tests are not run anywhere.
+
+State plainly what was not proven. Some things cannot be automated here: real controllers and Bluetooth pairing, and macOS permission prompts (Input Monitoring, Bluetooth). For those, prove everything up to the hardware edge (for example, decode captured reports in a unit test) and list the rest as "needs hands-on test" in the PR. Never write "fixed" for something only a person with the hardware can confirm.
+
+Before you report any in-game result, make sure the thing you ran is the thing you built (see "Working on a core" above, and use `./Scripts/launch-debug.sh` for the app). The headless scripts build their own copy of the core, so they never test a stale install.
+
+---
+
 ## File Organization
 
 | What you're touching | Where it lives |

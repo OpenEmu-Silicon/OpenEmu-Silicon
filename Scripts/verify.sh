@@ -374,11 +374,19 @@ fi
 if [ "$RUN_TESTS" -eq 1 ] && [ -z "$CORE" ]; then
   info "running OpenEmuTests (xcodebuild test)"
   TEST_LOG=$(mktemp -t verify_test.XXXXXX)
+  # With the stable "OpenEmu Debug" certificate (Scripts/setup-debug-signing.sh) the test app keeps the same
+  # signature across rebuilds, so macOS asks for folder access (Documents) once instead of blocking every run.
+  SIGN_ARGS=()
+  if "$(dirname "$0")/setup-debug-signing.sh" --check >/dev/null 2>&1; then
+    SIGN_ARGS=(CODE_SIGN_IDENTITY="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}")
+  fi
   if xcodebuild test \
        -workspace "$WORKSPACE" \
        -scheme OpenEmu \
        -configuration Debug \
        -destination 'platform=macOS,arch=arm64' \
+       -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
+       ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} \
        > "$TEST_LOG" 2>&1; then
     PASS_COUNT=$(grep -c 'passed' "$TEST_LOG" 2>/dev/null || true)
     pass "OpenEmuTests ($PASS_COUNT tests passed)"

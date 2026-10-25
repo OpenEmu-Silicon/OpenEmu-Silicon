@@ -44,7 +44,7 @@ class ImportFailureTests: XCTestCase, ROMImporterDelegate {
             .deletingLastPathComponent()
             .appending(path: "Import Failure Test Files/")
         
-        let importer = try XCTUnwrap(OELibraryDatabase.default?.importer)
+        let importer = try ensureTestLibrary().importer
         importer.delegate = self
         
         let testFiles = [

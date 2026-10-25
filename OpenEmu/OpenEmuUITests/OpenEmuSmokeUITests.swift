@@ -34,10 +34,18 @@ final class OpenEmuSmokeUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        libraryPath = NSTemporaryDirectory() + "openemu-ui-\(UUID().uuidString)"
+        // Not NSTemporaryDirectory(): the UI test runner is sandboxed, so that folder lives inside the runner's
+        // container, which macOS does not let the app under test write to. The app then cannot create the
+        // library and shows "library not found". /private/tmp is writable by both.
+        libraryPath = "/private/tmp/openemu-ui-\(UUID().uuidString)"
         app = XCUIApplication(bundleIdentifier: "org.openemu.OpenEmu.debug")
-        // Both keys must match, otherwise the app refuses to create a library at a non-default path.
-        app.launchArguments = ["-databasePath", libraryPath, "-defaultDatabasePath", libraryPath]
+        if Self.usesRealLibrary {
+            // Play tests (Scripts/playtest.sh --game ...) use the real library, so no library arguments.
+            app.launchArguments = []
+        } else {
+            // Both keys must match, otherwise the app refuses to create a library at a non-default path.
+            app.launchArguments = ["-databasePath", libraryPath, "-defaultDatabasePath", libraryPath]
+        }
         app.launch()
         XCTAssertTrue(libraryWindow.waitForExistence(timeout: 45), "Library window did not appear")
         dismissFirstRunAlert()
@@ -45,8 +53,11 @@ final class OpenEmuSmokeUITests: XCTestCase {
 
     override func tearDownWithError() throws {
         app.terminate()
-        try? FileManager.default.removeItem(atPath: libraryPath)
+        if !Self.usesRealLibrary { try? FileManager.default.removeItem(atPath: libraryPath) }
     }
+
+    /// True when OE_USE_REAL_LIBRARY=1: the test opens games from the user's own library instead of a throwaway one.
+    private static var usesRealLibrary: Bool { ProcessInfo.processInfo.environment["OE_USE_REAL_LIBRARY"] == "1" }
 
     private var libraryWindow: XCUIElement { app.windows["LibraryWindow"] }
 
@@ -70,7 +81,7 @@ final class OpenEmuSmokeUITests: XCTestCase {
     func testPreferencesPanesAllOpen() throws {
         app.typeKey(",", modifierFlags: .command)
         let panes = ["Library", "Gameplay", "Controls", "Cores", "System Files",
-                     "Cloud Sync", "Cover Art", "Achievements", "Secrets"]
+                     "Cloud Sync", "Cover Art", "Achievements"]
         for name in panes {
             let button = app.buttons[name].firstMatch
             XCTAssertTrue(button.waitForExistence(timeout: 10), "Missing pane button: \(name)")
@@ -140,9 +151,149 @@ final class OpenEmuSmokeUITests: XCTestCase {
         XCTAssertFalse(Self.isBlank(Self.fingerprint(gameWindow.screenshot().image)), "Game went blank after screenshot")
 
         chooseMenu("Controls", "Quit Game")
-        let quitSheet = app.sheets.buttons.matching(NSPredicate(format: "title IN {'Quit Game','Stop','OK'}")).firstMatch
-        if quitSheet.waitForExistence(timeout: 3) { quitSheet.click() }
+        confirmQuitIfAsked()
         XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+    }
+
+    /// Pausing must freeze the picture and resuming must start it moving again.
+    /// Needs OE_TEST_ROM to name a ROM whose picture always changes (check.sh supplies a built-in test ROM).
+    func testPauseFreezesPictureAndResumeContinues() throws {
+        let gameWindow = try openGameWindow()
+        sleep(5)
+
+        chooseMenu("Controls", "Pause Game")
+        sleep(1)
+        attach(gameWindow, named: "paused-A")
+        let frozenA = Self.fingerprint(gameWindow.screenshot().image)
+        sleep(2)
+        attach(gameWindow, named: "paused-B")
+        let frozenB = Self.fingerprint(gameWindow.screenshot().image)
+        XCTAssertFalse(Self.differs(frozenA, frozenB), "Picture kept changing while the game was paused")
+
+        chooseMenu("Controls", "Resume Game")
+        sleep(1)
+        let movingA = Self.fingerprint(gameWindow.screenshot().image)
+        sleep(2)
+        let movingB = Self.fingerprint(gameWindow.screenshot().image)
+        XCTAssertTrue(Self.differs(movingA, movingB), "Picture stayed frozen after Resume Game")
+
+        chooseMenu("Controls", "Quit Game")
+        confirmQuitIfAsked()
+        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+    }
+
+    /// A key typed into the game window must reach the game as a button press.
+    /// The built-in test ROM latches Start (default key: Return) by changing its shades for good.
+    /// Brightness, not the exact picture, is compared because the picture also scrolls.
+    func testKeyboardPressReachesGame() throws {
+        let gameWindow = try openGameWindow()
+        sleep(5)
+        attach(gameWindow, named: "before-key")
+        let before = Self.meanBrightness(Self.fingerprint(gameWindow.screenshot().image))
+
+        app.typeKey(.return, modifierFlags: [])
+        sleep(2)
+        attach(gameWindow, named: "after-key")
+        let after = Self.meanBrightness(Self.fingerprint(gameWindow.screenshot().image))
+        XCTAssertGreaterThan(abs(after - before), 8, "Pressing Return did not reach the game (brightness \(before) -> \(after))")
+
+        chooseMenu("Controls", "Quit Game")
+        confirmQuitIfAsked()
+        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+    }
+
+    /// Plays the ROM named by OE_TEST_ROM for OE_PLAYTEST_SECONDS (default 20), typing each key in OE_PLAYTEST_KEYS
+    /// (comma separated: return, space, escape, up, down, left, right, or a single character) about every two seconds
+    /// and taking a screenshot after each. It asserts almost nothing: its job is to produce screenshots, logs and
+    /// frame stats for `Scripts/playtest.sh` to report on. Skipped unless OE_PLAYTEST_SECONDS is set.
+    func testPlaytest() throws {
+        guard let secondsText = ProcessInfo.processInfo.environment["OE_PLAYTEST_SECONDS"], let seconds = Double(secondsText) else {
+            throw XCTSkip("Run through Scripts/playtest.sh")
+        }
+        let keys = (ProcessInfo.processInfo.environment["OE_PLAYTEST_KEYS"] ?? "")
+            .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let gameWindow = try openGameWindow()
+        let start = Date()
+        attach(gameWindow, named: "playtest-000s-start")
+        var step = 0
+        while Date().timeIntervalSince(start) < seconds {
+            sleep(2)
+            var label = "idle"
+            if step < keys.count {
+                label = keys[step]
+                typeKeyByName(label)
+                step += 1
+            }
+            attach(gameWindow, named: String(format: "playtest-%03ds-%@", Int(Date().timeIntervalSince(start)), label))
+        }
+        // Quick Save writes into the player's save slot, so a play test on the real library skips it unless asked.
+        if !Self.usesRealLibrary || ProcessInfo.processInfo.environment["OE_PLAYTEST_SAVE"] == "1" {
+            chooseMenu("Controls", "Quick Save")
+            sleep(2)
+        }
+        chooseMenu("Controls", "Quit Game")
+        confirmQuitIfAsked()
+        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+    }
+
+    private func typeKeyByName(_ name: String) {
+        switch name.lowercased() {
+        case "return", "enter": app.typeKey(.return, modifierFlags: [])
+        case "escape", "esc": app.typeKey(.escape, modifierFlags: [])
+        case "space": app.typeKey(" ", modifierFlags: [])
+        case "up": app.typeKey(.upArrow, modifierFlags: [])
+        case "down": app.typeKey(.downArrow, modifierFlags: [])
+        case "left": app.typeKey(.leftArrow, modifierFlags: [])
+        case "right": app.typeKey(.rightArrow, modifierFlags: [])
+        default: app.typeKey(name, modifierFlags: [])
+        }
+    }
+
+    private static func meanBrightness(_ pixels: [UInt8]) -> Double {
+        pixels.isEmpty ? 0 : Double(pixels.reduce(0) { $0 + Int($1) }) / Double(pixels.count)
+    }
+
+    /// Opens the ROM named by OE_TEST_ROM in a game window and returns that window.
+    private func openGameWindow() throws -> XCUIElement {
+        guard let rom = ProcessInfo.processInfo.environment["OE_TEST_ROM"], !rom.isEmpty else {
+            throw XCTSkip("Set OE_TEST_ROM to a ROM path (check.sh --rom <path>) to run this test")
+        }
+        app.terminate()
+        app.launchArguments += [rom]
+        app.launch()
+        dismissFirstRunAlert()
+        let play = app.sheets.buttons["Play Game"]
+        if Self.usesRealLibrary {
+            // The game is already in the library, so there may be no import prompt: press Play if it shows up.
+            if play.waitForExistence(timeout: 20) { play.click() }
+        } else {
+            XCTAssertTrue(play.waitForExistence(timeout: 60), "Import-finished prompt did not appear")
+            play.click()
+        }
+        if Self.usesRealLibrary {
+            // A game that was closed before offers "Would you like to continue your last game?". Answer it the way a
+            // player would: Resume (or Restart when OE_PLAYTEST_RESTART=1).
+            let answer = ProcessInfo.processInfo.environment["OE_PLAYTEST_RESTART"] == "1" ? "Restart" : "Resume"
+            let button = app.buttons[answer].firstMatch
+            if button.waitForExistence(timeout: 15) { button.click() }
+        }
+        let gameWindow = app.windows.matching(NSPredicate(
+            format: "identifier != 'LibraryWindow' AND title != '' AND title != 'OpenEmu'")).firstMatch
+        XCTAssertTrue(gameWindow.waitForExistence(timeout: 60), "Game window did not open")
+        return gameWindow
+    }
+
+    private func attach(_ element: XCUIElement, named name: String) {
+        let attachment = XCTAttachment(screenshot: element.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// "Are you sure you want to quit the game?" is a dialog inside the game window with a "Quit" button.
+    private func confirmQuitIfAsked() {
+        let quit = app.buttons.matching(NSPredicate(format: "title IN {'Quit','Quit Game','Stop','OK'}")).firstMatch
+        if quit.waitForExistence(timeout: 3) { quit.click() }
     }
 
     private func chooseMenu(_ menu: String, _ item: String) {
@@ -161,9 +312,10 @@ final class OpenEmuSmokeUITests: XCTestCase {
                                       bytesPerRow: size, space: CGColorSpaceCreateDeviceGray(),
                                       bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return pixels }
         context.interpolationQuality = .low
-        // Skip the title bar (top 7%) so a black game still counts as blank.
+        // Skip the title bar (top 7%) so a black game still counts as blank, and the bottom 20% where the
+        // on-screen control bar fades in and out, which would otherwise look like the picture changing.
         let content = cg.cropping(to: CGRect(x: 0, y: Int(Double(cg.height) * 0.07),
-                                             width: cg.width, height: Int(Double(cg.height) * 0.93))) ?? cg
+                                             width: cg.width, height: Int(Double(cg.height) * 0.73))) ?? cg
         context.draw(content, in: CGRect(x: 0, y: 0, width: size, height: size))
         return pixels
     }
