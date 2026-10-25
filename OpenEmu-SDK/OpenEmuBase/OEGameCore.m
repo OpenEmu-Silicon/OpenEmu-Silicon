@@ -44,11 +44,16 @@
 
 NSString *const OEGameCoreErrorDomain = @"org.openemu.GameCore.ErrorDomain";
 
+/// The most time, in seconds, the game loop will try to win back after running late (about six frames at 60 Hz).
+static const NSTimeInterval OEGameCoreMaxCatchUp = 0.1;
+
 @implementation OEGameCore
 {
     uint64_t _statsWindowStart, _statsLastFrame;
     NSUInteger _statsFrames;
     double _statsWorstGapMs;
+    NSUInteger _statsAudioCapacity, _statsAudioFillMin, _statsAudioFillMax, _statsAudioWrittenAtStart, _statsAudioWrittenNow;
+    BOOL _statsAudioWrittenAtStartSet;
     NSThread *_gameCoreThread;
     CFRunLoopRef _gameCoreRunLoop;
 
@@ -348,9 +353,13 @@ static Class GameCoreClass = Nil;
         // Sleep till next time.
         NSTimeInterval realTime = OEMonotonicTime();
 
-        // If we are running more than a second behind, synchronize
+        // If we have fallen behind by more than a few frames, give up the lost time instead of catching up.
+        // Catching up runs frames back to back, which also produces their audio back to back: the audio buffer
+        // (about 125 ms) overflows and the dropped samples are heard as a crackle, and the game visibly rushes.
+        // Measured on Mario 64: the first 3 seconds ran 194 frames instead of 180 and overflowed the buffer 14 to 29
+        // times, while every later 3-second window was exactly 180 frames with no overflow.
         NSTimeInterval timeOver = realTime - nextFrameTime;
-        if(timeOver >= 1.0)
+        if(timeOver >= OEGameCoreMaxCatchUp)
         {
 
             nextFrameTime = realTime;
@@ -447,13 +456,36 @@ static Class GameCoreClass = Nil;
     if (gapMs > _statsWorstGapMs) _statsWorstGapMs = gapMs;
     _statsLastFrame = now;
     _statsFrames++;
+
+    // How full the first audio buffer is, sampled once per frame, and how many bytes the core wrote.
+    NSUInteger fill = 0, written = 0;
+    id<OEAudioBuffer> buffer = self.audioBufferCount > 0 ? [self audioBufferAtIndex:0] : nil;
+    if ([buffer isKindOfClass:[OERingBuffer class]]) {
+        OERingBuffer *ring = (OERingBuffer *)buffer;
+        fill = ring.availableBytes;
+        written = ring.bytesWritten;
+        _statsAudioCapacity = ring.length;
+        if (_statsFrames == 1 || fill < _statsAudioFillMin) _statsAudioFillMin = fill;
+        if (fill > _statsAudioFillMax) _statsAudioFillMax = fill;
+        if (_statsAudioWrittenAtStart == 0 && _statsAudioWrittenAtStartSet == NO) { _statsAudioWrittenAtStart = written; _statsAudioWrittenAtStartSet = YES; }
+        _statsAudioWrittenNow = written;
+    }
+
     double elapsed = (now - _statsWindowStart) / 1e9;
     if (elapsed >= kReportInterval) {
         os_log(OE_LOG_CORE_RUN, "frame stats: %lu frames in %.1fs (%.1f fps), worst gap %.1f ms",
                (unsigned long)_statsFrames, elapsed, _statsFrames / elapsed, _statsWorstGapMs);
+        if (_statsAudioCapacity > 0) {
+            double bytesPerSecond = (_statsAudioWrittenNow - _statsAudioWrittenAtStart) / elapsed;
+            os_log(OE_LOG_CORE_RUN, "audio stats: core wrote %.0f bytes/s, buffer fill min %lu max %lu of %lu bytes",
+                   bytesPerSecond, (unsigned long)_statsAudioFillMin, (unsigned long)_statsAudioFillMax, (unsigned long)_statsAudioCapacity);
+        }
         _statsWindowStart = now;
         _statsFrames = 0;
         _statsWorstGapMs = 0;
+        _statsAudioFillMax = 0;
+        _statsAudioWrittenAtStartSet = NO;
+        _statsAudioWrittenAtStart = 0;
     }
 }
 

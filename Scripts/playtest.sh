@@ -85,6 +85,12 @@ if stats:
           % (len(stats), min(fps), sum(fps) / len(fps), max(fps), max(gaps)))
 else:
     print("frame pacing: no 'frame stats' lines found (the game may not have reached the running state)")
+aud = [re.search(r"core wrote (\d+) bytes/s, buffer fill min (\d+) max (\d+) of (\d+)", l) for l in log if "audio stats" in l]
+aud = [tuple(int(g) for g in m.groups()) for m in aud if m]
+if aud:
+    rates = [a[0] for a in aud]
+    print("audio stats: core wrote %d-%d bytes/s per 3s window (avg %d); buffer holds %d bytes, fill ranged %d to %d"
+          % (min(rates), max(rates), sum(rates) / len(rates), aud[0][3], min(a[1] for a in aud), max(a[2] for a in aud)))
 overruns = sum(1 for l in log if "Tried to write" in l)
 print("audio: %d buffer-full warnings" % overruns)
 problems = [l for l in log if re.search(r"\s(E|Fa)\s", l) and "Tried to write" not in l and "CredentialStore" not in l]
