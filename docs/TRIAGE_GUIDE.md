@@ -38,7 +38,7 @@ Three principles:
 | `documentation` | Wiki, README, or inline comment work |
 | `chore` | Cleanup, tooling, non-functional changes |
 | `shaders` | Metal shaders / rendering pipeline |
-| `cloud-sync` | Google Drive save sync |
+| `cloud-sync` | Cloud Sync backup folder (iCloud Drive, Google Drive for desktop) |
 | `arm64` | Apple Silicon–specific behavior (not present on Intel OpenEmu) |
 
 ### Core Scope Labels

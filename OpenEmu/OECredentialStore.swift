@@ -39,7 +39,7 @@ enum OECredentialKey: String, CaseIterable {
     /// RetroAchievements login token — not the password; the password is used
     /// only once to obtain this token from the RA server.
     case retroAchievementsToken  = "retroachievements.token"
-    /// Google Drive OAuth 2.0 refresh token, used to obtain short-lived access tokens.
+    /// Left over from the removed Google Drive sign-in. Only read so it can be deleted.
     case googleDriveRefreshToken = "googledrive.refreshToken"
 }
 
@@ -268,14 +268,8 @@ final class OECredentialStore {
             migrated += 1
         }
 
-        if let token = keychainRead(service: "com.openemu.GoogleDriveSaveSync", account: "refreshToken") {
-            cache[OECredentialKey.googleDriveRefreshToken.rawValue] = token
-            keychainDelete(service: "com.openemu.GoogleDriveSaveSync", account: "refreshToken")
-            migrated += 1
-        }
-
-        // saveFolderID was written by an older version of the sync code and is no longer
-        // used anywhere. Delete it so it can't trigger a keychain prompt.
+        // The Google Drive sign-in is gone. Delete what it left in the keychain.
+        keychainDelete(service: "com.openemu.GoogleDriveSaveSync", account: "refreshToken")
         keychainDelete(service: "com.openemu.GoogleDriveSaveSync", account: "saveFolderID")
 
         if migrated > 0 {
