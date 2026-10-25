@@ -27,6 +27,7 @@
 #import "BlissGameCore.h"
 #import <IOKit/hid/IOHIDLib.h>
 #import <OpenEmuBase/OERingBuffer.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 #import <OpenGL/gl.h>
 #import "OEIntellivisionSystemResponderClient.h"
 
@@ -37,6 +38,12 @@
 #import "drivers/intv/Intellivision.h"
 #import "drivers/intv/HandController.h"
 #import "drivers/intv/ECSKeyboard.h"
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #define INTV_IMAGE_WIDTH	(160)
 #define INTV_IMAGE_HEIGHT	(192)
@@ -112,6 +119,8 @@ public:
 	Rip				*currentRip;
 
 	NSMutableData	*_stateData;
+	OERetroAchievementsBridge *_raBridge;
+	NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 - (int)blissButtonForIntellivisionButton:(OEIntellivisionButton)button player:(NSUInteger)player;
 @end
@@ -124,6 +133,35 @@ static BlissController _controller[2] = {0};
 static uint64_t _keyboard = 0;
 static uint8_t _keyboardDownCount = 0;
 static uint8_t _keyboardShiftCount = 0;
+
+static Emulator *s_blissEmu = nullptr;
+
+// rcheevos Intellivision map (consoleinfo rc_memory_regions_intellivision): RA address =
+// intvWordAddr*4 + 0x80, with each 16-bit word exposed as a 32-bit little-endian value (the
+// FreeIntv layout the achievement sets are authored against). The first 0x80 bytes are
+// video-RAM padding, and the high 16 bits of every word are always 0.
+static uint32_t bliss_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                     uint32_t num_bytes, rc_client_t *client)
+{
+    if (s_blissEmu == nullptr)
+        return 0;
+
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        const uint32_t a = address + i;
+        uint8_t value = 0;
+        if (a >= 0x80) {
+            const uint32_t off  = a - 0x80;
+            const uint32_t word = off >> 2;   // Intellivision 16-bit address
+            const uint32_t sub  = off & 3;    // byte within the 32-bit LE value
+            if (word <= 0xFFFF && sub < 2) {
+                const UINT16 w = s_blissEmu->PeekMemory((UINT16)word);
+                value = (sub == 0) ? (uint8_t)(w & 0xFF) : (uint8_t)((w >> 8) & 0xFF);
+            }
+        }
+        buffer[i] = value;
+    }
+    return num_bytes;
+}
 
 #pragma mark - OpenEmu Core
 
@@ -144,6 +182,7 @@ static uint8_t _keyboardShiftCount = 0;
 		_videoBus = new BlissVideoBus;
 
 		_stateData = [NSMutableData dataWithLength:sizeof(IntellivisionState)];
+		_cheatList = [[NSMutableDictionary alloc] init];
     }
 
     return self;
@@ -152,6 +191,10 @@ static uint8_t _keyboardShiftCount = 0;
 - (void)dealloc
 {
     DLog(@"releasing/deallocating Bliss memory");
+
+	[_raBridge shutdown];
+	_raBridge = nil;
+	s_blissEmu = nullptr;
 
 	delete _videoBus;
 	_videoBus = NULL;
@@ -168,11 +211,30 @@ static uint8_t _keyboardShiftCount = 0;
 	// run the emulation
 	currentEmu->Run();
 
+	// Reassert cheats every frame: the emulated CPU overwrites these RAM words during Run(),
+	// and Bliss has no persistent patch engine, so the pokes must be reapplied continuously.
+	if (_cheatList.count) {
+		for (NSString *key in _cheatList) {
+			if (![_cheatList[key] boolValue]) continue;
+			for (NSString *singleCode in [key componentsSeparatedByString:@"+"]) {
+				NSRange colonRange = [singleCode rangeOfString:@":"];
+				if (colonRange.location == NSNotFound) continue;
+				unsigned int addr = 0, val = 0;
+				if (![[NSScanner scannerWithString:[singleCode substringToIndex:colonRange.location]] scanHexInt:&addr]) continue;
+				if (![[NSScanner scannerWithString:[singleCode substringFromIndex:colonRange.location + 1]] scanHexInt:&val]) continue;
+				if (addr > 0xFFFF) continue;
+				currentEmu->PokeMemory((UINT16)addr, (UINT16)val);
+			}
+		}
+	}
+
 	// render and display the video
 	currentEmu->Render();
 
 	// flush the audio
 	currentEmu->FlushAudio();
+
+	[_raBridge doFrame];
 }
 
 #pragma mark - Bliss Core Helpers
@@ -429,16 +491,29 @@ static uint8_t _keyboardShiftCount = 0;
 	// finally, run everything
 	currentEmu->Reset();
 
+    // RAM is initialized after Reset; start RA (login + whole-file hash) and mark ready.
+    s_blissEmu = currentEmu;
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:bliss_rc_read_memory
+                                                          consoleID:RC_CONSOLE_INTELLIVISION];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
+
     return YES;
 }
 
 - (void)resetEmulation
 {
 	currentEmu->Reset();
+	[_raBridge reset];
 }
 
 - (void)stopEmulation
 {
+	[_raBridge shutdown];
+	_raBridge = nil;
+	s_blissEmu = nullptr;
+
 	if(currentEmu)
 	{
 		currentEmu->SetRip(NULL);
@@ -454,6 +529,76 @@ static uint8_t _keyboardShiftCount = 0;
 	}
 
     [super stopEmulation];
+}
+
+#pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
+}
+
+#pragma mark - Cheats
+
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    if (!_cheatList)
+        _cheatList = [[NSMutableDictionary alloc] init];
+
+    code = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    code = [[code stringByReplacingOccurrencesOfString:@" " withString:@""] uppercaseString];
+
+    if (enabled)
+        _cheatList[code] = @YES;
+    else
+        [_cheatList removeObjectForKey:code];
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (currentEmu == NULL)
+        return @[];
+
+    // Intellivision RAM is 16-bit word-addressed. Each word is exposed as 2 bytes (little-endian)
+    // and the region base address is the word address doubled, so a cheat-search hit's byte address
+    // is exactly twice the real CP1610 word address (halved back app-side in displayAddress /
+    // convertCheatSearchCode). This keeps the search unit one full 16-bit word.
+    struct { UINT16 base; UINT16 count; const char *name; } ramBanks[] = {
+        { 0x0100, 0x00F0, "Scratchpad RAM" }, // 8-bit system RAM (0x0100-0x01EF)
+        { 0x0200, 0x0160, "System RAM" },     // 16-bit system RAM (0x0200-0x035F)
+    };
+
+    NSMutableArray<OEMemoryRegionDescriptor *> *regions = [NSMutableArray array];
+    for (int b = 0; b < 2; b++) {
+        NSMutableData *data = [NSMutableData dataWithLength:ramBanks[b].count * 2];
+        uint8_t *bytes = (uint8_t *)data.mutableBytes;
+        for (UINT16 i = 0; i < ramBanks[b].count; i++) {
+            UINT16 w = currentEmu->PeekMemory((UINT16)(ramBanks[b].base + i));
+            bytes[i * 2]     = (uint8_t)(w & 0xFF);
+            bytes[i * 2 + 1] = (uint8_t)((w >> 8) & 0xFF);
+        }
+        [regions addObject:[OEMemoryRegionDescriptor descriptorWithName:[NSString stringWithUTF8String:ramBanks[b].name]
+                                                                address:(uint32_t)ramBanks[b].base * 2
+                                                           addressBytes:2
+                                                           minDataBytes:2
+                                                                   data:data]];
+    }
+
+    return regions;
 }
 
 - (OEIntSize)bufferSize

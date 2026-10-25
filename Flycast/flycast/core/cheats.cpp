@@ -29,6 +29,7 @@
 #include "emulator.h"
 #include "oslib/storage.h"
 #include "oslib/i18n.h"
+#include <algorithm>
 using namespace i18n;
 
 const WidescreenCheat CheatManager::widescreen_cheats[] =
@@ -807,7 +808,7 @@ static u32 decryptArg(u32 v) {
 	return (((v + 0x543700D0) >> 29) | ((v + 0x543700D0) * 8)) ^ Seeds[0];
 }
 
-void CheatManager::addGameSharkCheat(const std::string& name, const std::string& s)
+void CheatManager::addGameSharkCheat(const std::string& name, const std::string& s, bool persist)
 {
 	std::vector<u32> codes = parseCodes(s);
 	Cheat conditionCheat;
@@ -1028,19 +1029,32 @@ void CheatManager::addGameSharkCheat(const std::string& name, const std::string&
 			}
 		}
 #ifndef LIBRETRO
-		std::string path = config::loadStr("cheats", gameId);
-		if (path == "")
+		if (persist)
 		{
-			path = get_game_save_prefix() + ".cht";
-			config::saveStr("cheats", gameId, path);
+			std::string path = config::loadStr("cheats", gameId);
+			if (path == "")
+			{
+				path = get_game_save_prefix() + ".cht";
+				config::saveStr("cheats", gameId, path);
+			}
+			saveCheatFile(path);
 		}
-		saveCheatFile(path);
 #endif
 		setActive(!cheats.empty());
 	} catch (...) {
 		cheats.erase(cheats.begin() + prevSize, cheats.end());
 		throw;
 	}
+}
+
+// OpenEmu drives cheats itself (one Flycast cheat per enabled OpenEmu code), adding them with
+// persist=false and rebuilding the whole list on every change through this. Built-in game fixes
+// (boot/auth bypasses, widescreen) carry builtIn=true and must survive the rebuild.
+void CheatManager::clearUserCheats()
+{
+	cheats.erase(std::remove_if(cheats.begin(), cheats.end(),
+			[](const Cheat& c) { return !c.builtIn; }), cheats.end());
+	setActive(!cheats.empty());
 }
 
 void CheatManager::saveCheatFile(const std::string& filename)

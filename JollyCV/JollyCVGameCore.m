@@ -37,6 +37,12 @@
 #import "OEColecoVisionSystemResponderClient.h"
 #import <OpenGL/gl.h>
 
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+
 #define SAMPLERATE 48000
 #define FRAMERATE 60
 #define CHANNELS 1
@@ -48,12 +54,30 @@
     uint8_t _padData[NUMINPUTS][OEColecoVisionButtonCount];
     int16_t *_soundBuffer;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+    OERetroAchievementsBridge *_raBridge;
 }
 @end
 
 @implementation JollyCVGameCore
 
 static __weak JollyCVGameCore *_current;
+
+// rcheevos ColecoVision map: virtual 0x0000-0x03FF == real 0x6000-0x63FF System RAM
+// (rc_memory_regions_colecovision). jcv_get_ram() is already RAM-relative, matching the
+// cheat-search descriptor, so index it directly and stop at the 1 KB System RAM size.
+static uint32_t jollycv_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                       uint32_t num_bytes, rc_client_t *client)
+{
+    uint8_t *ram = jcv_get_ram();
+    if (!ram) return 0;
+
+    for (uint32_t i = 0; i < num_bytes; i++) {
+        if (address + i >= 0x400)
+            return i;
+        buffer[i] = ram[address + i];
+    }
+    return num_bytes;
+}
 
 - (id)init
 {
@@ -68,6 +92,9 @@ static __weak JollyCVGameCore *_current;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     jcv_deinit();
     free(_soundBuffer);
 }
@@ -105,6 +132,13 @@ static __weak JollyCVGameCore *_current;
         return NO;
     }
 
+    // RAM is valid after jcv_init; start RA (login + whole-file hash) and mark ready.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:jollycv_rc_read_memory
+                                                          consoleID:RC_CONSOLE_COLECOVISION];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
+
 	return YES;
 }
 
@@ -127,11 +161,43 @@ static __weak JollyCVGameCore *_current;
             ram[addr & 0x3FF] = (uint8_t)val;
         }
     }
+
+    [_raBridge doFrame];
 }
 
 - (void)resetEmulation
 {
     jcv_reset(0);
+    [_raBridge reset];
+}
+
+- (void)stopEmulation
+{
+    [_raBridge shutdown];
+    _raBridge = nil;
+
+    [super stopEmulation];
+}
+
+#pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Video

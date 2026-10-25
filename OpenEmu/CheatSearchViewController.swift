@@ -104,21 +104,35 @@ final class CheatSearchViewController: NSViewController {
     /// size, relative = absolute − user RAM base) — so it lines up with published `_L` codes. This is
     /// display only; the absolute `result.address` still drives the actual code conversion.
     private func displayAddress(_ address: UInt32) -> String {
-        guard gameDocument?.systemIdentifier == OESystemIdentifierPSP else {
+        switch gameDocument?.systemIdentifier {
+        case OESystemIdentifierPSP:
+            let relative = (address >= 0x0880_0000 ? address - 0x0880_0000 : address) & 0x0FFF_FFFF
+            let typeNibble: UInt32
+            switch selectedDataSize {
+            case 1: typeNibble = 0
+            case 2: typeNibble = 1
+            default: typeNibble = 2
+            }
+            return String(format: "%01X%07X", typeNibble, relative)
+        case OESystemIdentifierIntellivision:
+            // The region exposes 16-bit words as 2 bytes with the base doubled, so the raw hit
+            // address is twice the real CP1610 word address. Show the true word address.
+            return String(format: "%04X", address / 2)
+        default:
             return String(format: addressFormatString, address)
         }
-        let relative = (address >= 0x0880_0000 ? address - 0x0880_0000 : address) & 0x0FFF_FFFF
-        let typeNibble: UInt32
-        switch selectedDataSize {
-        case 1: typeNibble = 0
-        case 2: typeNibble = 1
-        default: typeNibble = 2
-        }
-        return String(format: "%01X%07X", typeNibble, relative)
     }
 
     private var minDataBytes: Int {
         memoryRegions.map { Int($0.minDataBytes) }.max() ?? 1
+    }
+
+    /// GameCube and Wii (PowerPC) store memory big-endian, so multi-byte search values must be read
+    /// MSB-first for the displayed/compared value to match the console's real value. Every other
+    /// supported system is read little-endian.
+    private var isBigEndian: Bool {
+        gameDocument?.systemIdentifier == OESystemIdentifierGameCube
+            || gameDocument?.systemIdentifier == OESystemIdentifierWii
     }
 
     // MARK: - Table View
@@ -331,6 +345,8 @@ final class CheatSearchViewController: NSViewController {
 
         let regions = memoryRegions
         var results = searchResults
+        let dataSize = selectedDataSize
+        let bigEndian = isBigEndian
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             for region in regions {
@@ -344,13 +360,10 @@ final class CheatSearchViewController: NSViewController {
                         guard address >= regionStart && address < regionEnd else { continue }
 
                         let offset = Int(address - regionStart)
-                        let available = min(4, byteCount - offset)
-                        guard available > 0 else { continue }
+                        let readSize = bigEndian ? min(dataSize, byteCount - offset) : min(4, byteCount - offset)
+                        guard readSize > 0 else { continue }
 
-                        var value: UInt64 = 0
-                        for b in 0..<available {
-                            value |= UInt64(buffer[offset + b]) << (b * 8)
-                        }
+                        let value = self?.readValue(from: buffer, at: offset, size: readSize, bigEndian: bigEndian) ?? 0
                         results[i].previousValue = results[i].currentValue
                         results[i].currentValue = value
                     }
@@ -651,6 +664,7 @@ final class CheatSearchViewController: NSViewController {
         let dataType = selectedDataType
         let comparison = selectedComparison
         let compareTo = selectedCompareTo
+        let bigEndian = isBigEndian
 
         var targetValue: UInt64 = 0
         if compareTo == .thisValue {
@@ -686,7 +700,10 @@ final class CheatSearchViewController: NSViewController {
                     data.withUnsafeBytes { buffer in
                         var offset = 0
                         while offset <= byteCount - dataSize {
-                            let fullValue = self?.readValue(from: buffer, at: offset, size: min(4, byteCount - offset)) ?? 0
+                            // Big-endian reads exactly dataSize bytes MSB-first; little-endian keeps
+                            // its existing up-to-4-byte read (masked to dataSize on compare/display).
+                            let readSize = bigEndian ? dataSize : min(4, byteCount - offset)
+                            let fullValue = self?.readValue(from: buffer, at: offset, size: readSize, bigEndian: bigEndian) ?? 0
 
                             let referenceValue: UInt64
                             switch compareTo {
@@ -1007,10 +1024,16 @@ final class CheatSearchViewController: NSViewController {
 
     // MARK: - Search Helpers
 
-    private func readValue(from buffer: UnsafeRawBufferPointer, at offset: Int, size: Int) -> UInt64 {
+    private func readValue(from buffer: UnsafeRawBufferPointer, at offset: Int, size: Int, bigEndian: Bool) -> UInt64 {
         var value: UInt64 = 0
-        for i in 0..<size {
-            value |= UInt64(buffer[offset + i]) << (i * 8)
+        if bigEndian {
+            for i in 0..<size {
+                value = (value << 8) | UInt64(buffer[offset + i])
+            }
+        } else {
+            for i in 0..<size {
+                value |= UInt64(buffer[offset + i]) << (i * 8)
+            }
         }
         return value
     }

@@ -239,6 +239,7 @@
 		AA0000011000000100000008 /* CheatCodeValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000007 /* CheatCodeValidator.swift */; };
 		AA0000011000000100000014 /* PugsyCheatFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000013 /* PugsyCheatFile.swift */; };
 		AA0000011000000100000016 /* PugsyCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000015 /* PugsyCheatProvider.swift */; };
+		AA0000011000000100000030 /* DolphinCheatProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000011000000100000031 /* DolphinCheatProvider.swift */; };
 		5A6C157C1DC96C3700839986 /* OEMediaViewController+TouchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6C157B1DC96C3700839986 /* OEMediaViewController+TouchBar.swift */; };
 		5A6E80A71DCA6B210022F2AE /* OEGameCollectionViewController+TouchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6E80A61DCA6B210022F2AE /* OEGameCollectionViewController+TouchBar.swift */; };
 		5A79F7951C15F542003124D5 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A79F7941C15F542003124D5 /* PreferencesWindowController.swift */; };
@@ -382,6 +383,8 @@
 		8F419A3C25B6C81600A7F0BE /* PrefDebugController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83753F1614F537C400D708A7 /* PrefDebugController.swift */; };
 		8F44DEB526DFD07200893A18 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 8F44DEB426DFD07200893A18 /* Sparkle */; };
 		8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */; };
+		CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */; };
+		CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000005 /* DrawableProviderTests.swift */; };
 		A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */; };
 		8F4A69732547F84500DFE092 /* GameControlsBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4A69722547F84500DFE092 /* GameControlsBarView.swift */; };
 		8F4AEAC1273594E6005C6246 /* OpenVGDB.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4AEAC0273594E6005C6246 /* OpenVGDB.swift */; };
@@ -1349,6 +1352,7 @@
 		AA0000011000000100000007 /* CheatCodeValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatCodeValidator.swift; sourceTree = "<group>"; };
 		AA0000011000000100000013 /* PugsyCheatFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PugsyCheatFile.swift; sourceTree = "<group>"; };
 		AA0000011000000100000015 /* PugsyCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PugsyCheatProvider.swift; sourceTree = "<group>"; };
+		AA0000011000000100000031 /* DolphinCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DolphinCheatProvider.swift; sourceTree = "<group>"; };
 		5A6C157B1DC96C3700839986 /* OEMediaViewController+TouchBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "OEMediaViewController+TouchBar.swift"; sourceTree = "<group>"; };
 		5A6E80A61DCA6B210022F2AE /* OEGameCollectionViewController+TouchBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "OEGameCollectionViewController+TouchBar.swift"; sourceTree = "<group>"; };
 		5A79F7941C15F542003124D5 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
@@ -1561,6 +1565,8 @@
 		8F4198AF25B68B7500A7F0BE /* OELibraryDatabase+Maintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OELibraryDatabase+Maintenance.swift"; sourceTree = "<group>"; };
 		8F419A0225B6C7AE00A7F0BE /* OEAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OEAppearance.swift; sourceTree = "<group>"; };
 		8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureTests.swift; sourceTree = "<group>"; };
+		CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRenderBlockTests.swift; sourceTree = "<group>"; };
+		CE47B0C12A00000000000005 /* DrawableProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawableProviderTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderBackupTests.swift; sourceTree = "<group>"; };
 		8F4A69722547F84500DFE092 /* GameControlsBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlsBarView.swift; sourceTree = "<group>"; };
 		8F4AEAC0273594E6005C6246 /* OpenVGDB.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenVGDB.swift; sourceTree = "<group>"; };
@@ -2588,6 +2594,8 @@
 				8F93FDD927374F2000B59F3E /* GameInfoHelperTests.swift */,
 				A7B4C9102EEB000000000001 /* GameLaunchTests.swift */,
 				8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */,
+				CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */,
+				CE47B0C12A00000000000005 /* DrawableProviderTests.swift */,
 				A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */,
 				8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */,
 				8F93FDD827374F1F00B59F3E /* OpenEmuTests-Bridging-Header.h */,
@@ -3352,6 +3360,7 @@
 				AA0000011000000100000007 /* CheatCodeValidator.swift */,
 				AA0000011000000100000013 /* PugsyCheatFile.swift */,
 				AA0000011000000100000015 /* PugsyCheatProvider.swift */,
+				AA0000011000000100000031 /* DolphinCheatProvider.swift */,
 			);
 			name = Utilities;
 			sourceTree = "<group>";
@@ -6248,6 +6257,8 @@
 			files = (
 				8F93FDE02737506900B59F3E /* ROMImporterTests.swift in Sources */,
 				8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */,
+				CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */,
+				CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */,
 				8F93FDDA27374F2000B59F3E /* GameInfoHelperTests.swift in Sources */,
 				A7B4C9102EEB000000000002 /* GameLaunchTests.swift in Sources */,
@@ -6402,6 +6413,7 @@
 				AA0000011000000100000008 /* CheatCodeValidator.swift in Sources */,
 				AA0000011000000100000014 /* PugsyCheatFile.swift in Sources */,
 				AA0000011000000100000016 /* PugsyCheatProvider.swift in Sources */,
+				AA0000011000000100000030 /* DolphinCheatProvider.swift in Sources */,
 				53439A9A13B92C97005C0CC8 /* OEDBAllGamesCollection.swift in Sources */,
 				8FEE03E126D556610087CB51 /* OEDBRom.swift in Sources */,
 				83CACEC8196D6D1300999E70 /* Download.swift in Sources */,

@@ -509,6 +509,7 @@
 		<string>wbfs</string>
 		<string>ciso</string>
 		<string>wad</string>
+		<string>rvz</string>
 	</array>
 	<key>OEGenericControlNamesKey</key>
 	<array>
