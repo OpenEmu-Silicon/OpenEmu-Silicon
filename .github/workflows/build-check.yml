@@ -20,6 +20,12 @@ on:
       - '.claude/**'
       - '.cursor/**'
 
+# Cancel a PR's in-flight run when a newer commit is pushed to it. Pushes to
+# main are keyed by commit, so they are never cancelled by a later push.
+concurrency:
+  group: build-check-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   core-sources:
     # Fast guard (no Xcode): catches a flattened core submodule that was
@@ -90,11 +96,15 @@ jobs:
 
             # A change to shared framework code, the workspace, or scheme files
             # can affect every core's build — fall back to building all of them.
+            # Scripts/ is deliberately not on this list: no Xcode project,
+            # scheme, or build phase references it, so a script change cannot
+            # change what a core compiles. (If a build phase ever starts
+            # calling a script, add that script's path here.)
             # OpenEmuKit/ is included because several cores (Gambatte, FCEU,
             # GenesisPlus, Mednafen, mGBA, Mupen64Plus, Nestopia, SNES9x, BSNES)
             # compile .m files directly out of OpenEmuKit/Source/ into their
             # own plugin targets.
-            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/|Scripts/)'; then
+            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/)'; then
               echo "Shared code changed — building all core schemes"
               cores="$all_cores"
             else
@@ -119,6 +129,9 @@ jobs:
     runs-on: macos-latest
     strategy:
       fail-fast: false
+      # Cap parallel macOS runners so a full-matrix run does not exhaust
+      # runner capacity (the rest queue and start as slots free up).
+      max-parallel: 8
       matrix:
         core: ${{ fromJson(needs.detect-core-changes.outputs.cores) }}
 
