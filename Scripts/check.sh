@@ -44,16 +44,38 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-echo "----  building and running UI tests"
-xcodebuild test \
-  -workspace OpenEmu-metal.xcworkspace \
-  -scheme OpenEmuUITests \
-  -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' \
-  -derivedDataPath "$BUILD_DIR" \
-  -resultBundlePath "$RESULT" \
-  ${ONLY[@]+"${ONLY[@]}"} > "$LOG" 2>&1
+XC_ARGS=(-workspace OpenEmu-metal.xcworkspace -scheme OpenEmuUITests -configuration Debug
+         -destination 'platform=macOS,arch=arm64' -derivedDataPath "$BUILD_DIR")
+
+echo "----  building UI tests"
+xcodebuild build-for-testing "${XC_ARGS[@]}" > "$LOG" 2>&1
 XC_STATUS=$?
+
+# Re-sign the test runner with a stable local certificate so the macOS Accessibility grant survives rebuilds.
+# Ad-hoc signatures change on every build, which silently revokes the grant (same cause as launch-debug.sh's
+# Input Monitoring note). Uses the same certificate: "OpenEmu Debug", or OE_DEBUG_SIGN_IDENTITY.
+RUNNER="$BUILD_DIR/Build/Products/Debug/OpenEmuUITests-Runner.app"
+SIGN_NAME="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}"
+if [ "$XC_STATUS" -eq 0 ]; then
+  if security find-identity -p codesigning 2>/dev/null | grep -qF "\"$SIGN_NAME\""; then
+    echo "----  signing UI test runner with \"$SIGN_NAME\""
+    # The runner is signed without its entitlements on purpose: Xcode gives it the app sandbox, and once it
+    # has a real signature macOS enforces that sandbox, so OpenEmu can no longer write into the runner's
+    # temp folder where the tests put their libraries. The app under test keeps its entitlements.
+    codesign --force --deep --sign "$SIGN_NAME" "$RUNNER" >> "$LOG" 2>&1 \
+      || echo "WARN  signing the UI test runner failed; it stays ad-hoc signed and permissions may need re-granting" >&2
+    codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime \
+      --sign "$SIGN_NAME" "$BUILD_DIR/Build/Products/Debug/OpenEmu.app" >> "$LOG" 2>&1 \
+      || echo "WARN  signing OpenEmu.app failed; it stays ad-hoc signed and permissions may need re-granting" >&2
+  else
+    echo "WARN  no \"$SIGN_NAME\" certificate found; Accessibility will need re-granting after each rebuild" >&2
+  fi
+
+  echo "----  running UI tests"
+  xcodebuild test-without-building "${XC_ARGS[@]}" -resultBundlePath "$RESULT" \
+    ${ONLY[@]+"${ONLY[@]}"} >> "$LOG" 2>&1
+  XC_STATUS=$?
+fi
 
 FAILURES=0
 grep -E "^Test Case .* (passed|failed)" "$LOG" | sed -E "s/^Test Case '-\[OpenEmuUITests\.[A-Za-z]+ ([A-Za-z0-9_]+)\]' (passed|failed) \((.*)\)\./\2  \1 (\3)/" | while read -r line; do

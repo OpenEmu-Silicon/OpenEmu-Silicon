@@ -138,7 +138,6 @@
 		05F5BAE9228662C5004D713C /* OpenEmuShaders.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05F5BAE8228662C5004D713C /* OpenEmuShaders.framework */; };
 		05F5BAED228662D3004D713C /* OpenEmuShaders.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05F5BAE8228662C5004D713C /* OpenEmuShaders.framework */; };
 		05F5BAEE22866317004D713C /* OpenEmuShaders.framework in Copy Frameworks to App Frameworks */ = {isa = PBXBuildFile; fileRef = 05F5BAE8228662C5004D713C /* OpenEmuShaders.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		060837EB57D7C9F44F51156B /* OESyncStatusOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCE228E57ED51524BAE52BB /* OESyncStatusOverlayView.swift */; };
 		0867695A1B96E8B2006545DA /* OEPMSystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = 086769591B96E8B2006545DA /* OEPMSystemResponder.m */; };
 		086769671B96E92C006545DA /* Keyboard-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = 086769661B96E92C006545DA /* Keyboard-Mappings.plist */; };
 		086769691B96E936006545DA /* Controller-Preferences.plist in Resources */ = {isa = PBXBuildFile; fileRef = 086769681B96E936006545DA /* Controller-Preferences.plist */; };
@@ -146,11 +145,9 @@
 		08D786151B95870000CCC1A3 /* OpenEmuSystem.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C6D120C417112E1300E868A8 /* OpenEmuSystem.framework */; };
 		09A018F48F34B8D5484BA9FF /* Pokemon mini.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 081A46261B95744A00565444 /* Pokemon mini.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		0E026D7220704B74B7A5E66C /* Wii.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = AC6CB8F335B64A48AE857C59 /* Wii.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		12EDAEC64C70D710AF8B8065 /* OEGoogleDriveConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BAF3ECDABF5A2D068218C7F /* OEGoogleDriveConfig.swift */; };
 		141554211442B7B100A01683 /* OEN64SystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = 141554201442B7B100A01683 /* OEN64SystemResponder.m */; };
 		14CB5DAA16FE1F8300342817 /* OEAudioDeviceManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 14CB5DA916FE1F8300342817 /* OEAudioDeviceManager.m */; };
 		14F6A926168180D00071386D /* GameWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6A925168180CF0071386D /* GameWindowController.swift */; };
-		170AA9A84CF138836883E194 /* OEGoogleDriveSecrets.template.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F8401C31D685D3E7EAA048 /* OEGoogleDriveSecrets.template.swift */; };
 		1B32151514DDD49E00C5B50A /* OpenEmu.dae in Resources */ = {isa = PBXBuildFile; fileRef = 1B32151214DDD06500C5B50A /* OpenEmu.dae */; };
 		1B32151614DDD49E00C5B50A /* OpenEmuText.dae in Resources */ = {isa = PBXBuildFile; fileRef = 1B32151314DDD06500C5B50A /* OpenEmuText.dae */; };
 		1B6DA4A914DDE6A40067F7F6 /* SetupAssistantQCOpenGLLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6DA4A814DDE6A40067F7F6 /* SetupAssistantQCOpenGLLayer.swift */; };
@@ -385,6 +382,7 @@
 		8F419A3C25B6C81600A7F0BE /* PrefDebugController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83753F1614F537C400D708A7 /* PrefDebugController.swift */; };
 		8F44DEB526DFD07200893A18 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 8F44DEB426DFD07200893A18 /* Sparkle */; };
 		8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */; };
+		A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */; };
 		8F4A69732547F84500DFE092 /* GameControlsBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4A69722547F84500DFE092 /* GameControlsBarView.swift */; };
 		8F4AEAC1273594E6005C6246 /* OpenVGDB.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4AEAC0273594E6005C6246 /* OpenVGDB.swift */; };
 		8F4BDF7B1CE4AB25007DCB86 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F4BDF7A1CE4AB25007DCB86 /* libz.tbd */; };
@@ -694,7 +692,6 @@
 		CEA508990AF842369046D92D /* OEFolderBackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9964A7D7B3C4438D9BE62654 /* OEFolderBackupManager.swift */; };
 		D3360575D5430005882E67D6 /* ArtworkImportReviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44117B42E921F7FC91F8889D /* ArtworkImportReviewViewController.swift */; };
 		DEAAB8E598494A97A260F43C84A6B563 /* Dreamcast.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 87DF04FE1BCE2D100060E2C2 /* Dreamcast.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		DFDDE95A9D47B0C0B525780A /* OESaveSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F74677D2124A2E934C10038 /* OESaveSyncManager.swift */; };
 		E0D3D5AF068C48148780583F /* Keyboard-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = C6534A32E31642F3805D9A90 /* Keyboard-Mappings.plist */; };
 		E66ED795617D681F41CFA7BD /* MSX.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = FEB6625B187B791800D14713 /* MSX.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E8D9112BFB38FBCEEA8B22DD /* CheatSearchWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED2D0AB7012BE11642E384A3 /* CheatSearchWindowController.swift */; };
@@ -1252,7 +1249,6 @@
 		277CBA5B19DE553C0059A2C1 /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
 		277CBA5C19DE553C0059A2C1 /* Controller-Preferences.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Preferences.plist"; sourceTree = "<group>"; };
 		32DBCF750370BD2300C91783 /* OpenEmu_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OpenEmu_Prefix.pch; sourceTree = "<group>"; };
-		35F8401C31D685D3E7EAA048 /* OEGoogleDriveSecrets.template.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEGoogleDriveSecrets.template.swift; sourceTree = "<group>"; };
 		3887A7F61024D1F9000FC4CF /* OESaveStateQLPlugin.qlgenerator */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OESaveStateQLPlugin.qlgenerator; sourceTree = BUILT_PRODUCTS_DIR; };
 		3887A8021024D2BC000FC4CF /* GenerateThumbnailForURL.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GenerateThumbnailForURL.m; sourceTree = "<group>"; };
 		3887A8031024D2BC000FC4CF /* GeneratePreviewForURL.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratePreviewForURL.m; sourceTree = "<group>"; };
@@ -1369,11 +1365,9 @@
 		5AECA1471BE1D25600C3B4E2 /* OpenEmu-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OpenEmu-Bridging-Header.h"; sourceTree = "<group>"; };
 		5AFD06BC2058893B00DFE765 /* GameScannerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScannerViewController.swift; sourceTree = "<group>"; };
 		5C5F9C05070A447796EC6D4D /* OEWiiSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiSystemResponderClient.h; sourceTree = "<group>"; };
-		5CCE228E57ED51524BAE52BB /* OESyncStatusOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OESyncStatusOverlayView.swift; sourceTree = "<group>"; };
 		60C6AA00A0A44B609186B94D /* OEWiiSystemController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEWiiSystemController.m; sourceTree = "<group>"; };
 		669734CE138046AC84F66296 /* OEWiiSystemController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiSystemController.h; sourceTree = "<group>"; };
 		68416A57049F48B997026285 /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
-		6F74677D2124A2E934C10038 /* OESaveSyncManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OESaveSyncManager.swift; sourceTree = "<group>"; };
 		6FAD47F297164AD6B87C99DF /* OECoreMigration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OECoreMigration.swift; sourceTree = "<group>"; };
 		7477EF479ACE06E7ADE90A88 /* OpenEmuUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenEmuUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7699EC921D6303EB005BC437 /* ca */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = ca; path = ca.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -1567,6 +1561,7 @@
 		8F4198AF25B68B7500A7F0BE /* OELibraryDatabase+Maintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OELibraryDatabase+Maintenance.swift"; sourceTree = "<group>"; };
 		8F419A0225B6C7AE00A7F0BE /* OEAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OEAppearance.swift; sourceTree = "<group>"; };
 		8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderBackupTests.swift; sourceTree = "<group>"; };
 		8F4A69722547F84500DFE092 /* GameControlsBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlsBarView.swift; sourceTree = "<group>"; };
 		8F4AEAC0273594E6005C6246 /* OpenVGDB.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenVGDB.swift; sourceTree = "<group>"; };
 		8F4BDF7A1CE4AB25007DCB86 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
@@ -1885,7 +1880,6 @@
 		94E6C303166DB15900082F27 /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
 		99574CB1B5EE4AE89B192EBD /* OEWiiSystemResponder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiSystemResponder.h; sourceTree = "<group>"; };
 		9964A7D7B3C4438D9BE62654 /* OEFolderBackupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEFolderBackupManager.swift; sourceTree = "<group>"; };
-		9BAF3ECDABF5A2D068218C7F /* OEGoogleDriveConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEGoogleDriveConfig.swift; sourceTree = "<group>"; };
 		AA0000011000000100000001 /* CheatDatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatDatabaseService.swift; sourceTree = "<group>"; };
 		AA0000011000000100000003 /* LibretroCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibretroCheatProvider.swift; sourceTree = "<group>"; };
 		AA0000011000000100000005 /* OpenEmuCheatProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenEmuCheatProvider.swift; sourceTree = "<group>"; };
@@ -2594,6 +2588,7 @@
 				8F93FDD927374F2000B59F3E /* GameInfoHelperTests.swift */,
 				A7B4C9102EEB000000000001 /* GameLaunchTests.swift */,
 				8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */,
+				A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */,
 				8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */,
 				8F93FDD827374F1F00B59F3E /* OpenEmuTests-Bridging-Header.h */,
 			);
@@ -4157,12 +4152,8 @@
 		B8396A2616B1FF9F2C6C8029 /* OpenEmu */ = {
 			isa = PBXGroup;
 			children = (
-				9BAF3ECDABF5A2D068218C7F /* OEGoogleDriveConfig.swift */,
-				6F74677D2124A2E934C10038 /* OESaveSyncManager.swift */,
 				9964A7D7B3C4438D9BE62654 /* OEFolderBackupManager.swift */,
-				5CCE228E57ED51524BAE52BB /* OESyncStatusOverlayView.swift */,
 				0EF37C00BE9099269AB29467 /* PrefCloudSyncController.swift */,
-				35F8401C31D685D3E7EAA048 /* OEGoogleDriveSecrets.template.swift */,
 				CC0011223344557201900001 /* ScreenScraperDevCredentials.template.swift */,
 				42A14B489D09FD1B597AD586 /* OECredentialStore.swift */,
 				CC00CW00KIT0000000000001 /* CheatWorksKit */,
@@ -6257,6 +6248,7 @@
 			files = (
 				8F93FDE02737506900B59F3E /* ROMImporterTests.swift in Sources */,
 				8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */,
 				8F93FDDA27374F2000B59F3E /* GameInfoHelperTests.swift in Sources */,
 				A7B4C9102EEB000000000002 /* GameLaunchTests.swift in Sources */,
 				8F0C1C252A09E01A00343B6C /* BundleResourcesTests.swift in Sources */,
@@ -6574,12 +6566,8 @@
 				C67DBF4317DBE859006AF087 /* NSDocument+OEAdditions.m in Sources */,
 				8CBD3AA217D23AA80022399B /* OEGridGameCell.m in Sources */,
 				5A9606D41C0A63740089B494 /* NSMutableDictionary+Pop.swift in Sources */,
-				12EDAEC64C70D710AF8B8065 /* OEGoogleDriveConfig.swift in Sources */,
-				DFDDE95A9D47B0C0B525780A /* OESaveSyncManager.swift in Sources */,
 				CEA508990AF842369046D92D /* OEFolderBackupManager.swift in Sources */,
-				060837EB57D7C9F44F51156B /* OESyncStatusOverlayView.swift in Sources */,
 				1E0E90051A8932BB72161909 /* PrefCloudSyncController.swift in Sources */,
-				170AA9A84CF138836883E194 /* OEGoogleDriveSecrets.template.swift in Sources */,
 				F2E3C43668DB03A494D5B16E /* OECredentialStore.swift in Sources */,
 				C0D2C87DC8E70B924B0364B8 /* ArtworkFolderMatcher.swift in Sources */,
 				D3360575D5430005882E67D6 /* ArtworkImportReviewViewController.swift in Sources */,

@@ -24,27 +24,9 @@
 
 import Cocoa
 
-/// Preferences pane that lets users connect/disconnect their Google Drive account
-/// for the Save Sync feature and see the current connection status.
+/// Preferences pane for choosing the Cloud Sync backup folder and seeing its status.
 final class PrefCloudSyncController: NSViewController {
     
-    // MARK: - Google Drive UI (retained for future re-enablement)
-
-    private let headerLabel       = NSTextField(labelWithString: "")
-    private let descLabel         = NSTextField(wrappingLabelWithString: "")
-    private let signInButton      = NSButton()
-    private let signOutButton     = NSButton()
-    private let divider           = NSBox()
-    private let statusDot         = NSTextField(labelWithString: "●")
-    private let statusLabel       = NSTextField(labelWithString: "")
-    private let syncNowButton     = NSButton()
-    private let syncInfoLabel     = NSTextField(wrappingLabelWithString: "")
-    private let loadingIndicator  = NSProgressIndicator()
-    private let scrollView        = NSScrollView()
-    private let tableView         = NSTableView()
-    private let lastSyncedLabel   = NSTextField(labelWithString: "")
-    private var cloudFiles: [OESaveSyncManager.DriveFile] = []
-
     // MARK: - Backup Folder UI
 
     private let bkHeaderLabel     = NSTextField(labelWithString: "")
@@ -65,17 +47,6 @@ final class PrefCloudSyncController: NSViewController {
         df.timeStyle = .short
         return df
     }()
-    
-    private lazy var tableDateFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateStyle = .short
-        df.timeStyle = .short
-        return df
-    }()
-    
-    // MARK: - Notification Token
-    
-    private var syncStatusToken: NSObjectProtocol?
     
     // MARK: - Lifecycle
     
@@ -98,38 +69,7 @@ final class PrefCloudSyncController: NSViewController {
     }
     
     deinit {
-        if let token = syncStatusToken  { NotificationCenter.default.removeObserver(token) }
         if let token = bkStatusToken    { NotificationCenter.default.removeObserver(token) }
-    }
-    
-    // MARK: - TableView Setup
-    
-    private func setupTableView() {
-        tableView.delegate = self
-        tableView.dataSource = self
-        tableView.headerView = NSTableHeaderView()
-        tableView.rowHeight = 20
-        tableView.gridStyleMask = .solidHorizontalGridLineMask
-        tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
-        
-        let sysCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("System"))
-        sysCol.headerCell.stringValue = "System"
-        sysCol.width = 60
-        tableView.addTableColumn(sysCol)
-        
-        let fileCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Filename"))
-        fileCol.headerCell.stringValue = "Filename"
-        fileCol.width = 200
-        tableView.addTableColumn(fileCol)
-        
-        let dateCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Modified"))
-        dateCol.headerCell.stringValue = "Modified"
-        dateCol.width = 120
-        tableView.addTableColumn(dateCol)
-        
-        scrollView.documentView = tableView
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .bezelBorder
     }
     
     // MARK: - Build UI
@@ -244,61 +184,6 @@ final class PrefCloudSyncController: NSViewController {
         ])
     }
     
-    // MARK: - Status Update
-    
-    private func updateStatus() {
-        let isSignedIn = OESaveSyncManager.shared.isSignedIn
-        
-        if isSignedIn {
-            statusDot.textColor    = NSColor(red: 0.2, green: 0.78, blue: 0.35, alpha: 1)  // green
-            statusLabel.stringValue = "Connected"
-            statusLabel.textColor   = NSColor(red: 0.2, green: 0.78, blue: 0.35, alpha: 1)
-            fetchCloudFiles()
-        } else {
-            statusDot.textColor    = NSColor(red: 0.87, green: 0.20, blue: 0.18, alpha: 1) // red
-            statusLabel.stringValue = "Not Connected"
-            statusLabel.textColor   = NSColor(red: 0.87, green: 0.20, blue: 0.18, alpha: 1)
-            cloudFiles = []
-            tableView.reloadData()
-        }
-        
-        signInButton.isHidden  = isSignedIn
-        signOutButton.isHidden = !isSignedIn
-        
-        scrollView.isHidden    = !isSignedIn
-        syncNowButton.isHidden = !isSignedIn
-        lastSyncedLabel.isHidden = !isSignedIn
-        
-        if isSignedIn {
-            if let date = OESaveSyncManager.shared.lastSyncDate {
-                lastSyncedLabel.stringValue = "Last synced: \(dateFormatter.string(from: date))"
-            } else {
-                lastSyncedLabel.stringValue = "Not synced yet"
-            }
-        }
-    }
-    
-    private func fetchCloudFiles() {
-        guard OESaveSyncManager.shared.isSignedIn else { return }
-        
-        loadingIndicator.startAnimation(nil)
-        
-        Task {
-            do {
-                let files = try await OESaveSyncManager.shared.fetchCloudFileList()
-                await MainActor.run {
-                    self.cloudFiles = files.sorted { ($0.modifiedTime ?? .distantPast) > ($1.modifiedTime ?? .distantPast) }
-                    self.tableView.reloadData()
-                    self.loadingIndicator.stopAnimation(nil)
-                }
-            } catch {
-                await MainActor.run {
-                    self.loadingIndicator.stopAnimation(nil)
-                }
-            }
-        }
-    }
-    
     private func updateBackupStatus() {
         let mgr    = OEFolderBackupManager.shared
         let green  = NSColor(red: 0.2,  green: 0.78, blue: 0.35, alpha: 1)
@@ -357,85 +242,6 @@ final class PrefCloudSyncController: NSViewController {
     @objc private func removeBackupFolder() {
         OEFolderBackupManager.shared.removeFolder()
         updateBackupStatus()
-    }
-
-    // MARK: - Actions
-
-    @objc private func signIn() {
-        OESaveSyncManager.shared.signIn()
-    }
-    
-    @objc private func signOut() {
-        let alert = NSAlert()
-        alert.messageText     = "Sign Out of Google Drive?"
-        alert.informativeText = "Your local saves will not be affected. You can sign back in at any time."
-        alert.addButton(withTitle: "Sign Out")
-        alert.addButton(withTitle: "Cancel")
-        alert.alertStyle = .warning
-        
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        OESaveSyncManager.shared.signOut()
-        updateStatus()
-    }
-    
-    @objc private func syncNow() {
-        OESaveSyncManager.shared.performFullSyncCheck()
-        fetchCloudFiles()
-    }
-}
-
-// MARK: - TableView Data Source & Delegate
-
-extension PrefCloudSyncController: NSTableViewDataSource, NSTableViewDelegate {
-    
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        return cloudFiles.count
-    }
-    
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let identifier = NSUserInterfaceItemIdentifier("CloudFileCell")
-        var view = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTextField
-        
-        if view == nil {
-            view = NSTextField(labelWithString: "")
-            view?.identifier = identifier
-            view?.font = .systemFont(ofSize: 11)
-        }
-        
-        let file = cloudFiles[row]
-        let name = file.name ?? "Unknown"
-        
-        switch tableColumn?.identifier.rawValue {
-        case "System":
-            // Attempt to extract system from path: "openemu.system.gba/Game.sav"
-            let parts = name.components(separatedBy: CharacterSet(charactersIn: "/\\"))
-            if let firstPart = parts.first {
-                let sys = String(firstPart).replacingOccurrences(of: "openemu.system.", with: "").uppercased()
-                view?.stringValue = sys
-            } else {
-                view?.stringValue = "???"
-            }
-            
-        case "Filename":
-            let parts = name.components(separatedBy: CharacterSet(charactersIn: "/\\"))
-            if let lastPart = parts.last {
-                view?.stringValue = String(lastPart)
-            } else {
-                view?.stringValue = name
-            }
-            
-        case "Modified":
-            if let date = file.modifiedTime {
-                view?.stringValue = tableDateFormatter.string(from: date)
-            } else {
-                view?.stringValue = "-"
-            }
-            
-        default:
-            break
-        }
-        
-        return view
     }
 }
 

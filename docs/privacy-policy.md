@@ -13,7 +13,6 @@ OpenEmu-Silicon is a macOS game emulator. Most gameplay and library features run
 The app only connects to external services for features you use, or for optional crash reporting if you consent:
 
 - **RetroAchievements** — optional achievements, leaderboards, and Rich Presence.
-- **Google Drive Save Sync** — optional save-state and battery-save backup/sync.
 - **Sentry crash reporting** — optional crash and hang diagnostics.
 - **CheatWorks** (community cheat ratings): used when you open Browse Online Cheats or rate a cheat. Unlike the features above, it is on by default in official releases. You can turn it off in **Preferences → Gameplay**. See [CheatWorks community cheat ratings](#cheatworks-community-cheat-ratings).
 
@@ -48,36 +47,11 @@ RetroAchievements is an external service. OpenEmu-Silicon does not operate Retro
 
 ---
 
-## Google Drive Save Sync (optional)
+## Cloud Sync folder (optional)
 
-This feature lets you back up and sync your save states and battery saves to your own Google Drive. It is off by default and only activates after you sign in.
+Cloud Sync copies your save states, battery saves, and BIOS files into a folder you choose, such as a folder in iCloud Drive or Google Drive for desktop. It is off until you pick a folder. OpenEmu-Silicon only writes files to that folder. Your sync provider (Apple or Google) moves them between your Macs under its own terms. OpenEmu-Silicon does not sign in to any Google or Apple account and does not send this data to any server it operates.
 
-### What access is requested
-
-OpenEmu-Silicon requests the `drive.appdata` scope. This gives the app access to a private, hidden App Data folder inside your Google Drive. This folder:
-
-- Is not visible in the Google Drive web interface
-- Cannot be read by other apps
-- Can only be accessed by OpenEmu-Silicon
-
-The app does **not** request access to your files, documents, photos, or any other part of your Google Drive.
-
-### What is stored in your Drive
-
-Only your game save data:
-
-- Save state files (snapshots of game progress)
-- Battery save files (in-game save data)
-
-No personal information, no device identifiers, no usage metrics.
-
-### How authentication works
-
-Sign-in uses Google's standard OAuth 2.0 flow. Your Google account password is never seen or stored by the app. After you authorize access, Google issues an OAuth token. That token is stored locally in OpenEmu-Silicon's encrypted credential file at `~/Library/Application Support/OpenEmu/.oe_credentials` and is used only to read and write your save data to the App Data folder.
-
-### Revoking access
-
-You can disconnect Google Drive at any time from **Preferences → Cloud Sync → Sign Out**. This clears the stored Google Drive token from OpenEmu-Silicon's local credential store. You can also revoke access from your Google Account at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+Older versions could sign in to the Google Drive API. That feature has been removed, and any token it left in the local credential file is deleted on launch.
 
 ---
 
@@ -166,7 +140,6 @@ OpenEmu-Silicon does not control what CheatWorks does with the data it receives,
 - Does not operate its own analytics backend.
 - Does not transmit game ROMs to this project.
 - Does not transmit save data to this project.
-- Does not access your Google Drive files outside the hidden App Data folder.
 
 ---
 
