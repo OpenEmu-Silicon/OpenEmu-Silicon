@@ -34,6 +34,12 @@
 			<true/>
 			<key>OEGameCoreSaveStatesNotSupported</key>
 			<true/>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 		</dict>
 	</dict>
 	<key>OEGameCorePlayerCount</key>

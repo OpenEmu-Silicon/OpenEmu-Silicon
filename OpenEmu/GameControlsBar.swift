@@ -557,6 +557,7 @@ final class GameControlsBar: NSWindow {
         case OpenEmuCheatProvider.providerName: return NSImage(named: "cheat_provider_openemu")
         case LibretroCheatProvider.providerName: return NSImage(named: "cheat_provider_libretro")
         case PugsyCheatProvider.providerName: return NSImage(named: "cheat_provider_pugsy")
+        case DolphinCheatProvider.providerName: return NSImage(named: "cheat_provider_dolphin")
         default: return nil
         }
     }

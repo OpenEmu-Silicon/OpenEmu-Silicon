@@ -13,16 +13,38 @@
 #include "joystick.h"
 #include "dac.h"
 
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
+#include <rc_consoles.h>
+
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
+
 @interface JaguarGameCore () <OEJaguarSystemResponderClient>
 {
     int videoWidth, videoHeight;
     double sampleRate;
     uint32_t *buffer;
+
+    OERetroAchievementsBridge *_raBridge;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 @end
 @implementation JaguarGameCore
 
 static JaguarGameCore *current;
+
+// rcheevos addresses Jaguar RAM from 0 across the 2 MB main RAM; jaguarMainRAM points at that
+// block (jagMemSpace + 0x000000). The bridge gates reads for ROM-ready and shutdown.
+static uint32_t jaguar_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                      uint32_t num_bytes, rc_client_t *client)
+{
+    if (address >= 0x200000)
+        return 0;
+    if (address + num_bytes > 0x200000)
+        num_bytes = 0x200000 - address;
+    memcpy(buffer, jaguarMainRAM + address, num_bytes);
+    return num_bytes;
+}
 
 - (id)init
 {
@@ -33,6 +55,7 @@ static JaguarGameCore *current;
         buffer = new uint32_t[videoWidth * videoHeight];
         sampleBuffer = (uint16_t *)malloc(2048 * sizeof(uint16_t));
         memset(sampleBuffer, 0, 2048 * sizeof(uint16_t));
+        _cheatList = [[NSMutableDictionary alloc] init];
     }
     
     current = self;
@@ -66,6 +89,14 @@ static JaguarGameCore *current;
 	SET32(jaguarMainRAM, 0, 0x00200000);                      // set up stack
 	JaguarLoadFile((char *)[path UTF8String]);                // load rom
 	JaguarReset();
+
+    // RAM is allocated by JaguarInit and the ROM is loaded; start RA (login + whole-file hash)
+    // and mark ready so rcheevos can read memory during -doFrame.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:jaguar_rc_read_memory
+                                                          consoleID:(uint32_t)RC_CONSOLE_ATARI_JAGUAR];
+    [_raBridge startWithROMPath:path];
+    [_raBridge markROMReady];
     
     return YES;
     
@@ -74,9 +105,15 @@ static JaguarGameCore *current;
 - (void)executeFrame
 {
     JaguarExecuteNew();
-    
+
+    // Reassert cheats every frame: the core has no persistent patch engine, so a poked
+    // value would otherwise be overwritten by the game on the next frame.
+    [self applyCheats];
+
     SDLSoundCallback(NULL, sampleBuffer, 2048*2);
     [[current ringBufferAtIndex:0] write:sampleBuffer maxLength:2048*2];
+
+    [_raBridge doFrame];
 }
 
 - (void)initVideo
@@ -98,6 +135,9 @@ static JaguarGameCore *current;
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     JaguarDone();
 
     [super stopEmulation];
@@ -106,12 +146,102 @@ static JaguarGameCore *current;
 - (void)resetEmulation
 {
     JaguarReset();
+    [_raBridge reset];
 }
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     free(buffer);
     free(sampleBuffer);
+}
+
+#pragma mark - Cheats
+
+// Codes are raw ADDRESS:VALUE hex pokes into the Jaguar's 2 MB main RAM (e.g. 004811:0A).
+// Multi-part codes are joined with '+'. This matches the libretro "B format" cheats, whose
+// decimal address/value map directly onto a hex poke (e.g. address 18449 value 10 -> 4811:0A).
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    NSString *key = [[code stringByReplacingOccurrencesOfString:@" " withString:@""] uppercaseString];
+    if (key.length == 0)
+        return;
+
+    if (enabled)
+        _cheatList[key] = @YES;
+    else
+        [_cheatList removeObjectForKey:key];
+}
+
+- (void)applyCheats
+{
+    if (_cheatList.count == 0 || jaguarMainRAM == NULL)
+        return;
+
+    for (NSString *code in _cheatList) {
+        if (![_cheatList[code] boolValue])
+            continue;
+
+        for (NSString *part in [code componentsSeparatedByString:@"+"]) {
+            NSArray<NSString *> *pair = [part componentsSeparatedByString:@":"];
+            if (pair.count != 2)
+                continue;
+
+            unsigned int address = 0, value = 0;
+            if (![[NSScanner scannerWithString:pair[0]] scanHexInt:&address])
+                continue;
+            if (![[NSScanner scannerWithString:pair[1]] scanHexInt:&value])
+                continue;
+
+            // One byte per two hex digits, written big-endian (MSB at the lowest address) to
+            // match the 68000's byte order, so a value like 1234 lands in RAM as 12 34.
+            NSUInteger byteCount = MAX((NSUInteger)1, (pair[1].length + 1) / 2);
+            for (NSUInteger i = 0; i < byteCount; i++) {
+                uint32_t addr = address + (uint32_t)i;
+                if (addr >= 0x200000)
+                    break;
+                jaguarMainRAM[addr] = (value >> ((byteCount - 1 - i) * 8)) & 0xFF;
+            }
+        }
+    }
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (jaguarMainRAM == NULL)
+        return @[];
+
+    // The Jaguar's 2 MB main RAM (68000 address 0x000000-0x1FFFFF) — what cheats poke and what
+    // RetroAchievements reads. Peripheral/hardware regions aren't exposed for search.
+    NSData *data = [NSData dataWithBytes:jaguarMainRAM length:0x200000];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"Main RAM"
+                                                                                address:0
+                                                                           addressBytes:3
+                                                                                   data:data];
+    return @[descriptor];
+}
+
+#pragma mark - RetroAchievements
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
 }
 
 - (OEIntRect)screenRect
