@@ -258,6 +258,14 @@ extension MainWindowController: LibraryControllerDelegate {
     func libraryController(_ controller: LibraryController, didSelectSaveState saveState: OEDBSaveState) {
         openGameDocument(with: nil, saveState: saveState)
     }
+
+    static func autosaveForLaunch(_ autosave: OEDBSaveState?, coreIdentifier: String?) -> OEDBSaveState? {
+        guard let autosave else { return nil }
+        if let coreIdentifier, autosave.coreIdentifier != coreIdentifier {
+            return nil
+        }
+        return autosave
+    }
     
     @available(macOS, deprecated: 10.15, message: "Remove 'or \"User Reports\"' from alert (~line 392) and localizations, the term is not used in Catalina and above.")
     private func openGameDocument(with game: OEDBGame?, core: OECorePlugin? = nil, saveState state: OEDBSaveState?, secondAttempt retry: Bool = false, lockOnROM: OEDBRom? = nil, disableAutoReload noAutoReload: Bool = false) {
@@ -273,7 +281,8 @@ extension MainWindowController: LibraryControllerDelegate {
         let fullScreen = defaults.bool(forKey: OEFullScreenGameWindowKey)
         
         var openWithSaveState = state != nil
-        let state = state != nil ? state : game?.autosaveForLastPlayedRom
+        // Save states select their own core, so only offer a compatible autosave.
+        let state = state ?? Self.autosaveForLaunch(game?.autosaveForLastPlayedRom, coreIdentifier: core?.bundleIdentifier)
         if !noAutoReload {
             openWithSaveState = openWithSaveState || (state != nil && OEAlert.loadAutoSaveGame().runModal() == .alertFirstButtonReturn)
         }
@@ -311,7 +320,7 @@ extension MainWindowController: LibraryControllerDelegate {
                         if panel.runModal() == .OK {
                             missingRom?.url = panel.url
                             missingRom?.save()
-                            self.openGameDocument(with: game, saveState: state)
+                            self.openGameDocument(with: game, core: core, saveState: state, secondAttempt: retry, lockOnROM: lockOnROM, disableAutoReload: noAutoReload)
                         }
                     }
                 }
@@ -332,7 +341,7 @@ extension MainWindowController: LibraryControllerDelegate {
                             CoreUpdater.shared.cancelCheckForNewCores()
                             self.presentError(error)
                         } else {
-                            self.openGameDocument(with: game, saveState: state, secondAttempt: true, disableAutoReload: false)
+                            self.openGameDocument(with: game, core: core, saveState: state, secondAttempt: true, lockOnROM: lockOnROM, disableAutoReload: noAutoReload)
                         }
                     }
                 }
@@ -350,7 +359,7 @@ extension MainWindowController: LibraryControllerDelegate {
                         alert.alternateButtonTitle = NSLocalizedString("Cancel", comment: "")
                         alert.beginSheetModal(for: window) { response in
                             if response == .alertFirstButtonReturn {
-                                self.openGameDocument(with: state?.rom?.game, saveState: nil, secondAttempt: true, disableAutoReload: true)
+                                self.openGameDocument(with: state?.rom?.game, core: core, saveState: nil, secondAttempt: true, lockOnROM: lockOnROM, disableAutoReload: true)
                             }
                         }
                     } else {

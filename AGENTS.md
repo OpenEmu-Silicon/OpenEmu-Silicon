@@ -91,7 +91,7 @@ Working in a git worktree? Use `Scripts/build-for-worktree.sh` or `verify.sh --w
 | System | Core(s) |
 |--------|---------|
 | 3DO | 4DO |
-| Arcade | MAME |
+| Arcade | MAME (default), FBNeo |
 | Atari 2600 | Stella |
 | Atari 5200 | Atari800 |
 | Atari 7800 | ProSystem |
@@ -134,10 +134,11 @@ Working in a git worktree? Use `Scripts/build-for-worktree.sh` or `verify.sh --w
 ### Default core selection
 
 For systems with multiple cores, OpenEmu uses the value at
-`defaultCore.openemu.system.<sysid>` in `UserDefaults`. The host app seeds a default in `OpenEmu/AppDelegate.swift` for two systems today:
+`defaultCore.openemu.system.<sysid>` in `UserDefaults`. The host app seeds a default in `OpenEmu/AppDelegate.swift` for three systems today:
 
 - `openemu.system.nes` → `org.openemu.Nestopia`
 - `openemu.system.snes` → `org.openemu.SNES9x`
+- `openemu.system.arcade` → `org.openemu.MAME` (so MAME, the pre-existing core, stays default; the user can switch to FBNeo in Preferences → Cores)
 
 For any other multi-core system (e.g. ColecoVision — JollyCV / CrabEmu / blueMSX), no default is seeded and the user picks from Preferences → Cores. Adding a default seed is a one-line change in `AppDelegate.swift` if a default is wanted; until that is done, behavior is whatever the picker chooses to surface first.
 
@@ -228,5 +229,5 @@ The main app is **BSD 2-Clause**. Emulator cores are mostly **GPL v2**. Key rule
    // modification, are permitted provided that the following conditions are met:
    // ...
    ```
-3. **picodrive is non-commercial** — never charge for a build that includes it
+3. **picodrive and FBNeo are non-commercial** — never charge for a build that includes either. FBNeo also inherits the MAME license; ship its license verbatim (see [`FBNeo/LICENSE`](FBNeo/LICENSE))
 4. **No CLA** — your contributions are covered by the license of the files you touch

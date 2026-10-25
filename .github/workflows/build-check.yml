@@ -58,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       cores: ${{ steps.detect.outputs.cores }}
+      fbneo: ${{ steps.detect.outputs.fbneo }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
@@ -93,9 +94,15 @@ jobs:
             base="${{ github.event.before }}"
           fi
 
+          # FBNeo builds via its own clone-and-build script (its deps/fbneo source
+          # isn't vendored and it's not a slot in the xcodebuild matrix — same
+          # situation as MAME). Track it with a separate flag.
+          fbneo=false
+
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             echo "No usable diff base (event: ${{ github.event_name }}) - building all core schemes"
             cores="$all_cores"
+            fbneo=true
           else
             # --no-renames lists both the old and new path of a move; quotePath=false
             # keeps non-ASCII file names readable instead of octal-escaped.
@@ -136,10 +143,18 @@ jobs:
             echo "$proposed"
             echo "--- actually building: $cores ---"
             echo "::notice title=detect-core-changes (report only)::$proposed"
+
+            # FBNeo depends on FBNeo/ plus the frameworks it links (OpenEmu-SDK /
+            # OpenEmuBase) and compiles from (OpenEmuKit/Source: the RA bridge).
+            if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/|OpenEmuKit/)'; then
+              fbneo=true
+            fi
           fi
 
           echo "Core schemes to build: $cores"
           echo "cores=$cores" >> "$GITHUB_OUTPUT"
+          echo "Build FBNeo: $fbneo"
+          echo "fbneo=$fbneo" >> "$GITHUB_OUTPUT"
 
   build-cores:
     name: Build core (${{ matrix.core }})
@@ -196,6 +211,40 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+  build-fbneo:
+    # FBNeo isn't a slot in the core matrix above: its deps/fbneo source isn't
+    # vendored (pulled from the OpenEmu-Silicon/fbneo fork at a pinned revision)
+    # and it builds the headless engine + plugin through its own script. Same
+    # clone-and-build shape MAME needs. Only runs when FBNeo-relevant files change.
+    name: Build FBNeo core
+    needs: detect-core-changes
+    if: needs.detect-core-changes.outputs.fbneo == 'true'
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Generate credentials stubs
+        run: |
+          cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
+
+      - name: Build FBNeo (clone pinned fork, build dylib + plugin)
+        run: |
+          # build-fbneo-core.sh runs prepare-fbneo-core.sh (clones the pinned
+          # fork revision into FBNeo/deps/fbneo), builds fbneo_headless.dylib,
+          # then OpenEmuBase + FBNeo.oecoreplugin (adhoc-signed, no identity needed).
+          ./Scripts/build-fbneo-core.sh
 
   build:
     name: Build (arm64)

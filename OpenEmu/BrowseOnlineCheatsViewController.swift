@@ -1242,9 +1242,11 @@ extension BrowseOnlineCheatsViewController: NSTableViewDelegate {
     }
 
     private func refreshImportedCodeKeys() {
-        let allCheats = gameDocument?.cheats ?? []
-        otherSourceCodeKeys = Set(allCheats.filter { $0.cheatSource == nil }.map { CheatFeedbackService.key(for: $0.code) })
-        importedCodeKeys = Set(allCheats.filter { $0.cheatSource != nil }.map { CheatFeedbackService.key(for: $0.code) })
+        // Scope to the running core so a per-core system (arcade: MAME vs FBNeo) doesn't mark the
+        // other core's imported cheats as already-present when their codes happen to match.
+        let coreCheats = gameDocument?.visibleCheats ?? []
+        otherSourceCodeKeys = Set(coreCheats.filter { $0.cheatSource == nil }.map { CheatFeedbackService.key(for: $0.code) })
+        importedCodeKeys = Set(coreCheats.filter { $0.cheatSource != nil }.map { CheatFeedbackService.key(for: $0.code) })
     }
 
     private func importState(for cheat: DatabaseCheat) -> ImportState {

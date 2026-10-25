@@ -371,6 +371,7 @@
 		8F071F391C25534E007B76DA /* Preferences.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8F071F381C25534E007B76DA /* Preferences.xib */; };
 		8F071F3B1C255362007B76DA /* Credits.rtf in Resources */ = {isa = PBXBuildFile; fileRef = 8F071F3A1C255362007B76DA /* Credits.rtf */; };
 		8F0C1C252A09E01A00343B6C /* BundleResourcesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0C1C242A09E01A00343B6C /* BundleResourcesTests.swift */; };
+		A7B4C9102EEB000000000002 /* GameLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B4C9102EEB000000000001 /* GameLaunchTests.swift */; };
 		CE47B0C12A00000000000002 /* CheatWorksEmulatorCodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000001 /* CheatWorksEmulatorCodeTests.swift */; };
 		8F0D804724ED76C4001BD8E2 /* ControlsLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0D804624ED76C3001BD8E2 /* ControlsLabels.swift */; };
 		8F2543FA2714C274003FC137 /* Finite in Frameworks */ = {isa = PBXBuildFile; productRef = 8F2543F92714C274003FC137 /* Finite */; };
@@ -1543,6 +1544,7 @@
 		8F071F381C25534E007B76DA /* Preferences.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = Preferences.xib; sourceTree = "<group>"; };
 		8F071F3A1C255362007B76DA /* Credits.rtf */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.rtf; path = Credits.rtf; sourceTree = "<group>"; };
 		8F0C1C242A09E01A00343B6C /* BundleResourcesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleResourcesTests.swift; sourceTree = "<group>"; };
+		A7B4C9102EEB000000000001 /* GameLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameLaunchTests.swift; sourceTree = "<group>"; };
 		CE47B0C12A00000000000001 /* CheatWorksEmulatorCodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheatWorksEmulatorCodeTests.swift; sourceTree = "<group>"; };
 		8F0D804624ED76C3001BD8E2 /* ControlsLabels.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ControlsLabels.swift; sourceTree = "<group>"; };
 		8F22764529D2FDE3001FB9F8 /* CodeSign.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = CodeSign.xcconfig; path = ../CodeSign.xcconfig; sourceTree = "<group>"; };
@@ -2590,6 +2592,7 @@
 				8F0C1C242A09E01A00343B6C /* BundleResourcesTests.swift */,
 				CE47B0C12A00000000000001 /* CheatWorksEmulatorCodeTests.swift */,
 				8F93FDD927374F2000B59F3E /* GameInfoHelperTests.swift */,
+				A7B4C9102EEB000000000001 /* GameLaunchTests.swift */,
 				8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */,
 				CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */,
 				CE47B0C12A00000000000005 /* DrawableProviderTests.swift */,
@@ -6258,6 +6261,7 @@
 				CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */,
 				8F93FDDA27374F2000B59F3E /* GameInfoHelperTests.swift in Sources */,
+				A7B4C9102EEB000000000002 /* GameLaunchTests.swift in Sources */,
 				8F0C1C252A09E01A00343B6C /* BundleResourcesTests.swift in Sources */,
 				CE47B0C12A00000000000002 /* CheatWorksEmulatorCodeTests.swift in Sources */,
 			);
