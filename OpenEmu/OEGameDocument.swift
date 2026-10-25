@@ -203,6 +203,8 @@ final class OEGameDocument: NSDocument {
     private var displaySleepAssertionID: IOPMAssertionID = 0
     
     private var emulationStatus: EmulationStatus = .notSetup
+    /// True while the game is running. Read by the debug play test driver.
+    var isPlaying: Bool { emulationStatus == .playing }
     private var saveStateForGameStart: OEDBSaveState?
     private var lastPlayStartDate: Date?
     private var lastSelectedDisplayModeOption: String?

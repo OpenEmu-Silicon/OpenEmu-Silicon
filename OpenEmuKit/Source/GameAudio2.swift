@@ -54,6 +54,7 @@ final public class GameAudio2: GameAudioProtocol {
     }
     
     @objc public func audioSampleRateDidChange() {
+        log.info("Sample rate changed to \(self.gameCore.audioSampleRate(forBuffer: 0)); engine running: \(self.isRunning)")
         guard isRunning else { return }
         
         engine.stop()
@@ -64,6 +65,7 @@ final public class GameAudio2: GameAudioProtocol {
     }
     
     public func startAudio() {
+        log.info("startAudio")
         precondition(gameCore.audioBufferCount == 1,
                      "nly one buffer supported; got \(gameCore.audioBufferCount)")
         
@@ -100,6 +102,7 @@ final public class GameAudio2: GameAudioProtocol {
         isRunning = true
         do {
             try engine.start()
+            log.info("Audio engine started")
         } catch {
             log.error("Unable to start AVAudioEngine: \(error.localizedDescription, privacy: .public)")
         }

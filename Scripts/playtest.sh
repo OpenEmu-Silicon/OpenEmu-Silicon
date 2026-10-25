@@ -2,86 +2,138 @@
 # playtest.sh — Play a game in the real app without anyone at the keyboard, then report what happened.
 #
 # Usage:
-#   ./Scripts/playtest.sh --game "Super Mario 64" [--seconds 30] [--keys "start,up,ok,ok"]
-#   ./Scripts/playtest.sh --rom <file> [--seconds 30] [--keys "return,a,right"]    # a file outside the library
+#   ./Scripts/playtest.sh --game "Super Mario 64" [--seconds 30] [--keys "start,ok,ok,up"] [--restart]
 #
-# --game finds the game in your real OpenEmu library by name (read-only lookup) and plays it from there, using
-# your real library, settings and saved key bindings. Actions in --keys (up down left right start select ok cancel
-# x y l r z) are turned into the keys you have saved for that game's system. OpenEmu must be closed.
-# A run adds the usual traces of playing a game: play count and last-played time, and an auto save state when
-# the game quits. It never deletes anything, and it skips Quick Save unless you add --save.
-# --game-shot also uses the game's own Take Screenshot, which captures what the core rendered even when the window
-# capture shows black. It adds one screenshot to your library.
-# --rom uses a throwaway library instead and takes literal key names.
+# --game finds the game in your real OpenEmu library by name (a read-only lookup) and plays it from there,
+# with your real library, settings and saved key bindings. Actions in --keys (up down left right start select
+# ok cancel x y l r z) become the keys you have saved for that game's system; a plain key name such as "k" or
+# "return" is sent as is. One key goes in about every two seconds. OpenEmu must be closed.
 #
-# What it does: opens the game, types the keys in order (one about every two seconds), and screenshots the
-# game window after each. Then it reads the app log for the run and prints a report:
-#   - frame pacing: frames per second per 3-second window, and the longest gap between two frames
-#   - audio: how many times the sound buffer overflowed
-#   - errors and faults logged by the app and the game helper
-#   - crash reports
-#   - where the screenshots are (open them to see what the game looked like)
-# The tests click and type, so leave the mouse and keyboard alone while it runs.
-# Keyboard input here reaches the game as real key events; it does not need Input Monitoring permission.
+# How it works: the debug app has a built-in driver (OpenEmu/PlaytestDriver.swift, debug builds only). This script
+# builds the app, starts it with a plan file, and the driver opens the game, sends the keys through the same path a
+# real keyboard uses, saves screenshots of what the core rendered, then closes the game and quits. There is no UI-test
+# runner, so no macOS permission prompts, and nothing takes over your mouse or keyboard.
+#
+# A run leaves the usual traces of playing: play count, last-played time, and an auto save state when the game closes.
+# It never deletes anything and never uses Quick Save. By default it answers "continue your last game?" with Resume;
+# --restart answers Restart.
+#
+# Report: frame pacing and audio buffer levels (from the core's own log lines), errors and crashes, and for the
+# picture how many screenshots were blank and how many differed from the one before. Screenshots and result.json
+# are in the output folder it prints.
 
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-ROM=""; GAME=""; SAVE=0; GAMESHOT=0; SECONDS_TO_PLAY=30; KEYS=""
+GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1
 while [ $# -gt 0 ]; do
   case "$1" in
-    --rom) ROM="${2:-}"; shift 2 ;;
     --game) GAME="${2:-}"; shift 2 ;;
-    --save) SAVE=1; shift ;;
-    --game-shot) GAMESHOT=1; shift ;;
     --seconds) SECONDS_TO_PLAY="${2:-}"; shift 2 ;;
     --keys) KEYS="${2:-}"; shift 2 ;;
-    -h|--help) sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --restart) RESUME=0; shift ;;
+    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-if [ -n "$GAME" ]; then
-  MATCH="$(python3 Scripts/playtest/library.py find "$GAME")" || exit 2
-  SYSTEM="$(echo "$MATCH" | cut -f1)"; TITLE="$(echo "$MATCH" | cut -f2)"; ROM="$(echo "$MATCH" | cut -f3)"
-  echo "game: $TITLE ($SYSTEM)"
-  if [ -n "$KEYS" ]; then
-    KEYS="$(python3 Scripts/playtest/library.py keys "$SYSTEM" "$KEYS")" || exit 2
-    echo "keys (from your saved bindings): $KEYS"
-  fi
-  export TEST_RUNNER_OE_USE_REAL_LIBRARY=1
-  [ "$SAVE" -eq 1 ] && export TEST_RUNNER_OE_PLAYTEST_SAVE=1
+[ -n "$GAME" ] || { echo "FAIL  need --game <name of a game in your library>" >&2; exit 2; }
+if pgrep -x OpenEmu > /dev/null; then
+  echo "FAIL  OpenEmu is running. Quit it first: it shares the library with the play test." >&2
+  exit 2
 fi
-[ -f "$ROM" ] || { echo "FAIL  need --game <name in your library> or --rom <existing file>" >&2; exit 2; }
 
-export TEST_RUNNER_OE_PLAYTEST_SECONDS="$SECONDS_TO_PLAY"
-export TEST_RUNNER_OE_PLAYTEST_KEYS="$KEYS"
-[ "$GAMESHOT" -eq 1 ] && export TEST_RUNNER_OE_PLAYTEST_GAME_SHOT=1
+MATCH="$(python3 Scripts/playtest/library.py find "$GAME")" || exit 2
+SYSTEM="$(echo "$MATCH" | cut -f1)"; TITLE="$(echo "$MATCH" | cut -f2)"; ROM="$(echo "$MATCH" | cut -f3)"
+echo "game: $TITLE ($SYSTEM)"
+KEYLIST=""
+if [ -n "$KEYS" ]; then
+  # Actions like "start" become saved keys; anything that is not an action is sent as a literal key.
+  KEYLIST="$(python3 - "$SYSTEM" "$KEYS" <<'PY'
+import subprocess, sys
+system, keys = sys.argv[1], [k.strip() for k in sys.argv[2].split(",") if k.strip()]
+actions = {"up","down","left","right","start","select","ok","cancel","x","y","l","r","z"}
+out = []
+for k in keys:
+    if k in actions:
+        r = subprocess.run(["python3", "Scripts/playtest/library.py", "keys", system, k], capture_output=True, text=True)
+        if r.returncode != 0: sys.exit(r.stderr.strip() or "cannot resolve action " + k)
+        out.append(r.stdout.strip())
+    else:
+        out.append(k)
+print(",".join(out))
+PY
+)" || { echo "FAIL  $KEYLIST" >&2; exit 2; }
+  echo "keys (from your saved bindings): $KEYLIST"
+fi
 
-START_MARK="$(mktemp "${TMPDIR:-/tmp}/oe-playtest.XXXXXX")"
-RUN_OUT="$(./Scripts/check.sh --rom "$ROM" --test testPlaytest 2>&1)"
-STATUS=$?
-echo "$RUN_OUT" | grep -aE "^(PASS|FAIL)|error:" | cut -c1-220
+OUT="${TMPDIR:-/tmp}/openemu-playtest/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$OUT"
+BUILD="$HOME/Builds/openemu/chore-autonomous-testing-harness"
+APP="$BUILD/Build/Products/Debug/OpenEmu.app"
 
-SHOTS_DIR_FOR_LOG="$(echo "$RUN_OUT" | sed -n 's/^.*screenshots: \(.*\) (names in manifest.json)$/\1/p' | tail -1)"
-PICTURE="$(grep -a "PLAYTEST-PICTURE" "$(dirname "${SHOTS_DIR_FOR_LOG:-/nonexistent/x}")/xcodebuild.log" 2>/dev/null | tail -1 | sed 's/.*PLAYTEST-PICTURE //')"
-SHOTS="$(echo "$RUN_OUT" | sed -n 's/^.*screenshots: \(.*\) (names in manifest.json)$/\1/p' | tail -1)"
-START_TIME="$(date -r "$(stat -f %m "$START_MARK")" '+%Y-%m-%d %H:%M:%S')"
-LOG="$(log show --start "$START_TIME" --style compact --predicate 'subsystem BEGINSWITH "org.openemu"' 2>/dev/null)"
-rm -f "$START_MARK"
+echo "----  building the debug app"
+if ! xcodebuild build -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu -configuration Debug \
+     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$BUILD" > "$OUT/build.log" 2>&1; then
+  echo "FAIL  build failed, see $OUT/build.log"; tail -15 "$OUT/build.log"; exit 1
+fi
+
+KEYLIST="$KEYLIST" ROM="$ROM" SECS="$SECONDS_TO_PLAY" OUTDIR="$OUT" python3 - <<'PY'
+import json, os
+keys = [k for k in os.environ["KEYLIST"].split(",") if k]
+plan = {"romPath": os.environ["ROM"], "seconds": float(os.environ["SECS"]), "screenshotEvery": 2,
+        "outputDirectory": os.environ["OUTDIR"],
+        "steps": [{"at": 2.0 + 2.0 * i, "key": k} for i, k in enumerate(keys)]}
+json.dump(plan, open(os.path.join(os.environ["OUTDIR"], "plan.json"), "w"), indent=2)
+PY
+
+START_MARK="$OUT/.start"; touch "$START_MARK"
+START_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
+echo "----  playing for ${SECONDS_TO_PLAY}s"
+"$APP/Contents/MacOS/OpenEmu" -OEPlaytestPlan "$OUT/plan.json" \
+  -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1 > "$OUT/app.log" 2>&1 &
+APP_PID=$!
+LIMIT=$(( SECONDS_TO_PLAY + 180 )); WAITED=0
+while kill -0 "$APP_PID" 2>/dev/null && [ "$WAITED" -lt "$LIMIT" ]; do sleep 2; WAITED=$(( WAITED + 2 )); done
+TIMED_OUT=0
+if kill -0 "$APP_PID" 2>/dev/null; then TIMED_OUT=1; kill "$APP_PID" 2>/dev/null; sleep 2; kill -9 "$APP_PID" 2>/dev/null; fi
+
+LOG="$(/usr/bin/log show --start "$START_TIME" --style compact --info --predicate 'subsystem BEGINSWITH "org.openemu"' 2>/dev/null)"
+CRASHES=$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'OpenEmu*.ips' -newer "$START_MARK" 2>/dev/null | wc -l | tr -d ' ')
 
 echo ""
-echo "==== playtest report: $(basename "$ROM"), ${SECONDS_TO_PLAY}s, keys: ${KEYS:-none}"
-LOG_TEXT="$LOG" /usr/bin/python3 -I - <<'PY'
-import os, re
+echo "==== playtest report: $TITLE, ${SECONDS_TO_PLAY}s, keys: ${KEYLIST:-none}"
+LOG_TEXT="$LOG" OUTDIR="$OUT" TIMED_OUT="$TIMED_OUT" CRASHES="$CRASHES" /usr/bin/python3 -I - <<'PY'
+import json, os, re
 log = os.environ["LOG_TEXT"].splitlines()
+out = os.environ["OUTDIR"]
+ok = True
+
+# What the driver did
+try:
+    result = json.load(open(os.path.join(out, "result.json")))
+except Exception:
+    result = None
+if result is None:
+    print("driver: no result.json. The app did not finish the play test%s." % (" (timed out)" if os.environ["TIMED_OUT"] == "1" else ""))
+    ok = False
+else:
+    print("driver: %s, %s. Played %.0fs, sent keys: %s" % (result["status"], result["message"], result["secondsPlayed"], ", ".join(result["keysSent"]) or "none"))
+    if result["status"] != "ok": ok = False
+    shots = result["shots"]
+    blank = sum(1 for s in shots if s["blank"]); changes = sum(1 for s in shots if s["changedFromPrevious"])
+    print("picture: %d screenshots, %d blank, picture changed %d times between screenshots" % (len(shots), blank, changes))
+    if shots and blank == len(shots):
+        print("PROBLEM: every screenshot was blank. The game drew nothing.")
+        ok = False
+
+# Frame pacing and audio, from the core's own log lines
 stats = [re.search(r"\((\d+\.?\d*) fps\), worst gap (\d+\.?\d*) ms", l) for l in log if "frame stats" in l]
 stats = [(float(m.group(1)), float(m.group(2))) for m in stats if m]
 if stats:
-    fps = [f for f, _ in stats]
-    gaps = [g for _, g in stats]
-    print("frame pacing: %d windows, fps min %.1f / avg %.1f / max %.1f, longest gap between frames %.1f ms"
+    fps = [f for f, _ in stats]; gaps = [g for _, g in stats]
+    print("frame pacing: %d windows of 3s, fps min %.1f / avg %.1f / max %.1f, longest gap between frames %.1f ms"
           % (len(stats), min(fps), sum(fps) / len(fps), max(fps), max(gaps)))
 else:
     print("frame pacing: no 'frame stats' lines found (the game may not have reached the running state)")
@@ -89,35 +141,18 @@ aud = [re.search(r"core wrote (\d+) bytes/s, buffer fill min (\d+) max (\d+) of 
 aud = [tuple(int(g) for g in m.groups()) for m in aud if m]
 if aud:
     rates = [a[0] for a in aud]
-    print("audio stats: core wrote %d-%d bytes/s per 3s window (avg %d); buffer holds %d bytes, fill ranged %d to %d"
+    print("audio stats: core wrote %d-%d bytes/s per window (avg %d); buffer holds %d bytes, fill ranged %d to %d"
           % (min(rates), max(rates), sum(rates) / len(rates), aud[0][3], min(a[1] for a in aud), max(a[2] for a in aud)))
-overruns = sum(1 for l in log if "Tried to write" in l)
-print("audio: %d buffer-full warnings" % overruns)
+print("audio: %d buffer-full warnings" % sum(1 for l in log if "Tried to write" in l))
 problems = [l for l in log if re.search(r"\s(E|Fa)\s", l) and "Tried to write" not in l and "CredentialStore" not in l]
 print("errors/faults (excluding audio and credential-store noise): %d" % len(problems))
-for l in problems[:10]:
-    print("   ", l[:230])
-for l in log:
-    if "Input Monitoring access" in l:
-        print("input permission:", l.split("]")[-1].strip()); break
+for l in problems[:10]: print("   ", l[:230])
+print("crash reports: %s" % os.environ["CRASHES"])
+if os.environ["CRASHES"] != "0": ok = False
+print("")
+print("PLAYTEST COMPLETED: the game ran, took the keys and closed cleanly." if ok else "PLAYTEST PROBLEM: see above.")
+raise SystemExit(0 if ok else 1)
 PY
-if [ -n "$PICTURE" ]; then
-  echo "picture: $PICTURE"
-  BLANK=$(echo "$PICTURE" | sed -n 's/.*blank=\([0-9]*\).*/\1/p'); TOTAL=$(echo "$PICTURE" | sed -n 's/.*screenshots=\([0-9]*\).*/\1/p')
-  if [ -n "$BLANK" ] && [ -n "$TOTAL" ] && [ "$TOTAL" -gt 0 ] && [ "$BLANK" -eq "$TOTAL" ]; then
-    echo "PROBLEM: every screenshot of the game window was blank. Either the game draws nothing, or the window capture cannot see this core's rendering."
-    BLANKALL=1
-  fi
-else
-  echo "picture: no result line found"
-fi
-CRASHES=$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'OpenEmu*.ips' -newermt "$START_TIME" 2>/dev/null | wc -l | tr -d ' ')
-echo "crash reports: $CRASHES"
-if [ "$GAMESHOT" -eq 1 ]; then
-  NEWSHOTS=$(find "$HOME/Library/Application Support/OpenEmu/Screenshots" -type f -newermt "$START_TIME" 2>/dev/null)
-  echo "game screenshot (the picture the core rendered, saved by the app): ${NEWSHOTS:-none found}"
-fi
-[ -n "$SHOTS" ] && echo "screenshots and manifest: $SHOTS   (files are named by UUID; manifest.json maps each to playtest-<seconds>s-<key>)"
-echo ""
-if [ "$STATUS" -eq 0 ] && [ "$CRASHES" = "0" ] && [ "${BLANKALL:-0}" -eq 0 ]; then echo "PLAYTEST COMPLETED: game loaded, ran, accepted keys and quit cleanly."; exit 0; fi
-echo "PLAYTEST PROBLEM: see above."; exit 1
+STATUS=$?
+echo "screenshots, result.json and app.log: $OUT"
+exit $STATUS

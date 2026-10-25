@@ -253,6 +253,7 @@
 		5A9606E41C0BA85F0089B494 /* NSURL+LibraryAdditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9606E31C0BA85F0089B494 /* NSURL+LibraryAdditions.swift */; };
 		5A9606E81C0BCD350089B494 /* NSImage+DrawingAdditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9606E71C0BCD350089B494 /* NSImage+DrawingAdditions.swift */; };
 		5A9606EA1C0BD2BD0089B494 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9606E91C0BD2BD0089B494 /* Logging.swift */; };
+		CE5A1A00000000000000A002 /* PlaytestDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE5A1A00000000000000A001 /* PlaytestDriver.swift */; };
 		5AC349311D89E4EB0089B26F /* NSDocumentController+Additions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC349301D89E4EB0089B26F /* NSDocumentController+Additions.swift */; };
 		5AC349331D89EB7B0089B26F /* GameIntegralScalingDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AC349321D89EB7B0089B26F /* GameIntegralScalingDelegate.swift */; };
 		5AFD06BD2058893B00DFE765 /* GameScannerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFD06BC2058893B00DFE765 /* GameScannerViewController.swift */; };
@@ -1363,6 +1364,7 @@
 		5A9606E31C0BA85F0089B494 /* NSURL+LibraryAdditions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSURL+LibraryAdditions.swift"; sourceTree = "<group>"; };
 		5A9606E71C0BCD350089B494 /* NSImage+DrawingAdditions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSImage+DrawingAdditions.swift"; sourceTree = "<group>"; };
 		5A9606E91C0BD2BD0089B494 /* Logging.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
+		CE5A1A00000000000000A001 /* PlaytestDriver.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaytestDriver.swift; sourceTree = "<group>"; };
 		5AC349301D89E4EB0089B26F /* NSDocumentController+Additions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSDocumentController+Additions.swift"; sourceTree = "<group>"; };
 		5AC349321D89EB7B0089B26F /* GameIntegralScalingDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GameIntegralScalingDelegate.swift; sourceTree = "<group>"; };
 		5AECA1471BE1D25600C3B4E2 /* OpenEmu-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OpenEmu-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -3335,6 +3337,7 @@
 				0571307E259A8859001CB13A /* AppMover.swift */,
 				8F580206283AFE5E0021465F /* ArchiveHelper.swift */,
 				5A9606E91C0BD2BD0089B494 /* Logging.swift */,
+				CE5A1A00000000000000A001 /* PlaytestDriver.swift */,
 				8F419A0225B6C7AE00A7F0BE /* OEAppearance.swift */,
 				83F7DBAD18C0E2470029199C /* OEFileManager.h */,
 				83F7DBAE18C0E2470029199C /* OEFileManager.m */,
@@ -6420,6 +6423,7 @@
 				052EA5BC2357941100DEC2A3 /* NSBitmapImageRep+OEAdditions.swift in Sources */,
 				5A3DB1691D8C93C3009445EC /* PreferencesControlsBox.swift in Sources */,
 				5A9606EA1C0BD2BD0089B494 /* Logging.swift in Sources */,
+				CE5A1A00000000000000A002 /* PlaytestDriver.swift in Sources */,
 				8306CD3E1BD3DB180025BC6C /* OEGameCollectionViewController.m in Sources */,
 				8FDCCAD8270632AC00CBF2E3 /* OEGridViewFieldEditor.swift in Sources */,
 				53439AAB13B92CE6005C0CC8 /* OECollectionViewController.m in Sources */,

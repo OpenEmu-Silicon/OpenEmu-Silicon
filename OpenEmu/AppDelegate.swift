@@ -261,6 +261,9 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: .libraryDidLoad, object: OELibraryDatabase.default!)
+                #if DEBUG
+                PlaytestDriver.shared.startIfRequested()
+                #endif
             }
             
         } catch {

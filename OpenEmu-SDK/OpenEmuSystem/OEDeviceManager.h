@@ -78,6 +78,11 @@ extern NSString *const OEDeviceManagerDeviceHandlerUserInfoKey;
 
 - (void)deviceHandler:(nullable OEDeviceHandler *)handler didReceiveEvent:(OEHIDEvent *)event;
 
+/*! Sends a keyboard key press or release into the same path a real keyboard uses, so bindings, games and menus
+    see it exactly as if the key was typed. `usage` is the HID keyboard usage (4 is A, 40 is Return, 79 to 82 are the arrows).
+    Used by the debug play test driver; harmless otherwise. */
+- (void)sendKeyboardKeyWithUsage:(NSUInteger)usage pressed:(BOOL)pressed;
+
 @property (readonly, nonatomic) BOOL hasEventMonitor;
 
 - (id)addGlobalEventMonitorHandler:(BOOL(^)(OEDeviceHandler *handler, OEHIDEvent *event))handler;

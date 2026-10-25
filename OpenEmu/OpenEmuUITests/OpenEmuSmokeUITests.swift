@@ -202,69 +202,6 @@ final class OpenEmuSmokeUITests: XCTestCase {
         XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
     }
 
-    /// Plays the ROM named by OE_TEST_ROM for OE_PLAYTEST_SECONDS (default 20), typing each key in OE_PLAYTEST_KEYS
-    /// (comma separated: return, space, escape, up, down, left, right, or a single character) about every two seconds
-    /// and taking a screenshot after each. It asserts almost nothing: its job is to produce screenshots, logs and
-    /// frame stats for `Scripts/playtest.sh` to report on. Skipped unless OE_PLAYTEST_SECONDS is set.
-    func testPlaytest() throws {
-        guard let secondsText = ProcessInfo.processInfo.environment["OE_PLAYTEST_SECONDS"], let seconds = Double(secondsText) else {
-            throw XCTSkip("Run through Scripts/playtest.sh")
-        }
-        let keys = (ProcessInfo.processInfo.environment["OE_PLAYTEST_KEYS"] ?? "")
-            .split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        let gameWindow = try openGameWindow()
-        let start = Date()
-        attach(gameWindow, named: "playtest-000s-start")
-        var step = 0
-        var shots = 0, blank = 0, changes = 0
-        var previous = Self.fingerprint(gameWindow.screenshot().image)
-        while Date().timeIntervalSince(start) < seconds {
-            sleep(2)
-            var label = "idle"
-            if step < keys.count {
-                label = keys[step]
-                typeKeyByName(label)
-                step += 1
-            }
-            attach(gameWindow, named: String(format: "playtest-%03ds-%@", Int(Date().timeIntervalSince(start)), label))
-            let now = Self.fingerprint(gameWindow.screenshot().image)
-            shots += 1
-            if Self.isBlank(now) { blank += 1 }
-            if Self.differs(previous, now) { changes += 1 }
-            previous = now
-        }
-        // The game's own "Take Screenshot" reads the picture the core rendered, so it works even for cores whose
-        // output a window capture cannot see. It adds one screenshot to the library, hence opt-in.
-        if ProcessInfo.processInfo.environment["OE_PLAYTEST_GAME_SHOT"] == "1" {
-            chooseMenu("Controls", "Take Screenshot")
-            sleep(2)
-        }
-        // Read by Scripts/playtest.sh. "blank" means the picture was one flat colour (black), "changes" how many
-        // times the picture differed from the one before it.
-        print("PLAYTEST-PICTURE screenshots=\(shots) blank=\(blank) changes=\(changes)")
-        // Quick Save writes into the player's save slot, so a play test on the real library skips it unless asked.
-        if !Self.usesRealLibrary || ProcessInfo.processInfo.environment["OE_PLAYTEST_SAVE"] == "1" {
-            chooseMenu("Controls", "Quick Save")
-            sleep(2)
-        }
-        chooseMenu("Controls", "Quit Game")
-        confirmQuitIfAsked()
-        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
-    }
-
-    private func typeKeyByName(_ name: String) {
-        switch name.lowercased() {
-        case "return", "enter": app.typeKey(.return, modifierFlags: [])
-        case "escape", "esc": app.typeKey(.escape, modifierFlags: [])
-        case "space": app.typeKey(" ", modifierFlags: [])
-        case "up": app.typeKey(.upArrow, modifierFlags: [])
-        case "down": app.typeKey(.downArrow, modifierFlags: [])
-        case "left": app.typeKey(.leftArrow, modifierFlags: [])
-        case "right": app.typeKey(.rightArrow, modifierFlags: [])
-        default: app.typeKey(name, modifierFlags: [])
-        }
-    }
-
     private static func meanBrightness(_ pixels: [UInt8]) -> Double {
         pixels.isEmpty ? 0 : Double(pixels.reduce(0) { $0 + Int($1) }) / Double(pixels.count)
     }
