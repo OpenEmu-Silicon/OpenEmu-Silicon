@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+    # ready_for_review makes the full build start when a draft is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
   # Direct pushes to main (small maintainer changes) get the same build.
   # Docs-only and bookkeeping pushes are skipped. This filter is on push only,
   # so it never affects the required checks on pull requests.
@@ -41,6 +43,9 @@ jobs:
       - name: Check vendored core externals are populated
         run: ./Scripts/check-core-sources.sh
 
+      - name: Test core change detection
+        run: python3 Scripts/test-detect-core-changes.py
+
   detect-core-changes:
     # The `OpenEmu` scheme only builds the main app plus its own dependencies
     # (OpenEmuKit/Base/System) — it never compiles core plugins, so a PR that
@@ -48,6 +53,8 @@ jobs:
     # built. Figure out which cores (if any) actually need building for this
     # PR, so the core matrix below only runs what changed.
     name: Detect changed cores
+    # Draft PRs skip the macOS builds; marking one ready for review starts them.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     outputs:
       cores: ${{ steps.detect.outputs.cores }}
@@ -117,6 +124,14 @@ jobs:
           print(json.dumps(selected))
           ")
             fi
+
+            # REPORT ONLY: Scripts/detect-core-changes.py narrows OpenEmuKit/
+            # changes using the cores' Xcode projects. Log what it would pick
+            # next to what this job actually builds, so we can compare over a
+            # few PRs before it is allowed to skip anything. Never fails the job.
+            echo "--- detect-core-changes.py (report only, not used) ---"
+            echo "$changed" | python3 Scripts/detect-core-changes.py --files - || echo "(script failed; ignored)"
+            echo "--- actually building: $cores ---"
           fi
 
           echo "Core schemes to build: $cores"
@@ -180,6 +195,8 @@ jobs:
 
   build:
     name: Build (arm64)
+    # Draft PRs skip the macOS builds; marking one ready for review starts them.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: macos-latest
 
     steps:
