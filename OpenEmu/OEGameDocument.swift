@@ -3526,58 +3526,41 @@ extension OEGameDocument {
             completion()
             return
         }
-        // Chain: Google Drive check → folder backup check → launch.
-        performGoogleDriveSyncCheck(systemId: systemId, gameName: gameName) { [weak self] in
-            guard let self else { completion(); return }
-            self.performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
-        }
-    }
-
-    private func performGoogleDriveSyncCheck(systemId: String, gameName: String, completion: @escaping () -> Void) {
-        let syncManager = OESaveSyncManager.shared
-        guard syncManager.isSignedIn else { completion(); return }
-
-        syncManager.checkForNewerCloudSave(
-            systemIdentifier: systemId,
-            gameName: gameName
-        ) { [weak self] shouldSync, cloudDate in
-            guard shouldSync else { completion(); return }
-            guard let self else { completion(); return }
-            self.presentSyncAlert(
-                providerName: "Google Drive", gameName: gameName, cloudDate: cloudDate,
-                defaultButtonTitle: NSLocalizedString("Download & Play", comment: "Save Sync: download and play"),
-                alternateButtonTitle: NSLocalizedString("Play Without Syncing", comment: "Save Sync: skip sync")
-            ) { download in
-                if download {
-                    syncManager.downloadCloudSave(systemIdentifier: systemId, gameName: gameName) { _, _ in
-                        completion()
-                    }
-                } else {
-                    completion()
-                }
-            }
-        }
+        performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
     }
 
     private func performFolderBackupSyncCheck(systemId: String, gameName: String, completion: @escaping () -> Void) {
         let backupManager = OEFolderBackupManager.shared
-        guard backupManager.isEnabled else { completion(); return }
+        guard backupManager.backupFolderURL != nil else { completion(); return }
 
-        backupManager.checkForNewerBackup(
-            systemIdentifier: systemId,
-            gameName: gameName
-        ) { [weak self] shouldRestore, backupDate in
-            guard shouldRestore else { completion(); return }
+        let aliases = [rom?.url?.deletingPathExtension().lastPathComponent].compactMap { $0 }
+        backupManager.checkForNewerBackup(systemIdentifier: systemId, gameName: gameName, aliases: aliases, discID: rom?.serial) { [weak self] result in
             guard let self else { completion(); return }
-            self.presentSyncAlert(
-                providerName: "backup folder", gameName: gameName, cloudDate: backupDate,
-                defaultButtonTitle: NSLocalizedString("Restore & Play", comment: "Save Sync: restore and play"),
-                alternateButtonTitle: NSLocalizedString("Play Without Restoring", comment: "Save Sync: skip restore")
-            ) { restore in
+            switch result {
+            case .upToDate:
+                completion()
+
+            case .newerBackup(let backupDate, let machineName):
+                let restore = self.presentNewerSaveAlert(gameName: gameName, backupDate: backupDate, machineName: machineName)
                 if restore {
-                    backupManager.restoreFromBackup(systemIdentifier: systemId, gameName: gameName) { _ in
-                        completion()
-                    }
+                    backupManager.restoreFromBackup(systemIdentifier: systemId, gameName: gameName) { _ in completion() }
+                } else {
+                    completion()
+                }
+
+            case .conflict(let localDate, let backupDate, let machineName):
+                switch self.presentConflictAlert(gameName: gameName, localDate: localDate, backupDate: backupDate, machineName: machineName) {
+                case .alertFirstButtonReturn:
+                    backupManager.keepLocalSave(systemIdentifier: systemId, gameName: gameName) { _ in completion() }
+                case .alertSecondButtonReturn:
+                    backupManager.restoreFromBackup(systemIdentifier: systemId, gameName: gameName) { _ in completion() }
+                default:
+                    completion()
+                }
+
+            case .stillSyncing:
+                if self.presentStillSyncingAlert(gameName: gameName) {
+                    self.performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
                 } else {
                     completion()
                 }
@@ -3585,34 +3568,60 @@ extension OEGameDocument {
         }
     }
 
-    private func presentSyncAlert(
-        providerName: String,
-        gameName: String,
-        cloudDate: Date?,
-        defaultButtonTitle: String,
-        alternateButtonTitle: String,
-        completion: @escaping (_ download: Bool) -> Void
-    ) {
-        let dateStr: String
-        if let cloudDate {
-            let fmt = DateFormatter()
-            fmt.dateStyle = .medium
-            fmt.timeStyle = .short
-            dateStr = fmt.string(from: cloudDate)
-        } else {
-            dateStr = "unknown date"
-        }
+    private static let syncDateFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateStyle = .medium
+        fmt.timeStyle = .short
+        return fmt
+    }()
+
+    private func presentNewerSaveAlert(gameName: String, backupDate: Date, machineName: String?) -> Bool {
+        let from = machineName.map { String(format: NSLocalizedString("%@, saved on %@", comment: "Save Sync: date and Mac name"), Self.syncDateFormatter.string(from: backupDate), $0) }
+            ?? Self.syncDateFormatter.string(from: backupDate)
         let alert = OEAlert()
         alert.messageText = NSLocalizedString("Newer Save Available", comment: "Save Sync alert title")
         alert.informativeText = String(
             format: NSLocalizedString(
-                "A newer save for '%@' is available in your %@ (from %@). Restore it before playing?",
-                comment: "Save Sync alert body: game name, provider, date"
+                "A newer save for '%@' is available in your backup folder (from %@). Restore it before playing? Your current save is kept in a .versions folder.",
+                comment: "Save Sync alert body: game name, date and Mac name"
             ),
-            gameName, providerName, dateStr
+            gameName, from
         )
-        alert.defaultButtonTitle   = defaultButtonTitle
-        alert.alternateButtonTitle = alternateButtonTitle
-        completion(alert.runModal() == .alertFirstButtonReturn)
+        alert.defaultButtonTitle   = NSLocalizedString("Restore & Play", comment: "Save Sync: restore and play")
+        alert.alternateButtonTitle = NSLocalizedString("Play Without Restoring", comment: "Save Sync: skip restore")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func presentConflictAlert(gameName: String, localDate: Date, backupDate: Date, machineName: String?) -> NSApplication.ModalResponse {
+        let other = machineName ?? NSLocalizedString("Another Mac", comment: "Save Sync: name used when the other Mac is unknown")
+        let thisMac = Host.current().localizedName ?? NSLocalizedString("This Mac", comment: "Save Sync: this Mac")
+        let alert = OEAlert()
+        alert.messageText = NSLocalizedString("Saves Don't Match", comment: "Save Sync conflict title")
+        alert.informativeText = String(
+            format: NSLocalizedString(
+                "'%@' was changed on two Macs since they last synced.\n\n%@: %@\n%@: %@\n\nWhich save do you want to keep? The other one is kept in a .versions folder.",
+                comment: "Save Sync conflict body: game, this Mac, its date, other Mac, its date"
+            ),
+            gameName, thisMac, Self.syncDateFormatter.string(from: localDate), other, Self.syncDateFormatter.string(from: backupDate)
+        )
+        alert.defaultButtonTitle   = String(format: NSLocalizedString("Keep %@'s Save", comment: "Save Sync conflict: keep this Mac's save"), thisMac)
+        alert.alternateButtonTitle = String(format: NSLocalizedString("Use %@'s Save", comment: "Save Sync conflict: use the other Mac's save"), other)
+        alert.otherButtonTitle     = NSLocalizedString("Decide Later", comment: "Save Sync conflict: play without choosing")
+        return alert.runModal()
+    }
+
+    private func presentStillSyncingAlert(gameName: String) -> Bool {
+        let alert = OEAlert()
+        alert.messageText = NSLocalizedString("Still Syncing", comment: "Save Sync still downloading title")
+        alert.informativeText = String(
+            format: NSLocalizedString(
+                "Saves for '%@' are still downloading from your backup folder. Wait a moment and check again, or play now with the save on this Mac?",
+                comment: "Save Sync still downloading body: game name"
+            ),
+            gameName
+        )
+        alert.defaultButtonTitle   = NSLocalizedString("Wait & Check Again", comment: "Save Sync: wait for downloads")
+        alert.alternateButtonTitle = NSLocalizedString("Play Anyway", comment: "Save Sync: play without waiting")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 }

@@ -38,7 +38,6 @@ cd OpenEmu-Silicon
 
 # 2. Copy credential stubs (required, real credentials are never committed)
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
 # 3. Open the workspace (not the .xcodeproj)
@@ -99,7 +98,6 @@ Each block below is meant to be pasted into Terminal as is. Only the lines marke
 git clone --recursive https://github.com/OpenEmu-Silicon/OpenEmu-Silicon.git
 cd OpenEmu-Silicon
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 ```
 
 **Step 2: Switch to the PR you want to test.** Do this every time. First, in the repo folder, change the PR number on the first line to the one you're testing (it's in the PR's title, like `#123`). If git complains about local changes, stash or discard them first.

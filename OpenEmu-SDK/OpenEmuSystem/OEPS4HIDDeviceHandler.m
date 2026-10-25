@@ -28,17 +28,226 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+static const NSUInteger OEPS4VendorID = 0x054C;
+
+static const uint32_t OEPS4BluetoothInputReportID = 0x11;
+static const uint32_t OEPS4BluetoothInputUsagePage = 0xFF00;
+static const uint32_t OEPS4BluetoothInputUsage = 0x20;
+
+static const NSUInteger OEPS4StandardReportID = 0x01;
+
+/* Byte offsets inside the Bluetooth report 0x11 payload. The payload arrives
+ * without the report ID byte, so the layout starts with the two header bytes. */
+static const size_t OEPS4BluetoothLeftStickXOffset   = 2;
+static const size_t OEPS4BluetoothLeftStickYOffset   = 3;
+static const size_t OEPS4BluetoothRightStickXOffset  = 4;
+static const size_t OEPS4BluetoothRightStickYOffset  = 5;
+static const size_t OEPS4BluetoothButtonsOffset      = 6;
+static const size_t OEPS4BluetoothButtonsHighOffset  = 7;
+static const size_t OEPS4BluetoothSystemOffset       = 8;
+static const size_t OEPS4BluetoothLeftTriggerOffset  = 9;
+static const size_t OEPS4BluetoothRightTriggerOffset = 10;
+
+static const size_t OEPS4BluetoothMinimumLength = OEPS4BluetoothRightTriggerOffset + 1;
+
 @interface OEDeviceHandler ()
 @property(readwrite) NSUInteger deviceNumber;
 @end
 
+@interface OEPS4HIDDeviceHandler ()
+@end
+
 @implementation OEPS4HIDDeviceHandler {
+    NSArray *_deviceElements;
+    NSDictionary<NSNumber *, NSValue *> *_controlElements;
+    uint8_t _lastBluetoothState[16];
 }
 
 + (BOOL)canHandleDevice:(IOHIDDeviceRef)device
 {
+    /* macOS 27 names the controller "DUALSHOCK 4 Wireless Controller" over
+     * Bluetooth and "Wireless Controller" over USB. Match the identifiers
+     * too, so the name never decides whether this handler is used. */
+    NSNumber *vendorID  = (__bridge NSNumber *)IOHIDDeviceGetProperty(device, CFSTR(kIOHIDVendorIDKey));
+    NSNumber *productID = (__bridge NSNumber *)IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductIDKey));
+    NSUInteger product  = productID.unsignedIntegerValue;
+
+    if(vendorID.unsignedIntegerValue == OEPS4VendorID && (product == 0x05C4 || product == 0x09CC))
+        return YES;
+
     NSString *deviceName = (__bridge id)IOHIDDeviceGetProperty(device, CFSTR(kIOHIDProductKey));
     return [deviceName hasPrefix:@"Wireless Controller"];
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)inputValueMatchingProperties
+{
+    NSArray *properties = [super inputValueMatchingProperties];
+
+    if(![self OE_isBluetoothDevice])
+        return properties;
+
+    /* Over Bluetooth, macOS 27 delivers report 0x11 as a vendor-defined value
+     * instead of separate control elements. Whitelist it to decode it. */
+    return [properties arrayByAddingObject:@{
+        @kIOHIDElementUsagePageKey : @(OEPS4BluetoothInputUsagePage),
+        @kIOHIDElementUsageKey     : @(OEPS4BluetoothInputUsage),
+    }];
+}
+
+- (void)dispatchEventWithHIDValue:(IOHIDValueRef)aValue
+{
+    IOHIDElementRef element = IOHIDValueGetElement(aValue);
+
+    if(IOHIDElementGetUsagePage(element) == OEPS4BluetoothInputUsagePage &&
+       IOHIDElementGetUsage(element) == OEPS4BluetoothInputUsage &&
+       IOHIDElementGetReportID(element) == OEPS4BluetoothInputReportID)
+    {
+        [self OE_dispatchBluetoothInputReport:aValue];
+        return;
+    }
+
+    [super dispatchEventWithHIDValue:aValue];
+}
+
+- (BOOL)OE_isBluetoothDevice
+{
+    CFTypeRef transport = IOHIDDeviceGetProperty(self.device, CFSTR(kIOHIDTransportKey));
+    if(transport == NULL)
+        return NO;
+
+    return CFStringCompare(transport, CFSTR(kIOHIDTransportBluetoothValue), 0) == kCFCompareEqualTo;
+}
+
+- (void)OE_dispatchBluetoothInputReport:(IOHIDValueRef)aValue
+{
+    const uint8_t *report = IOHIDValueGetBytePtr(aValue);
+    CFIndex length = IOHIDValueGetLength(aValue);
+
+    if(report == NULL || length < (CFIndex)OEPS4BluetoothMinimumLength)
+        return;
+
+    /* The left stick is the first control, so the compared block covers the
+     * sticks, the buttons and the triggers, and no other report byte. */
+    const uint8_t *state = report + OEPS4BluetoothLeftStickXOffset;
+    size_t stateLength = OEPS4BluetoothMinimumLength - OEPS4BluetoothLeftStickXOffset;
+    if(memcmp(state, _lastBluetoothState, stateLength) == 0)
+        return;
+
+    memcpy(_lastBluetoothState, state, stateLength);
+
+    uint64_t timestamp = IOHIDValueGetTimeStamp(aValue);
+    uint8_t buttons    = report[OEPS4BluetoothButtonsOffset];
+    uint8_t buttonsHigh = report[OEPS4BluetoothButtonsHighOffset];
+    uint8_t system     = report[OEPS4BluetoothSystemOffset];
+
+    [self OE_dispatchValue:report[OEPS4BluetoothLeftStickXOffset]
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_X
+              timestamp:timestamp];
+    [self OE_dispatchValue:report[OEPS4BluetoothLeftStickYOffset]
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_Y
+              timestamp:timestamp];
+    [self OE_dispatchValue:report[OEPS4BluetoothRightStickXOffset]
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_Z
+              timestamp:timestamp];
+    [self OE_dispatchValue:report[OEPS4BluetoothRightStickYOffset]
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_Rz
+              timestamp:timestamp];
+    [self OE_dispatchValue:report[OEPS4BluetoothLeftTriggerOffset]
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_Rx
+              timestamp:timestamp];
+    [self OE_dispatchValue:report[OEPS4BluetoothRightTriggerOffset]
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_Ry
+              timestamp:timestamp];
+
+    [self OE_dispatchValue:(buttons & 0x0F)
+              usagePage:kHIDPage_GenericDesktop
+                  usage:kHIDUsage_GD_Hatswitch
+              timestamp:timestamp];
+
+    for(NSUInteger usage = 1; usage <= 14; usage++)
+    {
+        BOOL pressed = [self OE_isButtonPressedWithUsage:usage buttons:buttons buttonsHigh:buttonsHigh system:system];
+        [self OE_dispatchValue:pressed
+                  usagePage:kHIDPage_Button
+                      usage:(uint32_t)usage
+                  timestamp:timestamp];
+    }
+}
+
+- (BOOL)OE_isButtonPressedWithUsage:(NSUInteger)usage buttons:(uint8_t)buttons buttonsHigh:(uint8_t)buttonsHigh system:(uint8_t)system
+{
+    switch(usage)
+    {
+        case 1  : return (buttons >> 4) & 1; // Square
+        case 2  : return (buttons >> 5) & 1; // Cross
+        case 3  : return (buttons >> 6) & 1; // Circle
+        case 4  : return (buttons >> 7) & 1; // Triangle
+        case 5  : return buttonsHigh & 1;
+        case 6  : return (buttonsHigh >> 1) & 1;
+        case 7  : return (buttonsHigh >> 2) & 1;
+        case 8  : return (buttonsHigh >> 3) & 1;
+        case 9  : return (buttonsHigh >> 4) & 1;
+        case 10 : return (buttonsHigh >> 5) & 1;
+        case 11 : return (buttonsHigh >> 6) & 1;
+        case 12 : return (buttonsHigh >> 7) & 1;
+        case 13 : return system & 1;
+        case 14 : return (system >> 1) & 1;
+        default : return NO;
+    }
+}
+
+- (void)OE_dispatchValue:(CFIndex)value usagePage:(uint32_t)usagePage usage:(uint32_t)usage timestamp:(uint64_t)timestamp
+{
+    IOHIDElementRef element = [self OE_elementForUsagePage:usagePage usage:usage];
+    if(element == NULL)
+        return;
+
+    IOHIDValueRef syntheticValue = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, element, timestamp, value);
+    if(syntheticValue == NULL)
+        return;
+
+    [super dispatchEventWithHIDValue:syntheticValue];
+    CFRelease(syntheticValue);
+}
+
+- (IOHIDElementRef)OE_elementForUsagePage:(uint32_t)usagePage usage:(uint32_t)usage
+{
+    if(_controlElements == nil)
+        [self OE_setUpControlElements];
+
+    NSNumber *key = @((((uint64_t)usagePage) << 16) | usage);
+    return [_controlElements[key] pointerValue];
+}
+
+- (void)OE_setUpControlElements
+{
+    NSMutableDictionary *elements = [NSMutableDictionary dictionary];
+
+    _deviceElements = (__bridge_transfer NSArray *)IOHIDDeviceCopyMatchingElements(self.device, NULL, 0);
+
+    for(id value in _deviceElements)
+    {
+        IOHIDElementRef element = (__bridge IOHIDElementRef)value;
+        IOHIDElementType type = IOHIDElementGetType(element);
+
+        if(IOHIDElementGetReportID(element) != OEPS4StandardReportID)
+            continue;
+
+        if(type != kIOHIDElementTypeInput_Misc && type != kIOHIDElementTypeInput_Button)
+            continue;
+
+        NSNumber *key = @((((uint64_t)IOHIDElementGetUsagePage(element)) << 16) | IOHIDElementGetUsage(element));
+        if(elements[key] == nil)
+            elements[key] = [NSValue valueWithPointer:element];
+    }
+
+    _controlElements = [elements copy];
 }
 
 - (BOOL)connect
