@@ -205,7 +205,6 @@ jobs:
       - name: Generate credentials stubs
         run: |
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-          cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
           cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
       - name: Build FBNeo (clone pinned fork, build dylib + plugin)
