@@ -94,6 +94,7 @@ final class OELibraryDatabase: NSObject {
     }
     
     private static let openVGDBSyncBatchSize = 5
+    private let syncThreadLock = NSLock()
     private lazy var syncThread: Thread = makeSyncThread()
     
     // MARK: -
@@ -610,8 +611,11 @@ final class OELibraryDatabase: NSObject {
     // MARK: - OpenVGDB Sync
     
     func startOpenVGDBSync() {
-        objc_sync_enter(syncThread)
-        defer { objc_sync_exit(syncThread) }
+        // Lock a dedicated lock, not the thread itself: the thread is replaced below, so unlocking
+        // "syncThread" afterwards released the wrong object and left the old lock held forever,
+        // freezing the app the next time cover art was requested.
+        syncThreadLock.lock()
+        defer { syncThreadLock.unlock() }
 
         if syncThread.isFinished {
             syncThread = makeSyncThread()
