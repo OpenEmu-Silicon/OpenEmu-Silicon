@@ -6,11 +6,11 @@ How to help build the PS2 core. Read this first, then pick an issue from the [wo
 
 | Item | State |
 |---|---|
-| PS2 system plugin and button mapping | Exists (`OpenEmu/SystemPlugins/PlayStation 2`) |
+| PS2 system plugin and button mapping | Exists (`OpenEmu/SystemPlugins/PlayStation 2`) and ships in the app (it was left out of the app bundle until item 2) |
 | Engine builds for arm64 | Proven in a spike (libretro target, no Qt) |
 | Engine runs a game fast on Apple Silicon | Proven standalone: one game, about 60 fps |
-| Engine pin and build script | Written (`PCSX2/deps-armsx2-revision.txt`), not yet run on a Mac |
-| OpenEmu core plugin | Skeleton written (item 2): host layer, game core, Xcode project. Not yet built or run on a Mac |
+| Engine pin and build script | Built and run on a Mac (`Scripts/build-armsx2-core.sh`) |
+| OpenEmu core plugin | Builds, installs, loads a BIOS and boots a game into its code (item 2). No picture, sound or input yet |
 | Heavy 3D games | Untested |
 
 Nothing in this port is released. The first release will be marked Experimental.
