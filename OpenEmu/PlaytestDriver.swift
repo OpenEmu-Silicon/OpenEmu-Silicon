@@ -83,6 +83,7 @@ final class PlaytestDriver {
     }
 
     private var plan: Plan?
+    private var watchdog: Timer?
     private var started = false
     private var shots: [Shot] = []
     private var keysSent: [String] = []
@@ -110,7 +111,24 @@ final class PlaytestDriver {
         }
         os_log(.info, log: log, "Play test starting")
         NSApp.activate(ignoringOtherApps: true)
-        openGame()
+        // An alert can appear inside the very call that opens the game (the save sync "Still Syncing" prompt does) and
+        // block it, so the checks below would never run. This timer runs in all run loop modes, including a modal one.
+        var ticks = 0
+        let watchdog = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            ticks += 1
+            if self.failIfAlertIsShowing(during: "the play test") { return }
+            // Every 10 seconds, say which windows exist, so a stuck run can be understood from the log.
+            if ticks % 20 == 0, self.currentDocument()?.isPlaying != true {
+                let list = NSApp.windows.filter { $0.isVisible }.map {
+                    "\(type(of: $0)) level=\($0.level.rawValue) title='\($0.title)' modal=\($0 == NSApp.modalWindow) sheet=\($0.attachedSheet != nil)"
+                }
+                os_log(.info, log: self.log, "Not playing yet. Visible windows: %{public}@", list.joined(separator: "; "))
+            }
+        }
+        RunLoop.main.add(watchdog, forMode: .common)
+        self.watchdog = watchdog
+        DispatchQueue.main.async { self.openGame() }
     }
 
     // MARK: - Steps
@@ -240,6 +258,8 @@ final class PlaytestDriver {
         if let modal = NSApp.modalWindow { windows.append(modal) }
         for window in NSApp.windows {
             if let sheet = window.attachedSheet { windows.append(sheet) }
+            // Alerts shown with runModal sit at the modal panel level.
+            if window.isVisible, window.level == .modalPanel, !windows.contains(window) { windows.append(window) }
         }
         for window in windows {
             let texts = window.contentView.map { Self.texts(in: $0) } ?? []
@@ -340,6 +360,10 @@ final class PlaytestDriver {
                 lines.append("save states: \(local.count) local, \(identical) identical in the backup, \(missing.count) missing, \(different.count) different")
                 if !missing.isEmpty { lines.append("   missing from backup: \(missing.prefix(5).joined(separator: ", "))") }
                 if !different.isEmpty { lines.append("   different in backup: \(different.prefix(5).joined(separator: ", "))") }
+                let hidden = (try? fm.contentsOfDirectory(at: mirroredDir, includingPropertiesForKeys: nil, options: [])) ?? []
+                let placeholders = hidden.filter { $0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent.hasSuffix(".icloud") }
+                lines.append("iCloud placeholders in the backup folder (saves not downloaded to this Mac): \(placeholders.count)")
+                if !placeholders.isEmpty { lines.append("   e.g. \(placeholders.prefix(3).map { $0.lastPathComponent }.joined(separator: ", "))") }
                 if let newest { lines.append("newest backup copy written \(Int(Date().timeIntervalSince(newest))) seconds ago") }
                 
                 // Restore uses its own lookup folder; report whether that folder exists in the backup.
@@ -382,6 +406,7 @@ final class PlaytestDriver {
     private func finish(status: String, message: String, exitImmediately: Bool = false) {
         guard !finished else { return }
         finished = true
+        watchdog?.invalidate()
         let result = Result(status: status, message: message, game: gameName,
                             secondsPlayed: Date().timeIntervalSince(runStart),
                             keysSent: keysSent, shots: shots, backupAudit: backupAudit)
