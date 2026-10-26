@@ -54,6 +54,7 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	NSURL *_gameURL;
 	NSString *_biosFilename;
 	uint32_t *_videoBuffer;
+	BOOL _ownsVideoBuffer;  // NO once OpenEmu hands us its own buffer
 	BOOL _engineStarted;
 }
 
@@ -123,6 +124,7 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 	// A black frame until item 3 sends the engine's picture here.
 	_videoBuffer = (uint32_t *)calloc(kFrameWidth * kFrameHeight, sizeof(uint32_t));
+	_ownsVideoBuffer = YES;
 }
 
 - (void)startEmulation
@@ -179,7 +181,9 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (void)dealloc
 {
-	free(_videoBuffer);
+	if (_ownsVideoBuffer) {
+		free(_videoBuffer);
+	}
 }
 
 #pragma mark - Video
@@ -192,7 +196,11 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 - (const void *)getVideoBufferWithHint:(void *)hint
 {
 	if (hint != NULL) {
-		free(_videoBuffer);
+		// The hint buffer belongs to OpenEmu; only free the one we made.
+		if (_ownsVideoBuffer) {
+			free(_videoBuffer);
+			_ownsVideoBuffer = NO;
+		}
 		_videoBuffer = (uint32_t *)hint;
 	}
 	return _videoBuffer;
