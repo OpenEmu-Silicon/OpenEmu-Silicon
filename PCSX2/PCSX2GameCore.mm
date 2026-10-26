@@ -140,6 +140,7 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 {
 	if (_engineStarted) {
 		[super startEmulation];
+		[self releaseFrameWait];
 		return;
 	}
 
@@ -159,6 +160,15 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	});
 
 	[super startEmulation];
+	[self releaseFrameWait];
+}
+
+// OpenEmu's Metal renderer makes the game loop wait after every frame for a signal that only
+// OpenGL cores send, so a Metal core's loop would stall after one frame. The engine paces
+// itself (VMManager::Throttle), so turn that wait off.
+- (void)releaseFrameWait
+{
+	[self.renderDelegate suspendFPSLimiting];
 }
 
 - (void)stopEmulation
