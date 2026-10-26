@@ -220,12 +220,12 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (GLenum)pixelFormat
 {
-	return GL_BGRA;
+	return 0x80E1; // GL_BGRA
 }
 
 - (GLenum)pixelType
 {
-	return GL_UNSIGNED_INT_8_8_8_8_REV;
+	return 0x8367; // GL_UNSIGNED_INT_8_8_8_8_REV
 }
 
 #pragma mark - Audio
