@@ -10,7 +10,7 @@ How to help build the PS2 core. Read this first, then pick an issue from the [wo
 | Engine builds for arm64 | Proven in a spike (libretro target, no Qt) |
 | Engine runs a game fast on Apple Silicon | Proven standalone: one game, about 60 fps |
 | Engine pin and build script | Written (`PCSX2/deps-armsx2-revision.txt`), not yet run on a Mac |
-| OpenEmu core plugin | Not started |
+| OpenEmu core plugin | Skeleton written (item 2): host layer, game core, Xcode project. Not yet built or run on a Mac |
 | Heavy 3D games | Untested |
 
 Nothing in this port is released. The first release will be marked Experimental.

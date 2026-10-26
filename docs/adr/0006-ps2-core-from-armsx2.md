@@ -26,7 +26,7 @@ A spike on 2026-10-21 (commit `65fd14b`, Apple Silicon Mac, macOS 26) found:
 
 Replace the PCSX2 plan with a native core built on ARMSX2. Reuse the existing OpenEmu `PCSX2-Core` bridge as the template for the OpenEmu side, and port it onto ARMSX2 instead of writing a new wrapper.
 
-- Do not use ARMSX2's libretro target. The libretro bridge is being removed.
+- Do not use ARMSX2's libretro target or API. The libretro bridge is being removed. We do build the engine with its `ENABLE_LIBRETRO` setting on, because that is the engine's "host owns pads, audio and video" mode (it declares `Host::SetPadVibration` and embeds the shaders); see `PCSX2/README.md`.
 - Do not copy the old bridge's forked copies of engine files (Metal device, SPU2 mixer, `Pad.cpp`). They are stale against ARMSX2. Patch ARMSX2's own files with small, flagged changes instead.
 - Pin ARMSX2 to a specific commit, never a branch or the nightly channel.
 - Develop on a long-lived integration branch, `feat/ps2-core`, and merge it into `main` in one PR once the core works end to end. This is an exception to the usual "no long-lived branches" habit, because the core cannot be released in pieces.

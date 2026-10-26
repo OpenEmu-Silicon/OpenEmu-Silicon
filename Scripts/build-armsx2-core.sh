@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Build the ARMSX2 engine for the PCSX2 core (arm64, Metal only).
 #
-# Stage 1 (this script today): build the engine as static libraries with CMake
-# into PCSX2/build/lib. Stage 2, the PCSX2.oecoreplugin that links them, comes
-# with the plugin skeleton (issue #769, item 2).
+# Stage 1: build the engine as static libraries with CMake and write the compile
+# flags and link line the Xcode project needs (PCSX2/build/engine.xcconfig and
+# engine-link.rsp).
+# Stage 2: build the PCSX2.oecoreplugin that links them (added below).
 #
 # Needs Apple Silicon and Homebrew. Set PCSX2_EXTRA_CMAKE_ARGS to pass more
 # flags to CMake.
@@ -43,20 +44,27 @@ if [ ! -f "$DEPS_PREFIX/.done" ]; then
     cmake -S "$SRC_DIR/3rdparty/$dep" -B "$BUILD_DIR/deps-build/$dep" \
       -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_INSTALL_PREFIX="$DEPS_PREFIX" \
-      -D"$(echo "$dep" | tr a-z A-Z)_BUILD_EXAMPLES=OFF" "${extra[@]}"
+      -D"$(echo "$dep" | tr a-z A-Z)_BUILD_EXAMPLES=OFF" ${extra[@]+"${extra[@]}"}
     cmake --build "$BUILD_DIR/deps-build/$dep" -j"$(sysctl -n hw.ncpu)"
     cmake --install "$BUILD_DIR/deps-build/$dep"
   done
   touch "$DEPS_PREFIX/.done"
 fi
 
-# No Qt, frontends or libretro. Metal only: Vulkan off drops shaderc and MoltenVK
-# (OpenGL is already off on macOS).
+# No Qt and no frontends. Metal only: Vulkan off drops shaderc and MoltenVK (OpenGL is
+# already off on macOS).
+#
+# ENABLE_LIBRETRO=ON is on purpose, even though we never build or use the libretro
+# target or API. In the engine it is the "the host owns pads, audio and video" mode:
+# it declares Host::SetPadVibration (our rumble hook), embeds the shaders and game
+# database in the binary, and stops the engine defining the frontend callbacks that
+# PCSX2/OEHost.cpp defines. Our single-owner rule for g_host_hotkeys depends on it.
 # shellcheck disable=SC2086
 cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DCMAKE_PREFIX_PATH="$DEPS_PREFIX;$HOMEBREW_PREFIX" \
-  -DENABLE_QT_UI=OFF -DENABLE_SDL_FRONTEND=OFF -DENABLE_LIBRETRO=OFF \
+  -DENABLE_QT_UI=OFF -DENABLE_SDL_FRONTEND=OFF -DENABLE_LIBRETRO=ON \
   -DENABLE_GSRUNNER=OFF -DENABLE_EERUNNER=OFF -DENABLE_VURUNNER=OFF \
   -DENABLE_TESTS=OFF -DENABLE_RECOMPILER_TEST_HOOKS=OFF \
   -DUSE_VULKAN=OFF \
@@ -65,15 +73,51 @@ cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
 
 cmake --build "$BUILD_DIR/engine" --target PCSX2 common -j"$(sysctl -n hw.ncpu)"
 
-rm -rf "$BUILD_DIR/lib"
-mkdir -p "$BUILD_DIR/lib"
-find "$BUILD_DIR/engine" -name '*.a' -exec cp {} "$BUILD_DIR/lib/" \;
+# The Xcode project reads the engine's compile flags and link line from these, so
+# they follow whatever the engine's CMake decided.
+python3 "$SCRIPT_DIR/gen-armsx2-xcconfig.py" "$BUILD_DIR/engine" "$BUILD_DIR"
 
-count="$(find "$BUILD_DIR/lib" -name '*.a' | wc -l | tr -d ' ')"
-if [ "$count" -eq 0 ]; then
-  echo "error: build produced no .a files" >&2
+# Every library or object file the link line names must exist by now.
+missing=0
+while IFS= read -r arg; do
+  case "$arg" in
+    /*.a|/*.o) [ -e "$arg" ] || { echo "error: link input missing: $arg" >&2; missing=1; } ;;
+  esac
+done < "$BUILD_DIR/engine-link.rsp"
+if [ "$missing" -ne 0 ]; then
+  exit 1
+fi
+
+echo "$(git -C "$SRC_DIR" rev-parse HEAD)" > "$BUILD_DIR/ENGINE_COMMIT"
+echo ""
+echo "Built the ARMSX2 engine. Xcode inputs: $BUILD_DIR/engine.xcconfig and $BUILD_DIR/engine-link.rsp"
+
+# --- Stage 2: OpenEmuBase + the PCSX2.oecoreplugin that links the engine ---
+
+DD="$PCSX2_DIR/build/XcodeDerived"
+
+xcodebuild \
+  -project "$REPO_ROOT/OpenEmu-SDK/OpenEmu-SDK.xcodeproj" \
+  -scheme OpenEmuBase \
+  -configuration Release \
+  -derivedDataPath "$DD" \
+  ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+  build
+
+xcodebuild \
+  -project "$PCSX2_DIR/PCSX2.xcodeproj" \
+  -scheme PCSX2 \
+  -configuration Release \
+  -derivedDataPath "$DD" \
+  ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+  build
+
+PLUGIN="$DD/Build/Products/Release/PCSX2.oecoreplugin"
+if [ ! -d "$PLUGIN" ]; then
+  echo "error: build did not produce $PLUGIN" >&2
   exit 1
 fi
 
 echo ""
-echo "Built $count engine libraries in $BUILD_DIR/lib"
+echo "Built plugin: $PLUGIN"
+file "$PLUGIN/Contents/MacOS/PCSX2"
