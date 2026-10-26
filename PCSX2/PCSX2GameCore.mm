@@ -39,6 +39,12 @@
 #include "pcsx2/VMManager.h"
 #undef BOOL
 
+#import <AppKit/AppKit.h>
+#import <Metal/Metal.h>
+
+// Defined by the engine patch PCSX2/patches/0001-openemu-metal-output.patch.
+void GSDeviceMTLSetOutputTexture(void *texture);
+
 #include <string>
 
 static const NSUInteger kFrameWidth = 640;
@@ -56,6 +62,9 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	uint32_t *_videoBuffer;
 	BOOL _ownsVideoBuffer;  // NO once OpenEmu hands us its own buffer
 	BOOL _engineStarted;
+	id<MTLDevice> _outputDevice;
+	id<MTLTexture> _outputTexture;  // the picture OpenEmu shows; the engine draws into it
+	NSView *_renderView;            // the engine attaches its Metal layer here
 }
 
 - (BOOL)loadFileAtURL:(NSURL *)url error:(NSError **)error
@@ -134,6 +143,8 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 		return;
 	}
 
+	[self ensureRenderView];
+
 	VMBootParameters params;
 	params.filename = _gameURL.fileSystemRepresentation;
 	params.source_type = CDVD_SourceType::Iso;
@@ -190,7 +201,51 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (OEGameCoreRendering)gameCoreRendering
 {
-	return OEGameCoreRenderingBitmap;
+	return OEGameCoreRenderingMetal2;
+}
+
+// The engine needs a view for its Metal layer even though the picture goes to the
+// texture below. Build it on the main thread and hand it over before the CPU thread starts.
+- (void)ensureRenderView
+{
+	if (_renderView != nil) {
+		return;
+	}
+	void (^make)(void) = ^{
+		self->_renderView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, kFrameWidth, kFrameHeight)];
+	};
+	if (NSThread.isMainThread) {
+		make();
+	} else {
+		dispatch_sync(dispatch_get_main_queue(), make);
+	}
+	OEHost::SetRenderSurface((__bridge void *)_renderView, (u32)kFrameWidth, (u32)kFrameHeight);
+}
+
+// OpenEmu calls this while it sets up the renderer. The engine's last render pass
+// writes into this texture (see the engine patch), so it needs the render-target usage.
+- (void)createMetalTextureWithDevice:(id<MTLDevice>)device
+{
+	_outputDevice = device;
+	MTLTextureDescriptor *desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+																					width:kFrameWidth
+																				   height:kFrameHeight
+																				mipmapped:NO];
+	desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	desc.storageMode = MTLStorageModePrivate;
+	_outputTexture = [device newTextureWithDescriptor:desc];
+	GSDeviceMTLSetOutputTexture((__bridge void *)_outputTexture);
+	[self ensureRenderView];
+}
+
+- (id<MTLDevice>)metalDevice
+{
+	return _outputDevice;
+}
+
+- (id<MTLTexture>)metalTexture
+{
+	return _outputTexture;
 }
 
 - (const void *)getVideoBufferWithHint:(void *)hint

@@ -28,9 +28,13 @@ namespace OEHost
 	};
 
 	/// Sets folders, loads or creates the settings file and applies the OpenEmu overrides
-	/// (Null renderer until the Metal path lands, Null audio backend, no SDL input).
+	/// (Metal renderer, Null audio backend until item 4, no SDL input).
 	/// Call once, before StartCPUThread. Returns false and fills `error` on failure.
 	bool Initialize(const Folders& folders, std::string* error);
+
+	/// The view the engine attaches its Metal layer to, and the picture size. Call before
+	/// StartCPUThread. The view is an NSView and must stay alive while the engine runs.
+	void SetRenderSurface(void* view, u32 width, u32 height);
 
 	/// The base settings layer, for the game core to change values and then call
 	/// VMManager::ApplySettings() on the CPU thread. Valid after Initialize().

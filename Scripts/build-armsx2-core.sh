@@ -51,6 +51,9 @@ if [ ! -f "$DEPS_PREFIX/.done" ]; then
   touch "$DEPS_PREFIX/.done"
 fi
 
+# OE_METAL_OUTPUT turns on PCSX2/patches/0001-openemu-metal-output.patch: the final
+# picture is drawn into a Metal texture that OpenEmu owns instead of a window.
+#
 # No Qt and no frontends. Metal only: Vulkan off drops shaderc and MoltenVK (OpenGL is
 # already off on macOS).
 #
@@ -68,10 +71,23 @@ cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
   -DENABLE_GSRUNNER=OFF -DENABLE_EERUNNER=OFF -DENABLE_VURUNNER=OFF \
   -DENABLE_TESTS=OFF -DENABLE_RECOMPILER_TEST_HOOKS=OFF \
   -DUSE_VULKAN=OFF \
+  -DCMAKE_CXX_FLAGS=-DOE_METAL_OUTPUT -DCMAKE_OBJCXX_FLAGS=-DOE_METAL_OUTPUT \
   -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
   ${PCSX2_EXTRA_CMAKE_ARGS:-}
 
 cmake --build "$BUILD_DIR/engine" --target PCSX2 common -j"$(sysctl -n hw.ncpu)"
+
+# The engine's CMake only builds its Metal shader library for a full app target, which we
+# do not build. Compile it here the way the engine does (its Metal 2.3 build) so the plugin
+# can bundle it. The engine looks for Metal23.metallib in the plugin's Resources.
+SHADER_DIR="$BUILD_DIR/shaders"
+rm -rf "$SHADER_DIR"
+mkdir -p "$SHADER_DIR/air"
+for shader in "$SRC_DIR"/pcsx2/GS/Renderers/Metal/*.metal; do
+  xcrun metal -ffast-math -std=macos-metal2.3 -target air64-apple-macos11.0 \
+    -o "$SHADER_DIR/air/$(basename "$shader" .metal).air" -c "$shader"
+done
+xcrun metallib -o "$SHADER_DIR/Metal23.metallib" "$SHADER_DIR"/air/*.air
 
 # The Xcode project reads the engine's compile flags and link line from these, so
 # they follow whatever the engine's CMake decided.

@@ -1,0 +1,64 @@
+diff --git a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+index 23c13cc..5ca98ab 100644
+--- a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
++++ b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+@@ -1786,6 +1786,17 @@ static bool ConvertShaderNotNeeded(ShaderConvert shader)
+ 
+ static bool s_capture_next = false;
+ 
++#ifdef OE_METAL_OUTPUT
++// OpenEmu owns the output texture. When it is set, the final "present" pass renders
++// into it instead of into a window drawable.
++static MRCOwned<id<MTLTexture>> s_oe_output_texture;
++
++void GSDeviceMTLSetOutputTexture(void* texture)
++{
++	s_oe_output_texture = MRCRetain((__bridge id<MTLTexture>)texture);
++}
++#endif
++
+ GSDevice::PresentResult GSDeviceMTL::DoBeginPresent(bool frame_skip)
+ { @autoreleasepool {
+ 	if (m_capture_start_frame && FrameNo() == m_capture_start_frame)
+@@ -1832,8 +1843,24 @@ static bool ConvertShaderNotNeeded(ShaderConvert shader)
+ 		return PresentResult::FrameSkipped;
+ 	}
+ 	id<MTLCommandBuffer> buf = GetRenderCmdBuf();
++#ifdef OE_METAL_OUTPUT
++	const bool oe_output = static_cast<bool>(s_oe_output_texture);
++	if (oe_output)
++		m_current_drawable = nullptr;
++	else
++#endif
+ 	m_current_drawable = MRCRetain([m_layer nextDrawable]);
+ 	EndRenderPass();
++#ifdef OE_METAL_OUTPUT
++	if (oe_output)
++	{
++		[m_pass_desc colorAttachments][0].texture = s_oe_output_texture;
++		id<MTLRenderCommandEncoder> oe_enc = [buf renderCommandEncoderWithDescriptor:m_pass_desc];
++		[oe_enc setLabel:@"Present"];
++		m_current_render.encoder = MRCRetain(oe_enc);
++		return PresentResult::OK;
++	}
++#endif
+ 	if (!m_current_drawable)
+ 	{
+ 		[buf pushDebugGroup:@"Present Skipped"];
+@@ -1867,7 +1894,16 @@ static bool ConvertShaderNotNeeded(ShaderConvert shader)
+ 				[drawable present];
+ 			}];
+ 	}
++#ifdef OE_METAL_OUTPUT
++	// OpenEmu reads the output texture on its own command queue, so wait for the
++	// frame to finish before handing it over.
++	MRCOwned<id<MTLCommandBuffer>> oe_cmdbuf = s_oe_output_texture ? m_current_render_cmdbuf : nullptr;
++#endif
+ 	FlushEncoders();
++#ifdef OE_METAL_OUTPUT
++	if (oe_cmdbuf)
++		[oe_cmdbuf waitUntilCompleted];
++#endif
+ 	FrameCompleted();
+ 	m_current_drawable = nullptr;
+ 	if (m_capture_start_frame)

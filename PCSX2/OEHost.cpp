@@ -111,8 +111,10 @@ bool OEHost::Initialize(const Folders& folders, std::string* error)
 		if (!folders.biosFilename.empty())
 			si.SetStringValue("Filenames", "BIOS", folders.biosFilename.c_str());
 
-		// No picture yet: item 3 switches this to the Metal renderer.
-		si.SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Null));
+		// Metal renderer; the picture is copied to OpenEmu's texture (patch 0001).
+		// Stretch fills that texture, and OpenEmu applies the 4:3 shape itself.
+		si.SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Metal));
+		si.SetStringValue("EmuCore/GS", "AspectRatio", "Stretch");
 		// No SDL input and no audio device. Item 4 adds an OpenEmu audio backend.
 		si.SetBoolValue("InputSources", "SDL", false);
 		si.SetStringValue("SPU2/Output", "Backend", "Null");
@@ -351,13 +353,28 @@ void Host::EndTextInput()
 {
 }
 
+static std::atomic<void*> s_render_view{nullptr};
+static std::atomic<u32> s_render_width{640};
+static std::atomic<u32> s_render_height{448};
+
+void OEHost::SetRenderSurface(void* view, u32 width, u32 height)
+{
+	s_render_width = width;
+	s_render_height = height;
+	s_render_view = view;
+}
+
 static std::optional<WindowInfo> BuildWindowInfo()
 {
-	// No surface yet. Item 3 returns a Metal layer here.
+	// The engine needs a view to attach its Metal layer to, even though the picture
+	// goes to OpenEmu's texture instead (see the patch). Without a view it stays
+	// surfaceless and skips every frame.
 	WindowInfo wi;
-	wi.type = WindowInfo::Type::Surfaceless;
-	wi.surface_width = 640;
-	wi.surface_height = 448;
+	void* view = s_render_view.load();
+	wi.type = view ? WindowInfo::Type::MacOS : WindowInfo::Type::Surfaceless;
+	wi.window_handle = view;
+	wi.surface_width = s_render_width;
+	wi.surface_height = s_render_height;
 	wi.surface_scale = 1.0f;
 	return wi;
 }

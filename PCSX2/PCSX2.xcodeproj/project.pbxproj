@@ -22,6 +22,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F600000000A006 /* Metal23.metallib in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A005 /* Metal23.metallib */; };
 		D00A068E1763763000C99008 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D00A068D1763763000C99008 /* Cocoa.framework */; };
 		D00A06A617637E9100C99008 /* PCSX2GameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = D00A06A517637E9100C99008 /* PCSX2GameCore.mm */; };
 		A1B2C3D4E5F600000000A002 /* OEHost.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A001 /* OEHost.cpp */; };
@@ -39,6 +40,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F600000000A005 /* Metal23.metallib */ = {isa = PBXFileReference; lastKnownFileType = "archive.metal-library"; name = Metal23.metallib; path = build/shaders/Metal23.metallib; sourceTree = SOURCE_ROOT; };
 		05334A951C52AEEF0066D493 /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
 		05334A981C52AF0E0066D493 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		8C3132F7177F667D0002D0B9 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
@@ -115,6 +117,7 @@
 			children = (
 				D00A069F17637AB600C99008 /* Info.plist */,
 				A1B2C3D4E5F600000000A004 /* engine.xcconfig */,
+				A1B2C3D4E5F600000000A005 /* Metal23.metallib */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -210,6 +213,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F600000000A006 /* Metal23.metallib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
