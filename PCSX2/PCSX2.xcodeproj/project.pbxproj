@@ -22,6 +22,8 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F600000000A008 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A007 /* fonts */; };
+		A1B2C3D4E5F600000000A00A /* patches.zip in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A009 /* patches.zip */; };
 		A1B2C3D4E5F600000000A006 /* Metal23.metallib in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A005 /* Metal23.metallib */; };
 		D00A068E1763763000C99008 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D00A068D1763763000C99008 /* Cocoa.framework */; };
 		D00A06A617637E9100C99008 /* PCSX2GameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = D00A06A517637E9100C99008 /* PCSX2GameCore.mm */; };
@@ -40,6 +42,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A1B2C3D4E5F600000000A007 /* fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fonts; path = build/resources/fonts; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F600000000A009 /* patches.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = patches.zip; path = build/resources/patches.zip; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F600000000A005 /* Metal23.metallib */ = {isa = PBXFileReference; lastKnownFileType = "archive.metal-library"; name = Metal23.metallib; path = build/shaders/Metal23.metallib; sourceTree = SOURCE_ROOT; };
 		05334A951C52AEEF0066D493 /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
 		05334A981C52AF0E0066D493 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -118,6 +122,8 @@
 				D00A069F17637AB600C99008 /* Info.plist */,
 				A1B2C3D4E5F600000000A004 /* engine.xcconfig */,
 				A1B2C3D4E5F600000000A005 /* Metal23.metallib */,
+				A1B2C3D4E5F600000000A007 /* fonts */,
+				A1B2C3D4E5F600000000A009 /* patches.zip */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -214,6 +220,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F600000000A006 /* Metal23.metallib in Resources */,
+				A1B2C3D4E5F600000000A008 /* fonts in Resources */,
+				A1B2C3D4E5F600000000A00A /* patches.zip in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

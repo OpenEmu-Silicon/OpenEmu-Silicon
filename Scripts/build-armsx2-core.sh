@@ -75,6 +75,15 @@ for shader in "$SRC_DIR"/pcsx2/GS/Renderers/Metal/*.metal; do
 done
 xcrun metallib -o "$SHADER_DIR/Metal23.metallib" "$SHADER_DIR"/air/*.air
 
+# Engine resources the plugin bundles next to the shaders: the UI fonts (with their licenses)
+# and the game patch archive (widescreen and similar fixes). The engine looks for them in the
+# plugin's Resources folder. The patch archive ships in the engine repository's mobile assets.
+RESOURCE_DIR="$BUILD_DIR/resources"
+rm -rf "$RESOURCE_DIR"
+mkdir -p "$RESOURCE_DIR"
+cp -R "$SRC_DIR/bin/resources/fonts" "$RESOURCE_DIR/fonts"
+cp "$SRC_DIR/platforms/ios/app/src/main/assets/resources/patches.zip" "$RESOURCE_DIR/patches.zip"
+
 # The Xcode project reads the engine's compile flags and link line from these, so
 # they follow whatever the engine's CMake decided.
 python3 "$SCRIPT_DIR/gen-armsx2-xcconfig.py" "$BUILD_DIR/engine" "$BUILD_DIR"

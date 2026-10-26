@@ -49,7 +49,8 @@
 #import <OpenEmuBase/OEAudioBuffer.h>
 
 // Defined by the engine patch PCSX2/patches/0001-openemu-metal-output.patch.
-void GSDeviceMTLSetOutputTexture(void *texture);
+void GSDeviceMTLSetOutputTextures(void *texture0, void *texture1);
+int GSDeviceMTLReadyOutputIndex();
 
 #include <string>
 
@@ -69,7 +70,8 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	BOOL _ownsVideoBuffer;  // NO once OpenEmu hands us its own buffer
 	BOOL _engineStarted;
 	id<MTLDevice> _outputDevice;
-	id<MTLTexture> _outputTexture;  // the picture OpenEmu shows; the engine draws into it
+	id<MTLTexture> _outputTextures[2];  // the engine draws into one while OpenEmu shows the other
+	NSArray<NSURL *> *_discURLs;        // the discs of an .m3u playlist; one entry for a single disc
 	NSView *_renderView;            // the engine attaches its Metal layer here
 }
 
@@ -78,11 +80,32 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	// The engine reads .iso, .bin/.cue images and compressed images by itself, so
 	// the URL goes through untouched. A .cue is mapped to its .bin the way the
 	// old bridge did, because the engine opens the data track directly.
-	if ([url.pathExtension caseInsensitiveCompare:@"cue"] == NSOrderedSame) {
-		_gameURL = [[url URLByDeletingPathExtension] URLByAppendingPathExtension:@"bin"];
+	if ([url.pathExtension caseInsensitiveCompare:@"m3u"] == NSOrderedSame) {
+		// A playlist of discs, one path per line (relative to the playlist), for games on
+		// more than one disc. The first disc boots; the others are swapped in with setDisc:.
+		NSString *playlist = [NSString stringWithContentsOfURL:url encoding:NSUTF8StringEncoding error:nil];
+		NSMutableArray<NSURL *> *discs = [NSMutableArray array];
+		for (NSString *rawLine in [playlist componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+			NSString *line = [rawLine stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+			if (line.length == 0 || [line hasPrefix:@"#"]) {
+				continue;
+			}
+			[discs addObject:[self discURLForPath:line relativeTo:url]];
+		}
+		if (discs.count == 0) {
+			if (error) {
+				*error = [NSError errorWithDomain:OEGameCoreErrorDomain
+											 code:OEGameCoreCouldNotLoadROMError
+										 userInfo:@{NSLocalizedDescriptionKey: @"The playlist does not list any discs.",
+													NSURLErrorKey: url}];
+			}
+			return NO;
+		}
+		_discURLs = discs;
 	} else {
-		_gameURL = [url copy];
+		_discURLs = @[[self discURLForPath:url.path relativeTo:url]];
 	}
+	_gameURL = _discURLs.firstObject;
 
 	// Find a BIOS now so a missing one is reported before anything starts.
 	NSFileManager *fm = NSFileManager.defaultManager;
@@ -112,6 +135,19 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 		return NO;
 	}
 	return YES;
+}
+
+// The engine opens an image's data directly, so a .cue is mapped to the .bin next to it
+// (as the old bridge did). A relative path is taken from the playlist's folder.
+- (NSURL *)discURLForPath:(NSString *)path relativeTo:(NSURL *)base
+{
+	NSURL *disc = path.isAbsolutePath
+		? [NSURL fileURLWithPath:path]
+		: [[base URLByDeletingLastPathComponent] URLByAppendingPathComponent:path];
+	if ([disc.pathExtension caseInsensitiveCompare:@"cue"] == NSOrderedSame) {
+		disc = [[disc URLByDeletingPathExtension] URLByAppendingPathExtension:@"bin"];
+	}
+	return disc;
 }
 
 - (void)setupEmulation
@@ -271,8 +307,9 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 																				mipmapped:NO];
 	desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
 	desc.storageMode = MTLStorageModePrivate;
-	_outputTexture = [device newTextureWithDescriptor:desc];
-	GSDeviceMTLSetOutputTexture((__bridge void *)_outputTexture);
+	_outputTextures[0] = [device newTextureWithDescriptor:desc];
+	_outputTextures[1] = [device newTextureWithDescriptor:desc];
+	GSDeviceMTLSetOutputTextures((__bridge void *)_outputTextures[0], (__bridge void *)_outputTextures[1]);
 	[self ensureRenderView];
 }
 
@@ -281,9 +318,10 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	return _outputDevice;
 }
 
+// The newest frame the GPU has finished. The engine draws the next one into the other texture.
 - (id<MTLTexture>)metalTexture
 {
-	return _outputTexture;
+	return _outputTextures[GSDeviceMTLReadyOutputIndex() & 1];
 }
 
 - (const void *)getVideoBufferWithHint:(void *)hint
@@ -339,6 +377,27 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 - (double)audioSampleRate
 {
 	return 48000;
+}
+
+#pragma mark - Discs
+
+- (NSUInteger)discCount
+{
+	return _discURLs.count;
+}
+
+// OpenEmu numbers discs from 1. The engine opens and closes the tray itself.
+- (void)setDisc:(NSUInteger)discNumber
+{
+	if (!_engineStarted || discNumber < 1 || discNumber > _discURLs.count) {
+		return;
+	}
+	const std::string path = _discURLs[discNumber - 1].fileSystemRepresentation;
+	Host::RunOnCPUThread([path]() {
+		if (VMManager::HasValidVM()) {
+			VMManager::ChangeDisc(CDVD_SourceType::Iso, path);
+		}
+	}, false);
 }
 
 #pragma mark - Input
