@@ -34,6 +34,7 @@
 // The engine's headers use the name BOOL too. Rename Objective-C's for their duration.
 #define BOOL PCSX2BOOL
 #include "OEHost.h"
+#include "common/Error.h"
 #include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/Host/AudioStream.h"
 #include "pcsx2/Host.h"
@@ -401,20 +402,76 @@ static int EngineInputForButton(OEPS2Button button)
 	[self setPS2Button:button value:0.0f forPlayer:player];
 }
 
-#pragma mark - Save states (item 6)
+#pragma mark - Save states
 
+static NSError *SaveStateError(NSString *message, NSURL *url)
+{
+	return [NSError errorWithDomain:OEGameCoreErrorDomain
+							   code:OEGameCoreCouldNotSaveStateError
+						   userInfo:@{NSLocalizedDescriptionKey: message, NSURLErrorKey: url}];
+}
+
+// Both calls run on the engine's CPU thread and wait for it, since the engine only
+// touches the machine from there. A save state is the engine's own zip file.
 - (void)saveStateToFileAtURL:(NSURL *)fileURL completionHandler:(void (^)(BOOL, NSError *))block
 {
-	block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain
-								  code:OEGameCoreDoesNotSupportSaveStatesError
-							  userInfo:@{NSLocalizedDescriptionKey: @"PlayStation 2 save states are not available yet."}]);
+	if (!_engineStarted) {
+		block(NO, SaveStateError(@"The PlayStation 2 is not running.", fileURL));
+		return;
+	}
+
+	const std::string path = fileURL.fileSystemRepresentation;
+	bool saved = false;
+	std::string failure;
+	Host::RunOnCPUThread([&]() {
+		if (!VMManager::HasValidVM()) {
+			failure = "No game is running.";
+			return;
+		}
+		// Not zipped on a background thread, so the file is complete when this returns.
+		VMManager::SaveState(path.c_str(), false, false, [&failure](const std::string &error) {
+			failure = error.empty() ? "The save failed." : error;
+		});
+		saved = failure.empty();
+	}, true);
+
+	if (saved) {
+		block(YES, nil);
+	} else {
+		block(NO, SaveStateError([NSString stringWithFormat:@"Could not save the state: %s", failure.c_str()], fileURL));
+	}
 }
 
 - (void)loadStateFromFileAtURL:(NSURL *)fileURL completionHandler:(void (^)(BOOL, NSError *))block
 {
-	block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain
-								  code:OEGameCoreDoesNotSupportSaveStatesError
-							  userInfo:@{NSLocalizedDescriptionKey: @"PlayStation 2 save states are not available yet."}]);
+	if (!_engineStarted) {
+		block(NO, SaveStateError(@"The PlayStation 2 is not running.", fileURL));
+		return;
+	}
+
+	const std::string path = fileURL.fileSystemRepresentation;
+	bool loaded = false;
+	std::string failure;
+	Host::RunOnCPUThread([&]() {
+		if (!VMManager::HasValidVM()) {
+			failure = "No game is running.";
+			return;
+		}
+		Error error;
+		loaded = VMManager::LoadState(path.c_str(), &error);
+		if (!loaded) {
+			failure = error.GetDescription();
+		}
+	}, true);
+
+	if (loaded) {
+		block(YES, nil);
+	} else {
+		block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain
+									  code:OEGameCoreCouldNotLoadStateError
+								  userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not load the state: %s", failure.c_str()],
+											 NSURLErrorKey: fileURL}]);
+	}
 }
 
 @end
