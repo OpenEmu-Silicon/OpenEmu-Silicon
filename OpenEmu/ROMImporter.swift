@@ -246,7 +246,9 @@ final class ROMImporter: NSObject {
             
             if let block = operation.completionHandler {
                 // save so changes propagate to other stores
-                try? importer.context?.save()
+                // This block runs on an operation-queue thread, not the context's own queue. Saving from here
+                // crashed the app (a Core Data object released twice) while several imports finished at once.
+                importer.context?.performAndWait { try? importer.context?.save() }
                 
                 DispatchQueue.main.asyncAfter(deadline: DispatchTime(uptimeNanoseconds: 1)) {
                     block(operation.romObjectID)
