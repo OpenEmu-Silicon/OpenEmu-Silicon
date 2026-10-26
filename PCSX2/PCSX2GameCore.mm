@@ -555,6 +555,11 @@ static NSError *SaveStateError(NSString *message, NSURL *url)
 
 - (void)loadStateFromFileAtURL:(NSURL *)fileURL completionHandler:(void (^)(BOOL, NSError *))block
 {
+	// OpenEmu loads a resume (auto) save the moment the core starts, before the engine has
+	// booted its virtual machine. Wait for the machine to exist instead of failing, up to 30 s.
+	for (int waited = 0; waited < 600 && !(_engineStarted && VMManager::HasValidVM()); waited++) {
+		usleep(50 * 1000);
+	}
 	if (!_engineStarted) {
 		block(NO, SaveStateError(@"The PlayStation 2 is not running.", fileURL));
 		return;
