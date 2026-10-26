@@ -334,7 +334,9 @@ extension Notification.Name {
             }
         } catch {
             try? fm.removeItem(at: temp)
-            os_log(.error, log: log, "Copy failed (%@ %@): %@", direction, src.lastPathComponent, error.localizedDescription)
+            let nsError = error as NSError
+            os_log(.error, log: log, "Copy failed (%{public}@ %{public}@): %{public}@ [%{public}@ %ld] to %{public}@",
+                   direction, src.lastPathComponent, error.localizedDescription, nsError.domain, nsError.code, dest.path)
             DispatchQueue.main.async { [weak self] in self?.status = .failed }
             return false
         }

@@ -16,7 +16,9 @@
 #
 # A run leaves the usual traces of playing: play count, last-played time, and an auto save state when the game closes.
 # It never deletes anything and never uses Quick Save. By default it answers "continue your last game?" with Resume;
-# --restart answers Restart.
+# --restart answers Restart. The app is started through LaunchServices (`open`), the way a person starts it, so macOS
+# treats it as its own program (iCloud Drive and other privacy permissions apply to it, not to the Claude app that ran
+# this script). --direct runs the binary straight from this script instead, for comparison.
 #
 # Report: frame pacing and audio buffer levels (from the core's own log lines), errors and crashes, and for the
 # picture how many screenshots were blank and how many differed from the one before. Screenshots and result.json
@@ -27,13 +29,14 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1
+GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open
 while [ $# -gt 0 ]; do
   case "$1" in
     --game) GAME="${2:-}"; shift 2 ;;
     --seconds) SECONDS_TO_PLAY="${2:-}"; shift 2 ;;
     --keys) KEYS="${2:-}"; shift 2 ;;
     --restart) RESUME=0; shift ;;
+    --direct) LAUNCH=direct; shift ;;
     -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -91,13 +94,20 @@ PY
 START_MARK="$OUT/.start"; touch "$START_MARK"
 START_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
 echo "----  playing for ${SECONDS_TO_PLAY}s"
-"$APP/Contents/MacOS/OpenEmu" -OEPlaytestPlan "$OUT/plan.json" \
-  -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1 > "$OUT/app.log" 2>&1 &
-APP_PID=$!
+APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1)
+if [ "$LAUNCH" = "direct" ]; then
+  "$APP/Contents/MacOS/OpenEmu" "${APP_ARGS[@]}" > "$OUT/app.log" 2>&1 &
+else
+  /usr/bin/open -n -W --stdout "$OUT/app.log" --stderr "$OUT/app.log" "$APP" --args "${APP_ARGS[@]}" &
+fi
+LAUNCHER_PID=$!
 LIMIT=$(( SECONDS_TO_PLAY + 180 )); WAITED=0
-while kill -0 "$APP_PID" 2>/dev/null && [ "$WAITED" -lt "$LIMIT" ]; do sleep 2; WAITED=$(( WAITED + 2 )); done
+while kill -0 "$LAUNCHER_PID" 2>/dev/null && [ "$WAITED" -lt "$LIMIT" ]; do sleep 2; WAITED=$(( WAITED + 2 )); done
 TIMED_OUT=0
-if kill -0 "$APP_PID" 2>/dev/null; then TIMED_OUT=1; kill "$APP_PID" 2>/dev/null; sleep 2; kill -9 "$APP_PID" 2>/dev/null; fi
+if kill -0 "$LAUNCHER_PID" 2>/dev/null; then
+  TIMED_OUT=1
+  pkill -f "$APP/Contents/MacOS/OpenEmu" 2>/dev/null; sleep 2; pkill -9 -f "$APP/Contents/MacOS/OpenEmu" 2>/dev/null
+fi
 
 LOG="$(/usr/bin/log show --start "$START_TIME" --style compact --info --predicate 'subsystem BEGINSWITH "org.openemu"' 2>/dev/null)"
 CRASHES=$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'OpenEmu*.ips' -newer "$START_MARK" 2>/dev/null | wc -l | tr -d ' ')
@@ -147,6 +157,9 @@ print("audio: %d buffer-full warnings" % sum(1 for l in log if "Tried to write" 
 problems = [l for l in log if re.search(r"\s(E|Fa)\s", l) and "Tried to write" not in l and "CredentialStore" not in l]
 print("errors/faults (excluding audio and credential-store noise): %d" % len(problems))
 for l in problems[:10]: print("   ", l[:230])
+copy_failures = [l for l in log if "Copy failed" in l]
+print("backup folder: %d copy failure(s)" % len(copy_failures))
+for l in copy_failures[:3]: print("   ", re.sub(r"^.*\[org.openemu.OpenEmu:FolderBackup\]\s*", "", l)[:260])
 print("crash reports: %s" % os.environ["CRASHES"])
 if os.environ["CRASHES"] != "0": ok = False
 print("")
