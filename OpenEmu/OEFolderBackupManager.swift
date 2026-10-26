@@ -270,7 +270,12 @@ enum OEExtraSaveLocations {
     /// when several FSEvents fire simultaneously (e.g. auto-save + screenshot + Info.plist).
     private let copyQueue = DispatchQueue(label: "org.openemu.OpenEmu.FolderBackup.copy", qos: .utility)
 
+    /// Guards the in-memory copies of the sync records and game aliases below. It is never held while writing to
+    /// UserDefaults: that write can wait for the main thread, and the main thread may be waiting for this lock.
     private let recordsLock = NSLock()
+    private let persistQueue = DispatchQueue(label: "org.openemu.OpenEmu.FolderBackup.persist", qos: .utility)
+    private var recordsCache: [String: [String: Double]]?
+    private var aliasesCache: [String: String]?
 
     private override init() { super.init() }
 
@@ -643,9 +648,12 @@ enum OEExtraSaveLocations {
             return
         }
         let safeName = sanitizedName(gameName)
-        registerAliases(aliases, discID: discID, forGame: safeName)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { DispatchQueue.main.async { completion(.upToDate) }; return }
+            // Not on the caller's thread: this takes `recordsLock`, and the caller is the main thread. The background sync
+            // holds that lock while it writes to UserDefaults, which can wait for the main thread, so taking it on the
+            // main thread could freeze the app for good (seen when a game was started right after launch).
+            self.registerAliases(aliases, discID: discID, forGame: safeName)
 
             let deadline = Date().addingTimeInterval(downloadTimeout)
             var pending = self.requestDownloads(backupFolder: backupFolder, safeName: safeName, systemShort: nil)
@@ -817,9 +825,8 @@ enum OEExtraSaveLocations {
     }
 
     private func syncRecord(forGame safeName: String) -> OEBackupSyncRecord? {
-        recordsLock.lock(); defer { recordsLock.unlock() }
-        guard let all = UserDefaults.standard.dictionary(forKey: kSyncRecordsKey) as? [String: [String: Double]],
-              let entry = all[safeName], let b = entry["backup"], let l = entry["local"] else { return nil }
+        let all = syncRecords()
+        guard let entry = all[safeName], let b = entry["backup"], let l = entry["local"] else { return nil }
         return OEBackupSyncRecord(backupDate: Date(timeIntervalSinceReferenceDate: b), localDate: Date(timeIntervalSinceReferenceDate: l))
     }
 
@@ -829,15 +836,32 @@ enum OEExtraSaveLocations {
         let state = syncState(forGame: safeName, backupFolder: backupFolder)
         guard OEBackupPolicy.isInSync(backupDate: state.backupDate, localDate: state.localDate),
               let b = state.backupDate, let l = state.localDate else { return }
-        recordsLock.lock(); defer { recordsLock.unlock() }
-        var all = (UserDefaults.standard.dictionary(forKey: kSyncRecordsKey) as? [String: [String: Double]]) ?? [:]
+        recordsLock.lock()
+        var all = loadedSyncRecords()
         all[safeName] = ["backup": b.timeIntervalSinceReferenceDate, "local": l.timeIntervalSinceReferenceDate]
-        UserDefaults.standard.set(all, forKey: kSyncRecordsKey)
+        recordsCache = all
+        recordsLock.unlock()
+        persistQueue.async { UserDefaults.standard.set(all, forKey: kSyncRecordsKey) }
+    }
+
+    private func syncRecords() -> [String: [String: Double]] {
+        recordsLock.lock(); defer { recordsLock.unlock() }
+        return loadedSyncRecords()
+    }
+
+    /// Call with `recordsLock` held.
+    private func loadedSyncRecords() -> [String: [String: Double]] {
+        if let recordsCache { return recordsCache }
+        let loaded = (UserDefaults.standard.dictionary(forKey: kSyncRecordsKey) as? [String: [String: Double]]) ?? [:]
+        recordsCache = loaded
+        return loaded
     }
 
     private func clearSyncRecords() {
-        recordsLock.lock(); defer { recordsLock.unlock() }
-        UserDefaults.standard.removeObject(forKey: kSyncRecordsKey)
+        recordsLock.lock()
+        recordsCache = [:]
+        recordsLock.unlock()
+        persistQueue.async { UserDefaults.standard.removeObject(forKey: kSyncRecordsKey) }
     }
 
     // MARK: - Game name aliases
@@ -856,18 +880,28 @@ enum OEExtraSaveLocations {
             if compact.count == 6, compact.allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }) { aliases.append(String(compact.prefix(4))) }
         }
         aliases = Array(Set(aliases)).filter { !$0.isEmpty && $0 != safeName }
-        recordsLock.lock(); defer { recordsLock.unlock() }
-        var map = (UserDefaults.standard.dictionary(forKey: kGameAliasesKey) as? [String: String]) ?? [:]
+        recordsLock.lock()
+        var map = loadedAliases()
         var changed = false
         // A name that already belongs to another game stays with that game. Two games that share
         // a ROM file name also share its save file, so it cannot be attributed to one of them.
         for alias in aliases + [safeName] where map[alias] == nil { map[alias] = safeName; changed = true }
-        if changed { UserDefaults.standard.set(map, forKey: kGameAliasesKey) }
+        if changed { aliasesCache = map }
+        recordsLock.unlock()
+        if changed { persistQueue.async { UserDefaults.standard.set(map, forKey: kGameAliasesKey) } }
+    }
+
+    /// Call with `recordsLock` held.
+    private func loadedAliases() -> [String: String] {
+        if let aliasesCache { return aliasesCache }
+        let loaded = (UserDefaults.standard.dictionary(forKey: kGameAliasesKey) as? [String: String]) ?? [:]
+        aliasesCache = loaded
+        return loaded
     }
 
     private func aliasMap() -> [String: String] {
         recordsLock.lock(); defer { recordsLock.unlock() }
-        return (UserDefaults.standard.dictionary(forKey: kGameAliasesKey) as? [String: String]) ?? [:]
+        return loadedAliases()
     }
 
     /// The library title for a battery save file name, if its ROM has been launched on this Mac.
@@ -915,7 +949,7 @@ enum OEExtraSaveLocations {
         }
 
         for url in files where isDownloadPending(url) {
-            os_log(.info, log: log, "Still downloading: %@", url.path)
+            os_log(.info, log: log, "Still downloading: %{public}@", url.path)
             try? fm.startDownloadingUbiquitousItem(at: url)
             pending = true
         }
@@ -928,7 +962,9 @@ enum OEExtraSaveLocations {
         // A folder reports its own status, which stays "not current" while anything inside it
         // changes. Only the files inside decide whether the save is ready to read.
         if values.isDirectory == true { return false }
-        return values.ubiquitousItemDownloadingStatus != .current
+        // No status means the file is a normal local one (for example just written by this Mac's own upload).
+        guard let status = values.ubiquitousItemDownloadingStatus else { return false }
+        return status != .current
     }
 
     // MARK: - Path mapping
