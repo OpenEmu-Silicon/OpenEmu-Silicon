@@ -14,8 +14,8 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 PCSX2_DIR="$REPO_ROOT/PCSX2"
 DEPS_DIR="$PCSX2_DIR/deps"
 SRC_DIR="$DEPS_DIR/armsx2"
-# This fork moves to the OpenEmu-Silicon org later; change this one line then.
-REMOTE="https://github.com/nickybmon/armsx2.git"
+# The fork lives in the OpenEmu-Silicon org (a fork of ARMSX2/ARMSX2).
+REMOTE="https://github.com/OpenEmu-Silicon/armsx2.git"
 # Keep in sync with PCSX2/deps-armsx2-revision.txt.
 REVISION="65fd14b9160e7fa3779794fc45c4e92a86772621"
 
