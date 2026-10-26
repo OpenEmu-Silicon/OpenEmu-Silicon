@@ -51,7 +51,7 @@
 		A1B2C3D4E5F600000000A001 /* OEHost.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OEHost.cpp; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000A003 /* OEHost.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEHost.h; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000A004 /* engine.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = engine.xcconfig; path = build/engine.xcconfig; sourceTree = SOURCE_ROOT; };
-		D00A06A717637EB500C99008 /* OEPS2SystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEPS2SystemResponderClient.h; path = ../OpenEmu/SystemPlugins/PlayStation 2/OEPS2SystemResponderClient.h; sourceTree = "<group>"; };
+		D00A06A717637EB500C99008 /* OEPS2SystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEPS2SystemResponderClient.h; path = "../OpenEmu/SystemPlugins/PlayStation 2/OEPS2SystemResponderClient.h"; sourceTree = "<group>"; };
 		D0AADE30176382F900759E26 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D0AADE331763838A00759E26 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		D0AADE341763838A00759E26 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
