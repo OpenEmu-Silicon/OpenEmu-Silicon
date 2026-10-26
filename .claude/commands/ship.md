@@ -12,7 +12,7 @@ Do not use this lane for `.github/workflows/`, for another contributor's work, o
 
 ## 2. Check before shipping
 
-- Code changed: run `/verify` now if you have not since the last edit.
+- Do not rebuild just to ship. A build or `Scripts/check.sh` run after your last code edit already counts. CI is the build gate for a PR.
 - Read `git diff` once. Never commit secrets or build output.
 - Run the adversarial reviewer (`.claude/agents/adversarial-reviewer.md`) only when the diff touches a core, input handling, or threading, or is over about 50 lines of code. Show `git diff main...HEAD | wc -l` first. Skip it for docs, scripts, and small fixes. Fix `block` findings or rebut them with evidence; `note` findings go in the PR body.
 

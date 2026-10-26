@@ -1,6 +1,6 @@
 Run the local verification checks on the current branch.
 
-Run this yourself when you believe a fix or change is done, and again right before shipping. You do not need permission to build, install, launch, or read logs. Do not ask the user to launch the app, check the console, or look at crash reports; do it and report what you found.
+Run this yourself when you believe a fix or change is done. Do not run it again before committing or shipping if you built after your last edit; CI is the build gate for a PR. You do not need permission to build, install, launch, or read logs. Do not ask the user to launch the app, check the console, or look at crash reports; do it and report what you found.
 
 ## Which mode
 
