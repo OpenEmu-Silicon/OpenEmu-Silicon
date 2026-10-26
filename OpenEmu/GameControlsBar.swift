@@ -440,7 +440,7 @@ final class GameControlsBar: NSWindow {
             menu.addItem(browseItem)
         }
 
-        let cheats = gameViewController.document.cheats
+        let cheats = gameViewController.document.visibleCheats
             // Stable sort: manual/Cheat Search entries first, Browse Online Cheats imports after.
             .sorted { ($0.cheatSource != nil ? 1 : 0) < ($1.cheatSource != nil ? 1 : 0) }
         if !cheats.isEmpty {
@@ -557,6 +557,7 @@ final class GameControlsBar: NSWindow {
         case OpenEmuCheatProvider.providerName: return NSImage(named: "cheat_provider_openemu")
         case LibretroCheatProvider.providerName: return NSImage(named: "cheat_provider_libretro")
         case PugsyCheatProvider.providerName: return NSImage(named: "cheat_provider_pugsy")
+        case DolphinCheatProvider.providerName: return NSImage(named: "cheat_provider_dolphin")
         default: return nil
         }
     }

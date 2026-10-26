@@ -30,10 +30,22 @@
 		<dict>
 			<key>OEGameCoreHasGlitches</key>
 			<true/>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
 		</dict>
 		<key>openemu.system.wii</key>
 		<dict>
 			<key>OEGameCoreHasGlitches</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatCode</key>
+			<true/>
+			<key>OEGameCoreSupportsCheatSearch</key>
+			<true/>
+			<key>OEGameCoreSupportsRetroAchievements</key>
 			<true/>
 		</dict>
 	</dict>

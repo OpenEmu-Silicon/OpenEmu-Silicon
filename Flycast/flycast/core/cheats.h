@@ -82,7 +82,9 @@ public:
 	void saveCheatFile(const std::string& filename);
 	// Returns true if using 16:9 anamorphic screen ratio
 	bool isWidescreen() const { return widescreen_cheat != nullptr; }
-	void addGameSharkCheat(const std::string& name, const std::string& s);
+	void addGameSharkCheat(const std::string& name, const std::string& s, bool persist = true);
+	// OpenEmu: remove every user-added (non-built-in) cheat, keeping the built-in game fixes.
+	void clearUserCheats();
 
 private:
 	u32 readRam(u32 addr, u32 bits);

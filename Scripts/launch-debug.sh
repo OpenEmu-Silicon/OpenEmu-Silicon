@@ -116,6 +116,23 @@ if [[ $FORCE -eq 0 ]]; then
     fi
 fi
 
+# Sign debug builds with a stable local certificate so macOS keeps the Input Monitoring grant across rebuilds.
+# Ad-hoc signatures change on every build, which silently revokes it. Create a code-signing certificate named
+# "OpenEmu Debug" in Keychain Access (or set OE_DEBUG_SIGN_IDENTITY); without one the build is launched as is.
+if [[ "$CONFIG" == "Debug" ]]; then
+    SIGN_NAME="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}"
+    if security find-identity -p codesigning 2>/dev/null | grep -qF "\"$SIGN_NAME\""; then
+        if ! codesign -dvv "$NEWEST" 2>&1 | grep -qxF "Authority=$SIGN_NAME"; then
+            echo "launch-debug: signing with \"$SIGN_NAME\" so permissions survive rebuilds"
+            codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime \
+                --sign "$SIGN_NAME" "$NEWEST" >/dev/null 2>&1 \
+                || echo "launch-debug: warning: signing failed, launching the ad-hoc build" >&2
+        fi
+    else
+        echo "launch-debug: no \"$SIGN_NAME\" certificate found — Input Monitoring will need re-granting after each rebuild." >&2
+    fi
+fi
+
 echo "launch-debug: launching $NEWEST"
 
 # 3. Kill any running OpenEmu (debug + production share a bundle ID).

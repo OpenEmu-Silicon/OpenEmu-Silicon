@@ -58,7 +58,7 @@ protocol CheatDatabaseProvider {
 /// Facade that aggregates cheat database providers and presents a unified interface to the UI.
 final class CheatDatabaseService {
 
-    static let shared = CheatDatabaseService(providers: [OpenEmuCheatProvider(), LibretroCheatProvider(), PugsyCheatProvider()])
+    static let shared = CheatDatabaseService(providers: [OpenEmuCheatProvider(), LibretroCheatProvider(), PugsyCheatProvider(), DolphinCheatProvider()])
 
     private let providers: [CheatDatabaseProvider]
 

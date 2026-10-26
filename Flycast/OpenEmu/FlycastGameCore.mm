@@ -30,6 +30,7 @@
 #import "FlycastGameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
 #import <OpenEmuBase/OEGameCore.h>
+#import <OpenEmuBase/OEMemoryRegionDescriptor.h>
 
 #include "emulator.h"
 #include "types.h"
@@ -44,8 +45,16 @@
 #include "ui/gui.h"
 #include "rend/gles/gles.h"
 #include "hw/mem/addrspace.h"
+#include "hw/sh4/sh4_mem.h"
 #include "oslib/oslib.h"
 #include "wsi/osx.h"
+#include "cheats.h"
+
+#define RC_CLIENT_SUPPORTS_HASH 1
+#include <rc_client.h>
+#include <rc_consoles.h>
+#import "OERetroAchievementsTransport.h"
+#import "OERetroAchievementsBridge.h"
 
 #include <OpenGL/gl3.h>
 #include <mach/mach_time.h>
@@ -133,10 +142,30 @@ static OpenEmuAudioBackend openEmuAudioBackend;
     BOOL _isInitialized;
     BOOL _emuInitialized;
     double _frameInterval;
+    OERetroAchievementsBridge *_raBridge;
+    NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
 }
 @end
 
 __weak FlycastGameCore *_current;
+
+// Mirrors Flycast's own RA reader (Achievements::clientReadMemory): rcheevos addresses the
+// 16 MB Dreamcast system RAM from 0; it lives at SH4 0x0C000000. Read through the SH4 bus.
+static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
+                                       uint32_t num_bytes, rc_client_t *client)
+{
+    if (address + num_bytes > RAM_SIZE)
+        return 0;
+    address += 0x0C000000;
+    switch (num_bytes)
+    {
+        case 1: *buffer = ReadMem8_nommu(address); break;
+        case 2: *(u16 *)buffer = ReadMem16_nommu(address); break;
+        case 4: *(u32 *)buffer = ReadMem32_nommu(address); break;
+        default: return 0;
+    }
+    return num_bytes;
+}
 
 @implementation FlycastGameCore
 
@@ -149,6 +178,7 @@ __weak FlycastGameCore *_current;
         _videoHeight = 480;
         _isInitialized = NO;
         _frameInterval = 59.94;
+        _cheatList = [[NSMutableDictionary alloc] init];
     }
     _current = self;
     return self;
@@ -156,12 +186,24 @@ __weak FlycastGameCore *_current;
 
 - (void)dealloc
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     _current = nil;
 }
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     _romPath = [path copy];
+
+    // Start the RA bridge now (login + disc hashing run off the ROM path, independent of
+    // emulation state). markROMReady is deferred to -executeFrame, once the game has loaded
+    // and Dreamcast RAM is mapped.
+    _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+                                                       memoryReader:flycast_rc_read_memory
+                                                          consoleID:(uint32_t)RC_CONSOLE_DREAMCAST];
+    [_raBridge startWithROMPath:path];
+
     return YES;
 }
 
@@ -216,6 +258,9 @@ __weak FlycastGameCore *_current;
 
 - (void)stopEmulation
 {
+    [_raBridge shutdown];
+    _raBridge = nil;
+
     if (_isInitialized) {
         emu.stop();
         emu.unloadGame();
@@ -236,6 +281,100 @@ __weak FlycastGameCore *_current;
     if (_isInitialized) {
         emu.requestReset();
     }
+    [_raBridge reset];
+}
+
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+    [_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+    return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+    return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+    [_raBridge deserializeProgress:data];
+}
+
+#pragma mark - Cheats
+
+// Dreamcast codes are GameShark/Action Replay: whitespace/newline-separated 8-hex words, decoded
+// by Flycast's own CheatManager (8/16/32-bit writes, conditionals, repeats, encrypted codes).
+// Whitespace is only a separator between words, so just trim the ends and uppercase.
+- (void)setCheat:(NSString *)code setType:(NSString *)type setEnabled:(BOOL)enabled
+{
+    NSString *key = [[code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] uppercaseString];
+    if (key.length == 0)
+        return;
+
+    if (enabled)
+        _cheatList[key] = @YES;
+    else
+        [_cheatList removeObjectForKey:key];
+
+    [self applyCheats];
+}
+
+- (void)applyCheats
+{
+    if (!_isInitialized)
+        return;
+
+    // Rebuild the whole list: drop the previous user cheats (built-in game fixes are kept), then
+    // re-add every enabled one. CheatManager::apply() reasserts them on each VBlank event.
+    cheatManager.clearUserCheats();
+
+    for (NSString *code in _cheatList) {
+        if (![_cheatList[code] boolValue])
+            continue;
+        try {
+            cheatManager.addGameSharkCheat("OpenEmu", code.UTF8String, false);
+        } catch (...) {
+            NSLog(@"[Flycast] Ignoring invalid cheat code: %@", code);
+        }
+    }
+
+    // addGameSharkCheat appends each cheat with enabled=false (standalone Flycast relies on the
+    // user ticking a checkbox afterward). OpenEmu only ever adds cheats it wants active, so turn
+    // them all on — otherwise CheatManager::apply() skips them and nothing is written. Built-in
+    // game fixes are already enabled, so re-enabling them is a no-op.
+    for (size_t i = 0; i < cheatManager.cheatCount(); i++)
+        cheatManager.enableCheat(i, true);
+}
+
+- (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions
+{
+    if (!_isInitialized)
+        return @[];
+
+    // Dreamcast system RAM (SH4 area 3, cached at 0x0C000000). Cap at 16 MB: the GameShark code
+    // address field is 24-bit, so nothing above 0xFFFFFF is expressible as a cheat anyway.
+    uint32_t size = RAM_SIZE;
+    if (size > 0x01000000)
+        size = 0x01000000;
+
+    u8 *ram = GetMemPtr(0x0C000000, size);
+    if (ram == NULL)
+        return @[];
+
+    // Address 0 = RAM offset, matching the 24-bit offset a GameShark code pokes. SH4 runs
+    // little-endian, so the raw bytes line up with the search's little-endian reads.
+    NSData *data = [NSData dataWithBytes:ram length:size];
+    OEMemoryRegionDescriptor *descriptor = [OEMemoryRegionDescriptor descriptorWithName:@"System RAM"
+                                                                                address:0
+                                                                           addressBytes:3
+                                                                                   data:data];
+    return @[descriptor];
 }
 
 #pragma mark - Frame Execution
@@ -258,6 +397,13 @@ __weak FlycastGameCore *_current;
             emu.start();
             gui_setState(GuiState::Closed);
             _isInitialized = YES;
+
+            // Dreamcast RAM is mapped now; let rcheevos read it during -doFrame.
+            [_raBridge markROMReady];
+
+            // emu.loadGame ran cheatManager.reset() which cleared any user cheats; (re)apply the
+            // ones OpenEmu has queued now that the game (and its gameId) is loaded.
+            [self applyCheats];
         } catch (const std::exception &e) {
             NSLog(@"[Flycast] Error loading game: %s", e.what());
             return;
@@ -268,6 +414,8 @@ __weak FlycastGameCore *_current;
     }
 
     emu.render();
+
+    [_raBridge doFrame];
 }
 
 #pragma mark - Video

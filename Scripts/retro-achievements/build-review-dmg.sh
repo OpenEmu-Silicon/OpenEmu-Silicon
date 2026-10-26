@@ -216,33 +216,47 @@ FAILED_CORES=()
 for core in "${CORE_NAMES[@]}"; do
   info "Building $core..."
 
-  # Determine scheme: prefer "OpenEmu + Core" combined scheme
-  COMBINED_SCHEME="OpenEmu + $core"
-  AVAILABLE=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/,0' | tail -n +2)
-  if echo "$AVAILABLE" | grep -qxF "        $COMBINED_SCHEME"; then
-    SCHEME="$COMBINED_SCHEME"
-  elif echo "$AVAILABLE" | grep -qxF "        $core"; then
-    SCHEME="$core"
+  # Clone-and-build cores (e.g. FBNeo, MAME) aren't in the workspace: they have a
+  # dedicated Scripts/build-<core>-core.sh that clones a pinned fork, builds the
+  # dylib, then the plugin into <Core>/build/XcodeDerived. Use it when present.
+  CORE_SCRIPT="$REPO_ROOT/Scripts/build-$(echo "$core" | tr '[:upper:]' '[:lower:]')-core.sh"
+  if [ -f "$CORE_SCRIPT" ]; then
+    if ! "$CORE_SCRIPT" 2>&1 | tail -3; then
+      echo "  FAILED: $core"
+      FAILED_CORES+=("$core")
+      continue
+    fi
+    PLUGIN="$REPO_ROOT/$core/build/XcodeDerived/Build/Products/Release/${core}.oecoreplugin"
   else
-    echo "  WARNING: No scheme found for $core — skipping"
-    FAILED_CORES+=("$core")
-    continue
-  fi
+    # Determine scheme: prefer "OpenEmu + Core" combined scheme
+    COMBINED_SCHEME="OpenEmu + $core"
+    AVAILABLE=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/,0' | tail -n +2)
+    if echo "$AVAILABLE" | grep -qxF "        $COMBINED_SCHEME"; then
+      SCHEME="$COMBINED_SCHEME"
+    elif echo "$AVAILABLE" | grep -qxF "        $core"; then
+      SCHEME="$core"
+    else
+      echo "  WARNING: No scheme found for $core — skipping"
+      FAILED_CORES+=("$core")
+      continue
+    fi
 
-  if ! xcodebuild \
-      -workspace "$WORKSPACE" \
-      -scheme "$SCHEME" \
-      -configuration Release \
-      -destination "$DESTINATION" \
-      -derivedDataPath "$DERIVED_DATA" \
-      build 2>&1 | tail -3; then
-    echo "  FAILED: $core"
-    FAILED_CORES+=("$core")
-    continue
+    if ! xcodebuild \
+        -workspace "$WORKSPACE" \
+        -scheme "$SCHEME" \
+        -configuration Release \
+        -destination "$DESTINATION" \
+        -derivedDataPath "$DERIVED_DATA" \
+        build 2>&1 | tail -3; then
+      echo "  FAILED: $core"
+      FAILED_CORES+=("$core")
+      continue
+    fi
+
+    PLUGIN="$DERIVED_DATA/Build/Products/Release/${core}.oecoreplugin"
   fi
 
   # Locate the built plugin
-  PLUGIN="$DERIVED_DATA/Build/Products/Release/${core}.oecoreplugin"
   if [ ! -d "$PLUGIN" ]; then
     echo "  WARNING: Plugin not found at $PLUGIN"
     FAILED_CORES+=("$core")
