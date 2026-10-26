@@ -16,7 +16,8 @@
 #
 # A run leaves the usual traces of playing: play count, last-played time, and an auto save state when the game closes.
 # It never deletes anything and never uses Quick Save. By default it answers "continue your last game?" with Resume;
-# --restart answers Restart. The app is started through LaunchServices (`open`), the way a person starts it, so macOS
+# --restart answers Restart (the game boots fresh; the auto save state is not loaded). --no-backup switches the save
+# backup folder off for this run, which also avoids the save-sync prompts. The app is started through LaunchServices (`open`), the way a person starts it, so macOS
 # treats it as its own program (iCloud Drive and other privacy permissions apply to it, not to the Claude app that ran
 # this script). --direct runs the binary straight from this script instead, for comparison.
 #
@@ -29,7 +30,7 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open
+GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --game) GAME="${2:-}"; shift 2 ;;
@@ -37,6 +38,7 @@ while [ $# -gt 0 ]; do
     --keys) KEYS="${2:-}"; shift 2 ;;
     --restart) RESUME=0; shift ;;
     --direct) LAUNCH=direct; shift ;;
+    --no-backup) NO_BACKUP=1; shift ;;
     -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -94,7 +96,12 @@ PY
 START_MARK="$OUT/.start"; touch "$START_MARK"
 START_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
 echo "----  playing for ${SECONDS_TO_PLAY}s"
-APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1)
+# OESkipDiscGuideMessageKey: the library shows "Have you read the guide?" whenever it opens on a disc-based system
+# (the sidebar remembers the last one used), which would block the run. Launch arguments are never saved to preferences.
+APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1
+          -OESkipDiscGuideMessageKey 1)
+# --no-backup turns the save backup folder off for this run only (a launch argument is never saved to preferences).
+[ "$NO_BACKUP" -eq 1 ] && APP_ARGS+=(-OEBackupFolderPath "")
 if [ "$LAUNCH" = "direct" ]; then
   "$APP/Contents/MacOS/OpenEmu" "${APP_ARGS[@]}" > "$OUT/app.log" 2>&1 &
 else
@@ -131,12 +138,30 @@ if result is None:
 else:
     print("driver: %s, %s. Played %.0fs, sent keys: %s" % (result["status"], result["message"], result["secondsPlayed"], ", ".join(result["keysSent"]) or "none"))
     if result["status"] != "ok": ok = False
+    for line in result.get("backupAudit", []): print("backup audit: " + line)
+    opening = [re.sub(r"^.*\[org.openemu.OpenEmu:core\]\s*", "", l) for l in log if "] Opening '" in l]
+    if opening: print("start: " + opening[-1])
     shots = result["shots"]
     blank = sum(1 for s in shots if s["blank"]); changes = sum(1 for s in shots if s["changedFromPrevious"])
-    print("picture: %d screenshots, %d blank, picture changed %d times between screenshots" % (len(shots), blank, changes))
+    src = [s["sourceBlank"] for s in shots if s.get("sourceBlank") is not None]
+    print("picture: %d screenshots, %d blank after the shader chain, picture changed %d times between screenshots" % (len(shots), blank, changes))
+    if src:
+        print("capture stages: core picture before the shader chain blank in %d of %d; after the shader chain blank in %d of %d"
+              % (sum(1 for b in src if b), len(src), blank, len(shots)))
+    rendering = re.findall(r"this core renders with (\w+)", "\n".join(log))
+    rendering = rendering[-1] if rendering else "unknown"
+    print("core rendering type: %s" % rendering)
+    for l in [l for l in log if "capture source texture" in l or "capture output source texture" in l][:2]:
+        print("   " + re.sub(r"^.*\[org.openemu.OpenEmuKit:capture\]\s*", "", l)[:200])
     if shots and blank == len(shots):
-        print("PROBLEM: every screenshot was blank. The game drew nothing.")
-        ok = False
+        if rendering == "metal2":
+            print("NOTE: every screenshot was blank, but this core renders with Metal 2 and the capture may be unreliable for it.")
+            print("      A blank result here does NOT show the game drew nothing. Check the window yourself or the frame rate and audio above.")
+        else:
+            print("PROBLEM: every screenshot was blank. The game may have drawn nothing.")
+            ok = False
+    elif shots and blank > len(shots) // 2:
+        print("NOTE: most screenshots were blank%s." % (" (Metal 2 core: the capture may be unreliable)" if rendering == "metal2" else ""))
 
 # Frame pacing and audio, from the core's own log lines
 stats = [re.search(r"\((\d+\.?\d*) fps\), worst gap (\d+\.?\d*) ms", l) for l in log if "frame stats" in l]

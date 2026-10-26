@@ -26,6 +26,27 @@ import Foundation
 import OpenEmuShaders
 import CoreImage
 import CoreGraphics
+import Metal
+internal import os
+
+private let captureLog = Logger(subsystem: "org.openemu.OpenEmuKit", category: "capture")
+
+private func describe(_ texture: MTLTexture) -> String {
+    let storage: String
+    switch texture.storageMode {
+    case .shared: storage = "shared"
+    case .managed: storage = "managed"
+    case .private: storage = "private"
+    case .memoryless: storage = "memoryless"
+    @unknown default: storage = "unknown"
+    }
+    var usage: [String] = []
+    if texture.usage.contains(.shaderRead) { usage.append("shaderRead") }
+    if texture.usage.contains(.shaderWrite) { usage.append("shaderWrite") }
+    if texture.usage.contains(.renderTarget) { usage.append("renderTarget") }
+    if texture.usage.contains(.pixelFormatView) { usage.append("pixelFormatView") }
+    return "\(texture.width)x\(texture.height) pixelFormat=\(texture.pixelFormat.rawValue) storage=\(storage) usage=\(usage.joined(separator: "|"))"
+}
 
 public class Screenshot {
     let ss: OpenEmuShaders.Screenshot
@@ -44,8 +65,10 @@ public class Screenshot {
         guard let commandBuffer = commandQueue.makeCommandBuffer() else { return blackImage }
         
         guard let sourceTexture = f.prepareFrameForRender(commandBuffer: commandBuffer) else {
+            captureLog.info("capture source: the renderer had no frame to give")
             return blackImage
         }
+        captureLog.info("capture source texture: \(describe(sourceTexture), privacy: .public)")
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
         
@@ -61,8 +84,10 @@ public class Screenshot {
         guard let commandBuffer = commandQueue.makeCommandBuffer() else { return blackImage }
         
         guard let sourceTexture = gr.prepareFrameForRender(commandBuffer: commandBuffer) else {
+            captureLog.info("capture output: the renderer had no frame to give")
             return blackImage
         }
+        captureLog.info("capture output source texture: \(describe(sourceTexture), privacy: .public)")
         
         return ss.applyFilterChain(f, to: sourceTexture, flip: flippedVertically, commandBuffer: commandBuffer) ?? blackImage
     }

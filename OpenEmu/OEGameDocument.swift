@@ -1504,6 +1504,15 @@ final class OEGameDocument: NSDocument {
         return screenshot
     }
     
+    /// The core's picture before the shader chain (not aspect corrected). Used by the debug play test driver to tell
+    /// which stage of the capture went blank.
+    func sourceScreenshot() -> NSImage? {
+        guard let rep = gameCoreManager?.captureSourceImage() else { return nil }
+        let image = NSImage(size: rep.size)
+        image.addRepresentation(rep)
+        return image
+    }
+    
     @objc func takeScreenshot(_ sender: Any?) {
         let defaults = UserDefaults.standard
         let type = NSBitmapImageRep.FileType(rawValue: UInt(defaults.integer(forKey: OEScreenshotFileFormatKey)))!

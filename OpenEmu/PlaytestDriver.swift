@@ -24,6 +24,7 @@
 
 #if DEBUG
 import Cocoa
+import CryptoKit
 import OpenEmuSystem
 import os.log
 
@@ -64,7 +65,10 @@ final class PlaytestDriver {
         var file: String
         var secondsIn: Double
         var lastKey: String
+        /// The picture after the shader chain (what a player sees, and what the PNG shows).
         var blank: Bool
+        /// The core's own picture before the shader chain. nil when it could not be captured.
+        var sourceBlank: Bool?
         var changedFromPrevious: Bool
     }
 
@@ -75,6 +79,7 @@ final class PlaytestDriver {
         var secondsPlayed: Double
         var keysSent: [String]
         var shots: [Shot]
+        var backupAudit: [String]
     }
 
     private var plan: Plan?
@@ -84,6 +89,8 @@ final class PlaytestDriver {
     private var lastKey = "none"
     private var previousPrint: [UInt8]?
     private var gameName = ""
+    private var systemIdentifier = ""
+    private var backupAudit: [String] = []
     private var runStart = Date()
     private var shotCounter = 0
 
@@ -117,7 +124,8 @@ final class PlaytestDriver {
                 return
             }
             gameName = game.displayName ?? url.lastPathComponent
-            (NSApp.delegate as! AppDelegate).mainWindowController.startGame(game)
+            systemIdentifier = game.system?.systemIdentifier ?? ""
+            (NSApp.delegate as! AppDelegate).mainWindowController.startGameAsPlayer(game)
         } catch {
             finish(status: "error", message: "Could not look the game up: \(error)")
             return
@@ -130,6 +138,7 @@ final class PlaytestDriver {
     }
 
     private func waitForGameToRun(deadline: Date) {
+        if failIfAlertIsShowing(during: "waiting for the game to start") { return }
         if let document = currentDocument(), document.isPlaying {
             // Give the first frames a moment so the first screenshot is not the loading screen.
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.play(document) }
@@ -164,6 +173,12 @@ final class PlaytestDriver {
             }
         }
 
+        var checkAt = 1.0
+        while checkAt < plan.seconds {
+            DispatchQueue.main.asyncAfter(deadline: .now() + checkAt) { _ = self.failIfAlertIsShowing(during: "playing") }
+            checkAt += 1.0
+        }
+        
         let every = plan.screenshotEvery ?? 2
         var t = every
         while t < plan.seconds {
@@ -179,6 +194,7 @@ final class PlaytestDriver {
     private func takeShot(_ document: OEGameDocument) {
         guard let plan else { return }
         guard let image = document.screenshot() else { return }
+        let sourceBlank = document.sourceScreenshot().map { Self.isBlank(Self.fingerprint(of: $0)) }
         shotCounter += 1
         let seconds = Date().timeIntervalSince(runStart)
         let name = String(format: "shot-%02d-%03ds-%@.png", shotCounter, Int(seconds), lastKey)
@@ -190,7 +206,7 @@ final class PlaytestDriver {
            let png = rep.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: plan.outputDirectory).appendingPathComponent(name))
         }
-        shots.append(Shot(file: name, secondsIn: seconds, lastKey: lastKey, blank: blank, changedFromPrevious: changed))
+        shots.append(Shot(file: name, secondsIn: seconds, lastKey: lastKey, blank: blank, sourceBlank: sourceBlank, changedFromPrevious: changed))
     }
 
     private func closeGame(_ document: OEGameDocument) {
@@ -201,8 +217,9 @@ final class PlaytestDriver {
     }
 
     private func waitForGameToClose(deadline: Date) {
+        if failIfAlertIsShowing(during: "closing the game") { return }
         if currentDocument() == nil {
-            finish(status: "ok", message: "Played and closed the game")
+            auditBackup { self.finish(status: "ok", message: "Played and closed the game") }
             return
         }
         if Date() > deadline {
@@ -212,10 +229,162 @@ final class PlaytestDriver {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.waitForGameToClose(deadline: deadline) }
     }
 
-    private func finish(status: String, message: String) {
+
+    // MARK: - Unexpected alerts
+
+    /// Text of any alert or sheet that is blocking the app right now, or nil. Alerts such as the save sync "Still
+    /// Syncing" prompt or "Could not load the state" wait for a person, so a play test must stop and say so instead of
+    /// waiting out its timeout.
+    private func visibleAlertText() -> String? {
+        var windows: [NSWindow] = []
+        if let modal = NSApp.modalWindow { windows.append(modal) }
+        for window in NSApp.windows {
+            if let sheet = window.attachedSheet { windows.append(sheet) }
+        }
+        for window in windows {
+            let texts = window.contentView.map { Self.texts(in: $0) } ?? []
+            if !texts.isEmpty { return texts.joined(separator: " | ") }
+        }
+        return nil
+    }
+    
+    private static func texts(in view: NSView) -> [String] {
+        var found: [String] = []
+        if let field = view as? NSTextField, !field.stringValue.isEmpty { found.append(field.stringValue) }
+        if let button = view as? NSButton, !button.title.isEmpty { found.append("[\(button.title)]") }
+        for sub in view.subviews { found.append(contentsOf: texts(in: sub)) }
+        return found
+    }
+    
+    /// Stops the play test with a clear message when an alert is blocking. Returns true when it did.
+    private func failIfAlertIsShowing(during step: String) -> Bool {
+        guard !finished, let text = visibleAlertText() else { return false }
+        finish(status: "error", message: "An alert is blocking the app while \(step): \(text)", exitImmediately: true)
+        return true
+    }
+    
+    // MARK: - Save backup audit
+
+    /// After the game has closed: checks that the save backup folder (iCloud, or wherever it points) really holds
+    /// this game's saves, byte for byte, and that restoring from it works. Restoring rewrites the local saves with the
+    /// backup's bytes, so it only runs when they are already identical, and a copy of the local saves is kept first.
+    private func auditBackup(then done: @escaping () -> Void) {
+        let manager = OEFolderBackupManager.shared
+        guard let backup = manager.backupFolderURL else {
+            backupAudit = ["No save backup folder is set, nothing to check."]
+            done()
+            return
+        }
+        // The same sync that runs when OpenEmu quits, so a state saved a moment ago has been copied.
+        manager.flush { [self] in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var lines: [String] = []
+                let fm = FileManager.default
+                let support = URL.oeApplicationSupportDirectory
+                let safeName = gameName.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "..", with: "__")
+                let shortSystem = systemIdentifier.replacingOccurrences(of: "openemu.system.", with: "")
+                
+                // Where the sync writes: it mirrors the local folder names.
+                let localStates = support.appendingPathComponent("Save States")
+                var mirroredDir: URL?
+                var localDir: URL?
+                if let systems = try? fm.contentsOfDirectory(at: localStates, includingPropertiesForKeys: nil) {
+                    // Local folders are named after the ROM file (with its region), the game's name may be shorter.
+                    for system in systems {
+                        let entries = (try? fm.contentsOfDirectory(at: system, includingPropertiesForKeys: nil)) ?? []
+                        if let match = entries.first(where: { $0.lastPathComponent == safeName })
+                            ?? entries.first(where: { $0.lastPathComponent.hasPrefix(safeName) }) {
+                            localDir = match
+                        }
+                    }
+                }
+                if let localDir {
+                    let relative = localDir.standardized.path.dropFirst(support.standardized.path.count)
+                    mirroredDir = URL(fileURLWithPath: backup.standardized.path + relative)
+                }
+                guard let localDir, let mirroredDir else {
+                    lines.append("No local save states found for \(safeName).")
+                    DispatchQueue.main.async { self.backupAudit = lines; done() }
+                    return
+                }
+                lines.append("local saves:  \(localDir.path)")
+                lines.append("backup copy:  \(mirroredDir.path)")
+                
+                func states(in dir: URL) -> [URL] {
+                    ((try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
+                        .filter { $0.pathExtension.lowercased() == "oesavestate" }
+                }
+                func digest(of bundle: URL) -> String {
+                    var parts: [String] = []
+                    let files = (fm.enumerator(at: bundle, includingPropertiesForKeys: nil)?.allObjects as? [URL]) ?? []
+                    for file in files.sorted(by: { $0.path < $1.path }) {
+                        var isDir: ObjCBool = false
+                        fm.fileExists(atPath: file.path, isDirectory: &isDir)
+                        guard !isDir.boolValue, let data = try? Data(contentsOf: file) else { continue }
+                        let name = file.path.dropFirst(bundle.path.count)
+                        parts.append("\(name):\(SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())")
+                    }
+                    return SHA256.hash(data: Data(parts.joined(separator: "\n").utf8)).map { String(format: "%02x", $0) }.joined()
+                }
+                
+                let local = states(in: localDir)
+                var identical = 0, missing: [String] = [], different: [String] = []
+                for state in local {
+                    let counterpart = mirroredDir.appendingPathComponent(state.lastPathComponent)
+                    if !fm.fileExists(atPath: counterpart.path) { missing.append(state.lastPathComponent); continue }
+                    if digest(of: state) == digest(of: counterpart) { identical += 1 } else { different.append(state.lastPathComponent) }
+                }
+                let newest = states(in: mirroredDir).compactMap {
+                    (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                }.max()
+                lines.append("save states: \(local.count) local, \(identical) identical in the backup, \(missing.count) missing, \(different.count) different")
+                if !missing.isEmpty { lines.append("   missing from backup: \(missing.prefix(5).joined(separator: ", "))") }
+                if !different.isEmpty { lines.append("   different in backup: \(different.prefix(5).joined(separator: ", "))") }
+                if let newest { lines.append("newest backup copy written \(Int(Date().timeIntervalSince(newest))) seconds ago") }
+                
+                // Restore uses its own lookup folder; report whether that folder exists in the backup.
+                let restoreLooksIn = backup.appendingPathComponent("Save States").appendingPathComponent(shortSystem).appendingPathComponent(safeName)
+                let restoreFolderExists = fm.fileExists(atPath: restoreLooksIn.path)
+                lines.append("restore looks in: Save States/\(shortSystem)/\(safeName) -> \(restoreFolderExists ? "found" : "NOT FOUND in the backup")")
+                
+                guard missing.isEmpty, different.isEmpty, !local.isEmpty else {
+                    lines.append("Restore not run: the backup does not match the local saves.")
+                    DispatchQueue.main.async { self.backupAudit = lines; done() }
+                    return
+                }
+                
+                // Keep a copy of the local saves, then restore and compare again.
+                let snapshot = URL(fileURLWithPath: "/private/tmp/openemu-playtest-localsaves-\(Int(Date().timeIntervalSince1970))")
+                try? fm.createDirectory(at: snapshot, withIntermediateDirectories: true)
+                for state in local { try? fm.copyItem(at: state, to: snapshot.appendingPathComponent(state.lastPathComponent)) }
+                lines.append("copy of local saves kept at \(snapshot.path)")
+                let before = Dictionary(uniqueKeysWithValues: local.map { ($0.lastPathComponent, digest(of: $0)) })
+                
+                DispatchQueue.main.async {
+                    manager.checkForNewerBackup(systemIdentifier: self.systemIdentifier, gameName: self.gameName) { shouldRestore, date in
+                        lines.append("checkForNewerBackup: shouldRestore=\(shouldRestore), newest backup \(date.map { "\(Int(Date().timeIntervalSince($0)))s ago" } ?? "none found")")
+                        manager.restoreFromBackup(systemIdentifier: self.systemIdentifier, gameName: self.gameName) { success in
+                            DispatchQueue.global(qos: .userInitiated).async {
+                                let after = states(in: localDir)
+                                let unchanged = after.allSatisfy { before[$0.lastPathComponent] == digest(of: $0) } && after.count == local.count
+                                lines.append("restoreFromBackup: reported \(success ? "success" : "failure"); local saves afterwards \(unchanged ? "unchanged and intact" : "CHANGED")")
+                                DispatchQueue.main.async { self.backupAudit = lines; done() }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var finished = false
+    
+    private func finish(status: String, message: String, exitImmediately: Bool = false) {
+        guard !finished else { return }
+        finished = true
         let result = Result(status: status, message: message, game: gameName,
                             secondsPlayed: Date().timeIntervalSince(runStart),
-                            keysSent: keysSent, shots: shots)
+                            keysSent: keysSent, shots: shots, backupAudit: backupAudit)
         if let directory = plan?.outputDirectory ?? UserDefaults.standard.string(forKey: "OEPlaytestOutput") {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -225,7 +394,12 @@ final class PlaytestDriver {
             }
         }
         os_log(.info, log: log, "Play test finished: %{public}@ (%{public}@)", status, message)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { NSApp.terminate(nil) }
+        if exitImmediately {
+            // A blocking alert would also block a normal quit, so leave straight away.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exit(0) }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { NSApp.terminate(nil) }
+        }
     }
 
     // MARK: - Helpers
