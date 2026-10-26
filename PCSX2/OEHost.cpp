@@ -401,9 +401,17 @@ void Host::SetMouseLock(bool state)
 {
 }
 
+static std::function<void(u32, float, float)> s_vibration_callback;
+
+void OEHost::SetVibrationCallback(std::function<void(u32 pad, float large, float small)> callback)
+{
+	s_vibration_callback = std::move(callback);
+}
+
 void Host::SetPadVibration(u32 pad_index, float large_or_single_motor_intensity, float small_motor_intensity)
 {
-	// Item 5 forwards this to OpenEmu's rumble.
+	if (s_vibration_callback)
+		s_vibration_callback(pad_index, large_or_single_motor_intensity, small_motor_intensity);
 }
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)

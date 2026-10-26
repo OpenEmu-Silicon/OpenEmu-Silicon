@@ -36,6 +36,10 @@ namespace OEHost
 	/// StartCPUThread. The view is an NSView and must stay alive while the engine runs.
 	void SetRenderSurface(void* view, u32 width, u32 height);
 
+	/// Called on the CPU thread when the game sets a pad's vibration: pad index (from 0), large
+	/// and small motor strength (0 to 1). Set before StartCPUThread.
+	void SetVibrationCallback(std::function<void(u32 pad, float large, float small)> callback);
+
 	/// The base settings layer, for the game core to change values and then call
 	/// VMManager::ApplySettings() on the CPU thread. Valid after Initialize().
 	INISettingsInterface& Settings();

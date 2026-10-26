@@ -188,6 +188,16 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 	[self ensureRenderView];
 
+	// A game's rumble goes to OpenEmu as an "OEGameCoreRumble" notification (player from 1,
+	// motor strengths 0 to 1); the helper app passes it on to the controller.
+	OEHost::SetVibrationCallback([](u32 pad, float large, float small) {
+		[NSNotificationCenter.defaultCenter postNotificationName:@"OEGameCoreRumble"
+														  object:nil
+														userInfo:@{@"player": @(pad + 1),
+																   @"strongMotor": @(large),
+																   @"weakMotor": @(small)}];
+	});
+
 	VMBootParameters params;
 	params.filename = _gameURL.fileSystemRepresentation;
 	params.source_type = CDVD_SourceType::Iso;
@@ -255,7 +265,13 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	float samples[2048 * 2];
 	int16_t pcm[2048 * 2];
 	u32 frames;
+	// Faster or slower than normal speed, the sound would only crackle and overflow OpenEmu's
+	// ring, so drain it and drop it.
+	const BOOL silent = self.rate != 1.0f;
 	while ((frames = stream->PullFrames(samples, 2048)) > 0) {
+		if (silent) {
+			continue;
+		}
 		for (u32 i = 0; i < frames * 2; i++) {
 			float s = samples[i] < -1.0f ? -1.0f : (samples[i] > 1.0f ? 1.0f : samples[i]);
 			pcm[i] = (int16_t)(s * 32767.0f);
@@ -269,6 +285,42 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	if (_ownsVideoBuffer) {
 		free(_videoBuffer);
 	}
+}
+
+#pragma mark - Speed and frame step
+
+// Fast-forward and slow motion arrive as a change of rate. The engine paces itself, so map
+// the rate onto its speed limiter: faster than normal runs unlimited, slower uses its
+// slow-motion speed, and normal goes back to its nominal speed.
+- (void)setRate:(float)rate
+{
+	[super setRate:rate];
+	if (!_engineStarted || rate <= 0.0f) {
+		return;  // paused, or not running yet; a pause is handled in setPauseEmulation:
+	}
+	const LimiterModeType mode = rate > 1.0f ? LimiterModeType::Unlimited
+							   : rate < 1.0f ? LimiterModeType::Slomo
+											 : LimiterModeType::Nominal;
+	Host::RunOnCPUThread([mode]() {
+		if (VMManager::HasValidVM()) {
+			VMManager::SetLimiterMode(mode);
+		}
+	}, false);
+}
+
+// While paused, run exactly one frame of the engine. OpenEmu's own loop only calls
+// executeFrame, which does nothing for the engine's picture.
+- (void)stepFrameForward
+{
+	[super stepFrameForward];
+	if (!_engineStarted) {
+		return;
+	}
+	Host::RunOnCPUThread([]() {
+		if (VMManager::HasValidVM()) {
+			VMManager::FrameAdvance(1);
+		}
+	}, false);
 }
 
 #pragma mark - Video

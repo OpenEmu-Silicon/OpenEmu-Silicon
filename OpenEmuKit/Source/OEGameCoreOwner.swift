@@ -103,4 +103,15 @@ public typealias OEContextID = UInt32
     /// a single, dismissible notice; the bridge already suppresses the fake
     /// unlock banner.
     @objc optional func retroAchievementsEmulatorUnrecognized()
+
+    /// Called when the running core asks a controller to rumble.
+    ///
+    /// Cores post an `OEGameCoreRumble` notification inside the helper process; the helper
+    /// forwards it here. Called on whatever thread the XPC message arrives on.
+    ///
+    /// - Parameters:
+    ///   - player: The player number, starting at 1
+    ///   - strongMotor: Strength of the large (low frequency) motor, 0 to 1
+    ///   - weakMotor: Strength of the small (high frequency) motor, 0 to 1
+    @objc optional func setRumble(player: UInt, strongMotor: Float, weakMotor: Float)
 }
