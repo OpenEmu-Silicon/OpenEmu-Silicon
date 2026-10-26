@@ -37,6 +37,8 @@
 #include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/Host/AudioStream.h"
 #include "pcsx2/Host.h"
+#include "pcsx2/SIO/Pad/Pad.h"
+#include "pcsx2/SIO/Pad/PadDualshock2.h"
 #include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
 #undef BOOL
@@ -338,18 +340,65 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	return 48000;
 }
 
-#pragma mark - Input (item 5)
+#pragma mark - Input
+
+// OpenEmu's PlayStation 2 buttons, in the engine's DualShock 2 input numbering.
+static int EngineInputForButton(OEPS2Button button)
+{
+	switch (button) {
+		case OEPS2ButtonUp:            return PadDualshock2::PAD_UP;
+		case OEPS2ButtonDown:          return PadDualshock2::PAD_DOWN;
+		case OEPS2ButtonLeft:          return PadDualshock2::PAD_LEFT;
+		case OEPS2ButtonRight:         return PadDualshock2::PAD_RIGHT;
+		case OEPS2ButtonTriangle:      return PadDualshock2::PAD_TRIANGLE;
+		case OEPS2ButtonCircle:        return PadDualshock2::PAD_CIRCLE;
+		case OEPS2ButtonCross:         return PadDualshock2::PAD_CROSS;
+		case OEPS2ButtonSquare:        return PadDualshock2::PAD_SQUARE;
+		case OEPS2ButtonL1:            return PadDualshock2::PAD_L1;
+		case OEPS2ButtonL2:            return PadDualshock2::PAD_L2;
+		case OEPS2ButtonL3:            return PadDualshock2::PAD_L3;
+		case OEPS2ButtonR1:            return PadDualshock2::PAD_R1;
+		case OEPS2ButtonR2:            return PadDualshock2::PAD_R2;
+		case OEPS2ButtonR3:            return PadDualshock2::PAD_R3;
+		case OEPS2ButtonStart:         return PadDualshock2::PAD_START;
+		case OEPS2ButtonSelect:        return PadDualshock2::PAD_SELECT;
+		case OEPS2ButtonAnalogMode:    return PadDualshock2::PAD_ANALOG;
+		case OEPS2LeftAnalogUp:        return PadDualshock2::PAD_L_UP;
+		case OEPS2LeftAnalogDown:      return PadDualshock2::PAD_L_DOWN;
+		case OEPS2LeftAnalogLeft:      return PadDualshock2::PAD_L_LEFT;
+		case OEPS2LeftAnalogRight:     return PadDualshock2::PAD_L_RIGHT;
+		case OEPS2RightAnalogUp:       return PadDualshock2::PAD_R_UP;
+		case OEPS2RightAnalogDown:     return PadDualshock2::PAD_R_DOWN;
+		case OEPS2RightAnalogLeft:     return PadDualshock2::PAD_R_LEFT;
+		case OEPS2RightAnalogRight:    return PadDualshock2::PAD_R_RIGHT;
+		default:                       return -1;
+	}
+}
+
+// OpenEmu numbers players from 1; the engine's pad ports from 0. A press is 1, a
+// release is 0, and a stick direction is the amount (0 to 1).
+- (void)setPS2Button:(OEPS2Button)button value:(float)value forPlayer:(NSUInteger)player
+{
+	const int input = EngineInputForButton(button);
+	if (input < 0 || player < 1) {
+		return;
+	}
+	Pad::SetControllerState((u32)(player - 1), (u32)input, value);
+}
 
 - (oneway void)didMovePS2JoystickDirection:(OEPS2Button)button withValue:(CGFloat)value forPlayer:(NSUInteger)player
 {
+	[self setPS2Button:button value:(float)value forPlayer:player];
 }
 
 - (oneway void)didPushPS2Button:(OEPS2Button)button forPlayer:(NSUInteger)player
 {
+	[self setPS2Button:button value:1.0f forPlayer:player];
 }
 
 - (oneway void)didReleasePS2Button:(OEPS2Button)button forPlayer:(NSUInteger)player
 {
+	[self setPS2Button:button value:0.0f forPlayer:player];
 }
 
 #pragma mark - Save states (item 6)
