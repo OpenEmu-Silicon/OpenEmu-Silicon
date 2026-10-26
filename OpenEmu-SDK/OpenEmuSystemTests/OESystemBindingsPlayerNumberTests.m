@@ -69,6 +69,31 @@
 
 @end
 
+@interface OETestKeyboardHandler : OEDeviceHandler
+@end
+
+@implementation OETestKeyboardHandler
+
+- (BOOL)isKeyboardDevice
+{
+    return YES;
+}
+
+@end
+
+@interface OETestPlayerBindingsChangeCounter : NSObject
+@property NSUInteger count;
+@end
+
+@implementation OETestPlayerBindingsChangeCounter
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context
+{
+    self.count++;
+}
+
+@end
+
 @interface OESystemBindingsPlayerNumberTests : XCTestCase
 @end
 
@@ -98,6 +123,19 @@
     OEDeviceHandler *handler = [[OEDeviceHandler alloc] initWithDeviceDescription:_deviceDescription];
     XCTAssertTrue([_bindings OE_didAddDeviceHandler:handler]);
     return handler;
+}
+
+- (void)assertPlayers:(NSArray<OEDeviceHandler *> *)handlers
+{
+    [handlers enumerateObjectsUsingBlock:^(OEDeviceHandler *handler, NSUInteger idx, BOOL *stop) {
+        NSUInteger player = idx + 1;
+        XCTAssertEqual([self->_bindings playerForDeviceHandler:handler], player);
+        if(player <= [self->_bindings numberOfPlayers])
+            XCTAssertEqual([[self->_bindings devicePlayerBindingsForPlayer:player] deviceHandler], handler);
+    }];
+
+    for(NSUInteger player = [handlers count] + 1; player <= [_bindings numberOfPlayers]; player++)
+        XCTAssertNil([_bindings devicePlayerBindingsForPlayer:player]);
 }
 
 - (void)testControllersConnectedWhileIdleTakeTheFirstPlayers
@@ -158,6 +196,202 @@
     [_bindings removeBindingsObserver:game];
 
     XCTAssertEqual([_bindings playerForDeviceHandler:handler], 2);
+}
+
+- (void)testDisconnectingLastControllerKeepsOtherPlayers
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+
+    [_bindings OE_didRemoveDeviceHandler:third];
+
+    [self assertPlayers:@[first, second]];
+    XCTAssertEqual([_bindings playerForDeviceHandler:third], 0);
+}
+
+- (void)testDisconnectingMiddleControllerMovesOnlyLaterPlayers
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+
+    [_bindings OE_didRemoveDeviceHandler:second];
+
+    [self assertPlayers:@[first, third]];
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 0);
+}
+
+- (void)testDisconnectingAllControllersLeavesNoPlayers
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+    [_bindings OE_didRemoveDeviceHandler:second];
+
+    [self assertPlayers:@[]];
+
+    OEDeviceHandler *third = [self connectController];
+    [self assertPlayers:@[third]];
+}
+
+- (void)testReconnectedControllerTakesNextPlayer
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+    OEDeviceHandler *reconnected = [self connectController];
+
+    [self assertPlayers:@[second, reconnected]];
+}
+
+- (void)testSeveralDisconnectsDuringGameAreFilledWhenGameEnds
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+    OEDeviceHandler *fourth = [self connectController];
+
+    OETestBindingsObserver *game = [[OETestBindingsObserver alloc] init];
+    [_bindings addBindingsObserver:game];
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+    [_bindings OE_didRemoveDeviceHandler:third];
+
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:1]);
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 2);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:3]);
+    XCTAssertEqual([_bindings playerForDeviceHandler:fourth], 4);
+
+    [_bindings removeBindingsObserver:game];
+
+    [self assertPlayers:@[second, fourth]];
+}
+
+- (void)testControllerConnectedDuringGameFillsEmptyPlayer
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    OETestBindingsObserver *game = [[OETestBindingsObserver alloc] init];
+    [_bindings addBindingsObserver:game];
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+    OEDeviceHandler *third = [self connectController];
+
+    [self assertPlayers:@[third, second]];
+
+    [_bindings removeBindingsObserver:game];
+
+    [self assertPlayers:@[third, second]];
+}
+
+- (void)testPlayersMoveOnlyWhenLastGameOfSystemEnds
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    OETestBindingsObserver *firstGame = [[OETestBindingsObserver alloc] init];
+    OETestBindingsObserver *secondGame = [[OETestBindingsObserver alloc] init];
+    [_bindings addBindingsObserver:firstGame];
+    [_bindings addBindingsObserver:secondGame];
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+
+    [_bindings removeBindingsObserver:firstGame];
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 2);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:1]);
+
+    [_bindings removeBindingsObserver:secondGame];
+    [self assertPlayers:@[second]];
+}
+
+- (void)testDisconnectWhileIdleAfterGameDoesNotNeedGameToEndAgain
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+
+    OETestBindingsObserver *game = [[OETestBindingsObserver alloc] init];
+    [_bindings addBindingsObserver:game];
+    [_bindings OE_didRemoveDeviceHandler:first];
+    [_bindings removeBindingsObserver:game];
+
+    [self assertPlayers:@[second, third]];
+
+    [_bindings OE_didRemoveDeviceHandler:second];
+
+    [self assertPlayers:@[third]];
+}
+
+- (void)testManualPlayerAssignmentIsLostAfterDisconnect
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    [_bindings setDeviceHandler:second forPlayer:4];
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 4);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:2]);
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+
+    [self assertPlayers:@[second]];
+}
+
+- (void)testControllersAbovePlayerLimitMoveIntoFreedPlayers
+{
+    NSMutableArray<OEDeviceHandler *> *handlers = [NSMutableArray array];
+    for(NSUInteger i = 0; i < [_bindings numberOfPlayers] + 1; i++)
+        [handlers addObject:[self connectController]];
+
+    OEDeviceHandler *extra = [handlers lastObject];
+    XCTAssertEqual([_bindings playerForDeviceHandler:extra], [_bindings numberOfPlayers] + 1);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:[_bindings numberOfPlayers] + 1]);
+
+    [_bindings OE_didRemoveDeviceHandler:handlers[0]];
+    [handlers removeObjectAtIndex:0];
+
+    [self assertPlayers:handlers];
+    XCTAssertEqual([[_bindings devicePlayerBindingsForPlayer:[_bindings numberOfPlayers]] deviceHandler], extra);
+}
+
+- (void)testKeyboardDevicesDoNotChangePlayers
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    OETestKeyboardHandler *keyboard = [[OETestKeyboardHandler alloc] initWithDeviceDescription:nil];
+    XCTAssertTrue([_bindings OE_didAddDeviceHandler:keyboard]);
+    XCTAssertEqual([_bindings playerForDeviceHandler:keyboard], 0);
+    [self assertPlayers:@[first, second]];
+
+    [_bindings OE_didRemoveDeviceHandler:keyboard];
+    [self assertPlayers:@[first, second]];
+}
+
+- (void)testPlayerChangeIsSentToObserversOfDevicePlayerBindings
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+
+    OETestPlayerBindingsChangeCounter *counter = [[OETestPlayerBindingsChangeCounter alloc] init];
+    [_bindings addObserver:counter forKeyPath:@"devicePlayerBindings" options:0 context:NULL];
+
+    [_bindings OE_didRemoveDeviceHandler:third];
+    NSUInteger changesWithoutMove = counter.count;
+
+    counter.count = 0;
+    [_bindings OE_didRemoveDeviceHandler:first];
+    NSUInteger changesWithMove = counter.count;
+
+    [_bindings removeObserver:counter forKeyPath:@"devicePlayerBindings"];
+
+    XCTAssertEqual(changesWithoutMove, 1);
+    XCTAssertEqual(changesWithMove, 2);
+    [self assertPlayers:@[second]];
 }
 
 @end
