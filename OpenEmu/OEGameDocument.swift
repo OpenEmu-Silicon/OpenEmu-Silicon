@@ -49,6 +49,10 @@ let OEGameCoreManagerModePreferenceKey = "OEGameCoreManagerModePreference"
 /// frame advance, and cheats while enabled.
 let RAHardcoreEnabledKey = "RAHardcoreEnabled"
 
+/// User preference: show the challenge/leaderboard/progress trackers in the
+/// top-right corner while playing in softcore. Hardcore always shows them.
+let RAShowTrackersSoftcoreKey = "RAShowTrackersSoftcore"
+
 /// Posted by `PrefRetroAchievementsController` when the user toggles hardcore mode.
 /// `userInfo[OEHardcoreEnabledKey]` carries the new `Bool`.
 extension Notification.Name {
@@ -144,6 +148,7 @@ final class OEGameDocument: NSDocument {
             OEScreenshotFileFormatKey : NSBitmapImageRep.FileType.png.rawValue,
             OEScreenshotPropertiesKey : [NSBitmapImageRep.PropertyKey : Any](),
             RAHardcoreEnabledKey      : true,
+            RAShowTrackersSoftcoreKey : true,
         ])
     }()
     
