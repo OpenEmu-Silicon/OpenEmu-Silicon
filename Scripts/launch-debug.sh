@@ -145,5 +145,22 @@ if pgrep -x OpenEmu >/dev/null; then
     done
 fi
 
+# 3b. Heal a stale library location. The debug build keeps its own preferences, and an
+#     automated UI-test run points them at a throwaway library in a temp folder. Once that
+#     folder is gone, OpenEmu cannot find a library and asks you to choose one. If the saved
+#     location no longer exists, drop it so OpenEmu falls back to its normal library
+#     (~/Library/Application Support/OpenEmu/Game Library, the one the regular app uses).
+BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$NEWEST/Contents/Info.plist" 2>/dev/null || true)
+if [ -n "$BUNDLE_ID" ]; then
+    STORED_LIBRARY=$(defaults read "$BUNDLE_ID" databasePath 2>/dev/null || true)
+    if [ -n "$STORED_LIBRARY" ]; then
+        STORED_LIBRARY_EXPANDED="${STORED_LIBRARY/#\~/$HOME}"
+        if [ ! -e "$STORED_LIBRARY_EXPANDED" ]; then
+            echo "launch-debug: saved library location is gone ($STORED_LIBRARY); using the default library instead." >&2
+            defaults delete "$BUNDLE_ID" databasePath
+        fi
+    fi
+fi
+
 # 4. Force a new instance bound to this bundle.
 open -n "$NEWEST"
