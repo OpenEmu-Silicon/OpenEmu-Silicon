@@ -44,7 +44,8 @@ final class OpenEmuSmokeUITests: XCTestCase {
             app.launchArguments = []
         } else {
             // Both keys must match, otherwise the app refuses to create a library at a non-default path.
-            app.launchArguments = ["-databasePath", libraryPath, "-defaultDatabasePath", libraryPath]
+            // The empty backup folder keeps the tests away from any Cloud Sync folder set in the debug app.
+            app.launchArguments = baseArguments + ["-OEBackupFolderPath", ""]
         }
         app.launch()
         XCTAssertTrue(libraryWindow.waitForExistence(timeout: 45), "Library window did not appear")
@@ -58,6 +59,8 @@ final class OpenEmuSmokeUITests: XCTestCase {
 
     /// True when OE_USE_REAL_LIBRARY=1: the test opens games from the user's own library instead of a throwaway one.
     private static var usesRealLibrary: Bool { ProcessInfo.processInfo.environment["OE_USE_REAL_LIBRARY"] == "1" }
+
+    private var baseArguments: [String] { ["-databasePath", libraryPath, "-defaultDatabasePath", libraryPath] }
 
     private var libraryWindow: XCUIElement { app.windows["LibraryWindow"] }
 
@@ -243,10 +246,78 @@ final class OpenEmuSmokeUITests: XCTestCase {
         add(attachment)
     }
 
-    /// "Are you sure you want to quit the game?" is a dialog inside the game window with a "Quit" button.
+
+    /// Plays the ROM named by OE_TEST_ROM with a backup folder set, then checks that a quick save is
+    /// copied into the folder with a "which Mac saved this" file, and that saving again keeps the
+    /// replaced copy in a .versions folder.
+    func testQuickSaveIsBackedUpWithVersions() throws {
+        guard let rom = ProcessInfo.processInfo.environment["OE_TEST_ROM"], !rom.isEmpty else {
+            throw XCTSkip("Set OE_TEST_ROM to a ROM path (check.sh --rom <path>) to run this test")
+        }
+        let backupFolder = NSTemporaryDirectory() + "openemu-ui-backup-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: backupFolder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: backupFolder) }
+
+        app.terminate()
+        app.launchArguments = baseArguments + ["-OEBackupFolderPath", backupFolder, rom]
+        app.launch()
+        dismissFirstRunAlert()
+        let play = app.sheets.buttons["Play Game"]
+        XCTAssertTrue(play.waitForExistence(timeout: 60), "Import-finished prompt did not appear")
+        play.click()
+
+        let gameWindow = app.windows.matching(NSPredicate(
+            format: "identifier != 'LibraryWindow' AND title != '' AND title != 'OpenEmu'")).firstMatch
+        XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game window did not open")
+        sleep(8)
+
+        chooseMenu("Controls", "Quick Save")
+        let saveState = try waitForFile(in: backupFolder, timeout: 30) { $0.pathExtension == "oesavestate" }
+        XCTAssertNotNil(saveState, "Quick save was not copied into the backup folder")
+        let info = try waitForFile(in: backupFolder + "/Sync Info", timeout: 15) { $0.pathExtension == "json" }
+        XCTAssertNotNil(info, "No sync info file was written next to the backup")
+        if let info {
+            let json = try JSONSerialization.jsonObject(with: Data(contentsOf: info)) as? [String: Any]
+            XCTAssertFalse((json?["machineName"] as? String ?? "").isEmpty, "Sync info does not name the Mac")
+            XCTAssertFalse((json?["machineID"] as? String ?? "").isEmpty, "Sync info has no Mac id")
+        }
+
+        sleep(3)
+        chooseMenu("Controls", "Quick Save")
+        let kept = try waitForFile(in: backupFolder, timeout: 30) { $0.deletingLastPathComponent().lastPathComponent == ".versions" }
+        XCTAssertNotNil(kept, "Saving again did not keep the replaced copy in a .versions folder")
+
+        chooseMenu("Controls", "Quit Game")
+        confirmQuitIfAsked()
+        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+    }
+
+    /// Polls until a file under `root` (hidden folders included) matches, or the timeout passes.
+    private func waitForFile(in root: String, timeout: TimeInterval, matching: (URL) -> Bool) throws -> URL? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let enumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: root), includingPropertiesForKeys: nil, options: []) {
+                for case let url as URL in enumerator where matching(url) { return url }
+            }
+            Thread.sleep(forTimeInterval: 1)
+        } while Date() < deadline
+        return nil
+    }
+
+    /// Quitting a game asks "Are you sure?" unless the user ticked "Do not ask me again". It appears as a
+    /// sheet, a separate dialog, or a dialog inside the game window, depending on the window state.
     private func confirmQuitIfAsked() {
-        let quit = app.buttons.matching(NSPredicate(format: "title IN {'Quit','Quit Game','Stop','OK'}")).firstMatch
-        if quit.waitForExistence(timeout: 3) { quit.click() }
+        let names = "{'Quit Game','Quit','Stop','OK'}"
+        let sheetButton = app.sheets.buttons.matching(NSPredicate(format: "title IN \(names)")).firstMatch
+        let dialogButton = app.dialogs.buttons.matching(NSPredicate(format: "title IN \(names)")).firstMatch
+        let inWindowButton = app.buttons.matching(NSPredicate(format: "title IN \(names)")).firstMatch
+        if sheetButton.waitForExistence(timeout: 3) {
+            sheetButton.click()
+        } else if dialogButton.waitForExistence(timeout: 1) {
+            dialogButton.click()
+        } else if inWindowButton.waitForExistence(timeout: 1) {
+            inWindowButton.click()
+        }
     }
 
     private func chooseMenu(_ menu: String, _ item: String) {

@@ -22,6 +22,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0BLIS0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0BLIS0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0BLIS0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0BLIS0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0BLIS0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0BLIS0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		1B46D09D14293CAD0025EF88 /* libz.1.2.5.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B46D09C14293CAD0025EF88 /* libz.1.2.5.dylib */; };
 		275CEE5319D5189200901DD8 /* ECS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 275CEE4919D5189200901DD8 /* ECS.cpp */; };
 		275CEE5419D5189200901DD8 /* ECSKeyboard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 275CEE4B19D5189200901DD8 /* ECSKeyboard.cpp */; };
@@ -204,6 +207,10 @@
 		8D5B49B7048680CD000E48DA /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		94BE9E79171695AE00AB08E6 /* OEIntellivisionSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEIntellivisionSystemResponderClient.h; path = ../OpenEmu/SystemPlugins/Intellivision/OEIntellivisionSystemResponderClient.h; sourceTree = "<group>"; };
 		C66DFC180F51D82F0080AA28 /* BlissGameCore.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = BlissGameCore.mm; sourceTree = "<group>"; };
+		OE0BLIS0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0BLIS0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0BLIS0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0BLIS0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		C66DFC190F51D82F0080AA28 /* BlissGameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BlissGameCore.h; sourceTree = "<group>"; };
 		C6D120E71711302600E868A8 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2F7E65807B2D6F200F64583 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = ../../../../../../../../../System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
@@ -261,6 +268,10 @@
 			children = (
 				C66DFC190F51D82F0080AA28 /* BlissGameCore.h */,
 				C66DFC180F51D82F0080AA28 /* BlissGameCore.mm */,
+				OE0BLIS0FILEREF000000001 /* rcheevos_build.c */,
+				OE0BLIS0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0BLIS0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0BLIS0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				94BE9E79171695AE00AB08E6 /* OEIntellivisionSystemResponderClient.h */,
 			);
 			name = Classes;
@@ -575,6 +586,9 @@
 				275CEEAB19D518FF00901DD8 /* ROM.cpp in Sources */,
 				275CEE9E19D518F600901DD8 /* JoystickInputProducer.cpp in Sources */,
 				C66DFC1A0F51D82F0080AA28 /* BlissGameCore.mm in Sources */,
+				OE0BLIS0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0BLIS0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0BLIS0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				275CEEF019D5194C00901DD8 /* VideoBus.cpp in Sources */,
 				275CEE5D19D5189B00901DD8 /* JoyPad.cpp in Sources */,
 				275CEE7C19D518D200901DD8 /* AY38914_Registers.cpp in Sources */,
@@ -644,7 +658,12 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
-				HEADER_SEARCH_PATHS = "\"$(SRCROOT)/Bliss\"";
+				HEADER_SEARCH_PATHS = (
+					"\"$(SRCROOT)/Bliss\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:identifier}";
@@ -659,7 +678,12 @@
 			buildSettings = {
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COMBINE_HIDPI_IMAGES = YES;
-				HEADER_SEARCH_PATHS = "\"$(SRCROOT)/Bliss\"";
+				HEADER_SEARCH_PATHS = (
+					"\"$(SRCROOT)/Bliss\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:identifier}";

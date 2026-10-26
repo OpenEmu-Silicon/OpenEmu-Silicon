@@ -89,6 +89,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# Cores whose upstream source isn't vendored (FBNeo) build through a dedicated
+# Scripts/build-<core>-core.sh: it clones the pinned source, builds the headless
+# engine, then the plugin into <Core>/build/XcodeDerived. These are Release-only
+# and are not workspace schemes, so verify builds them via that script.
+CORE_BUILD_SCRIPT=""
+if [ -n "${CORE:-}" ]; then
+  _core_lc=$(echo "$CORE" | tr '[:upper:]' '[:lower:]')
+  if [ -x "./Scripts/build-${_core_lc}-core.sh" ]; then
+    CORE_BUILD_SCRIPT="./Scripts/build-${_core_lc}-core.sh"
+    CONFIG="Release"
+  fi
+fi
+
 # Auto-detect worktree if not explicitly set.
 # `git rev-parse --show-superproject-working-tree` returns non-empty for submodules; use a different signal.
 # A linked worktree has its .git as a *file* (pointing into the main repo's .git/worktrees/), not a directory.
@@ -179,37 +192,49 @@ fi
 
 # --- Build ---------------------------------------------------------------
 
-if [ -n "$CORE" ]; then
-  # Workspace schemes are named "OpenEmu + <Core>" for the combined host+core build.
-  # Some cores also have a bare scheme (e.g. "4DO", "BSNES") — prefer the combined one.
-  COMBINED_SCHEME="OpenEmu + $CORE"
-  AVAILABLE=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/,0' | tail -n +2)
-  if echo "$AVAILABLE" | grep -qxF "        $COMBINED_SCHEME"; then
-    SCHEME="$COMBINED_SCHEME"
+if [ -n "$CORE_BUILD_SCRIPT" ]; then
+  info "Building core via $CORE_BUILD_SCRIPT (Release; clones the pinned source)"
+  BUILD_LOG=$(mktemp -t verify_build.XXXXXX)
+  wait_for_build_db
+  if "$CORE_BUILD_SCRIPT" > "$BUILD_LOG" 2>&1; then
+    pass "build ($CORE_BUILD_SCRIPT)"
   else
-    SCHEME="$CORE"
+    fail "build ($CORE_BUILD_SCRIPT) — see $BUILD_LOG (last 30 lines below)"
+    tail -30 "$BUILD_LOG"
   fi
-  info "Building core scheme: $SCHEME"
 else
-  SCHEME="OpenEmu"
-  info "Building main app scheme: $SCHEME"
-fi
+  if [ -n "$CORE" ]; then
+    # Workspace schemes are named "OpenEmu + <Core>" for the combined host+core build.
+    # Some cores also have a bare scheme (e.g. "4DO", "BSNES") — prefer the combined one.
+    COMBINED_SCHEME="OpenEmu + $CORE"
+    AVAILABLE=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/,0' | tail -n +2)
+    if echo "$AVAILABLE" | grep -qxF "        $COMBINED_SCHEME"; then
+      SCHEME="$COMBINED_SCHEME"
+    else
+      SCHEME="$CORE"
+    fi
+    info "Building core scheme: $SCHEME"
+  else
+    SCHEME="OpenEmu"
+    info "Building main app scheme: $SCHEME"
+  fi
 
-BUILD_LOG=$(mktemp -t verify_build.XXXXXX)
-XCODEBUILD_ARGS=(-workspace "$WORKSPACE" -scheme "$SCHEME"
-                 -configuration "$CONFIG" -destination 'platform=macOS,arch=arm64')
-if [ "$WORKTREE" -eq 1 ]; then
-  XCODEBUILD_ARGS+=(-derivedDataPath "$BUILD_DIR_OVERRIDE")
-  info "worktree mode — building to $BUILD_DIR_OVERRIDE"
-fi
+  BUILD_LOG=$(mktemp -t verify_build.XXXXXX)
+  XCODEBUILD_ARGS=(-workspace "$WORKSPACE" -scheme "$SCHEME"
+                   -configuration "$CONFIG" -destination 'platform=macOS,arch=arm64')
+  if [ "$WORKTREE" -eq 1 ]; then
+    XCODEBUILD_ARGS+=(-derivedDataPath "$BUILD_DIR_OVERRIDE")
+    info "worktree mode — building to $BUILD_DIR_OVERRIDE"
+  fi
 
-wait_for_build_db
+  wait_for_build_db
 
-if xcodebuild "${XCODEBUILD_ARGS[@]}" build > "$BUILD_LOG" 2>&1; then
-  pass "build ($SCHEME)"
-else
-  fail "build ($SCHEME) — see $BUILD_LOG (last 30 lines below)"
-  tail -30 "$BUILD_LOG"
+  if xcodebuild "${XCODEBUILD_ARGS[@]}" build > "$BUILD_LOG" 2>&1; then
+    pass "build ($SCHEME)"
+  else
+    fail "build ($SCHEME) — see $BUILD_LOG (last 30 lines below)"
+    tail -30 "$BUILD_LOG"
+  fi
 fi
 
 # Surface warnings even on a passing build — these are technical debt accumulating silently.
@@ -272,7 +297,11 @@ if [ -z "$CORE" ]; then
     ARTIFACT=$(find "$ARTIFACT_BASE" -maxdepth 5 -path "*OpenEmu-metal-*/Build/Products/${CONFIG}/OpenEmu.app" -print -quit 2>/dev/null)
   fi
 else
-  if [ "$WORKTREE" -eq 1 ]; then
+  if [ -n "$CORE_BUILD_SCRIPT" ]; then
+    # build-<core>-core.sh emits the plugin into <Core>/build/XcodeDerived.
+    ARTIFACT="$CORE/build/XcodeDerived/Build/Products/${CONFIG}/${CORE}.oecoreplugin"
+    [ -e "$ARTIFACT" ] || ARTIFACT=""
+  elif [ "$WORKTREE" -eq 1 ]; then
     ARTIFACT="$ARTIFACT_BASE/Build/Products/${CONFIG}/${CORE}.oecoreplugin"
     [ -e "$ARTIFACT" ] || ARTIFACT=""
   else

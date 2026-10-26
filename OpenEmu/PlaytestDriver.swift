@@ -385,8 +385,8 @@ final class PlaytestDriver {
                 let before = Dictionary(uniqueKeysWithValues: local.map { ($0.lastPathComponent, digest(of: $0)) })
                 
                 DispatchQueue.main.async {
-                    manager.checkForNewerBackup(systemIdentifier: self.systemIdentifier, gameName: self.gameName) { shouldRestore, date in
-                        lines.append("checkForNewerBackup: shouldRestore=\(shouldRestore), newest backup \(date.map { "\(Int(Date().timeIntervalSince($0)))s ago" } ?? "none found")")
+                    manager.checkForNewerBackup(systemIdentifier: self.systemIdentifier, gameName: self.gameName) { check in
+                        lines.append("checkForNewerBackup: \(check)")
                         manager.restoreFromBackup(systemIdentifier: self.systemIdentifier, gameName: self.gameName) { success in
                             DispatchQueue.global(qos: .userInitiated).async {
                                 let after = states(in: localDir)

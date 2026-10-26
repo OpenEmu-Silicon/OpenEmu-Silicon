@@ -22,6 +22,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0JAGU0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0JAGU0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0JAGU0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0JAGU0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0JAGU0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0JAGU0FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		941CAB691995EC5F0023BAF0 /* dac.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 941CAB681995EC5F0023BAF0 /* dac.cpp */; };
 		941CAB6C1995F1B20023BAF0 /* jagbios2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 941CAB6A1995F1B20023BAF0 /* jagbios2.cpp */; };
 		980BE278170989FE00511340 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 980BE277170989FE00511340 /* Cocoa.framework */; };
@@ -88,6 +91,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		OE0JAGU0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0JAGU0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0JAGU0FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0JAGU0FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		941CAB681995EC5F0023BAF0 /* dac.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = dac.cpp; sourceTree = "<group>"; };
 		941CAB6A1995F1B20023BAF0 /* jagbios2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jagbios2.cpp; sourceTree = "<group>"; };
 		941CAB6B1995F1B20023BAF0 /* jagbios2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = jagbios2.h; sourceTree = "<group>"; };
@@ -209,6 +216,10 @@
 		980BE26B170989FE00511340 = {
 			isa = PBXGroup;
 			children = (
+				OE0JAGU0FILEREF000000001 /* rcheevos_build.c */,
+				OE0JAGU0FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0JAGU0FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0JAGU0FILEREF000000004 /* OERetroAchievementsBridge.h */,
 				980BE27D170989FE00511340 /* VirtualJaguar */,
 				980BE276170989FE00511340 /* Frameworks */,
 				980BE275170989FE00511340 /* Products */,
@@ -471,6 +482,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				OE0JAGU0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0JAGU0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0JAGU0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				941CAB691995EC5F0023BAF0 /* dac.cpp in Sources */,
 				98B77B5C170999C700F2B5A6 /* JaguarGameCore.mm in Sources */,
 				9895124F170AD43E002E2694 /* blitter.cpp in Sources */,
@@ -617,6 +631,12 @@
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_VERSION = "";
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "VirtualJaguar/VirtualJaguar-Info.plist";
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				LIBRARY_SEARCH_PATHS = (
@@ -641,6 +661,12 @@
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_VERSION = "";
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
+				);
 				INFOPLIST_FILE = "VirtualJaguar/VirtualJaguar-Info.plist";
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
 				LIBRARY_SEARCH_PATHS = (

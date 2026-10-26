@@ -55,7 +55,6 @@ Generate the gitignored local files from their templates:
 
 ```bash
 cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
 cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 ```
 
@@ -121,7 +120,7 @@ Before you report any in-game result, make sure the thing you ran is the thing y
 | System | Core(s) |
 |--------|---------|
 | 3DO | 4DO |
-| Arcade | MAME |
+| Arcade | MAME (default), FBNeo |
 | Atari 2600 | Stella |
 | Atari 5200 | Atari800 |
 | Atari 7800 | ProSystem |
@@ -164,10 +163,11 @@ Before you report any in-game result, make sure the thing you ran is the thing y
 ### Default core selection
 
 For systems with multiple cores, OpenEmu uses the value at
-`defaultCore.openemu.system.<sysid>` in `UserDefaults`. The host app seeds a default in `OpenEmu/AppDelegate.swift` for two systems today:
+`defaultCore.openemu.system.<sysid>` in `UserDefaults`. The host app seeds a default in `OpenEmu/AppDelegate.swift` for three systems today:
 
 - `openemu.system.nes` → `org.openemu.Nestopia`
 - `openemu.system.snes` → `org.openemu.SNES9x`
+- `openemu.system.arcade` → `org.openemu.MAME` (so MAME, the pre-existing core, stays default; the user can switch to FBNeo in Preferences → Cores)
 
 For any other multi-core system (e.g. ColecoVision — JollyCV / CrabEmu / blueMSX), no default is seeded and the user picks from Preferences → Cores. Adding a default seed is a one-line change in `AppDelegate.swift` if a default is wanted; until that is done, behavior is whatever the picker chooses to surface first.
 
@@ -217,7 +217,7 @@ What has worked well here:
 - Do not add dependencies without discussion. The project intentionally has no package manager.
 - Do not remove or rename core directories. The Xcode project references them.
 - Do not change `MACOSX_DEPLOYMENT_TARGET` below `12.0`.
-- Do not commit real credentials (`OEGoogleDriveSecrets.swift`, `ScreenScraperDevCredentials.swift`, `CheatWorksSecrets.swift`). Use the templates.
+- Do not commit real credentials (`ScreenScraperDevCredentials.swift`, `CheatWorksSecrets.swift`). Use the templates.
 - Do not add debug `+load` / `+initialize` methods that write to `/tmp` or hardcode local paths.
 - Do not commit large binaries (`.zip`, `.tar.gz`, executables). Those belong in GitHub Releases.
 - Do not report a core test result without running `verify-core-installed.sh` since the last build.
@@ -258,5 +258,5 @@ The main app is **BSD 2-Clause**. Emulator cores are mostly **GPL v2**. Key rule
    // modification, are permitted provided that the following conditions are met:
    // ...
    ```
-3. **picodrive is non-commercial** — never charge for a build that includes it
+3. **picodrive and FBNeo are non-commercial** — never charge for a build that includes either. FBNeo also inherits the MAME license; ship its license verbatim (see [`FBNeo/LICENSE`](FBNeo/LICENSE))
 4. **No CLA** — your contributions are covered by the license of the files you touch

@@ -36,6 +36,67 @@ extension OSLog {
     static let renderer = OSLog(subsystem: "org.openemu.OpenEmuKit", category: "renderer")
 }
 
+// nextDrawable() can wait for the display. Keep that wait off the core thread.
+// The lock protects the pending drawable and request state; acquisition runs only
+// on the serial queue. A caller takes ownership of a drawable before using it.
+final class DrawableProvider<Drawable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private let queue: DispatchQueue
+    private let makeDrawable: () -> Drawable?
+    private var drawable: Drawable?
+    private var fetching = false
+    private var stopped = false
+    private var generation: UInt = 0
+
+    init(queue: DispatchQueue = DispatchQueue(label: "org.openemu.drawables", qos: .userInteractive),
+         makeDrawable: @escaping () -> Drawable?) {
+        self.queue = queue
+        self.makeDrawable = makeDrawable
+    }
+
+    /// Return immediately if the display has not supplied a drawable yet.
+    func take() -> Drawable? {
+        guard lock.try() else { return nil }
+        defer { lock.unlock() }
+        guard !stopped else { return nil }
+        let result = drawable
+        drawable = nil
+        if !fetching {
+            fetching = true
+            let requestedGeneration = generation
+            queue.async { [self] in
+                lock.lock()
+                let shouldFetch = !stopped && generation == requestedGeneration
+                lock.unlock()
+                let next = shouldFetch ? autoreleasepool { makeDrawable() } : nil
+                lock.lock()
+                if !stopped && generation == requestedGeneration {
+                    drawable = next
+                }
+                fetching = false
+                lock.unlock()
+            }
+        }
+        return result
+    }
+
+    /// A drawable acquired for an earlier window size must not be reused.
+    func invalidate() {
+        lock.lock()
+        generation &+= 1
+        drawable = nil
+        lock.unlock()
+    }
+
+    func stop() {
+        lock.lock()
+        stopped = true
+        generation &+= 1
+        drawable = nil
+        lock.unlock()
+    }
+}
+
 @objc public class OpenEmuHelperApp: NSResponder, NSApplicationDelegate {
     @objc public var gameCoreOwner: OEGameCoreOwner!
     @objc public private(set) var gameCore: OEGameCore!
@@ -67,12 +128,11 @@ extension OSLog {
     var _gameVideoCAContext: CAContext!
     
     var _videoLayer: GameHelperMetalLayer!
+    private var _drawableProvider: DrawableProvider<CAMetalDrawable>?
     var _filterChain: FilterChain!
     var _screenshot: Screenshot!
-    /// Only send 1 frame at once to the GPU.
-    /// Since we aren't synced to the display, even one more
-    /// is enough to block in nextDrawable for more than a frame
-    /// and cause audio skipping.
+    /// Limit GPU work to one frame at a time. Drawable acquisition runs
+    /// separately so waiting for the display cannot delay emulation or audio.
     var _inflightSemaphore = DispatchSemaphore(value: 1)
     var _scope: MTLCaptureScope!
     var _device: MTLDevice!
@@ -171,6 +231,9 @@ extension OSLog {
         _videoLayer.isOpaque = true
         _videoLayer.framebufferOnly = true
         _videoLayer.displaySyncEnabled = true
+        _drawableProvider = DrawableProvider { [layer = _videoLayer!] in
+            layer.nextDrawable()
+        }
         
         let rendering = gameCore.gameCoreRendering
         switch rendering {
@@ -467,6 +530,7 @@ extension OSLog {
             defer { CATransaction.commit() }
             
             _videoLayer.bounds = rect
+            _drawableProvider?.invalidate()
             _filterChain.drawableSize = _videoLayer.drawableSize
         }
         
@@ -483,6 +547,7 @@ extension OSLog {
         defer { CATransaction.commit() }
         
         _videoLayer.contentsScale = newBackingScaleFactor
+        _drawableProvider?.invalidate()
         _filterChain.drawableSize = _videoLayer.drawableSize
     }
     
@@ -560,6 +625,7 @@ extension OSLog {
             _raUnrecognizedObserver = nil
         }
 
+        _drawableProvider?.stop()
         gameCore.stopEmulation {
             self._gameAudio.stopAudio()
             gameCore.renderDelegate = nil
@@ -891,6 +957,9 @@ extension OSLog {
                 }
             }
             
+            // Drop a presentation rather than delaying the next emulated frame
+            // (and its audio) while Core Animation waits for a display refresh.
+            guard let drawable = _drawableProvider?.take() else { return }
             guard let offscreenCB = _commandQueue.makeCommandBuffer() else { return }
             offscreenCB.label = "offscreen"
             offscreenCB.enqueue()
@@ -898,8 +967,6 @@ extension OSLog {
                 _filterChain.renderOffscreenPasses(sourceTexture: sourceTexture, commandBuffer: offscreenCB)
             }
             offscreenCB.commit()
-            
-            guard let drawable = _videoLayer.nextDrawable() else { return }
             
             let rpd = MTLRenderPassDescriptor()
             rpd.colorAttachments[0].clearColor = _clearColor
