@@ -1067,7 +1067,11 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
     }
     
     // MARK: - Debug
-    
+
+    @IBAction func toggleBigPicture(_ sender: AnyObject?) {
+        MainActor.assumeIsolated { BigPictureWindowController.shared.toggle() }
+    }
+
     @IBAction func OEDebug_logResponderChain(_ sender: AnyObject?) {
         os_log(.info, log: .default, "NSApp.KeyWindow: %{public}@", String(describing: NSApp.keyWindow))
         
@@ -1277,7 +1281,15 @@ extension AppDelegate: NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Get the “Customize Touch Bar…” menu to display in the View menu.
         NSApp.isAutomaticCustomizeTouchBarMenuItemEnabled = true
-        
+
+        #if DEBUG
+        // Big-picture mode spike (#789): debug builds only, until it has a proper entry point.
+        let bigPictureItem = NSMenuItem(title: "Big Picture (Spike)", action: #selector(toggleBigPicture(_:)), keyEquivalent: "b")
+        bigPictureItem.keyEquivalentModifierMask = [.command, .control]
+        NSApp.windowsMenu?.insertItem(.separator(), at: 0)
+        NSApp.windowsMenu?.insertItem(bigPictureItem, at: 0)
+        #endif
+
         let notificationCenter = NotificationCenter.default
         
         notificationCenter.addObserver(self, selector: #selector(libraryDatabaseDidLoad), name: .libraryDidLoad, object: nil)

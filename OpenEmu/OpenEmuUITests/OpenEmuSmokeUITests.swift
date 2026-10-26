@@ -147,6 +147,75 @@ final class OpenEmuSmokeUITests: XCTestCase {
         XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
     }
 
+    /// Big-picture spike (#789): opens the mode, moves with the keyboard, launches a game from it,
+    /// and checks the menu comes back when the game quits. Controller input can't be sent from a test,
+    /// so this covers the keyboard path, the window handoff, and the return path.
+    func testBigPictureKeyboardNavigationLaunchAndReturn() throws {
+        guard let rom = ProcessInfo.processInfo.environment["OE_TEST_ROM"], !rom.isEmpty else {
+            throw XCTSkip("Set OE_TEST_ROM to a ROM path (check.sh --rom <path>) to run this test")
+        }
+        // Import the ROM and play it once so the library has a game, then quit that game.
+        app.terminate()
+        app.launchArguments += [rom]
+        app.launch()
+        dismissFirstRunAlert()
+        let play = app.sheets.buttons["Play Game"]
+        XCTAssertTrue(play.waitForExistence(timeout: 60), "Import-finished prompt did not appear")
+        play.click()
+        let gameWindow = app.windows.matching(NSPredicate(
+            format: "identifier != 'LibraryWindow' AND identifier != 'BigPictureWindow' AND title != '' AND title != 'OpenEmu'")).firstMatch
+        XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game window did not open")
+        sleep(3)
+        chooseMenu("Controls", "Quit Game")
+        confirmQuitIfAsked()
+        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+
+        // Open big-picture mode.
+        let bigPicture = app.windows["BigPictureWindow"]
+        app.typeKey("b", modifierFlags: [.control, .command])
+        XCTAssertTrue(bigPicture.waitForExistence(timeout: 10), "Big-picture window did not open")
+        XCTAssertTrue(bigPicture.staticTexts["Recently Played"].waitForExistence(timeout: 10), "Recently Played row missing")
+        attachScreenshot(named: "bigpicture-open")
+
+        // Keyboard navigation reaches the model and is reported in the readout.
+        func lastInput(contains text: String) -> Bool {
+            // SwiftUI exposes Text as the element's value, not its label, so read the values directly.
+            let deadline = Date().addingTimeInterval(5)
+            repeat {
+                for element in bigPicture.staticTexts.allElementsBoundByIndex {
+                    let shown = (element.value as? String) ?? element.label
+                    if shown.hasPrefix("Last input:"), shown.contains(text) { return true }
+                }
+                Thread.sleep(forTimeInterval: 0.25)
+            } while Date() < deadline
+            return false
+        }
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(lastInput(contains: "right"), "Right arrow did not register")
+        app.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(lastInput(contains: "down"), "Down arrow did not register")
+        attachScreenshot(named: "bigpicture-navigated")
+
+        // Select launches the game fullscreen and the menu steps aside.
+        app.typeKey(.upArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game did not launch from big picture")
+        XCTAssertTrue(bigPicture.waitForNonExistence(timeout: 10), "Big-picture window stayed up over the game")
+        sleep(4)
+        attachScreenshot(named: "bigpicture-game-running")
+
+        // Closing the game brings the menu back. The game is fullscreen and hides the menu bar, so use the
+        // Close Window shortcut instead of the menu.
+        app.typeKey("w", modifierFlags: .command)
+        confirmQuitIfAsked()
+        XCTAssertTrue(bigPicture.waitForExistence(timeout: 20), "Big picture did not return after the game quit")
+        attachScreenshot(named: "bigpicture-returned")
+
+        // Escape leaves the mode.
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(bigPicture.waitForNonExistence(timeout: 10), "Escape did not close big picture")
+    }
+
     /// Plays the ROM named by OE_TEST_ROM with a backup folder set, then checks that a quick save is
     /// copied into the folder with a "which Mac saved this" file, and that saving again keeps the
     /// replaced copy in a .versions folder.
