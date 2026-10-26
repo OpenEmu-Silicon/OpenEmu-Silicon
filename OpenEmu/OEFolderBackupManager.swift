@@ -1006,13 +1006,17 @@ enum OEExtraSaveLocations {
         } else {
             systemDirs = listDirectory(statesRoot).items
         }
+        // Save state folders are named after the ROM file ("Space Invaders (USA)"), which can differ from the game's
+        // library title ("Space Invaders"). Look under every name the game is known by, as battery saves already do.
+        let batteryNames = names(forGame: safeName)
         for systemDir in systemDirs {
-            let listing = listDirectory(systemDir.appendingPathComponent(safeName, isDirectory: true))
-            items += listing.items.filter { $0.pathExtension.lowercased() == "oesavestate" }
-            placeholders += listing.placeholders.filter { $0.pathExtension.lowercased() == "oesavestate" }
+            for name in batteryNames.sorted() {
+                let listing = listDirectory(systemDir.appendingPathComponent(name, isDirectory: true))
+                items += listing.items.filter { $0.pathExtension.lowercased() == "oesavestate" }
+                placeholders += listing.placeholders.filter { $0.pathExtension.lowercased() == "oesavestate" }
+            }
         }
 
-        let batteryNames = names(forGame: safeName)
         for coreDir in listDirectory(root).items {
             var isDir: ObjCBool = false
             fm.fileExists(atPath: coreDir.path, isDirectory: &isDir)
