@@ -115,7 +115,8 @@ bool OEHost::Initialize(const Folders& folders, std::string* error)
 		// Stretch fills that texture, and OpenEmu applies the 4:3 shape itself.
 		si.SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Metal));
 		si.SetStringValue("EmuCore/GS", "AspectRatio", "Stretch");
-		// No SDL input and no audio device. Item 4 adds an OpenEmu audio backend.
+		// No SDL input and no audio device. The Null backend keeps the mixed sound in a
+		// ring, and the game core pulls it out each frame (PCSX2GameCore executeFrame).
 		si.SetBoolValue("InputSources", "SDL", false);
 		si.SetStringValue("SPU2/Output", "Backend", "Null");
 

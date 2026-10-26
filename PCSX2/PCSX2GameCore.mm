@@ -35,12 +35,15 @@
 #define BOOL PCSX2BOOL
 #include "OEHost.h"
 #include "pcsx2/CDVD/CDVDcommon.h"
+#include "pcsx2/Host/AudioStream.h"
 #include "pcsx2/Host.h"
+#include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
 #undef BOOL
 
 #import <AppKit/AppKit.h>
 #import <Metal/Metal.h>
+#import <OpenEmuBase/OEAudioBuffer.h>
 
 // Defined by the engine patch PCSX2/patches/0001-openemu-metal-output.patch.
 void GSDeviceMTLSetOutputTexture(void *texture);
@@ -173,8 +176,8 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (void)stopEmulation
 {
+	_engineStarted = NO;  // stops executeFrame touching the stream while it is torn down
 	OEHost::StopCPUThread();
-	_engineStarted = NO;
 	[super stopEmulation];
 }
 
@@ -197,7 +200,29 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (void)executeFrame
 {
-	// The engine runs on its own CPU thread. Nothing to do per frame until item 3.
+	// The engine runs on its own CPU thread and draws its own picture. What is left per
+	// frame is the sound: the engine mixes into a stream that goes nowhere (the Null
+	// backend), and we drain it into OpenEmu's audio ring, the way the engine's libretro
+	// frontend does.
+	if (!_engineStarted) {
+		return;
+	}
+	AudioStream *stream = SPU2::GetOutputStream();
+	if (stream == nullptr) {
+		return;
+	}
+
+	id<OEAudioBuffer> ring = [self audioBufferAtIndex:0];
+	float samples[2048 * 2];
+	int16_t pcm[2048 * 2];
+	u32 frames;
+	while ((frames = stream->PullFrames(samples, 2048)) > 0) {
+		for (u32 i = 0; i < frames * 2; i++) {
+			float s = samples[i] < -1.0f ? -1.0f : (samples[i] > 1.0f ? 1.0f : samples[i]);
+			pcm[i] = (int16_t)(s * 32767.0f);
+		}
+		[ring write:pcm maxLength:frames * 2 * sizeof(int16_t)];
+	}
 }
 
 - (void)dealloc
