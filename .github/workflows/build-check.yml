@@ -59,6 +59,7 @@ jobs:
     outputs:
       cores: ${{ steps.detect.outputs.cores }}
       fbneo: ${{ steps.detect.outputs.fbneo }}
+      pcsx2: ${{ steps.detect.outputs.pcsx2 }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
@@ -99,10 +100,15 @@ jobs:
           # situation as MAME). Track it with a separate flag.
           fbneo=false
 
+          # PCSX2 (PlayStation 2) builds the pinned ARMSX2 engine with CMake through
+          # its own script, so it is not in the xcodebuild matrix either.
+          pcsx2=false
+
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             echo "No usable diff base (event: ${{ github.event_name }}) - building all core schemes"
             cores="$all_cores"
             fbneo=true
+            pcsx2=true
           else
             # --no-renames lists both the old and new path of a move; quotePath=false
             # keeps non-ASCII file names readable instead of octal-escaped.
@@ -149,12 +155,17 @@ jobs:
             if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/|OpenEmuKit/)'; then
               fbneo=true
             fi
+            if echo "$changed" | grep -qE '^(PCSX2/|Scripts/(prepare|build)-armsx2-core\.sh|Scripts/gen-armsx2-xcconfig\.py|OpenEmu-SDK/)'; then
+              pcsx2=true
+            fi
           fi
 
           echo "Core schemes to build: $cores"
           echo "cores=$cores" >> "$GITHUB_OUTPUT"
           echo "Build FBNeo: $fbneo"
           echo "fbneo=$fbneo" >> "$GITHUB_OUTPUT"
+          echo "Build PCSX2: $pcsx2"
+          echo "pcsx2=$pcsx2" >> "$GITHUB_OUTPUT"
 
   build-cores:
     name: Build core (${{ matrix.core }})
@@ -245,6 +256,33 @@ jobs:
           # fork revision into FBNeo/deps/fbneo), builds fbneo_headless.dylib,
           # then OpenEmuBase + FBNeo.oecoreplugin (adhoc-signed, no identity needed).
           ./Scripts/build-fbneo-core.sh
+
+  build-pcsx2:
+    # PCSX2 isn't a slot in the core matrix either: the ARMSX2 engine source is
+    # fetched at a pinned revision and built with CMake, then PCSX2.oecoreplugin
+    # links it. Only runs when PCSX2-relevant files change.
+    name: Build PCSX2 core
+    needs: detect-core-changes
+    if: needs.detect-core-changes.outputs.pcsx2 == 'true'
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Install engine dependencies
+        run: brew install cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype
+
+      - name: Build PCSX2 (fetch pinned engine, build engine + plugin)
+        run: ./Scripts/build-armsx2-core.sh
 
   build:
     name: Build (arm64)
