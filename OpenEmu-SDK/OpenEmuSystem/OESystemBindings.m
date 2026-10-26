@@ -88,6 +88,8 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
     NSMutableDictionary<NSString *, OEDevicePlayerBindings *> *_defaultDeviceBindings;
 
     OEDevicePlayerBindings *_emptyConfiguration;
+
+    BOOL _needsDevicePlayerCompaction;
 }
 
 - (void)OE_notifyObserversDidSetEvent:(OEHIDEvent *)anEvent forBindingKey:(id)bindingKey playerNumber:(NSUInteger)playerNumber  __attribute__((nonnull));
@@ -994,6 +996,40 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
 
     [controller OE_setDeviceHandler:nil];
     [controller OE_setPlayerNumber:0];
+
+    [self OE_compactDevicePlayerBindings];
+}
+
+- (void)OE_compactDevicePlayerBindings
+{
+    if([_bindingsObservers count] > 0)
+    {
+        _needsDevicePlayerCompaction = YES;
+        return;
+    }
+
+    _needsDevicePlayerCompaction = NO;
+
+    NSUInteger count = [_devicePlayerBindings count];
+    if(count == 0) return;
+
+    NSArray<NSNumber *> *players = [[_devicePlayerBindings allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    if([[players lastObject] unsignedIntegerValue] == count) return;
+
+    [self willChangeValueForKey:@"devicePlayerBindings"];
+    NSUInteger nextPlayerNumber = 1;
+    for(NSNumber *player in players)
+    {
+        if([player unsignedIntegerValue] != nextPlayerNumber)
+        {
+            OEDevicePlayerBindings *bindings = _devicePlayerBindings[player];
+            [_devicePlayerBindings removeObjectForKey:player];
+            [bindings OE_setPlayerNumber:nextPlayerNumber];
+            _devicePlayerBindings[@(nextPlayerNumber)] = bindings;
+        }
+        nextPlayerNumber++;
+    }
+    [self didChangeValueForKey:@"devicePlayerBindings"];
 }
 
 - (void)OE_notifyObserversForAddedDeviceBindings:(OEDevicePlayerBindings *)aHandler;
@@ -1169,6 +1205,8 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
 {
     // No need to tell it to unset everything
     [_bindingsObservers removeObject:observer];
+
+    if(_needsDevicePlayerCompaction) [self OE_compactDevicePlayerBindings];
 }
 
 @end
