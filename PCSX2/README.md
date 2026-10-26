@@ -17,11 +17,11 @@ That puts it in `PCSX2/deps/armsx2` (gitignored). Small changes to the engine ar
 ## Build
 
 ```sh
-brew install cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype
+brew install cmake
 ./Scripts/build-armsx2-core.sh
 ```
 
-Stage 1 builds the engine with CMake and writes `PCSX2/build/engine.xcconfig` (compile flags) and `PCSX2/build/engine-link.rsp` (link line), which `PCSX2.xcodeproj` reads. Stage 2 builds `PCSX2.oecoreplugin`. Install it with `./Scripts/install-core.sh PCSX2` and confirm with `./Scripts/verify-core-installed.sh PCSX2`.
+Stage 1 first builds the third-party libraries the engine needs (libpng, libjpeg-turbo, libwebp, zstd, lz4, freetype, SDL3) from pinned source archives as static libraries for macOS 13 (`Scripts/build-armsx2-deps.sh`), so the plugin needs nothing from Homebrew at run time and loads on the macOS versions OpenEmu supports. It then builds the engine with CMake and writes `PCSX2/build/engine.xcconfig` (compile flags) and `PCSX2/build/engine-link.rsp` (link line), which `PCSX2.xcodeproj` reads. Stage 2 builds `PCSX2.oecoreplugin`. Install it with `./Scripts/install-core.sh PCSX2` and confirm with `./Scripts/verify-core-installed.sh PCSX2`.
 
 You need a PS2 BIOS dump (for example `scph39001.bin`) in OpenEmu's PlayStation 2 BIOS folder. Do not commit or share BIOS files or game images.
 

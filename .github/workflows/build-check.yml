@@ -278,8 +278,8 @@ jobs:
       - name: Clear SPM binary artifact cache
         run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
 
-      - name: Install engine dependencies
-        run: brew install cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype
+      - name: Install cmake
+        run: brew install cmake
 
       - name: Build PCSX2 (fetch pinned engine, build engine + plugin)
         run: ./Scripts/build-armsx2-core.sh

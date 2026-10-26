@@ -6,7 +6,7 @@
 # engine-link.rsp).
 # Stage 2: build the PCSX2.oecoreplugin that links them (added below).
 #
-# Needs Apple Silicon and Homebrew. Set PCSX2_EXTRA_CMAKE_ARGS to pass more
+# Needs Apple Silicon, Xcode and cmake (brew install cmake). Set PCSX2_EXTRA_CMAKE_ARGS to pass more
 # flags to CMake.
 
 set -euo pipefail
@@ -23,33 +23,18 @@ if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
   exit 1
 fi
 
-HOMEBREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
-for formula in cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype; do
-  if ! brew list --versions "$formula" >/dev/null 2>&1; then
-    echo "error: missing Homebrew package: $formula" >&2
-    echo "Run: brew install cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype" >&2
-    exit 1
-  fi
-done
+if ! command -v cmake >/dev/null 2>&1; then
+  echo "error: cmake is not installed" >&2
+  echo "Run: brew install cmake" >&2
+  exit 1
+fi
 
 "$SCRIPT_DIR/prepare-armsx2-core.sh"
 
-# plutovg and plutosvg are vendored in the engine and not in Homebrew.
-# Build them into a private prefix.
-if [ ! -f "$DEPS_PREFIX/.done" ]; then
-  for dep in plutovg plutosvg; do
-    echo "Building $dep..."
-    extra=()
-    [ "$dep" = "plutosvg" ] && extra=(-DCMAKE_PREFIX_PATH="$DEPS_PREFIX")
-    cmake -S "$SRC_DIR/3rdparty/$dep" -B "$BUILD_DIR/deps-build/$dep" \
-      -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
-      -DCMAKE_INSTALL_PREFIX="$DEPS_PREFIX" \
-      -D"$(echo "$dep" | tr a-z A-Z)_BUILD_EXAMPLES=OFF" ${extra[@]+"${extra[@]}"}
-    cmake --build "$BUILD_DIR/deps-build/$dep" -j"$(sysctl -n hw.ncpu)"
-    cmake --install "$BUILD_DIR/deps-build/$dep"
-  done
-  touch "$DEPS_PREFIX/.done"
-fi
+# The libraries the engine links (libpng, libjpeg, libwebp, zstd, lz4, freetype, SDL3,
+# plutovg, plutosvg) are built here from pinned source as static libraries for macOS 13,
+# so the plugin needs nothing from Homebrew at run time.
+"$SCRIPT_DIR/build-armsx2-deps.sh" "$BUILD_DIR" "$DEPS_PREFIX" "$SRC_DIR"
 
 # OE_METAL_OUTPUT turns on PCSX2/patches/0001-openemu-metal-output.patch: the final
 # picture is drawn into a Metal texture that OpenEmu owns instead of a window.
@@ -66,7 +51,8 @@ fi
 cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -DCMAKE_PREFIX_PATH="$DEPS_PREFIX;$HOMEBREW_PREFIX" \
+  -DCMAKE_PREFIX_PATH="$DEPS_PREFIX" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
   -DENABLE_QT_UI=OFF -DENABLE_SDL_FRONTEND=OFF -DENABLE_LIBRETRO=ON \
   -DENABLE_GSRUNNER=OFF -DENABLE_EERUNNER=OFF -DENABLE_VURUNNER=OFF \
   -DENABLE_TESTS=OFF -DENABLE_RECOMPILER_TEST_HOOKS=OFF \
