@@ -75,7 +75,8 @@ fi
 
 OUT="${TMPDIR:-/tmp}/openemu-playtest/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUT"
-BUILD="$HOME/Builds/openemu/chore-autonomous-testing-harness"
+# OE_PLAYTEST_BUILD picks the build folder (default: one per branch name convention, so permissions persist).
+BUILD="${OE_PLAYTEST_BUILD:-$HOME/Builds/openemu/chore-autonomous-testing-harness}"
 APP="$BUILD/Build/Products/Debug/OpenEmu.app"
 
 echo "----  building the debug app"
