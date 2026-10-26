@@ -51,8 +51,10 @@ The full map and work breakdown are in [`docs/ps2-armsx2-port.md`](../ps2-armsx2
 - Threading between the engine's CPU, graphics and audio threads and OpenEmu's threads is the likeliest source of crashes.
 - Compatibility beyond one tested game is unknown.
 
-## Open decisions
+## Decisions on the open questions
 
-1. **How to vendor the engine.** ADR-0001 says cores are flattened into the repo. ARMSX2 is about 560 MB. Options: flatten a pruned copy, use a pinned submodule, or fetch a pinned archive at build time. This affects repo size, clone time and upgrade effort.
-2. **Whether to keep an OpenGL renderer** in the first release or ship Metal only (recommended: Metal only).
-3. **Where the engine and wrapper live.** In this repo as `PCSX2/` or `ARMSX2/`, or in a separate fork that the repo pins.
+Decided 2026-10-26 while starting work item 1.
+
+1. **How to vendor the engine:** do not copy it into the repo. This is the same pattern as the MAME and FBNeo cores. `PCSX2/deps-armsx2-revision.txt` and `Scripts/prepare-armsx2-core.sh` record a fork URL and a full commit SHA, and the script fetches exactly that commit (shallow) into the gitignored `PCSX2/deps/armsx2/`. `Scripts/build-armsx2-core.sh` builds it. The engine is about 560 MB and is not a core we edit wholesale, so ADR-0001's flattening does not fit it.
+2. **Renderer:** Metal only. The build sets `USE_VULKAN=OFF`, and OpenGL is already off on macOS.
+3. **Where the engine lives:** a fork that holds our small flagged patches, with this repo pinning it. For now the fork is `nickybmon/armsx2`. It moves to the OpenEmu-Silicon org later, and only `REMOTE` in `Scripts/prepare-armsx2-core.sh` changes. A small patch that is not yet in the fork can sit in `PCSX2/patches/*.patch`, which the prepare script applies in name order.

@@ -1,0 +1,3 @@
+nickybmon/armsx2 commit: 65fd14b9160e7fa3779794fc45c4e92a86772621
+branch: master
+source: https://github.com/nickybmon/armsx2.git

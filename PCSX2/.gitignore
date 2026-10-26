@@ -1,0 +1,8 @@
+# Xcode
+build
+*/Build/*
+xcuserdata
+DerivedData/
+
+# Prepared locally by Scripts/prepare-armsx2-core.sh; too large to commit.
+deps/armsx2/

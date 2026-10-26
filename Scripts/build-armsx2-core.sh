@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Build the ARMSX2 engine for the PCSX2 core (arm64, Metal only).
+#
+# Stage 1 (this script today): build the engine as static libraries with CMake
+# into PCSX2/build/lib. Stage 2, the PCSX2.oecoreplugin that links them, comes
+# with the plugin skeleton (issue #769, item 2).
+#
+# Needs Apple Silicon and Homebrew. Set PCSX2_EXTRA_CMAKE_ARGS to pass more
+# flags to CMake.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+PCSX2_DIR="$REPO_ROOT/PCSX2"
+SRC_DIR="$PCSX2_DIR/deps/armsx2"
+BUILD_DIR="$PCSX2_DIR/build"
+DEPS_PREFIX="$BUILD_DIR/deps-prefix"
+
+if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+  echo "error: this build needs an Apple Silicon Mac (found $(uname -s) $(uname -m))" >&2
+  exit 1
+fi
+
+HOMEBREW_PREFIX="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+for formula in cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype; do
+  if ! brew list --versions "$formula" >/dev/null 2>&1; then
+    echo "error: missing Homebrew package: $formula" >&2
+    echo "Run: brew install cmake sdl3 libpng jpeg-turbo webp zstd lz4 freetype" >&2
+    exit 1
+  fi
+done
+
+"$SCRIPT_DIR/prepare-armsx2-core.sh"
+
+# plutovg and plutosvg are vendored in the engine and not in Homebrew.
+# Build them into a private prefix.
+if [ ! -f "$DEPS_PREFIX/.done" ]; then
+  for dep in plutovg plutosvg; do
+    echo "Building $dep..."
+    extra=()
+    [ "$dep" = "plutosvg" ] && extra=(-DCMAKE_PREFIX_PATH="$DEPS_PREFIX")
+    cmake -S "$SRC_DIR/3rdparty/$dep" -B "$BUILD_DIR/deps-build/$dep" \
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
+      -DCMAKE_INSTALL_PREFIX="$DEPS_PREFIX" \
+      -D"$(echo "$dep" | tr a-z A-Z)_BUILD_EXAMPLES=OFF" "${extra[@]}"
+    cmake --build "$BUILD_DIR/deps-build/$dep" -j"$(sysctl -n hw.ncpu)"
+    cmake --install "$BUILD_DIR/deps-build/$dep"
+  done
+  touch "$DEPS_PREFIX/.done"
+fi
+
+# No Qt, frontends or libretro. Metal only: Vulkan off drops shaderc and MoltenVK
+# (OpenGL is already off on macOS).
+# shellcheck disable=SC2086
+cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_PREFIX_PATH="$DEPS_PREFIX;$HOMEBREW_PREFIX" \
+  -DENABLE_QT_UI=OFF -DENABLE_SDL_FRONTEND=OFF -DENABLE_LIBRETRO=OFF \
+  -DENABLE_GSRUNNER=OFF -DENABLE_EERUNNER=OFF -DENABLE_VURUNNER=OFF \
+  -DENABLE_TESTS=OFF -DENABLE_RECOMPILER_TEST_HOOKS=OFF \
+  -DUSE_VULKAN=OFF \
+  -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+  ${PCSX2_EXTRA_CMAKE_ARGS:-}
+
+cmake --build "$BUILD_DIR/engine" --target PCSX2 common -j"$(sysctl -n hw.ncpu)"
+
+rm -rf "$BUILD_DIR/lib"
+mkdir -p "$BUILD_DIR/lib"
+find "$BUILD_DIR/engine" -name '*.a' -exec cp {} "$BUILD_DIR/lib/" \;
+
+count="$(find "$BUILD_DIR/lib" -name '*.a' | wc -l | tr -d ' ')"
+if [ "$count" -eq 0 ]; then
+  echo "error: build produced no .a files" >&2
+  exit 1
+fi
+
+echo ""
+echo "Built $count engine libraries in $BUILD_DIR/lib"

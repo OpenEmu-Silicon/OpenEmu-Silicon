@@ -9,6 +9,7 @@ How to help build the PS2 core. Read this first, then pick an issue from the [wo
 | PS2 system plugin and button mapping | Exists (`OpenEmu/SystemPlugins/PlayStation 2`) |
 | Engine builds for arm64 | Proven in a spike (libretro target, no Qt) |
 | Engine runs a game fast on Apple Silicon | Proven standalone: one game, about 60 fps |
+| Engine pin and build script | Written (`PCSX2/deps-armsx2-revision.txt`), not yet run on a Mac |
 | OpenEmu core plugin | Not started |
 | Heavy 3D games | Untested |
 
