@@ -25,6 +25,28 @@
 import XCTest
 @testable import OpenEmu
 
+extension XCTestCase {
+    /// Returns the app's library, creating a throwaway one first if the test host did not load any.
+    /// A host started by `xcodebuild test` on a fresh machine (CI) has no library, and force-unwrapping
+    /// `OELibraryDatabase.default` there crashes the whole test run.
+    /// The saved library path is restored so the debug app does not keep pointing at the temporary folder.
+    @discardableResult
+    func ensureTestLibrary() throws -> OELibraryDatabase {
+        if let existing = OELibraryDatabase.default { return existing }
+        let defaults = UserDefaults.standard
+        let savedPath = defaults.object(forKey: OELibraryDatabase.databasePathKey)
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OpenEmu-TestLibrary-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer {
+            if let savedPath { defaults.set(savedPath, forKey: OELibraryDatabase.databasePathKey) }
+            else { defaults.removeObject(forKey: OELibraryDatabase.databasePathKey) }
+        }
+        try OELibraryDatabase.load(from: folder)
+        return try XCTUnwrap(OELibraryDatabase.default, "Could not create a test library")
+    }
+}
+
 class ROMImporterTests: XCTestCase {
 
     func testDreamcastGDIContentHashUsesReferencedTracks() throws {
@@ -70,8 +92,8 @@ class ROMImporterTests: XCTestCase {
         return gdiURL
     }
 
-    func testArchiveUnarchiveOperationQueue() {
-        let ri = ROMImporter(database: OELibraryDatabase.default!)
+    func testArchiveUnarchiveOperationQueue() throws {
+        let ri = ROMImporter(database: try ensureTestLibrary())
 
         let data: Data!
         let url1 = URL(string: "file://url/op1")!

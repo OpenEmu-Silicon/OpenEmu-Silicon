@@ -36,16 +36,24 @@ The maintainer is not a professional developer. Write commit messages, PR descri
 
 ## Build and Verify
 
-`Scripts/verify.sh` is the local check. It builds, runs the static analyzer, validates Info.plist and entitlements, and checks codesign.
+CI (`build-check.yml`) builds every PR, including every core the PR touches, and the test scripts below build the app themselves. A separate local build-and-analyze pass is not a step any more. Use the script that fits the change:
 
 ```bash
-./Scripts/verify.sh                 # build + analyze + plist + codesign
-./Scripts/verify.sh --launch        # above + 5s smoke launch with log and crash-report scan
-./Scripts/verify.sh --test          # above + run the OpenEmuTests unit target
+./Scripts/check.sh                  # build, then drive the real app (windows, panes, Cores) against your real library
+./Scripts/check.sh --no-build       # same, reusing the last build
+./Scripts/check.sh --rom <file>     # also load a game: draws, moves, quick save, quit (uses a throwaway library)
+./Scripts/playtest.sh --game "<name>"   # play a game from your real library, then report frame rate, audio, errors
+./Scripts/doctor.sh                 # a few seconds: signing certificate, credential stubs, running app, test runner signature
+./Scripts/prove.sh                  # the checks the diff touches, ends with PROVEN or NOT PROVEN (--all runs every step)
 ./Scripts/verify.sh --core <Name>   # build, install, and check one core (add --release for Release-only bugs)
+./Scripts/verify.sh --test          # run the OpenEmuTests unit target
 ```
 
-Read the whole output and note any new warnings even on a passing build. GitHub CI (`build-check.yml`) rebuilds every PR, including every core the PR touches, so a local build is a way to catch problems early, not the only gate.
+`check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either.
+
+`verify.sh` without `--core` or `--test` (build, analyze, plist, codesign) still works but is redundant with CI and the scripts above.
+
+Read the whole output and note any new warnings even on a passing build.
 
 To launch the debug app, use `./Scripts/launch-debug.sh` instead of `open <path>`. It picks the build that matches your current branch and refuses to launch a stale one.
 
@@ -69,6 +77,35 @@ OpenEmu loads cores from `~/Library/Application Support/OpenEmu/Cores/`, **not**
 3. Run `./Scripts/verify-core-installed.sh <Name>` and confirm it prints `OK` before you report any in-game result.
 
 Working in a git worktree? Use `Scripts/build-for-worktree.sh` or `verify.sh --worktree`, and run the three-way hash check. Both are explained in [`docs/worktree-workflow.md`](docs/worktree-workflow.md).
+
+---
+
+## Proving a fix (reproduce first, then fix, then show it passes)
+
+A bug is not fixed because the code compiles or the change looks right. It is fixed when a check that failed before now passes, and the output is in the PR. Do this without waiting for the maintainer, and only come back when you have proof or have hit a limit you can name.
+
+1. **Reproduce first.** Write the smallest check that fails for the reason in the issue, and run it. A failing check you cannot get is a finding in itself: say so.
+2. **Fix.** Change the code until that same check passes.
+3. **Show it.** Paste the before and after output into the PR description. When the proof is something you can see (a picture that changed, a window that now looks right, an alert that no longer appears), also post screenshots with `./Scripts/pr-evidence.sh --claim "<what this proves>" --from-playtest` (or `--before`/`--after`, or named files). It shows a dry run first; add `--post` once you have looked at every picture. The same goes for a feature: post pictures that show it built the way the agreed spec says.
+
+Pick the cheapest check that can really see the bug:
+
+| The bug lives in | Use |
+|------------------|-----|
+| A pure function, parser, or data rule | A unit test in the matching `*Tests` target (`./Scripts/verify.sh --test`) |
+| A core: loading, picture, sound, button input, save states | `./Scripts/headless/gb-checks.sh` for Game Boy, or `./Scripts/headless/run.sh <Core> --rom <file> ...` for any core. It runs the core with no window, so no one has to play the game |
+| The app window, menus, preferences, import, quick save | `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
+| A crash | The crash report plus `./Scripts/collect-diagnostics.sh`. Write the check that triggers it, then fix |
+
+`./Scripts/prove.sh` chains the build, tests, headless checks, and diagnostics and prints one pass or fail line. A change is proven only when it ends with `PROVEN`.
+
+**One-time setup on a Mac (the maintainer does this once).** Debug builds are signed ad hoc, so the signature changes on every rebuild and macOS forgets what the debug app was allowed to do. That shows up two ways: the keyboard dies (Input Monitoring) and unit tests hang until someone clicks Allow on a "read your Documents folder" prompt. Run `./Scripts/setup-debug-signing.sh` once (it asks for the login password), then click Allow once. `./Scripts/prove.sh` tells you when the certificate is missing. An agent must not run that script, because it changes the keychain.
+
+Known gap: `OpenEmuKitTests` does not compile in the workspace today (`OpenEmuKitPrivate` cannot be resolved), so shader-preset tests are not run anywhere.
+
+State plainly what was not proven. Some things cannot be automated here: real controllers and Bluetooth pairing, and macOS permission prompts (Input Monitoring, Bluetooth). For those, prove everything up to the hardware edge (for example, decode captured reports in a unit test) and list the rest as "needs hands-on test" in the PR. Never write "fixed" for something only a person with the hardware can confirm.
+
+Before you report any in-game result, make sure the thing you ran is the thing you built (see "Working on a core" above, and use `./Scripts/launch-debug.sh` for the app). The headless scripts build their own copy of the core, so they never test a stale install.
 
 ---
 
@@ -174,7 +211,7 @@ Use the issue templates (`bug_report`, `feature_request`, `core_integration`, `c
 What has worked well here:
 
 - **Point the agent at this file first**, then at `CONTEXT.md` so it uses the right words.
-- **Let the agent build and check its own work** with `verify.sh` before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
+- **Let the agent build and check its own work** with `check.sh` (and `verify.sh --core` for cores) before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
 - **Do core testing through the scripts above.** The stale-plugin mistake is the one agents make most.
 - **Ask for plain-language summaries.** The maintainer and most testers are not developers.
 - **Say in the PR that AI helped** (the template asks). Nobody minds. Transparency is the point.

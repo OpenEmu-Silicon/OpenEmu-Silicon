@@ -149,6 +149,17 @@ final class OELibraryDatabase: NSObject {
     
     // MARK: -
     
+    /// Saves `url` as the library to open next time, unless it came from a `-databasePath` launch argument.
+    /// A launch argument is a one-off override (UI tests pass a throwaway library this way). Saving it would
+    /// leave the app pointing at a folder that is deleted afterwards, and the next normal launch fails with
+    /// "library not found".
+    private static func rememberLocation(of url: URL) {
+        let launchOverrides = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        guard launchOverrides[databasePathKey] == nil else { return }
+        let path = (url.path as NSString).abbreviatingWithTildeInPath
+        UserDefaults.standard.set(path, forKey: databasePathKey)
+    }
+    
     static func load(from url: URL) throws {
         os_log(.info, log: .library, "Load library database from '%{public}@'", url.path)
         
@@ -170,8 +181,7 @@ final class OELibraryDatabase: NSObject {
         defaultDB.loadManagedObjectContext()
         defaultDB.createInitialItemsIfNeeded()
         
-        let path = (defaultDB.databaseURL.path as NSString).abbreviatingWithTildeInPath
-        UserDefaults.standard.set(path, forKey: Self.databasePathKey)
+        rememberLocation(of: defaultDB.databaseURL)
         
         let romImporter = defaultDB.importer
         romImporter.loadQueue()
@@ -224,8 +234,7 @@ final class OELibraryDatabase: NSObject {
         _mainThreadContext = mainThreadContext
         
         // remeber last location as database path
-        let path = (databaseURL.path as NSString).abbreviatingWithTildeInPath
-        UserDefaults.standard.set(path, forKey: Self.databasePathKey)
+        Self.rememberLocation(of: databaseURL)
         
         os_log(.debug, log: .library, "ROMs folder URL: %{public}@", romsFolderURL?.path ?? "nil")
     }
