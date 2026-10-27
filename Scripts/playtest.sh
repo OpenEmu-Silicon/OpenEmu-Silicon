@@ -29,8 +29,11 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+# shellcheck source=lib/harness.sh
+. "$REPO_ROOT/Scripts/lib/harness.sh"
+harness_ensure_stubs "$REPO_ROOT"
 
-GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0
+GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --game) GAME="${2:-}"; shift 2 ;;
@@ -39,6 +42,7 @@ while [ $# -gt 0 ]; do
     --restart) RESUME=0; shift ;;
     --direct) LAUNCH=direct; shift ;;
     --no-backup) NO_BACKUP=1; shift ;;
+    --no-build) NO_BUILD=1; shift ;;
     -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -46,6 +50,7 @@ done
 [ -n "$GAME" ] || { echo "FAIL  need --game <name of a game in your library>" >&2; exit 2; }
 if pgrep -x OpenEmu > /dev/null; then
   echo "FAIL  OpenEmu is running. Quit it first: it shares the library with the play test." >&2
+  harness_describe_running >&2
   exit 2
 fi
 
@@ -75,13 +80,16 @@ fi
 
 OUT="${TMPDIR:-/tmp}/openemu-playtest/$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUT"
-# OE_PLAYTEST_BUILD picks the build folder (default: one per branch name convention, so permissions persist).
-BUILD="${OE_PLAYTEST_BUILD:-$HOME/Builds/openemu/chore-autonomous-testing-harness}"
+# One build folder shared with check.sh, so a single build serves both and permissions persist.
+# OE_BUILD_DIR (or the older OE_PLAYTEST_BUILD) overrides it.
+BUILD="$(harness_build_dir)"
+trap 'harness_kill_debug_app "$BUILD"' EXIT
 APP="$BUILD/Build/Products/Debug/OpenEmu.app"
 
-echo "----  building the debug app"
-if ! xcodebuild build -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu -configuration Debug \
-     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$BUILD" > "$OUT/build.log" 2>&1; then
+if [ "$NO_BUILD" -eq 1 ] && [ -d "$APP" ]; then
+  echo "----  reusing the existing build ($BUILD)"
+elif ! { echo "----  building the debug app"; xcodebuild build -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu -configuration Debug \
+     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$BUILD" > "$OUT/build.log" 2>&1; }; then
   echo "FAIL  build failed, see $OUT/build.log"; tail -15 "$OUT/build.log"; exit 1
 fi
 

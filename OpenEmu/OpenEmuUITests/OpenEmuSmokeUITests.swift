@@ -65,6 +65,7 @@ final class OpenEmuSmokeUITests: XCTestCase {
     private var libraryWindow: XCUIElement { app.windows["LibraryWindow"] }
 
     func testLaunchShowsEmptyLibrary() throws {
+        try XCTSkipIf(Self.usesRealLibrary, "Needs the throwaway empty library (check.sh --throwaway-library)")
         XCTAssertTrue(libraryWindow.outlines.staticTexts["All Games"].waitForExistence(timeout: 10))
         XCTAssertTrue(libraryWindow.staticTexts["Game Scanner"].exists)
         attachScreenshot(named: "empty-library")
