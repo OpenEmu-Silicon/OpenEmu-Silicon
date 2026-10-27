@@ -2,7 +2,7 @@
 
 This directory contains the OpenEmu MAME core wrapper, based on OpenEmu/UME-Core, with the small changes needed to build natively on Apple Silicon against this fork.
 
-Status: WIP. The core builds as arm64 and loads as `org.openemu.MAME`, but polygonal 3D arcade rendering still needs validation/debugging. Use Sega Virtua Racing as the main repro case from issue #500.
+Status: the core builds as arm64 against MAME 0.289 and loads as `org.openemu.MAME`. Sega Virtua Racing (Model 1 3D, issue #500) renders correctly as of 0.289.
 
 ## Source dependency
 
@@ -61,7 +61,7 @@ Install the built plugin with the repo helper, which avoids stale bundle merges:
 ./Scripts/verify-core-installed.sh MAME --release
 ```
 
-Use a MAME 0.250-compatible ROM set. Validate both:
+Use a MAME 0.289-compatible ROM set. Validate both:
 
 - A known sprite-based arcade game, to confirm the core path works.
-- Sega Virtua Racing, to investigate the missing polygon issue from #500.
+- Sega Virtua Racing, as the Model 1 3D regression check from #500.
