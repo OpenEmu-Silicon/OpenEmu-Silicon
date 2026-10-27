@@ -3,6 +3,7 @@
 #
 # Usage:
 #   ./Scripts/prove.sh                         # build + unit tests + headless Game Boy checks + crash scan
+#   ./Scripts/prove.sh --all                   # run every step even when the diff against main does not touch its area
 #   ./Scripts/prove.sh --ui                    # also drive the real app (check.sh); needs OpenEmu closed
 #   ./Scripts/prove.sh --ui --rom <file>       # ...and load that ROM in the UI test (quick save, screenshot, quit)
 #   ./Scripts/prove.sh --core <Name> --rom <file> [--frames N]
@@ -21,12 +22,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 RUN_UI=0
+RUN_ALL=0
 ROM=""
 CORE=""
 FRAMES=600
 while [ $# -gt 0 ]; do
   case "$1" in
     --ui) RUN_UI=1; shift ;;
+    --all) RUN_ALL=1; shift ;;
     --rom) [ -f "${2:-}" ] || { echo "FAIL  --rom needs an existing file" >&2; exit 2; }; ROM="$2"; shift 2 ;;
     --core) CORE="${2:?--core needs a core name}"; shift 2 ;;
     --frames) FRAMES="${2:?}"; shift 2 ;;
@@ -41,6 +44,19 @@ mkdir -p "$OUT"
 touch "$OUT/.start"
 FAILS=0
 RAN=()
+
+# Files this branch changes against main, plus uncommitted work. A step whose area has no changed file is skipped
+# (and listed as skipped) unless --all is given or main cannot be found.
+BASE="$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main 2>/dev/null || true)"
+if [ -n "$BASE" ] && [ "$RUN_ALL" -eq 0 ]; then
+  CHANGED="$( { git diff --name-only "$BASE"; git ls-files --others --exclude-standard; } | sort -u)"
+else
+  CHANGED=""
+fi
+touches() { # touches <path-prefix-regex>: true when selecting is off, or a changed file matches
+  [ -z "$CHANGED" ] && return 0
+  printf '%s\n' "$CHANGED" | grep -qE "$1"
+}
 SKIPPED=("OpenEmuKit tests (do not compile in this workspace: OpenEmuKitPrivate module cannot be resolved)")
 
 step() { # step <name> <command...>
@@ -87,7 +103,11 @@ dualsense() {
 step "dualsense-decoding" dualsense
 
 # 5. Headless: the Gambatte core loads, draws, takes button presses and round-trips save states, with no window.
-step "headless-gameboy" ./Scripts/headless/gb-checks.sh
+if touches '^(OpenEmu-SDK/|OpenEmuKit/|Gambatte/|Scripts/headless/|Scripts/prove\.sh)'; then
+  step "headless-gameboy" ./Scripts/headless/gb-checks.sh
+else
+  SKIPPED+=("headless Game Boy checks (no change under OpenEmu-SDK, OpenEmuKit, Gambatte or Scripts/headless; --all runs them)")
+fi
 
 # 6. Optional: any core on any ROM, headless. Passing means it loaded and ran every frame without crashing.
 if [ -n "$CORE" ]; then
@@ -102,6 +122,8 @@ if [ "$RUN_UI" -eq 1 ]; then
     echo "FAIL  ui-tests   (OpenEmu is running; quit it first so the tests do not clobber your session)"
     FAILS=$((FAILS + 1))
     RAN+=("ui-tests (FAILED: OpenEmu was running)")
+  elif ! touches '^(OpenEmu/|OpenEmuKit/|OpenEmu-SDK/|Scripts/check\.sh|Scripts/lib/)'; then
+    SKIPPED+=("UI tests (no change under OpenEmu, OpenEmuKit or OpenEmu-SDK; --all runs them)")
   elif [ -n "$ROM" ]; then
     step "ui-tests" ./Scripts/check.sh --rom "$ROM"
   else
