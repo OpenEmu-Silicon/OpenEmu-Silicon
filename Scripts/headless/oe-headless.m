@@ -111,9 +111,11 @@ int main(int argc, char **argv)
             else if ([arg isEqual:@"--input"] && next) {
                 NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
                 if (parts.count < 3) return Fail(@"--input wants FRAME:SELECTOR:INT");
-                NSNumber *frame = @(parts[0].integerValue);
+                NSNumber *frame = @(parts.firstObject.integerValue);
+                // The selector may itself contain colons, e.g. didPushArcadeButton:forPlayer:
+                NSString *selectorName = [[parts subarrayWithRange:NSMakeRange(1, parts.count - 2)] componentsJoinedByString:@":"];
                 if (!inputs[frame]) inputs[frame] = [NSMutableArray array];
-                [inputs[frame] addObject:@[parts[1], @(parts[2].integerValue)]];
+                [inputs[frame] addObject:@[selectorName, @(parts.lastObject.integerValue)]];
                 i++;
             } else {
                 return Fail([NSString stringWithFormat:@"unknown or incomplete argument %@", arg]);
@@ -156,6 +158,7 @@ int main(int argc, char **argv)
         CC_SHA256_Init(&audioDigest);
         NSUInteger audioBytes = 0;
         const void *videoBuffer = NULL;
+        NSMutableData *hostVideo = nil;
         for (NSInteger frame = 1; frame <= frames; frame++) {
             for (NSArray *input in inputs[@(frame)]) {
                 NSString *name = [input[0] hasSuffix:@":"] ? input[0] : [input[0] stringByAppendingString:@":"];
@@ -182,8 +185,12 @@ int main(int argc, char **argv)
                 if (!savedState || ![core deserializeState:savedState withError:&e]) return Fail([NSString stringWithFormat:@"load state failed: %@", e]);
                 printf("state-loaded\n");
             }
-            void *noHint = NULL;
-            videoBuffer = [core getVideoBufferWithHint:noHint];
+            videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
+            if (!videoBuffer && !hostVideo) {
+                // Some cores (MAME) only draw into a buffer the host provides.
+                hostVideo = [NSMutableData dataWithLength:core.bytesPerRow * core.bufferSize.height];
+                videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
+            }
             [core executeFrame];
             DrainAudio(core, &audioDigest, &audioBytes);
             if ([hashAt containsObject:@(frame)] || frame == frames) {
