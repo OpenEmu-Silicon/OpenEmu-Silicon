@@ -4,12 +4,17 @@
 # Usage:
 #   ./Scripts/check.sh                               # run every UI test (game tests play the built-in test ROM)
 #   ./Scripts/check.sh --rom "/path/to/game.sfc"     # also load that ROM, check it draws and moves, quick save, screenshot, quit
+#   ./Scripts/check.sh --game "Super Mario 64"       # same checks on a game already in your real library, found by name
 #   ./Scripts/check.sh --no-build                    # reuse the last build as is (skip xcodebuild and re-signing)
 #   ./Scripts/check.sh --throwaway-library           # use an empty temporary library instead of your real one
 #   ./Scripts/check.sh --test testPreferencesPanesAllOpen   # run one test by name (repeat --test for several)
 #
 # By default the tests launch the Debug build against your real library (read-only checks: windows, panes, tabs).
 # --rom imports the ROM, so it switches to a throwaway empty library (add --real-library to import into yours).
+# --game plays a game from your real library (a read-only lookup, no import, no file path). It runs only the tests that
+# make sense for any game (loads and runs, pause and resume) and never writes saves: no quick save, and closing the game
+# does not replace its auto save. It does update play count and last-played time. If a game sits on a static screen the
+# picture check fails; that is the game, not the app.
 # The ROM file itself is not modified or copied into the repo.
 # The build folder is shared with playtest.sh (override with OE_BUILD_DIR), so one build serves both.
 # The tests click and type, so leave the mouse and keyboard alone while this runs (about 30 seconds).
@@ -44,13 +49,14 @@ harness_ensure_stubs "$REPO_ROOT"
 cleanup() { pkill -TERM -f "OpenEmuUITests-Runner" 2>/dev/null; harness_kill_debug_app "$BUILD_DIR"; }
 trap cleanup EXIT
 
-ONLY=(); NO_BUILD=0; LIBRARY=""; HAS_ROM=0
+ONLY=(); NO_BUILD=0; LIBRARY=""; HAS_ROM=0; GAME=
 while [ $# -gt 0 ]; do
   case "$1" in
     --rom)
       [ -f "${2:-}" ] || { echo "FAIL  --rom needs an existing file" >&2; exit 2; }
       # xcodebuild passes TEST_RUNNER_-prefixed variables to the test runner.
       export TEST_RUNNER_OE_TEST_ROM="$2"; HAS_ROM=1; shift 2 ;;
+    --game) GAME="${2:-}"; [ -n "$GAME" ] || { echo "FAIL  --game needs the name of a game in your library" >&2; exit 2; }; shift 2 ;;
     --no-build) NO_BUILD=1; shift ;;
     --real-library) LIBRARY=real; shift ;;
     --throwaway-library) LIBRARY=throwaway; shift ;;
@@ -58,6 +64,20 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+# --game: find the game in the real library by name, the way playtest.sh does, and run the checks that work on any game.
+if [ -n "$GAME" ]; then
+  [ "$HAS_ROM" -eq 0 ] || { echo "FAIL  use --game or --rom, not both" >&2; exit 2; }
+  MATCH="$(python3 "$REPO_ROOT/Scripts/playtest/library.py" find "$GAME")" || exit 2
+  GAME_NAME="$(printf '%s' "$MATCH" | cut -f2)"; GAME_PATH="$(printf '%s' "$MATCH" | cut -f3)"
+  [ -f "$GAME_PATH" ] || { echo "FAIL  \"$GAME_NAME\" is in your library but its file is missing: $GAME_PATH" >&2; exit 2; }
+  echo "----  game: $GAME_NAME ($GAME_PATH)"
+  export TEST_RUNNER_OE_TEST_ROM="$GAME_PATH"; LIBRARY=real
+  if [ ${#ONLY[@]} -eq 0 ]; then
+    ONLY=(-only-testing:OpenEmuUITests/OpenEmuSmokeUITests/testGameLoadsAndRuns
+          -only-testing:OpenEmuUITests/OpenEmuSmokeUITests/testPauseFreezesPictureAndResumeContinues)
+  fi
+fi
 
 # Without --rom, play the built-in Game Boy test ROM (written for this repo, always moving, no licensing issues)
 # so the game tests run instead of being skipped. It needs the Gambatte core installed, like any Game Boy game.

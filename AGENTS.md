@@ -41,13 +41,16 @@ CI (`build-check.yml`) builds every PR, including every core the PR touches, and
 ```bash
 ./Scripts/check.sh                  # build, then drive the real app (windows, panes, Cores) against your real library
 ./Scripts/check.sh --no-build       # same, reusing the last build
-./Scripts/check.sh --rom <file>     # also load a game: draws, moves, quick save, quit (uses a throwaway library)
+./Scripts/check.sh --rom <file>     # also load a game from a file: draws, moves, quick save, quit (uses a throwaway library)
+./Scripts/check.sh --game "<name>"  # same checks on a game already in your real library, found by name; writes no saves
 ./Scripts/playtest.sh --game "<name>"   # play a game from your real library, then report frame rate, audio, errors
 ./Scripts/doctor.sh                 # a few seconds: signing certificate, credential stubs, running app, test runner signature
 ./Scripts/prove.sh                  # the checks the diff touches, ends with PROVEN or NOT PROVEN (--all runs every step)
 ./Scripts/core.sh <Name>            # build, install, and check one core (add --release for Release-only bugs)
 ./Scripts/unit-tests.sh             # run the OpenEmuTests unit target
 ```
+
+To test a particular game, add it to your OpenEmu library the normal way and name it with `--game`; no file path is needed. `check.sh --game` and `prove.sh --game` skip quick save and keep the game's auto save unchanged, so your saves stay as they were (they do update play count and last-played time). `playtest.sh` still leaves an auto save when the game closes.
 
 `check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either.
 

@@ -6,6 +6,7 @@
 #   ./Scripts/prove.sh --all                   # run every step even when the diff against main does not touch its area
 #   ./Scripts/prove.sh --ui                    # also drive the real app (check.sh); needs OpenEmu closed
 #   ./Scripts/prove.sh --ui --rom <file>       # ...and load that ROM in the UI test (quick save, screenshot, quit)
+#   ./Scripts/prove.sh --game "<name>"          # ...or play a game from your real library by name (implies --ui; writes no saves)
 #   ./Scripts/prove.sh --core <Name> --rom <file> [--frames N]
 #                                              # also run that core headless on that ROM and require it to finish
 #
@@ -24,12 +25,14 @@ cd "$REPO_ROOT"
 RUN_UI=0
 RUN_ALL=0
 ROM=""
+GAME=""
 CORE=""
 FRAMES=600
 while [ $# -gt 0 ]; do
   case "$1" in
     --ui) RUN_UI=1; shift ;;
     --all) RUN_ALL=1; shift ;;
+    --game) GAME="${2:?--game needs the name of a game in your library}"; RUN_UI=1; shift 2 ;;
     --rom) [ -f "${2:-}" ] || { echo "FAIL  --rom needs an existing file" >&2; exit 2; }; ROM="$2"; shift 2 ;;
     --core) CORE="${2:?--core needs a core name}"; shift 2 ;;
     --frames) FRAMES="${2:?}"; shift 2 ;;
@@ -37,6 +40,7 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+[ -z "$GAME" ] || [ -z "$ROM" ] || { echo "FAIL  use --game or --rom, not both" >&2; exit 2; }
 if [ -n "$CORE" ] && [ -z "$ROM" ]; then echo "FAIL  --core needs --rom" >&2; exit 2; fi
 
 OUT="${TMPDIR:-/tmp}/openemu-prove/$(date +%Y%m%d-%H%M%S)"
@@ -122,8 +126,10 @@ if [ "$RUN_UI" -eq 1 ]; then
     echo "FAIL  ui-tests   (OpenEmu is running; quit it first so the tests do not clobber your session)"
     FAILS=$((FAILS + 1))
     RAN+=("ui-tests (FAILED: OpenEmu was running)")
-  elif ! touches '^(OpenEmu/|OpenEmuKit/|OpenEmu-SDK/|Scripts/check\.sh|Scripts/lib/)'; then
+  elif [ -z "$GAME" ] && ! touches '^(OpenEmu/|OpenEmuKit/|OpenEmu-SDK/|Scripts/check\.sh|Scripts/lib/)'; then
     SKIPPED+=("UI tests (no change under OpenEmu, OpenEmuKit or OpenEmu-SDK; --all runs them)")
+  elif [ -n "$GAME" ]; then
+    step "ui-tests" ./Scripts/check.sh --game "$GAME"
   elif [ -n "$ROM" ]; then
     step "ui-tests" ./Scripts/check.sh --rom "$ROM"
   else
