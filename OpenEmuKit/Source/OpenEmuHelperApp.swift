@@ -787,7 +787,20 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     
     // MARK: - OEGameCoreOwner image capture
     
+    private func logRenderingForCapture() {
+        let name: String
+        switch gameCore.gameCoreRendering {
+        case .bitmap: name = "bitmap"
+        case .openGL2: name = "openGL2"
+        case .openGL3: name = "openGL3"
+        case .metal2: name = "metal2"
+        @unknown default: name = "other"
+        }
+        os_log(.info, log: .captureRendering, "capture: this core renders with %{public}@", name)
+    }
+    
     public func captureOutputImage(completionHandler block: @escaping (NSBitmapImageRep) -> Void) {
+        logRenderingForCapture()
         let gr      = _gameRenderer!
         let ss      = _screenshot!
         let chain   = _filterChain!
@@ -800,6 +813,7 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     }
     
     public func captureSourceImage(completionHandler block: @escaping (NSBitmapImageRep) -> Void) {
+        logRenderingForCapture()
         let gr      = _gameRenderer!
         let ss      = _screenshot!
         let flipped = flipVertically
