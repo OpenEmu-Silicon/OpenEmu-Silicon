@@ -33,6 +33,7 @@ jobs:
     # Fast guard (no Xcode): catches a flattened core submodule that was
     # committed without its vendored upstream source — the regression that
     # silently broke the Dolphin build for months because CI never compiled it.
+    # Covers every core's .gitmodules, not a hardcoded list.
     # Runs on every PR; it takes seconds and needs no build toolchain.
     name: Core sources present
     runs-on: ubuntu-latest
@@ -42,6 +43,9 @@ jobs:
 
       - name: Check vendored core externals are populated
         run: ./Scripts/check-core-sources.sh
+
+      - name: Test vendored core externals check
+        run: python3 Scripts/test-check-core-sources.py
 
       - name: Test core change detection
         run: python3 Scripts/test-detect-core-changes.py
