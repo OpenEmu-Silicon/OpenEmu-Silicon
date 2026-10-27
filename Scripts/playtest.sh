@@ -14,8 +14,9 @@
 # real keyboard uses, saves screenshots of what the core rendered, then closes the game and quits. There is no UI-test
 # runner, so no macOS permission prompts, and nothing takes over your mouse or keyboard.
 #
-# A run leaves the usual traces of playing: play count, last-played time, and an auto save state when the game closes.
-# It never deletes anything and never uses Quick Save. By default it answers "continue your last game?" with Resume;
+# A run leaves the usual traces of playing in the library (play count, last-played time) but writes no saves: it never
+# uses Quick Save, closing the game skips the auto save state (debug builds only, -OESkipAutosaveOnStop), and the backup
+# check only reads. It never deletes anything. By default it answers "continue your last game?" with Resume;
 # --restart answers Restart (the game boots fresh; the auto save state is not loaded). --no-backup switches the save
 # backup folder off for this run, which also avoids the save-sync prompts. The app is started through LaunchServices (`open`), the way a person starts it, so macOS
 # treats it as its own program (iCloud Drive and other privacy permissions apply to it, not to the Claude app that ran
@@ -33,7 +34,7 @@ cd "$REPO_ROOT"
 . "$REPO_ROOT/Scripts/lib/harness.sh"
 harness_ensure_stubs "$REPO_ROOT"
 
-GAME=""; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
+GAME=""; AUDIT_RESTORE=0; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --game) GAME="${2:-}"; shift 2 ;;
@@ -42,6 +43,7 @@ while [ $# -gt 0 ]; do
     --restart) RESUME=0; shift ;;
     --direct) LAUNCH=direct; shift ;;
     --no-backup) NO_BACKUP=1; shift ;;
+    --audit-restore) AUDIT_RESTORE=1; shift ;;
     --no-build) NO_BUILD=1; shift ;;
     -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -93,11 +95,11 @@ elif ! { echo "----  building the debug app"; xcodebuild build -workspace OpenEm
   echo "FAIL  build failed, see $OUT/build.log"; tail -15 "$OUT/build.log"; exit 1
 fi
 
-KEYLIST="$KEYLIST" ROM="$ROM" SECS="$SECONDS_TO_PLAY" OUTDIR="$OUT" python3 - <<'PY'
+KEYLIST="$KEYLIST" ROM="$ROM" SECS="$SECONDS_TO_PLAY" OUTDIR="$OUT" AUDIT_RESTORE="$AUDIT_RESTORE" python3 - <<'PY'
 import json, os
 keys = [k for k in os.environ["KEYLIST"].split(",") if k]
 plan = {"romPath": os.environ["ROM"], "seconds": float(os.environ["SECS"]), "screenshotEvery": 2,
-        "outputDirectory": os.environ["OUTDIR"],
+        "outputDirectory": os.environ["OUTDIR"], "auditRestore": os.environ["AUDIT_RESTORE"] == "1",
         "steps": [{"at": 2.0 + 2.0 * i, "key": k} for i, k in enumerate(keys)]}
 json.dump(plan, open(os.path.join(os.environ["OUTDIR"], "plan.json"), "w"), indent=2)
 PY
@@ -108,7 +110,7 @@ echo "----  playing for ${SECONDS_TO_PLAY}s"
 # OESkipDiscGuideMessageKey: the library shows "Have you read the guide?" whenever it opens on a disc-based system
 # (the sidebar remembers the last one used), which would block the run. Launch arguments are never saved to preferences.
 APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1
-          -OESkipDiscGuideMessageKey 1)
+          -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1)
 # --no-backup turns the save backup folder off for this run only (a launch argument is never saved to preferences).
 [ "$NO_BACKUP" -eq 1 ] && APP_ARGS+=(-OEBackupFolderPath "")
 if [ "$LAUNCH" = "direct" ]; then
@@ -122,7 +124,7 @@ while kill -0 "$LAUNCHER_PID" 2>/dev/null && [ "$WAITED" -lt "$LIMIT" ]; do slee
 TIMED_OUT=0
 if kill -0 "$LAUNCHER_PID" 2>/dev/null; then
   TIMED_OUT=1
-  pkill -f "$APP/Contents/MacOS/OpenEmu" 2>/dev/null; sleep 2; pkill -9 -f "$APP/Contents/MacOS/OpenEmu" 2>/dev/null
+  harness_kill_debug_app "$BUILD"
 fi
 
 LOG="$(/usr/bin/log show --start "$START_TIME" --style compact --info --predicate 'subsystem BEGINSWITH "org.openemu"' 2>/dev/null)"

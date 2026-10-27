@@ -39,7 +39,10 @@ harness_warn_duplicate_certs() {
 harness_kill_debug_app() {
   local app="$1/Build/Products/Debug/OpenEmu.app/Contents/MacOS/OpenEmu"
   pkill -TERM -f "$app" 2>/dev/null || true
-  sleep 1
+  # Give the app up to 15 seconds to finish what it is writing (the library, saves) before the hard kill,
+  # which can cut a write in half.
+  local waited=0
+  while pgrep -f "$app" >/dev/null 2>&1 && [ "$waited" -lt 15 ]; do sleep 1; waited=$((waited + 1)); done
   pkill -KILL -f "$app" 2>/dev/null || true
 }
 

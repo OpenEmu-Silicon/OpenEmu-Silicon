@@ -79,17 +79,18 @@ if [ -n "$GAME" ]; then
   fi
 fi
 
-# Without --rom, play the built-in Game Boy test ROM (written for this repo, always moving, no licensing issues)
-# so the game tests run instead of being skipped. It needs the Gambatte core installed, like any Game Boy game.
-if [ -z "${TEST_RUNNER_OE_TEST_ROM:-}" ]; then
-  python3 "$REPO_ROOT/Scripts/headless/make-test-rom.py" "$OUT_DIR/oetest.gb" && export TEST_RUNNER_OE_TEST_ROM="$OUT_DIR/oetest.gb"
-fi
-
 rm -rf /private/tmp/openemu-ui-* /private/tmp/openemu-ui-backup-* 2>/dev/null  # leftovers from earlier runs (the sandboxed runner cannot always delete them)
 # Real library unless a ROM is being imported (or the caller chose).
 [ -n "$LIBRARY" ] || { [ "$HAS_ROM" -eq 1 ] && LIBRARY=throwaway || LIBRARY=real; }
 [ "$LIBRARY" = real ] && export TEST_RUNNER_OE_USE_REAL_LIBRARY=1
 echo "----  library: $LIBRARY"
+
+# Without --rom or --game, play the built-in Game Boy test ROM (written for this repo, always moving, no licensing
+# issues) so the game tests run instead of being skipped. It needs the Gambatte core installed, like any Game Boy game.
+# Never on the real library: opening the ROM there would import it, so those tests skip instead.
+if [ -z "${TEST_RUNNER_OE_TEST_ROM:-}" ] && [ "$LIBRARY" != real ]; then
+  python3 "$REPO_ROOT/Scripts/headless/make-test-rom.py" "$OUT_DIR/oetest.gb" && export TEST_RUNNER_OE_TEST_ROM="$OUT_DIR/oetest.gb"
+fi
 
 XC_ARGS=(-workspace OpenEmu-metal.xcworkspace -scheme OpenEmuUITests -configuration Debug
          -destination 'platform=macOS,arch=arm64' -derivedDataPath "$BUILD_DIR")

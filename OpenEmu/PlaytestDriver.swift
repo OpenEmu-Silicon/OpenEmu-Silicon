@@ -53,6 +53,8 @@ final class PlaytestDriver {
         var screenshotEvery: Double?
         var outputDirectory: String
         var steps: [Step]
+        /// Also restore from the backup and compare. This rewrites the local saves, so it is off unless asked for.
+        var auditRestore: Bool?
     }
 
     private struct Step: Decodable {
@@ -287,7 +289,7 @@ final class PlaytestDriver {
 
     /// After the game has closed: checks that the save backup folder (iCloud, or wherever it points) really holds
     /// this game's saves, byte for byte, and that restoring from it works. Restoring rewrites the local saves with the
-    /// backup's bytes, so it only runs when they are already identical, and a copy of the local saves is kept first.
+    /// backup's bytes, so it only runs on request (--audit-restore), when they are already identical, and a copy of the local saves is kept first.
     private func auditBackup(then done: @escaping () -> Void) {
         let manager = OEFolderBackupManager.shared
         guard let backup = manager.backupFolderURL else {
@@ -377,6 +379,17 @@ final class PlaytestDriver {
                     return
                 }
                 
+                // Reading is all a play test does to your saves unless it was asked to restore (--audit-restore).
+                if plan?.auditRestore != true {
+                    DispatchQueue.main.async {
+                        manager.checkForNewerBackup(systemIdentifier: self.systemIdentifier, gameName: self.gameName) { check in
+                            lines.append("checkForNewerBackup: \(check)")
+                            lines.append("Restore not run: it rewrites local saves (opt in with --audit-restore).")
+                            self.backupAudit = lines; done()
+                        }
+                    }
+                    return
+                }
                 // Keep a copy of the local saves, then restore and compare again.
                 let snapshot = URL(fileURLWithPath: "/private/tmp/openemu-playtest-localsaves-\(Int(Date().timeIntervalSince1970))")
                 try? fm.createDirectory(at: snapshot, withIntermediateDirectories: true)

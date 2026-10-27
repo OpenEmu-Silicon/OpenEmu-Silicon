@@ -331,6 +331,18 @@ jobs:
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
           cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
+      - name: Download the game database
+        # GameInfoHelperTests and ImportFailureTests read openvgdb.sqlite, which the app downloads into the user's
+        # Application Support folder on first run. A fresh runner does not have it, so those tests would skip.
+        # A fixed release, so the tests see the same data every run.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$HOME/Library/Application Support/OpenEmu"
+          gh release download v29.0 --repo OpenVGDB/OpenVGDB --pattern openvgdb.zip --dir "$RUNNER_TEMP"
+          unzip -o "$RUNNER_TEMP/openvgdb.zip" -d "$HOME/Library/Application Support/OpenEmu"
+          ls -l "$HOME/Library/Application Support/OpenEmu/openvgdb.sqlite"
+
       - name: Run OpenEmuTests
         # The app is the test host and starts with no library; tests that need one make a throwaway
         # library themselves (ensureTestLibrary in ROMImporterTests). A test that hangs fails after 2 minutes.
