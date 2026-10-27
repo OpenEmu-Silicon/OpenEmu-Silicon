@@ -364,20 +364,16 @@ private struct BPBackdrop: View {
 
     var body: some View {
         ZStack {
-            let key = OEBigPictureArt.GameKey(game)
-            if let hero = art.hero(for: key) {
+            // No hero art (no SteamGridDB, or none for this game): just the page's black, nothing in its place.
+            if let hero = art.hero(for: OEBigPictureArt.GameKey(game)) {
                 Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).opacity(0.6)
-            } else if let cover = art.poster(for: game) {
-                Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 40).opacity(0.35)
-            } else {
-                LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .topTrailing, endPoint: .bottomLeading).opacity(0.45)
+                // Dim under the tab bar, a soft pool behind the text, and a fade into the page below.
+                LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 90).frame(maxHeight: .infinity, alignment: .top)
+                LinearGradient(colors: [BP.background.opacity(0.6), .clear], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(colors: [.clear, BP.background], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 170).frame(maxHeight: .infinity, alignment: .bottom)
             }
-            // Dim under the tab bar, a soft pool behind the text, and a fade into the page below.
-            LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 90).frame(maxHeight: .infinity, alignment: .top)
-            LinearGradient(colors: [BP.background.opacity(0.6), .clear], startPoint: .leading, endPoint: .trailing)
-            LinearGradient(colors: [.clear, BP.background], startPoint: .top, endPoint: .bottom)
-                .frame(height: 170).frame(maxHeight: .infinity, alignment: .bottom)
         }
         .frame(width: BP.canvas.width, height: height)
         .clipped()
@@ -632,6 +628,12 @@ private struct BPLane: View {
     }
 
     /// A save-state preview that is all black (some cores write one) tells the player nothing.
+    /// "Dragon Quest VIII - Journey of the Cursed King" becomes "DQV".
+    private static func initials(_ name: String) -> String {
+        let words = name.split { !$0.isLetter && !$0.isNumber }.filter { !["of", "the", "a", "an", "and"].contains($0.lowercased()) }
+        return String(words.prefix(3).compactMap { $0.first }).uppercased()
+    }
+
     private static func isBlank(_ image: NSImage?) -> Bool {
         guard let cgImage = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return false }
         var pixels = [UInt8](repeating: 0, count: 64)
@@ -803,7 +805,10 @@ private struct BPLane: View {
                 if let image = image {
                     Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                 } else {
+                    // No art at all: the system's color with the game's initials.
                     LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
+                    Text(Self.initials(game.cleanDisplayName))
+                        .font(.system(size: 30, weight: .heavy)).foregroundColor(BP.primary.opacity(0.85))
                 }
             }
             .frame(width: BP.iconSize, height: BP.iconSize).clipped()
@@ -934,6 +939,8 @@ private struct BPLane: View {
                 } else if let fallback = fallback {
                     // Some cores save an all-black preview; show the game's art instead.
                     Image(nsImage: fallback).resizable().aspectRatio(contentMode: .fill).blur(radius: 18).opacity(0.5)
+                } else {
+                    LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom).opacity(0.7)
                 }
             }
             .frame(width: BP.wideCard.width, height: BP.wideCard.height).clipped()

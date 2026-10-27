@@ -82,7 +82,7 @@ final class OEBigPictureArt: ObservableObject {
             tick += 1
         }
 
-        guard SteamGridDBClient.isConfigured else { return }
+        guard Self.usesSteamGridDB else { return }
         Task { [weak self] in
             async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name)
             async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name)
@@ -90,6 +90,16 @@ final class OEBigPictureArt: ObservableObject {
             let (heroImage, gridImage, iconImage) = await (hero, grid, icon)
             self?.store(hero: heroImage, grid: gridImage, icon: iconImage, for: key.md5)
         }
+    }
+
+    /// Without a SteamGridDB key there is no hero, poster or icon art: posters fall back to the library's own cover,
+    /// tiles to the poster, and the hero backdrop is left black. Debug builds can force this with
+    /// `-OEBigPictureDisableSteamGridDB 1` to see it.
+    static var usesSteamGridDB: Bool {
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: "OEBigPictureDisableSteamGridDB") { return false }
+        #endif
+        return SteamGridDBClient.isConfigured
     }
 
     /// Forget what was asked, so a key just entered in Preferences takes effect.
