@@ -246,6 +246,63 @@ final class OpenEmuSmokeUITests: XCTestCase {
     }
 
 
+    /// Big-picture spike (#789): opens the mode, visits each screen with the keyboard, launches a game from it,
+    /// and checks the menu comes back when the game quits. Controller input can't be sent from a test.
+    func testBigPictureKeyboardNavigationLaunchAndReturn() throws {
+        let gameWindow = try openGameWindow()
+        sleep(3)
+        chooseMenu("Controls", "Quit Game")
+        confirmQuitIfAsked()
+        XCTAssertTrue(gameWindow.waitForNonExistence(timeout: 15), "Game window did not close after Quit Game")
+
+        let bigPicture = app.windows["BigPictureWindow"]
+        app.typeKey("b", modifierFlags: [.control, .command])
+        XCTAssertTrue(bigPicture.waitForExistence(timeout: 10), "Big-picture window did not open")
+        XCTAssertTrue(bigPicture.staticTexts["Resume"].waitForExistence(timeout: 10), "Hero Resume button missing")
+        sleep(2)
+        attachScreenshot(named: "bigpicture-home")
+
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.rightArrow, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-shelf")
+        app.typeKey("m", modifierFlags: [])
+        XCTAssertTrue(bigPicture.staticTexts["Systems"].waitForExistence(timeout: 5), "Sidebar did not open")
+        sleep(1)
+        attachScreenshot(named: "bigpicture-sidebar")
+        app.typeKey(.escape, modifierFlags: [])
+
+        app.typeKey(.return, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-detail")
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey("m", modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-settings")
+        app.typeKey(.escape, modifierFlags: [])
+        sleep(1)
+
+        app.typeKey(.upArrow, modifierFlags: [])
+        app.typeKey(.upArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game did not launch from big picture")
+        XCTAssertTrue(bigPicture.waitForNonExistence(timeout: 10), "Big-picture window stayed up over the game")
+        sleep(4)
+
+        // The game is fullscreen and hides the menu bar, so use the Close Window shortcut.
+        app.typeKey("w", modifierFlags: .command)
+        confirmQuitIfAsked()
+        XCTAssertTrue(bigPicture.waitForExistence(timeout: 20), "Big picture did not return after the game quit")
+        attachScreenshot(named: "bigpicture-returned")
+
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(bigPicture.waitForNonExistence(timeout: 10), "Escape did not close big picture")
+    }
+
     /// Plays the ROM named by OE_TEST_ROM with a backup folder set, then checks that a quick save is
     /// copied into the folder with a "which Mac saved this" file, and that saving again keeps the
     /// replaced copy in a .versions folder.
