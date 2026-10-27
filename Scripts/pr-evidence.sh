@@ -129,6 +129,10 @@ if [ "$POST" -ne 1 ]; then
   exit 0
 fi
 
+echo "----  posting to $REPO#$PR ($(gh pr view "$PR" --repo "$REPO" --json title,headRefName --jq '.title + "  [" + .headRefName + "]"' 2>/dev/null))"
+[ "$(gh api "repos/$REPO" --jq .permissions.push 2>/dev/null)" = "true" ] \
+  || die "your GitHub account cannot push to $REPO, and this script stores the pictures on a branch there. Attach them to the PR by hand instead."
+
 # Make sure the evidence branch exists (an empty branch with only a README, created once).
 if ! gh api "repos/$REPO/git/ref/heads/pr-evidence" >/dev/null 2>&1; then
   echo "----  creating the pr-evidence branch"
