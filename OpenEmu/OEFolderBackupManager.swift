@@ -622,7 +622,17 @@ enum OEExtraSaveLocations {
     }
 
     @discardableResult
+    /// Debug builds only: `-OEBackupSimulateLatencyMs 1500` makes every backup folder listing and copy take that much
+    /// longer, like a slow iCloud Drive, so a play test can show the app stays responsive and the waits stay bounded.
+    private func simulateSlowFolder() {
+        #if DEBUG
+        let ms = UserDefaults.standard.integer(forKey: "OEBackupSimulateLatencyMs")
+        if ms > 0 { Thread.sleep(forTimeInterval: Double(ms) / 1000) }
+        #endif
+    }
+
     private func copyFile(from src: URL, to dest: URL, direction: String) -> Bool {
+        simulateSlowFolder()
         let fm = FileManager.default
         try? fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
         // PPSSPP lists everything inside SAVEDATA as a save, so stage PSP folders next to it instead.
@@ -1041,6 +1051,7 @@ enum OEExtraSaveLocations {
     /// Lists a folder, separating iCloud placeholders (`.Name.icloud`) from real files.
     /// A placeholder is reported under the name of the file it stands for.
     private func listDirectory(_ dir: URL) -> (items: [URL], placeholders: [URL]) {
+        simulateSlowFolder()
         guard let entries = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil, options: []) else { return ([], []) }
         var items: [URL] = []
         var placeholders: [URL] = []
