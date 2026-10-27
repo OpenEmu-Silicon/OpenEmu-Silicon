@@ -1130,7 +1130,10 @@ enum OEExtraSaveLocations {
         guard !parts.contains(where: { $0.hasPrefix(".") && !$0.hasSuffix(".icloud") }) else { return nil }
         if let key = OEExtraSaveLocations.gameKey(for: parts) { return (canonicalName(key), nil) }
         if parts.count >= 4, parts[0] == "Save States" {
-            return (parts[2], parts[1])
+            // The folder is named after the ROM file ("Space Invaders (USA)"). Sync records and the "which Mac wrote
+            // this" file are kept under the library title ("Space Invaders"), as the launch check looks them up,
+            // so the two must agree or a game this Mac just synced is reported as changed on two Macs.
+            return (canonicalName(parts[2]), parts[1])
         }
         if parts.count >= 3, parts[1] == "Battery Saves" {
             return (gameName(forBatteryFile: parts[2]), nil)
