@@ -86,6 +86,8 @@ enum BP {
     static let posterRadius: CGFloat = 5
     static let cardRadius: CGFloat = 8
     static let wideCard = CGSize(width: 260, height: 146)
+    /// Library grids: large bare posters, five across.
+    static let gridSize = CGSize(width: 210, height: 292)
     /// Continue Playing icon tiles.
     static let iconSize: CGFloat = 104
     static let iconRadius: CGFloat = 22

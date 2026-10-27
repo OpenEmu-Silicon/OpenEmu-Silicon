@@ -197,6 +197,7 @@ private enum BPMetrics {
     static let stateBody: CGFloat = 228
     static let iconBody: CGFloat = 176
     static let featuredBody: CGFloat = 372
+    static let gridBody: CGFloat = 372
     static let laneGap: CGFloat = BP.sectionGap
     /// Where a shelf's top sits on screen when it has the highlight.
     static let focusTarget: CGFloat = 84
@@ -209,9 +210,9 @@ private enum BPMetrics {
             switch lane.style {
             case .icons: return header + iconBody + laneGap
             case .featured: return header + featuredBody + laneGap
-            default: return header + posterBody + laneGap
+            default: return header + gridBody + laneGap
             }
-        case .saveStates, .screenshots: return header + stateBody + laneGap
+        case .saveStates: return header + stateBody + laneGap
         }
     }
 }
@@ -447,32 +448,37 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
-    enum Style { case icons, poster, featured, wide }
+    enum Style { case icons, grid, featured, wide }
 
     /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
     var style: Style {
         switch kind {
-        case .saveStates, .screenshots: return .wide
-        default: return id == "recent" ? .icons : (id == "most-played" ? .featured : .poster)
+        case .saveStates: return .wide
+        default:
+            switch id {
+            case "recent": return .icons
+            case "most-played", "added": return .featured
+            default: return .grid
+            }
         }
     }
 
     var itemWidth: CGFloat {
         switch style {
         case .icons: return BP.iconSize
-        case .poster: return BP.posterSize.width
+        case .grid: return BP.gridSize.width
         case .featured: return BP.featuredSize.width
         case .wide: return BP.wideCard.width
         }
     }
 
-    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : BP.gutter) }
+    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : BP.gutter)) }
 
     /// Columns that fit on screen before the shelf starts to slide.
     var visibleColumns: Int {
         switch style {
         case .icons: return 8
-        case .poster: return 6
+        case .grid: return 5
         case .featured: return 5
         case .wide: return 4
         }
@@ -480,7 +486,7 @@ private extension BigPictureLane {
 
     var isWide: Bool {
         switch kind {
-        case .saveStates, .screenshots: return true
+        case .saveStates: return true
         default: return false
         }
     }
@@ -522,10 +528,6 @@ private struct BPLane: View {
                     ForEach(Array(states.enumerated()), id: \.offset) { column, state in
                         stateCard(state, column: column)
                     }
-                case .screenshots(let shots):
-                    ForEach(Array(shots.enumerated()), id: \.offset) { column, shot in
-                        screenshotCard(shot, column: column)
-                    }
                 case .heroActions:
                     EmptyView()
                 }
@@ -563,23 +565,6 @@ private struct BPLane: View {
         formatter.unitsStyle = .abbreviated
         return formatter
     }()
-
-    private func screenshotCard(_ shot: OEDBScreenshot, column: Int) -> some View {
-        let focused = isFocused(column)
-        let image = NSImage(contentsOf: shot.url)
-        return ZStack {
-            Color.white.opacity(0.06)
-            if let image = image { Image(nsImage: image).resizable().aspectRatio(contentMode: .fill) }
-        }
-        .frame(width: BP.wideCard.width, height: BP.wideCard.height).clipped()
-        .clipShape(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous).strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
-        .scaleEffect(focused ? 1.04 : 1, anchor: .top)
-        .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 14, y: 8)
-        .animation(.easeOut(duration: 0.12), value: focused)
-        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
-        .onTapGesture { model.click(lane: index, column: column) }
-    }
 
     private func isFocused(_ column: Int) -> Bool {
         !model.sidebarOpen && model.lane == index && model.column == column
@@ -623,6 +608,13 @@ private struct BPLane: View {
         return VStack(spacing: 0) {
             BPPoster(game: game, size: BP.featuredSize, coverTick: model.coverTick, art: art)
                 .clipShape(Rectangle())
+                .overlay(alignment: .topLeading) {
+                    if lane.id == "added", isNew(game) {
+                        Text("NEW").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundColor(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(Capsule().fill(BP.accent)).padding(8)
+                    }
+                }
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.cleanDisplayName).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
@@ -647,39 +639,56 @@ private struct BPLane: View {
         .onTapGesture { model.click(lane: index, column: column) }
     }
 
+    /// A large bare poster with a time-played badge and a "developer · year · genre" caption, like the AltUI library.
     private func poster(_ game: OEDBGame, column: Int) -> some View {
         let focused = isFocused(column)
+        let details = art.details(for: OEBigPictureArt.GameKey(game))
+        let caption = [details?.developer, details?.releaseDate.map { String($0.suffix(4)) }, details?.genres.first]
+            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         return VStack(alignment: .leading, spacing: BP.space8) {
-            BPPoster(game: game, size: BP.posterSize, coverTick: model.coverTick, art: art)
-                .overlay(alignment: .topLeading) {
-                    if lane.id == "added", isNew(game) {
-                        Text("NEW").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundColor(.white)
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                            .background(Capsule().fill(BP.accent)).padding(6)
+            BPPoster(game: game, size: BP.gridSize, coverTick: model.coverTick, art: art)
+                .overlay(alignment: .topTrailing) {
+                    if let played = game.lastPlayed {
+                        Text(Self.shortAgo(played)).font(.system(size: 9, weight: .bold)).tracking(0.6)
+                            .foregroundColor(BP.primary)
+                            .padding(.horizontal, 7).frame(height: 18)
+                            .background(Capsule().fill(Color.black.opacity(0.55)))
+                            .padding(7)
                     }
                 }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(game.cleanDisplayName)
-                    .font(BP.captionBold).foregroundColor(BP.primary)
-                    .lineLimit(1)
-                if let line = secondaryLine(for: game) {
-                    Text(line).font(BP.caption).foregroundColor(BP.tertiary).lineLimit(1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(game.cleanDisplayName).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                if !caption.isEmpty {
+                    Text(caption).font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(1)
                 }
             }
-            .frame(width: BP.posterSize.width, alignment: .leading)
-            .opacity(focused ? 1 : 0.8)
+            .frame(width: BP.gridSize.width, alignment: .leading)
+            .opacity(focused ? 1 : 0.85)
         }
         .overlay(alignment: .top) {
             RoundedRectangle(cornerRadius: BP.posterRadius + 3, style: .continuous)
                 .strokeBorder(BP.focusRing, lineWidth: focused ? BP.focusLine : 0)
-                .frame(width: BP.posterSize.width + 8, height: BP.posterSize.height + 8)
+                .frame(width: BP.gridSize.width + 8, height: BP.gridSize.height + 8)
                 .offset(y: -4)
         }
-        .scaleEffect(focused ? 1.06 : 1, anchor: .top)
+        .scaleEffect(focused ? 1.04 : 1, anchor: .top)
         .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 14, y: 8)
         .animation(.easeOut(duration: 0.12), value: focused)
+        .onAppear { art.load(OEBigPictureArt.GameKey(game)) }
         .onHover { inside in if inside { model.hover(lane: index, column: column) } }
         .onTapGesture { model.click(lane: index, column: column) }
+    }
+
+    /// "2H AGO", "YESTERDAY", "3D AGO", "1W AGO".
+    private static func shortAgo(_ date: Date) -> String {
+        let seconds = max(Date().timeIntervalSince(date), 0)
+        let hours = Int(seconds / 3600), days = Int(seconds / 86400)
+        if seconds < 3600 { return "JUST NOW" }
+        if hours < 24 { return "\(hours)H AGO" }
+        if days == 1 { return "YESTERDAY" }
+        if days < 7 { return "\(days)D AGO" }
+        if days < 60 { return "\(days / 7)W AGO" }
+        return "\(days / 30)MO AGO"
     }
 
     private func stateCard(_ state: OEDBSaveState, column: Int) -> some View {

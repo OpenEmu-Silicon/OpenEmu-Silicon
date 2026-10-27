@@ -51,7 +51,6 @@ struct BigPictureLane: Identifiable {
         case heroActions
         case games([OEDBGame])
         case saveStates([OEDBSaveState])
-        case screenshots([OEDBScreenshot])
     }
 
     let id: String
@@ -66,7 +65,6 @@ struct BigPictureLane: Identifiable {
         case .heroActions: return 2
         case .games(let games): return games.count
         case .saveStates(let states): return states.count
-        case .screenshots(let shots): return shots.count
         }
     }
 }
@@ -181,7 +179,7 @@ final class BigPictureModel: ObservableObject {
     }
 
     private func grid(_ games: [OEDBGame], id: String, title: String?, subtitle: String?) -> [BigPictureLane] {
-        let perRow = 7
+        let perRow = 5
         return stride(from: 0, to: games.count, by: perRow).enumerated().map { index, start in
             BigPictureLane(id: "\(id)-\(index)", title: index == 0 ? title : nil, subtitle: index == 0 ? subtitle : nil,
                            kind: .games(Array(games[start..<min(start + perRow, games.count)])))
@@ -197,10 +195,6 @@ final class BigPictureModel: ObservableObject {
             let states = (game.defaultROM?.normalSaveStates ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
             if !states.isEmpty {
                 built.append(BigPictureLane(id: "states", title: "Save States", subtitle: "\(states.count) saved", kind: .saveStates(states)))
-            }
-            let shots = (game.defaultROM?.screenShots ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
-            if !shots.isEmpty {
-                built.append(BigPictureLane(id: "shots", title: "Gameplay", subtitle: "\(shots.count) screenshots", kind: .screenshots(Array(shots.prefix(12)))))
             }
             lanes = built
         case .browse:
@@ -408,8 +402,6 @@ final class BigPictureModel: ObservableObject {
         case .saveStates(let states):
             guard states.indices.contains(column) else { return }
             onLaunchState?(states[column])
-        case .screenshots:
-            return
         }
     }
 
