@@ -91,10 +91,8 @@ struct BigPictureChip: Identifiable {
     enum Action {
         case toggleSystem(String)
         case toggleGenre(String)
-        case toggleGame(NSManagedObjectID)
         case clear(BigPictureModel.FilterMenu)
         case sort(BigPictureModel.SortOrder)
-        case stateSort(BigPictureModel.StateSort)
     }
     let id: String
     let title: String
@@ -157,8 +155,6 @@ final class BigPictureModel: ObservableObject {
     /// A system chosen in the sidebar. Filters the library tab.
     @Published private(set) var systemFilters = Set<String>()
     @Published private(set) var genreFilters = Set<String>()
-    @Published private(set) var gameFilters = Set<NSManagedObjectID>()
-    @Published private(set) var stateSort = StateSort.newest
     @Published private(set) var searchQuery = ""
     @Published private(set) var heroIndex = 0
     @Published private(set) var sortOrder = SortOrder.recentlyPlayed
@@ -171,13 +167,7 @@ final class BigPictureModel: ObservableObject {
         case rating = "Top Rated"
     }
 
-    enum StateSort: String, CaseIterable {
-        case newest = "Newest First"
-        case oldest = "Oldest First"
-        case game = "Game A–Z"
-    }
-
-    enum FilterMenu: Int { case system, genre, game, sort }
+    enum FilterMenu: Int { case system, genre, sort }
     @Published private(set) var openMenu: FilterMenu?
     @Published private(set) var menuIndex = 0
     @Published private(set) var lanes = [BigPictureLane]()
@@ -234,7 +224,6 @@ final class BigPictureModel: ObservableObject {
         tab = .home
         systemFilters = []
         genreFilters = []
-        gameFilters = []
         searchQuery = ""
         sidebarOpen = false
         tabBarIndex = 1
@@ -329,15 +318,10 @@ final class BigPictureModel: ObservableObject {
             case .saveStates:
                 var withSaves = allGames.filter { !($0.defaultROM?.normalSaveStates.isEmpty ?? true) }
                 if !systemFilters.isEmpty { withSaves = withSaves.filter { systemFilters.contains($0.system?.systemIdentifier ?? "") } }
-                if !gameFilters.isEmpty { withSaves = withSaves.filter { gameFilters.contains($0.objectID) } }
-                var groups = withSaves.map { game -> (game: OEDBGame, states: [OEDBSaveState]) in
+                if !genreFilters.isEmpty { withSaves = withSaves.filter { genreFilters.contains(genre(of: $0) ?? "") } }
+                // Same sort choices as the Library, applied to the games; each game's own saves stay newest first.
+                let groups = sorted(withSaves).map { game -> (game: OEDBGame, states: [OEDBSaveState]) in
                     (game, Array(game.defaultROM?.normalSaveStates ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) })
-                }
-                func newest(_ group: (game: OEDBGame, states: [OEDBSaveState])) -> Date { group.states.first?.timestamp ?? .distantPast }
-                switch stateSort {
-                case .newest: groups.sort { newest($0) > newest($1) }
-                case .oldest: groups.sort { newest($0) < newest($1) }
-                case .game: groups.sort { $0.game.displayName.localizedCaseInsensitiveCompare($1.game.displayName) == .orderedAscending }
                 }
                 lanes = [filterLane()] + groups.map { group in
                     let count = group.states.count == 1 ? "1 save" : "\(group.states.count) saves"
@@ -462,11 +446,10 @@ final class BigPictureModel: ObservableObject {
     // MARK: Filters
 
     /// The drop-downs for the tab being shown. Library filters by system and genre; Save States by system and game.
-    var filterMenus: [FilterMenu] { tab == .saveStates ? [.system, .game, .sort] : [.system, .genre, .sort] }
+    var filterMenus: [FilterMenu] { [.system, .genre, .sort] }
 
     var hasActiveFilters: Bool {
-        !systemFilters.isEmpty || !genreFilters.isEmpty || !gameFilters.isEmpty
-            || (tab == .saveStates ? stateSort != .newest : sortOrder != .recentlyPlayed)
+        !systemFilters.isEmpty || !genreFilters.isEmpty || sortOrder != .recentlyPlayed
     }
 
     private func filterLane() -> BigPictureLane {
@@ -482,38 +465,28 @@ final class BigPictureModel: ObservableObject {
             case .genre:
                 return BigPictureFilter(menu: menu, label: summary(genreFilters.sorted(), none: "Any Genre", many: "Genres"),
                                         icon: nil, active: !genreFilters.isEmpty)
-            case .game:
-                let names = allGames.filter { gameFilters.contains($0.objectID) }.map { $0.cleanDisplayName }
-                return BigPictureFilter(menu: menu, label: summary(names, none: "All Games", many: "Games"), icon: nil, active: !names.isEmpty)
             case .sort:
-                return BigPictureFilter(menu: menu, label: tab == .saveStates ? stateSort.rawValue : sortOrder.rawValue, icon: nil, active: false)
+                return BigPictureFilter(menu: menu, label: sortOrder.rawValue, icon: nil, active: false)
             }
         }
         if hasActiveFilters { items.append(BigPictureFilter(menu: nil, label: "Clear", icon: nil, active: false)) }
         return BigPictureLane(id: "filters", title: nil, subtitle: nil, kind: .filters(items))
     }
 
-    /// What a drop-down offers, with the current choices marked. System, genre and game stack; sort picks one.
+    /// What a drop-down offers, with the current choices marked. System and genre stack; sort picks one.
     func menuOptions(_ menu: FilterMenu) -> [BigPictureChip] {
         switch menu {
         case .system:
             return [BigPictureChip(id: "sys-all", title: "All Systems", icon: nil, selected: systemFilters.isEmpty, action: .clear(.system))]
                 + systems.map { BigPictureChip(id: "sys-\($0.id)", title: $0.name, icon: $0.icon, selected: systemFilters.contains($0.id), action: .toggleSystem($0.id)) }
         case .genre:
-            let scope = systemFilters.isEmpty ? allGames : allGames.filter { systemFilters.contains($0.system?.systemIdentifier ?? "") }
+            // Only genres that exist among what this tab lists (Save States lists games with saves).
+            var scope = tab == .saveStates ? allGames.filter { !($0.defaultROM?.normalSaveStates.isEmpty ?? true) } : allGames
+            if !systemFilters.isEmpty { scope = scope.filter { systemFilters.contains($0.system?.systemIdentifier ?? "") } }
             let names = Set(scope.compactMap { genre(of: $0) }).sorted()
             return [BigPictureChip(id: "genre-all", title: "Any Genre", icon: nil, selected: genreFilters.isEmpty, action: .clear(.genre))]
                 + names.map { BigPictureChip(id: "genre-\($0)", title: $0, icon: nil, selected: genreFilters.contains($0), action: .toggleGenre($0)) }
-        case .game:
-            var scope = allGames.filter { !($0.defaultROM?.normalSaveStates.isEmpty ?? true) }
-            if !systemFilters.isEmpty { scope = scope.filter { systemFilters.contains($0.system?.systemIdentifier ?? "") } }
-            return [BigPictureChip(id: "game-all", title: "All Games", icon: nil, selected: gameFilters.isEmpty, action: .clear(.game))]
-                + byName(scope).map { BigPictureChip(id: "game-\($0.objectID.uriRepresentation().absoluteString)", title: $0.cleanDisplayName, icon: nil,
-                                                    selected: gameFilters.contains($0.objectID), action: .toggleGame($0.objectID)) }
         case .sort:
-            if tab == .saveStates {
-                return StateSort.allCases.map { BigPictureChip(id: "ssort-\($0.rawValue)", title: $0.rawValue, icon: nil, selected: stateSort == $0, action: .stateSort($0)) }
-            }
             return SortOrder.allCases.map { BigPictureChip(id: "sort-\($0.rawValue)", title: $0.rawValue, icon: nil, selected: sortOrder == $0, action: .sort($0)) }
         }
     }
@@ -525,24 +498,21 @@ final class BigPictureModel: ObservableObject {
         switch action {
         case .toggleSystem(let id): toggle(&systemFilters, id)
         case .toggleGenre(let name): toggle(&genreFilters, name)
-        case .toggleGame(let id): toggle(&gameFilters, id)
         case .clear(let menu):
             switch menu {
             case .system: systemFilters = []
             case .genre: genreFilters = []
-            case .game: gameFilters = []
-            case .sort: sortOrder = .recentlyPlayed; stateSort = .newest
+            case .sort: sortOrder = .recentlyPlayed
             }
         case .sort(let order): sortOrder = order
-        case .stateSort(let order): stateSort = order
         }
         rebuildLanes()
     }
 
     /// Turns every filter off and puts the sort back to its default.
     func clearFilters() {
-        systemFilters = []; genreFilters = []; gameFilters = []
-        sortOrder = .recentlyPlayed; stateSort = .newest
+        systemFilters = []; genreFilters = []
+        sortOrder = .recentlyPlayed
         rebuildLanes()
         column = min(column, max((lanes.indices.contains(lane) ? lanes[lane].count : 1) - 1, 0))
     }
@@ -626,7 +596,6 @@ final class BigPictureModel: ObservableObject {
         tab = newTab
         systemFilters = system.map { [$0] } ?? []
         genreFilters = genre.map { [$0] } ?? []
-        gameFilters = []
         tabBarIndex = newTab.rawValue + 1
         rebuildLanes()
         // Start on the games (or the keyboard), not the filter bar.

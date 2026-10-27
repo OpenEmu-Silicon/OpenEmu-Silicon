@@ -235,7 +235,7 @@ private enum BPMetrics {
             }
         case .saveStates: return header + stateBody + laneGap
         case .genres: return header + genreBody + laneGap
-        case .filters: return 50
+        case .filters: return 64
         case .keys: return header + 52
         }
     }
