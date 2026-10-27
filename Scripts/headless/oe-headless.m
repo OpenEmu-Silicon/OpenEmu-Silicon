@@ -4,7 +4,12 @@
 // Usage:
 //   oe-headless --core <X.oecoreplugin> --rom <file> --frames N [--input FRAME:SELECTOR:INT ...]
 //               [--hash-at FRAME ...] [--save-state-at FRAME] [--load-state-at FRAME] [--audio]
-//               [--search-byte FRAME:HEXVALUE ...]
+//               [--search-byte FRAME:HEXVALUE ...] [--cheat-at FRAME:CODE ...] [--reset-at FRAME ...]
+//               [--buffer-once]
+//
+// --buffer-once asks the core for its video buffer only before the first frame, the way Release builds
+// of the app do (Debug builds ask again every frame from an assert), so a core that loses the buffer
+// shows up as a picture that stops changing.
 //
 // Output is one line per event, easy to grep:
 //   core-loaded <class>
@@ -12,6 +17,8 @@
 //   frame <n> video=<hash> audio=<hash>    (for every --hash-at frame, and the last frame)
 //   state-saved <bytes>
 //   state-loaded
+//   cheat-set <code>
+//   reset
 //   region <name> address=<hex> bytes=<n>  (for --search-byte, once per readable memory region)
 //   hit <hex address>                      (for --search-byte, every byte equal to the value, addressed
 //                                           the way the cheat search window addresses it)
@@ -101,6 +108,9 @@ int main(int argc, char **argv)
         NSInteger saveAt = -1, loadAt = -1;
         NSMutableSet<NSNumber *> *hashAt = [NSMutableSet set];
         NSMutableDictionary<NSNumber *, NSNumber *> *searchAt = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSNumber *, NSMutableArray<NSString *> *> *cheatsAt = [NSMutableDictionary dictionary];
+        NSMutableSet<NSNumber *> *resetAt = [NSMutableSet set];
+        BOOL bufferOnce = NO;
         NSMutableDictionary<NSNumber *, NSMutableArray<NSArray *> *> *inputs = [NSMutableDictionary dictionary];
 
         for (int i = 1; i < argc; i++) {
@@ -113,6 +123,16 @@ int main(int argc, char **argv)
             else if ([arg isEqual:@"--save-state-at"] && next) { saveAt = next.integerValue; i++; }
             else if ([arg isEqual:@"--load-state-at"] && next) { loadAt = next.integerValue; i++; }
             else if ([arg isEqual:@"--audio"]) { wantAudio = YES; }
+            else if ([arg isEqual:@"--buffer-once"]) { bufferOnce = YES; }
+            else if ([arg isEqual:@"--reset-at"] && next) { [resetAt addObject:@(next.integerValue)]; i++; }
+            else if ([arg isEqual:@"--cheat-at"] && next) {
+                NSRange colon = [next rangeOfString:@":"];
+                if (colon.location == NSNotFound) return Fail(@"--cheat-at wants FRAME:CODE");
+                NSNumber *frame = @([next substringToIndex:colon.location].integerValue);
+                if (!cheatsAt[frame]) cheatsAt[frame] = [NSMutableArray array];
+                [cheatsAt[frame] addObject:[next substringFromIndex:colon.location + 1]];
+                i++;
+            }
             else if ([arg isEqual:@"--search-byte"] && next) {
                 NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
                 if (parts.count != 2) return Fail(@"--search-byte wants FRAME:HEXVALUE");
@@ -198,7 +218,17 @@ int main(int argc, char **argv)
                 if (!savedState || ![core deserializeState:savedState withError:&e]) return Fail([NSString stringWithFormat:@"load state failed: %@", e]);
                 printf("state-loaded\n");
             }
-            videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
+            for (NSString *code in cheatsAt[@(frame)]) {
+                [core setCheat:code setType:@"Unknown" setEnabled:YES];
+                printf("cheat-set %s\n", code.UTF8String);
+            }
+            if ([resetAt containsObject:@(frame)]) {
+                [core resetEmulation];
+                printf("reset\n");
+            }
+            if (!bufferOnce || frame == 1) {
+                videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
+            }
             if (!videoBuffer && !hostVideo) {
                 // Some cores (MAME) only draw into a buffer the host provides.
                 hostVideo = [NSMutableData dataWithLength:core.bytesPerRow * core.bufferSize.height];
