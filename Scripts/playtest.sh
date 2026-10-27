@@ -51,6 +51,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$GAME" ] || { echo "FAIL  need --game <name of a game in your library>" >&2; exit 2; }
+harness_take_lock || exit 2
+trap harness_release_lock EXIT
 if pgrep -x OpenEmu > /dev/null; then
   echo "FAIL  OpenEmu is running. Quit it first: it shares the library with the play test." >&2
   harness_describe_running >&2

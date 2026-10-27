@@ -35,6 +35,24 @@ harness_warn_duplicate_certs() {
   fi
 }
 
+# Only one harness run (check.sh, playtest.sh) may use the library at a time: two at once replace each other's
+# auto saves and fight over the single OpenEmu process. /private/tmp, not $TMPDIR: sessions can have different ones.
+HARNESS_LOCK=/private/tmp/openemu-harness.lock
+harness_take_lock() {
+  local holder
+  if ! mkdir "$HARNESS_LOCK" 2>/dev/null; then
+    holder="$(cat "$HARNESS_LOCK/pid" 2>/dev/null)"
+    if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
+      echo "FAIL  another harness run is in progress (pid $holder: $(ps -o command= -p "$holder" 2>/dev/null | cut -c1-100))." >&2
+      echo "      Wait for it to finish; two runs at once overwrite each other's saves." >&2
+      return 1
+    fi
+    rm -rf "$HARNESS_LOCK"; mkdir "$HARNESS_LOCK" 2>/dev/null || return 1   # the holder died without releasing it
+  fi
+  echo "$$" > "$HARNESS_LOCK/pid"
+}
+harness_release_lock() { [ "$(cat "$HARNESS_LOCK/pid" 2>/dev/null)" = "$$" ] && rm -rf "$HARNESS_LOCK"; return 0; }
+
 # Quit any debug OpenEmu started from this build folder (used from an EXIT trap).
 harness_kill_debug_app() {
   local app="$1/Build/Products/Debug/OpenEmu.app/Contents/MacOS/OpenEmu"
