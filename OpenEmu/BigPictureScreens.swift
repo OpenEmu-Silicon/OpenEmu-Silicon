@@ -79,6 +79,9 @@ private extension OEDBGame {
 
     var systemName: String { system?.name ?? "" }
 
+    /// The title as shown on screen, without region and revision tags: "Dragon Quest VIII (USA)" is "Dragon Quest VIII".
+    var bpTitle: String { OEBigPictureArt.GameKey.searchName(cleanDisplayName) }
+
     var playedSummary: String {
         var parts = [String]()
         let hours = playTime / 3600
@@ -110,7 +113,7 @@ private struct BPPoster: View {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
             } else {
                 LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
-                Text(game.cleanDisplayName)
+                Text(game.bpTitle)
                     .font(BP.calloutBold)
                     .foregroundColor(BP.primary)
                     .multilineTextAlignment(.center)
@@ -405,7 +408,7 @@ private struct BPHero: View {
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.55), lineWidth: 1))
                 .offset(x: heroTextX, y: 100)
 
-            Text(game.cleanDisplayName)
+            Text(game.bpTitle)
                 .font(BP.display).tracking(-0.5).foregroundColor(BP.primary)
                 .lineLimit(1).minimumScaleFactor(0.65).frame(width: 800, alignment: .leading)
                 .offset(x: heroTextX, y: 132)
@@ -770,7 +773,7 @@ private struct BPLane: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("REDISCOVER").font(.system(size: 10, weight: .bold)).tracking(1.2).foregroundColor(BP.accent)
-                    Text(game.cleanDisplayName).font(.system(size: 24, weight: .heavy)).foregroundColor(BP.primary).lineLimit(1)
+                    Text(game.bpTitle).font(.system(size: 24, weight: .heavy)).foregroundColor(BP.primary).lineLimit(1)
                     Text([ago.map { "Last played \($0)" }, played].compactMap { $0 }.joined(separator: "  ·  "))
                         .font(BP.callout).foregroundColor(BP.secondary)
                 }
@@ -807,7 +810,7 @@ private struct BPLane: View {
                 } else {
                     // No art at all: the system's color with the game's initials.
                     LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
-                    Text(Self.initials(game.cleanDisplayName))
+                    Text(Self.initials(game.bpTitle))
                         .font(.system(size: 30, weight: .heavy)).foregroundColor(BP.primary.opacity(0.85))
                 }
             }
@@ -816,7 +819,7 @@ private struct BPLane: View {
             .overlay(RoundedRectangle(cornerRadius: BP.iconRadius, style: .continuous)
                 .strokeBorder(BP.focusRing, lineWidth: focused ? BP.focusLine : 0).padding(-3))
             .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
-            Text(game.cleanDisplayName).font(BP.captionBold).foregroundColor(BP.primary)
+            Text(game.bpTitle).font(BP.captionBold).foregroundColor(BP.primary)
                 .lineLimit(2).frame(width: BP.iconSize, alignment: .leading)
             if let played = game.lastPlayed {
                 Text(Self.ago.localizedString(for: played, relativeTo: Date()))
@@ -845,7 +848,7 @@ private struct BPLane: View {
                 }
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(game.cleanDisplayName).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                    Text(game.bpTitle).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
                     Text(secondaryLine(for: game) ?? "").font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -886,7 +889,7 @@ private struct BPLane: View {
                     }
                 }
             VStack(alignment: .leading, spacing: 3) {
-                Text(game.cleanDisplayName).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                Text(game.bpTitle).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
                 if !caption.isEmpty {
                     Text(caption).font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(1)
                 }
@@ -928,7 +931,7 @@ private struct BPLane: View {
         let fallback = game.flatMap { art.poster(for: $0) }
         // Save names carry a long timestamp ("Save-Game-2 2026-10-26 11:42:15 -0700"); show the name and a short date.
         let label = state.displayName.split(separator: " ").first.map { $0.replacingOccurrences(of: "-", with: " ") } ?? state.displayName
-        let title = lane.showsGame ? (game?.cleanDisplayName ?? label) : label
+        let title = lane.showsGame ? (game?.bpTitle ?? label) : label
         let detail = [lane.showsGame ? label : nil, state.timestamp.map { $0.formatted(.dateTime.month().day().hour().minute()) }]
             .compactMap { $0 }.joined(separator: "  ·  ")
         return VStack(alignment: .leading, spacing: 0) {
@@ -992,7 +995,7 @@ private struct BPDetailSections: View {
 
             HStack(alignment: .top, spacing: BP.space16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(game.cleanDisplayName).font(.system(size: 18, weight: .bold)).foregroundColor(BP.primary)
+                    Text(game.bpTitle).font(.system(size: 18, weight: .bold)).foregroundColor(BP.primary)
                     Text(([game.systemName] + (details?.genres ?? [])).filter { !$0.isEmpty }.joined(separator: ", ").uppercased())
                         .font(.system(size: 11, weight: .semibold)).tracking(0.6).foregroundColor(BP.secondary)
                     Text(details?.summary ?? game.gameDescription ?? "No description yet.")
