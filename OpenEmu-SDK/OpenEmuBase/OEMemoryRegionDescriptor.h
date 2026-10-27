@@ -50,6 +50,21 @@ NS_ASSUME_NONNULL_BEGIN
 /// For word-addressed systems (Genesis/Mega Drive) this is 2.
 @property (nonatomic, readonly) uint8_t minDataBytes;
 
+/// How the system's addresses relate to bytes in `data`, as a power of two.
+/// 0 (default): one address per byte. Positive: each byte spans 2^shift addresses (3 for a CPU
+/// that addresses bits, such as the TMS34010). Negative: 2^-shift bytes share one address.
+@property (nonatomic, readonly) int8_t addressShift;
+
+/// The system address of the byte at `offset` in `data`.
+- (uint32_t)addressForOffset:(NSInteger)offset;
+
+/// The offset in `data` of the byte at system `address`, or NSNotFound when the address is outside
+/// this region or does not start a byte.
+- (NSInteger)offsetForAddress:(uint32_t)address;
+
+- (instancetype)initWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes addressShift:(int8_t)addressShift data:(NSData *)data;
++ (instancetype)descriptorWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes addressShift:(int8_t)addressShift data:(NSData *)data;
+
 - (instancetype)initWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes data:(NSData *)data;
 + (instancetype)descriptorWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes data:(NSData *)data;
 

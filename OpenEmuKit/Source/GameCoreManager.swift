@@ -134,7 +134,8 @@ extension GameCoreManager: OEGameCoreHelper {
                       let data = dict["data"] as? Data
                 else { return nil }
                 let minDataBytes = dict["minDataBytes"] as? UInt8 ?? 1
-                return OEMemoryRegionDescriptor(name: name, address: address, addressBytes: addressBytes, minDataBytes: minDataBytes, data: data)
+                let addressShift = dict["addressShift"] as? Int8 ?? 0
+                return OEMemoryRegionDescriptor(name: name, address: address, addressBytes: addressBytes, minDataBytes: minDataBytes, addressShift: addressShift, data: data)
             }
             block(regions)
         }

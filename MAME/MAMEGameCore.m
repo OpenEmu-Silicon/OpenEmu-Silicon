@@ -563,10 +563,12 @@ BOOL driverIsNotWorking(GameDriverOptions o)
         uint32_t address = [dict[@"address"] unsignedIntValue];
         NSData *bytes = dict[@"bytes"];
         BOOL bigEndian = [dict[@"bigEndian"] boolValue];
+        int8_t addressShift = (int8_t)[dict[@"addressShift"] intValue];
         if (!bytes) continue;
 
         // Size the address width to the region's highest address, not its base.
-        uint32_t maxAddress = address + (uint32_t)bytes.length - 1;
+        uint64_t lastOffset = bytes.length - 1;
+        uint32_t maxAddress = address + (uint32_t)(addressShift >= 0 ? lastOffset << addressShift : lastOffset >> -addressShift);
         uint8_t addrBytes = (maxAddress > 0xFFFF) ? 4 : (maxAddress > 0xFF) ? 3 : 2;
         uint8_t minDataBytes = bigEndian ? 2 : 1;
 
@@ -574,6 +576,7 @@ BOOL driverIsNotWorking(GameDriverOptions o)
                                                               address:address
                                                          addressBytes:addrBytes
                                                          minDataBytes:minDataBytes
+                                                         addressShift:addressShift
                                                                  data:bytes]];
     }
     return result;
