@@ -60,7 +60,7 @@ enum BP {
 
     // MARK: Type (AltUI sizes)
 
-    static let display = Font.system(size: 44, weight: .heavy)
+    static let display = Font.system(size: 52, weight: .heavy)
     static let title = Font.system(size: 32, weight: .bold)
     static let headline = Font.system(size: 20, weight: .bold)
     static let callout = Font.system(size: 14, weight: .regular)
@@ -86,6 +86,12 @@ enum BP {
     static let posterRadius: CGFloat = 5
     static let cardRadius: CGFloat = 8
     static let wideCard = CGSize(width: 260, height: 146)
+    /// Continue Playing icon tiles.
+    static let iconSize: CGFloat = 104
+    static let iconRadius: CGFloat = 22
+    /// Most Played cards: a large poster over an info bar.
+    static let featuredSize = CGSize(width: 214, height: 300)
+    static let featuredInfoHeight: CGFloat = 58
     static let sidebarWidth: CGFloat = 260
     static let focusLine: CGFloat = 3
 

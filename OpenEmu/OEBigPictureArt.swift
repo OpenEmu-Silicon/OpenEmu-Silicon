@@ -53,12 +53,14 @@ final class OEBigPictureArt: ObservableObject {
 
     private var heroes = [String: NSImage]()
     private var grids = [String: NSImage]()
+    private var icons = [String: NSImage]()
     private var details = [String: Details]()
     private var requested = Set<String>()
     private var known = [String: GameKey]()
 
     func hero(for key: GameKey) -> NSImage? { heroes[key.md5] }
     func grid(for key: GameKey) -> NSImage? { grids[key.md5] }
+    func icon(for key: GameKey) -> NSImage? { icons[key.md5] }
     func details(for key: GameKey) -> Details? { details[key.md5] }
 
     /// Starts the lookups for a game once. Safe to call every time a game is shown.
@@ -76,8 +78,9 @@ final class OEBigPictureArt: ObservableObject {
         Task { [weak self] in
             async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name)
             async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name)
-            let (heroImage, gridImage) = await (hero, grid)
-            self?.store(hero: heroImage, grid: gridImage, for: key.md5)
+            async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name)
+            let (heroImage, gridImage, iconImage) = await (hero, grid, icon)
+            self?.store(hero: heroImage, grid: gridImage, icon: iconImage, for: key.md5)
         }
     }
 
@@ -90,9 +93,10 @@ final class OEBigPictureArt: ObservableObject {
 
     // MARK: -
 
-    private func store(hero: NSImage?, grid: NSImage?, for md5: String) {
+    private func store(hero: NSImage?, grid: NSImage?, icon: NSImage?, for md5: String) {
         if let hero = hero { heroes[md5] = hero }
         if let grid = grid { grids[md5] = grid }
+        if let icon = icon { icons[md5] = icon }
         tick += 1
     }
 

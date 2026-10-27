@@ -107,6 +107,20 @@ private struct BPPoster: View {
     }
 }
 
+/// A small outlined tag, like the rating and format chips on Apple TV.
+private struct BPChip: View {
+
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10, weight: .bold)).tracking(0.5)
+            .foregroundColor(BP.secondary)
+            .padding(.horizontal, 6).frame(height: 18)
+            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(BP.secondary, lineWidth: 1))
+    }
+}
+
 private struct BPButton: View {
 
     let title: String
@@ -177,10 +191,12 @@ private enum BPMetrics {
     /// Top of the page content, just under the tab bar.
     static let top: CGFloat = 92
     /// The hero block: art, cover, title, buttons, plus the air below it before the first shelf.
-    static let heroHeight: CGFloat = 330
+    static let heroHeight: CGFloat = 508
     static let headerHeight: CGFloat = 56
     static let posterBody: CGFloat = 262
     static let stateBody: CGFloat = 228
+    static let iconBody: CGFloat = 176
+    static let featuredBody: CGFloat = 372
     static let laneGap: CGFloat = BP.sectionGap
     /// Where a shelf's top sits on screen when it has the highlight.
     static let focusTarget: CGFloat = 84
@@ -189,7 +205,12 @@ private enum BPMetrics {
         let header = lane.title == nil ? 0 : headerHeight
         switch lane.kind {
         case .heroActions: return 0
-        case .games: return header + posterBody + laneGap
+        case .games:
+            switch lane.style {
+            case .icons: return header + iconBody + laneGap
+            case .featured: return header + featuredBody + laneGap
+            default: return header + posterBody + laneGap
+            }
         case .saveStates, .screenshots: return header + stateBody + laneGap
         }
     }
@@ -344,24 +365,25 @@ private struct BPHero: View {
 
         ZStack(alignment: .topLeading) {
             heroCover
-                .offset(x: BP.margin, y: 24)
+                .offset(x: BP.margin, y: 98)
 
             Text(eyebrow)
-                .font(.system(size: 10.5, weight: .bold)).tracking(1.2).foregroundColor(BP.secondary)
-                .lineLimit(1).frame(width: 800, alignment: .leading)
-                .offset(x: heroTextX, y: 34)
+                .font(.system(size: 10.5, weight: .bold)).tracking(1.2).foregroundColor(BP.primary)
+                .padding(.horizontal, 12).frame(height: 24)
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.55), lineWidth: 1))
+                .offset(x: heroTextX, y: 100)
 
             Text(game.cleanDisplayName)
                 .font(BP.display).tracking(-0.5).foregroundColor(BP.primary)
                 .lineLimit(1).minimumScaleFactor(0.65).frame(width: 800, alignment: .leading)
-                .offset(x: heroTextX, y: 52)
+                .offset(x: heroTextX, y: 132)
 
-            metaRow(details: details).offset(x: heroTextX, y: 112)
+            metaRow(details: details).offset(x: heroTextX, y: 200)
 
             Text(details?.summary ?? game.gameDescription ?? "")
                 .font(BP.callout).foregroundColor(BP.secondary)
                 .lineLimit(2).frame(width: 640, alignment: .topLeading)
-                .offset(x: heroTextX, y: 140)
+                .offset(x: heroTextX, y: 230)
 
             HStack(spacing: 10) {
                 BPButton(title: "Resume", symbol: "play.fill", isPrimary: true, focused: actionsFocused && model.column == 0)
@@ -369,7 +391,7 @@ private struct BPHero: View {
                 BPButton(title: "Save States", symbol: "square.and.arrow.down", isPrimary: false, focused: actionsFocused && model.column == 1)
                     .onTapGesture { model.click(lane: 0, column: 1) }
             }
-            .offset(x: heroTextX, y: 196)
+            .offset(x: heroTextX, y: 282)
         }
         .onAppear { art.load(key) }
     }
@@ -379,7 +401,7 @@ private struct BPHero: View {
 
     private var eyebrow: String {
         let place: String
-        if case .detail = model.screen { place = game.systemName } else { place = "\(game.systemName) · RECENTLY PLAYED" }
+        if case .detail = model.screen { place = game.systemName } else { place = "Recently played" }
         return place.uppercased()
     }
 
@@ -403,20 +425,20 @@ private struct BPHero: View {
         }
     }
 
+    /// Platform and genres, a year chip, rating, time played, and a saves chip: the Apple TV metadata line.
     private func metaRow(details: OEBigPictureArt.Details?) -> some View {
-        HStack(spacing: 14) {
-            let facts = [details?.genres.first, details?.releaseDate.map { String($0.suffix(4)) }, details?.developer].compactMap { $0 }
-            if !facts.isEmpty {
-                Text(facts.joined(separator: "  ·  ")).font(BP.callout).foregroundColor(BP.secondary)
-            }
+        HStack(spacing: 10) {
+            let facts = ([game.systemName] + (details?.genres.prefix(2).map { $0 } ?? [])).filter { !$0.isEmpty }
+            Text(facts.joined(separator: " · ")).font(BP.calloutBold).foregroundColor(BP.primary)
+            if let year = details?.releaseDate.map({ String($0.suffix(4)) }), !year.isEmpty { BPChip(text: year) }
             if let stars = game.rating?.intValue, stars > 0 {
                 Text(String(repeating: "★", count: min(stars, 5)) + String(repeating: "☆", count: max(5 - stars, 0)))
                     .font(BP.callout).foregroundColor(Color(hex: 0xF5A524))
             }
             let played = game.playedSummary
-            if !played.isEmpty {
-                Text(played).font(BP.callout).foregroundColor(BP.secondary)
-            }
+            if !played.isEmpty { Text(played).font(BP.callout).foregroundColor(BP.secondary) }
+            let saves = game.defaultROM?.normalSaveStates.count ?? 0
+            if saves > 0 { BPChip(text: saves == 1 ? "1 SAVE" : "\(saves) SAVES") }
         }
         .lineLimit(1)
     }
@@ -425,6 +447,37 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
+    enum Style { case icons, poster, featured, wide }
+
+    /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
+    var style: Style {
+        switch kind {
+        case .saveStates, .screenshots: return .wide
+        default: return id == "recent" ? .icons : (id == "most-played" ? .featured : .poster)
+        }
+    }
+
+    var itemWidth: CGFloat {
+        switch style {
+        case .icons: return BP.iconSize
+        case .poster: return BP.posterSize.width
+        case .featured: return BP.featuredSize.width
+        case .wide: return BP.wideCard.width
+        }
+    }
+
+    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : BP.gutter) }
+
+    /// Columns that fit on screen before the shelf starts to slide.
+    var visibleColumns: Int {
+        switch style {
+        case .icons: return 8
+        case .poster: return 6
+        case .featured: return 5
+        case .wide: return 4
+        }
+    }
+
     var isWide: Bool {
         switch kind {
         case .saveStates, .screenshots: return true
@@ -453,13 +506,17 @@ private struct BPLane: View {
                 .frame(height: BPMetrics.headerHeight, alignment: .bottomLeading)
             }
 
-            let step = (lane.isWide ? BP.wideCard.width : BP.posterSize.width) + BP.gutter
-            let shift = model.lane == index ? -CGFloat(max(0, model.column - (lane.isWide ? 3 : 5))) * step : 0
-            HStack(alignment: .top, spacing: BP.gutter) {
+            let step = lane.itemWidth + lane.itemGap
+            let shift = model.lane == index ? -CGFloat(max(0, model.column - (lane.visibleColumns - 1))) * step : 0
+            HStack(alignment: .top, spacing: lane.itemGap) {
                 switch lane.kind {
                 case .games(let games):
                     ForEach(Array(games.enumerated()), id: \.offset) { column, game in
-                        poster(game, column: column)
+                        switch lane.style {
+                        case .icons: iconTile(game, column: column)
+                        case .featured: featuredCard(game, column: column)
+                        default: poster(game, column: column)
+                        }
                     }
                 case .saveStates(let states):
                     ForEach(Array(states.enumerated()), id: \.offset) { column, state in
@@ -526,6 +583,68 @@ private struct BPLane: View {
 
     private func isFocused(_ column: Int) -> Bool {
         !model.sidebarOpen && model.lane == index && model.column == column
+    }
+
+    /// A rounded game icon with its name and when it was played: quick access to what you just played.
+    private func iconTile(_ game: OEDBGame, column: Int) -> some View {
+        let focused = isFocused(column)
+        let key = OEBigPictureArt.GameKey(game)
+        let image = art.icon(for: key) ?? art.grid(for: key) ?? game.boxImage?.image
+        return VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                if let image = image {
+                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
+                }
+            }
+            .frame(width: BP.iconSize, height: BP.iconSize).clipped()
+            .clipShape(RoundedRectangle(cornerRadius: BP.iconRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: BP.iconRadius, style: .continuous)
+                .strokeBorder(BP.focusRing, lineWidth: focused ? BP.focusLine : 0).padding(-3))
+            .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
+            Text(game.cleanDisplayName).font(BP.captionBold).foregroundColor(BP.primary)
+                .lineLimit(2).frame(width: BP.iconSize, alignment: .leading)
+            if let played = game.lastPlayed {
+                Text(Self.ago.localizedString(for: played, relativeTo: Date()))
+                    .font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(1)
+            }
+        }
+        .scaleEffect(focused ? 1.06 : 1, anchor: .top)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onAppear { art.load(key) }
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
+    }
+
+    /// A large poster with an info bar under it, like the AltUI Most Played cards.
+    private func featuredCard(_ game: OEDBGame, column: Int) -> some View {
+        let focused = isFocused(column)
+        return VStack(spacing: 0) {
+            BPPoster(game: game, size: BP.featuredSize, coverTick: model.coverTick, art: art)
+                .clipShape(Rectangle())
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(game.cleanDisplayName).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                    Text(secondaryLine(for: game) ?? "").font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Text("Play").font(.system(size: 11, weight: .semibold)).foregroundColor(BP.primary)
+                    .padding(.horizontal, 10).frame(height: 22)
+                    .background(Capsule().fill(BP.surfaceStrong))
+            }
+            .padding(.horizontal, 10)
+            .frame(width: BP.featuredSize.width, height: BP.featuredInfoHeight)
+            .background(BP.material)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: BP.cardRadius + 2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BP.cardRadius + 2, style: .continuous)
+            .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+        .scaleEffect(focused ? 1.04 : 1, anchor: .top)
+        .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 14, y: 8)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
     }
 
     private func poster(_ game: OEDBGame, column: Int) -> some View {
@@ -609,31 +728,77 @@ private struct BPDetailSections: View {
     let game: OEDBGame
     @ObservedObject var art: OEBigPictureArt
 
-    var body: some View {
-        let details = art.details(for: OEBigPictureArt.GameKey(game))
-        VStack(alignment: .leading, spacing: 12) {
-            Text("About").font(BP.headline).foregroundColor(BP.primary)
-            Text(details?.summary ?? game.gameDescription ?? "No description yet.")
-                .font(BP.callout).foregroundColor(BP.secondary)
-                .lineSpacing(3).lineLimit(4).frame(width: 640, alignment: .topLeading)
-                .fixedSize(horizontal: false, vertical: true)
-            keyValue("DEVELOPER", details?.developer)
-            keyValue("PUBLISHER", details?.publisher)
-            keyValue("RELEASED", details?.releaseDate)
-            keyValue("GENRE", details.map { $0.genres.joined(separator: " · ") })
-            keyValue("PLATFORM", game.systemName)
-        }
-        .padding(.horizontal, BP.margin)
-        .padding(.top, BP.space28)
+    private var ago: RelativeDateTimeFormatter {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
     }
 
-    @ViewBuilder private func keyValue(_ key: String, _ value: String?) -> some View {
-        if let value = value, !value.isEmpty {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(key).font(BP.caption).foregroundColor(BP.tertiary).frame(width: 110, alignment: .leading)
-                Text(value).font(BP.callout).foregroundColor(BP.primary).lineLimit(2)
+    var body: some View {
+        let details = art.details(for: OEBigPictureArt.GameKey(game))
+        let saves = game.defaultROM?.normalSaveStates.count ?? 0
+        VStack(alignment: .leading, spacing: BP.space16) {
+            Text("About").font(BP.headline).foregroundColor(BP.primary)
+
+            HStack(alignment: .top, spacing: BP.space16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(game.cleanDisplayName).font(.system(size: 18, weight: .bold)).foregroundColor(BP.primary)
+                    Text(([game.systemName] + (details?.genres ?? [])).filter { !$0.isEmpty }.joined(separator: ", ").uppercased())
+                        .font(.system(size: 11, weight: .semibold)).tracking(0.6).foregroundColor(BP.secondary)
+                    Text(details?.summary ?? game.gameDescription ?? "No description yet.")
+                        .font(BP.callout).foregroundColor(BP.secondary).lineSpacing(3).lineLimit(5)
+                        .fixedSize(horizontal: false, vertical: true).padding(.top, 6)
+                }
+                .padding(BP.space16)
+                .frame(width: 600, alignment: .topLeading)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(BP.material))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(game.playTime >= 3600 ? String(format: "%.0f hrs", game.playTime / 3600) : String(format: "%.0f min", game.playTime / 60))
+                        .font(.system(size: 18, weight: .bold)).foregroundColor(BP.primary)
+                    Text("TIME PLAYED").font(.system(size: 11, weight: .semibold)).tracking(0.6).foregroundColor(BP.secondary)
+                    Text(game.lastPlayed.map { "Last played " + ago.localizedString(for: $0, relativeTo: Date()) } ?? "Not played yet")
+                        .font(BP.callout).foregroundColor(BP.secondary).padding(.top, 6)
+                    if saves > 0 { Text(saves == 1 ? "1 save state" : "\(saves) save states").font(BP.callout).foregroundColor(BP.secondary) }
+                }
+                .padding(BP.space16)
+                .frame(width: 260, alignment: .topLeading)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(BP.material))
+            }
+
+            HStack(alignment: .top, spacing: 60) {
+                column("Information", [
+                    ("Released", details?.releaseDate),
+                    ("Developer", details?.developer),
+                    ("Publisher", details?.publisher),
+                    ("Genre", details.map { $0.genres.joined(separator: ", ") }),
+                ])
+                column("Library", [
+                    ("Platform", game.systemName),
+                    ("Added", game.importDate?.formatted(date: .long, time: .omitted)),
+                    ("Rating", game.rating.flatMap { $0.intValue > 0 ? "\($0.intValue) of 5" : nil }),
+                    ("File", game.defaultROM?.fileName),
+                ])
+            }
+            .padding(.top, BP.space16)
+        }
+        .padding(.horizontal, BP.margin)
+        .padding(.top, BP.space8)
+    }
+
+    private func column(_ title: String, _ rows: [(String, String?)]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title).font(.system(size: 16, weight: .bold)).foregroundColor(BP.primary)
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                if let value = row.1, !value.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.0).font(BP.captionBold).foregroundColor(BP.primary)
+                        Text(value).font(BP.caption).foregroundColor(BP.secondary).lineLimit(2)
+                    }
+                }
             }
         }
+        .frame(width: 280, alignment: .topLeading)
     }
 }
 
