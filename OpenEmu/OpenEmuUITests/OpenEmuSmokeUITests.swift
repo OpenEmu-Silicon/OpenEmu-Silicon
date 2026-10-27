@@ -306,6 +306,15 @@ final class OpenEmuSmokeUITests: XCTestCase {
         add(display)
         attachScreenshot(named: "bigpicture-returned")
 
+        // Visit the Save States and Library tabs from the tab bar.
+        app.typeKey(.upArrow, modifierFlags: [])
+        for _ in 0..<3 { app.typeKey(.rightArrow, modifierFlags: []) }
+        sleep(1)
+        attachScreenshot(named: "bigpicture-savestates")
+        app.typeKey(.rightArrow, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-library")
+
         // The first Escape moves the highlight up to the tab bar; the second leaves the mode.
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.escape, modifierFlags: [])

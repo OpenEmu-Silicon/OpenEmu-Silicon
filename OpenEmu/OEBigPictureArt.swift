@@ -51,7 +51,7 @@ final class OEBigPictureArt: ObservableObject {
         /// Use the next level down for the broad buckets, so tiles read Platformer, Shooter, Beat-'Em-Up.
         var primaryGenre: String? {
             guard let top = genres.first else { return nil }
-            if ["Action", "Miscellaneous"].contains(top), genres.count > 1 { return genres[1] }
+            if ["Action", "Miscellaneous"].contains(top), genres.count > 1, genres[1] != "General" { return genres[1] }
             return top
         }
     }

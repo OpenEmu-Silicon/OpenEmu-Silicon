@@ -52,6 +52,7 @@ struct BigPictureLane: Identifiable {
         case games([OEDBGame])
         case saveStates([OEDBSaveState])
         case genres([BigPictureGenre])
+        case chips([BigPictureChip])
     }
 
     let id: String
@@ -67,8 +68,23 @@ struct BigPictureLane: Identifiable {
         case .games(let games): return games.count
         case .saveStates(let states): return states.count
         case .genres(let genres): return genres.count
+        case .chips(let chips): return chips.count
         }
     }
+}
+
+/// A filter or sort choice in the Library's filter bar.
+struct BigPictureChip: Identifiable {
+    enum Action {
+        case system(String?)
+        case genre(String?)
+        case sort(BigPictureModel.SortOrder)
+    }
+    let id: String
+    let title: String
+    let icon: NSImage?
+    let selected: Bool
+    let action: Action
 }
 
 /// A group of games that share a genre, for the Browse by Genre tiles.
@@ -117,6 +133,13 @@ final class BigPictureModel: ObservableObject {
     /// A system chosen in the sidebar. Filters the library tab.
     @Published private(set) var systemFilter: String?
     @Published private(set) var genreFilter: String?
+    @Published private(set) var sortOrder = SortOrder.recentlyPlayed
+
+    enum SortOrder: String, CaseIterable {
+        case recentlyPlayed = "Recently Played"
+        case name = "A–Z"
+        case added = "Recently Added"
+    }
     @Published private(set) var lanes = [BigPictureLane]()
     /// -1 is the tab bar.
     @Published private(set) var lane = 0
@@ -247,9 +270,10 @@ final class BigPictureModel: ObservableObject {
             case .library:
                 var inScope = systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames
                 if let genreFilter = genreFilter { inScope = inScope.filter { genre(of: $0) == genreFilter } }
-                let games = byName(inScope)
+                let games = sorted(inScope)
                 let name = genreFilter ?? systems.first { $0.id == systemFilter }?.name ?? "Library"
-                lanes = grid(games, id: "library", title: name, subtitle: games.count == 1 ? "1 game" : "\(games.count) games")
+                let count = games.count == 1 ? "1 game" : "\(games.count) games"
+                lanes = filterLanes() + grid(games, id: "library", title: name, subtitle: "\(count) · sorted by \(sortOrder.rawValue.lowercased())")
             case .saveStates:
                 let states = allGames
                     .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
@@ -335,6 +359,37 @@ final class BigPictureModel: ObservableObject {
         }
     }
 
+    private func sorted(_ games: [OEDBGame]) -> [OEDBGame] {
+        switch sortOrder {
+        case .recentlyPlayed:
+            return games.sorted { ($0.lastPlayed ?? .distantPast) != ($1.lastPlayed ?? .distantPast)
+                ? ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast)
+                : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        case .name:
+            return byName(games)
+        case .added:
+            return games.sorted { ($0.importDate ?? .distantPast) > ($1.importDate ?? .distantPast) }
+        }
+    }
+
+    /// The Library's filter bar: a row of systems, a row of genres, and the sort order.
+    private func filterLanes() -> [BigPictureLane] {
+        let systemChips = [BigPictureChip(id: "sys-all", title: "All", icon: nil, selected: systemFilter == nil, action: .system(nil))]
+            + systems.map { BigPictureChip(id: "sys-\($0.id)", title: $0.name, icon: $0.icon, selected: systemFilter == $0.id, action: .system($0.id)) }
+        let scope = systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames
+        let genreNames = Set(scope.compactMap { genre(of: $0) }).sorted()
+        let genreChips = [BigPictureChip(id: "genre-all", title: "Any genre", icon: nil, selected: genreFilter == nil, action: .genre(nil))]
+            + genreNames.map { BigPictureChip(id: "genre-\($0)", title: $0, icon: nil, selected: genreFilter == $0, action: .genre($0)) }
+        let sortChips = SortOrder.allCases.map {
+            BigPictureChip(id: "sort-\($0.rawValue)", title: $0.rawValue, icon: nil, selected: sortOrder == $0, action: .sort($0))
+        }
+        return [
+            BigPictureLane(id: "filter-system", title: nil, subtitle: nil, kind: .chips(systemChips)),
+            BigPictureLane(id: "filter-genre", title: nil, subtitle: nil, kind: .chips(genreChips)),
+            BigPictureLane(id: "filter-sort", title: nil, subtitle: nil, kind: .chips(sortChips)),
+        ]
+    }
+
     /// The game's main genre, from OpenVGDB.
     private func genre(of game: OEDBGame) -> String? {
         OEBigPictureArt.shared.details(for: OEBigPictureArt.GameKey(game))?.primaryGenre
@@ -348,7 +403,8 @@ final class BigPictureModel: ObservableObject {
         genreFilter = genre
         tabBarIndex = newTab.rawValue + 1
         rebuildLanes()
-        lane = lanes.isEmpty ? -1 : 0
+        // Start on the games, not the filter bar.
+        lane = lanes.isEmpty ? -1 : (lanes.firstIndex { if case .chips = $0.kind { return false } else { return true } } ?? 0)
         column = 0
     }
 
@@ -431,6 +487,15 @@ final class BigPictureModel: ObservableObject {
         case .genres(let genres):
             guard genres.indices.contains(column) else { return }
             show(tab: .library, system: nil, genre: genres[column].name)
+        case .chips(let chips):
+            guard chips.indices.contains(column) else { return }
+            switch chips[column].action {
+            case .system(let id): systemFilter = id; genreFilter = nil
+            case .genre(let name): genreFilter = name
+            case .sort(let order): sortOrder = order
+            }
+            rebuildLanes()
+            column = min(column, max((lanes.indices.contains(lane) ? lanes[lane].count : 1) - 1, 0))
         }
     }
 
