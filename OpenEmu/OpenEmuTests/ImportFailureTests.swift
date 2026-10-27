@@ -25,6 +25,7 @@
 import XCTest
 @testable import OpenEmu
 @testable import OpenEmuSystem
+import OpenEmuKit
 
 class ImportFailureTests: XCTestCase, ROMImporterDelegate {
     
@@ -45,7 +46,19 @@ class ImportFailureTests: XCTestCase, ROMImporterDelegate {
             .deletingLastPathComponent()
             .appending(path: "Import Failure Test Files/")
         
-        let importer = try ensureTestLibrary().importer
+        let library = try ensureTestLibrary()
+        // The app enables each system with a plugin the first time it sees it (AppDelegate.loadPlugins). A fresh test
+        // library has none enabled, and the importer only recognises the file extensions of enabled systems, so without
+        // this a multi-file archive of known ROMs is not rejected as "archive not allowed".
+        let context = library.mainThreadContext
+        for plugin in OESystemPlugin.allPlugins where plugin.controller != nil {
+            let system = OEDBSystem.system(for: plugin, in: context)
+            if system.isEnabledByDefault {
+                system.isEnabled = true
+            }
+        }
+        try context.save()
+        let importer = library.importer
         importer.delegate = self
         
         let testFiles = [
