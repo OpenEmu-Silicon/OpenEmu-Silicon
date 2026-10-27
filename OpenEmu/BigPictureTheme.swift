@@ -34,8 +34,8 @@ enum BP {
     // MARK: Canvas
 
     static let canvas = CGSize(width: 1920, height: 1080)
-    /// Left and right margin of the tvOS safe area.
-    static let margin: CGFloat = 80
+    /// Left and right margin of the tvOS safe area (90 pt; 60 pt top and bottom).
+    static let margin: CGFloat = 90
     static let gutter: CGFloat = 36
 
     // MARK: Color
@@ -59,13 +59,14 @@ enum BP {
 
     // MARK: Type (tvOS text styles at 1× on a 1080p canvas)
 
+    // Sizes are the tvOS text styles: Title 1 76, Headline 38, Callout 31, Caption 1 25.
     static let display = Font.system(size: 76, weight: .heavy)
     static let title = Font.system(size: 62, weight: .bold)
-    static let headline = Font.system(size: 40, weight: .bold)
-    static let callout = Font.system(size: 30, weight: .regular)
-    static let calloutBold = Font.system(size: 30, weight: .semibold)
-    static let caption = Font.system(size: 24, weight: .regular)
-    static let captionBold = Font.system(size: 24, weight: .semibold)
+    static let headline = Font.system(size: 38, weight: .bold)
+    static let callout = Font.system(size: 31, weight: .regular)
+    static let calloutBold = Font.system(size: 31, weight: .semibold)
+    static let caption = Font.system(size: 25, weight: .regular)
+    static let captionBold = Font.system(size: 25, weight: .semibold)
 
     // MARK: Size
 

@@ -531,11 +531,19 @@ private struct BPLane: View {
                 if let image = image { Image(nsImage: image).resizable().aspectRatio(contentMode: .fill) }
             }
             .frame(width: 410, height: 231).clipped()
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
-                Text(detail).font(BP.caption).foregroundColor(BP.secondary).lineLimit(1)
+            HStack(spacing: 16) {
+                if let cover = state.rom?.game?.boxImage?.image {
+                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit)
+                        .frame(width: 56, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                    Text(detail).font(BP.caption).foregroundColor(BP.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 22).padding(.vertical, 16)
+            .padding(.horizontal, 22).padding(.vertical, 14)
             .frame(width: 410, height: 100, alignment: .leading)
         }
         .background(BP.material)
