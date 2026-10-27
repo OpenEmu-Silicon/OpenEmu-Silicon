@@ -174,29 +174,38 @@ final class OpenEmuSmokeUITests: XCTestCase {
         let bigPicture = app.windows["BigPictureWindow"]
         app.typeKey("b", modifierFlags: [.control, .command])
         XCTAssertTrue(bigPicture.waitForExistence(timeout: 10), "Big-picture window did not open")
-        XCTAssertTrue(bigPicture.staticTexts["Recently Played"].waitForExistence(timeout: 10), "Recently Played row missing")
-        attachScreenshot(named: "bigpicture-open")
+        XCTAssertTrue(bigPicture.staticTexts["Resume"].waitForExistence(timeout: 10), "Hero Resume button missing")
+        sleep(2)
+        attachScreenshot(named: "bigpicture-home")
 
-        // Keyboard navigation reaches the model and is reported in the readout.
-        func lastInput(contains text: String) -> Bool {
-            // SwiftUI exposes Text as the element's value, not its label, so read the values directly.
-            let deadline = Date().addingTimeInterval(5)
-            repeat {
-                for element in bigPicture.staticTexts.allElementsBoundByIndex {
-                    let shown = (element.value as? String) ?? element.label
-                    if shown.hasPrefix("Last input:"), shown.contains(text) { return true }
-                }
-                Thread.sleep(forTimeInterval: 0.25)
-            } while Date() < deadline
-            return false
-        }
-        app.typeKey(.rightArrow, modifierFlags: [])
-        XCTAssertTrue(lastInput(contains: "right"), "Right arrow did not register")
+        // Move down into the shelves and across, then open the sidebar.
         app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(lastInput(contains: "down"), "Down arrow did not register")
-        attachScreenshot(named: "bigpicture-navigated")
+        app.typeKey(.rightArrow, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-shelf")
+        app.typeKey("m", modifierFlags: [])
+        XCTAssertTrue(bigPicture.staticTexts["Systems"].waitForExistence(timeout: 5), "Sidebar did not open")
+        sleep(1)
+        attachScreenshot(named: "bigpicture-sidebar")
+        app.typeKey(.escape, modifierFlags: [])
+
+        // Open a game's detail page, then Settings from the sidebar.
+        app.typeKey(.return, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-detail")
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey("m", modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
+        sleep(1)
+        attachScreenshot(named: "bigpicture-settings")
+        app.typeKey(.escape, modifierFlags: [])
+        sleep(1)
 
         // Select launches the game fullscreen and the menu steps aside.
+        app.typeKey(.upArrow, modifierFlags: [])
         app.typeKey(.upArrow, modifierFlags: [])
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game did not launch from big picture")

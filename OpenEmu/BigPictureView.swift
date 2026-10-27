@@ -29,38 +29,106 @@ import OpenEmuSystem
 
 // MARK: - Model
 
+enum BigPictureTab: Int, CaseIterable {
+    case home, recent, favorites, saveStates, library, search
+
+    var title: String {
+        switch self {
+        case .home: return "Home"
+        case .recent: return "Recent"
+        case .favorites: return "Favorites"
+        case .saveStates: return "Save States"
+        case .library: return "Library"
+        case .search: return "Search"
+        }
+    }
+}
+
+/// One row of focusable content: the hero's buttons, or a shelf of posters or save states.
+struct BigPictureLane: Identifiable {
+
+    enum Kind {
+        case heroActions
+        case games([OEDBGame])
+        case saveStates([OEDBSaveState])
+    }
+
+    let id: String
+    let title: String?
+    let subtitle: String?
+    let kind: Kind
+    /// Save-state cards name their game, for lists that span the library.
+    var showsGame = false
+
+    var count: Int {
+        switch kind {
+        case .heroActions: return 2
+        case .games(let games): return games.count
+        case .saveStates(let states): return states.count
+        }
+    }
+}
+
 /// What is on screen and which item is highlighted.
 ///
-/// The highlight lives here as a plain (row, column) pair rather than in
-/// SwiftUI's focus system. That keeps controller navigation predictable on the
-/// macOS 12 deployment target, where focus tools are limited.
+/// The highlight lives here as plain (lane, column) numbers rather than in SwiftUI's focus system. That keeps
+/// controller navigation predictable on the macOS 12 deployment target, where focus tools are limited.
 @MainActor
 final class BigPictureModel: ObservableObject {
 
-    struct Item: Identifiable {
-        let id = UUID()
-        let game: OEDBGame
+    enum Screen: Equatable {
+        case browse
+        case detail(OEDBGame)
+        case settings
+
+        static func == (lhs: Screen, rhs: Screen) -> Bool {
+            switch (lhs, rhs) {
+            case (.browse, .browse), (.settings, .settings): return true
+            case (.detail(let a), .detail(let b)): return a.objectID == b.objectID
+            default: return false
+            }
+        }
     }
 
-    struct Row: Identifiable {
+    enum SidebarEntry: Hashable {
+        case tab(BigPictureTab)
+        case settings
+        case system(String)
+    }
+
+    struct SystemInfo: Identifiable {
         let id: String
-        let title: String
-        let items: [Item]
+        let name: String
+        let icon: NSImage?
+        let count: Int
     }
 
-    @Published private(set) var rows = [Row]()
-    @Published private(set) var selectedRow = 0
-    @Published private(set) var selectedColumn = 0
+    @Published private(set) var screen = Screen.browse
+    @Published private(set) var tab = BigPictureTab.home
+    /// A system chosen in the sidebar. Filters the library tab.
+    @Published private(set) var systemFilter: String?
+    @Published private(set) var lanes = [BigPictureLane]()
+    /// -1 is the tab bar.
+    @Published private(set) var lane = 0
+    @Published private(set) var column = 0
+    /// Position in the tab bar: 0 is the sidebar button, 1... are the tabs.
+    @Published private(set) var tabBarIndex = 1
+    /// On a detail page: the view has moved down past the last shelf to the About section.
+    @Published private(set) var detailScrolled = false
+    @Published private(set) var sidebarOpen = false
+    @Published private(set) var sidebarIndex = 0
+    @Published private(set) var systems = [SystemInfo]()
     /// Bumped when a cover finishes decoding so cards redraw.
     @Published private(set) var coverTick = 0
-    /// Shown in the on-screen test readout.
     @Published private(set) var lastInput = "—"
     @Published private(set) var controllers = [String]()
     @Published private(set) var gameRunning = false
 
     var onLaunch: ((OEDBGame) -> Void)?
+    var onLaunchState: ((OEDBSaveState) -> Void)?
     var onExit: (() -> Void)?
 
+    private var allGames = [OEDBGame]()
     private var mouseAnchor = NSEvent.mouseLocation
     private var coverObserver: NSObjectProtocol?
 
@@ -74,40 +142,116 @@ final class BigPictureModel: ObservableObject {
         if let coverObserver = coverObserver { NotificationCenter.default.removeObserver(coverObserver) }
     }
 
+    // MARK: Data
+
     func reload() {
         guard let database = OELibraryDatabase.default else { return }
         let context = database.mainThreadContext
 
-        let systems = OEDBSystem.allSystems(in: context).filter { !$0.games.isEmpty }
-        let allGames = systems.flatMap { Array($0.games) }
+        let all = OEDBSystem.allSystems(in: context).filter { !$0.games.isEmpty }
+        systems = all
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .map { SystemInfo(id: $0.systemIdentifier, name: $0.name, icon: $0.icon, count: $0.games.count) }
+        allGames = all.flatMap { Array($0.games) }
 
-        var built = [Row]()
+        // Ask for every game's artwork now, so posters do not wait for a card to scroll into view.
+        allGames.forEach { OEBigPictureArt.shared.load(OEBigPictureArt.GameKey($0)) }
 
-        let recent = allGames
-            .filter { $0.lastPlayed != nil }
-            .sorted { ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
-            .prefix(20)
-        if !recent.isEmpty {
-            built.append(Row(id: "recent", title: "Recently Played", items: recent.map { Item(game: $0) }))
+        screen = .browse
+        tab = .home
+        systemFilter = nil
+        sidebarOpen = false
+        tabBarIndex = 1
+        rebuildLanes()
+        lane = lanes.isEmpty ? -1 : 0
+        column = 0
+    }
+
+    func setControllers(_ names: [String]) { controllers = names }
+    func setGameRunning(_ running: Bool) { gameRunning = running }
+
+    private func sortedByRecent(_ games: [OEDBGame]) -> [OEDBGame] {
+        games.filter { $0.lastPlayed != nil }.sorted { ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
+    }
+
+    private func byName(_ games: [OEDBGame]) -> [OEDBGame] {
+        games.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    private func grid(_ games: [OEDBGame], id: String, title: String?, subtitle: String?) -> [BigPictureLane] {
+        let perRow = 6
+        return stride(from: 0, to: games.count, by: perRow).enumerated().map { index, start in
+            BigPictureLane(id: "\(id)-\(index)", title: index == 0 ? title : nil, subtitle: index == 0 ? subtitle : nil,
+                           kind: .games(Array(games[start..<min(start + perRow, games.count)])))
         }
+    }
 
-        for system in systems.sorted(by: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) {
-            let games = system.games.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-            built.append(Row(id: system.systemIdentifier, title: system.name, items: games.map { Item(game: $0) }))
+    private func rebuildLanes() {
+        switch screen {
+        case .settings:
+            lanes = []
+        case .detail(let game):
+            var built = [BigPictureLane(id: "actions", title: nil, subtitle: nil, kind: .heroActions)]
+            let states = (game.defaultROM?.normalSaveStates ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+            if !states.isEmpty {
+                built.append(BigPictureLane(id: "states", title: "Save States", subtitle: "\(states.count) saved", kind: .saveStates(states)))
+            }
+            lanes = built
+        case .browse:
+            switch tab {
+            case .home:
+                var built = [BigPictureLane]()
+                let recent = sortedByRecent(allGames)
+                if !allGames.isEmpty { built.append(BigPictureLane(id: "actions", title: nil, subtitle: nil, kind: .heroActions)) }
+                if !recent.isEmpty {
+                    built.append(BigPictureLane(id: "recent", title: "Recent", subtitle: "\(min(recent.count, 20)) games", kind: .games(Array(recent.prefix(20)))))
+                }
+                for system in systems {
+                    let games = byName(allGames.filter { $0.system?.systemIdentifier == system.id })
+                    built.append(BigPictureLane(id: system.id, title: system.name, subtitle: games.count == 1 ? "1 game" : "\(games.count) games", kind: .games(games)))
+                }
+                lanes = built
+            case .recent:
+                lanes = grid(Array(sortedByRecent(allGames).prefix(60)), id: "recent", title: "Recent", subtitle: nil)
+            case .favorites:
+                let rated = byName(allGames.filter { ($0.rating?.intValue ?? 0) >= 4 })
+                lanes = grid(rated, id: "favorites", title: "Favorites", subtitle: "Games you rated 4 stars or more")
+            case .library:
+                let games = byName(systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames)
+                let name = systems.first { $0.id == systemFilter }?.name ?? "Library"
+                lanes = grid(games, id: "library", title: name, subtitle: games.count == 1 ? "1 game" : "\(games.count) games")
+            case .saveStates:
+                let states = allGames
+                    .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
+                    .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+                let perRow = 4
+                lanes = stride(from: 0, to: states.count, by: perRow).enumerated().map { index, start in
+                    BigPictureLane(id: "states-\(index)", title: index == 0 ? "Save States" : nil,
+                                   subtitle: index == 0 ? "\(states.count) saved" : nil,
+                                   kind: .saveStates(Array(states[start..<min(start + perRow, states.count)])), showsGame: true)
+                }
+            case .search:
+                lanes = []
+            }
         }
-
-        rows = built
-        selectedRow = 0
-        selectedColumn = 0
     }
 
-    func setControllers(_ names: [String]) {
-        controllers = names
+    // MARK: Derived
+
+    /// The game the hero describes: what is highlighted, else the one played most recently.
+    var heroGame: OEDBGame? {
+        if case .detail(let game) = screen { return game }
+        if lane >= 0, lanes.indices.contains(lane), case .games(let games) = lanes[lane].kind, games.indices.contains(column) {
+            return games[column]
+        }
+        return sortedByRecent(allGames).first ?? byName(allGames).first
     }
 
-    func setGameRunning(_ running: Bool) {
-        gameRunning = running
+    var sidebarEntries: [SidebarEntry] {
+        [.tab(.home), .tab(.recent), .tab(.favorites), .settings] + systems.map { .system($0.id) }
     }
+
+    var isTabBarFocused: Bool { lane < 0 && !sidebarOpen }
 
     // MARK: Navigation
 
@@ -116,228 +260,185 @@ final class BigPictureModel: ObservableObject {
         lastInput = "\(action.rawValue)  ·  \(source)"
         mouseAnchor = NSEvent.mouseLocation
 
-        guard !rows.isEmpty else {
-            if action == .back { onExit?() }
-            return
-        }
+        if sidebarOpen { performSidebar(action); return }
 
         switch action {
-        case .up: moveRow(-1)
-        case .down: moveRow(1)
+        case .up: moveLane(-1)
+        case .down: moveLane(1)
         case .left: moveColumn(-1)
         case .right: moveColumn(1)
         case .tabPrevious: moveColumn(-5)
         case .tabNext: moveColumn(5)
-        case .select: launchSelected()
-        case .back: onExit?()
-        case .menu, .home: break
+        case .select: activate()
+        case .back: goBack()
+        case .menu: openSidebar()
+        case .home: break
         }
     }
 
-    private func moveRow(_ delta: Int) {
-        let target = min(max(selectedRow + delta, 0), rows.count - 1)
-        guard target != selectedRow else { return }
-        selectedRow = target
-        selectedColumn = min(selectedColumn, max(rows[target].items.count - 1, 0))
+    private func performSidebar(_ action: BigPictureAction) {
+        let entries = sidebarEntries
+        switch action {
+        case .up: sidebarIndex = max(sidebarIndex - 1, 0)
+        case .down: sidebarIndex = min(sidebarIndex + 1, entries.count - 1)
+        case .select: chooseSidebar(entries[sidebarIndex])
+        case .back, .menu, .right: sidebarOpen = false
+        default: break
+        }
+    }
+
+    private func chooseSidebar(_ entry: SidebarEntry) {
+        sidebarOpen = false
+        switch entry {
+        case .tab(let tab): show(tab: tab, system: nil)
+        case .system(let id): show(tab: .library, system: id)
+        case .settings:
+            screen = .settings
+            lanes = []
+            lane = 0
+            column = 0
+        }
+    }
+
+    private func show(tab newTab: BigPictureTab, system: String?) {
+        detailScrolled = false
+        screen = .browse
+        tab = newTab
+        systemFilter = system
+        tabBarIndex = newTab.rawValue + 1
+        rebuildLanes()
+        lane = lanes.isEmpty ? -1 : 0
+        column = 0
+    }
+
+    func openSidebar() {
+        sidebarIndex = sidebarEntries.firstIndex(of: screen == .settings ? .settings : .tab(tab)) ?? 0
+        sidebarOpen = true
+    }
+
+    private func moveLane(_ delta: Int) {
+        if screen == .settings {
+            if delta < 0 { return }
+            return
+        }
+        let target = lane + delta
+        if case .detail = screen {
+            if delta > 0, target >= lanes.count, !detailScrolled { detailScrolled = true; return }
+            if delta < 0, detailScrolled { detailScrolled = false; return }
+        }
+        if target < 0 {
+            guard lane >= 0, screen == .browse else { return }
+            lane = -1
+            return
+        }
+        guard target < lanes.count else { return }
+        lane = target
+        column = min(column, max(lanes[target].count - 1, 0))
     }
 
     private func moveColumn(_ delta: Int) {
-        let count = rows[selectedRow].items.count
-        selectedColumn = min(max(selectedColumn + delta, 0), max(count - 1, 0))
+        if lane < 0 {
+            let target = min(max(tabBarIndex + delta, 0), BigPictureTab.allCases.count)
+            guard target != tabBarIndex else { return }
+            tabBarIndex = target
+            if target > 0, let newTab = BigPictureTab(rawValue: target - 1), newTab != tab || screen != .browse {
+                show(tab: newTab, system: nil)
+                lane = -1
+            }
+            return
+        }
+        guard lanes.indices.contains(lane) else { return }
+        column = min(max(column + delta, 0), max(lanes[lane].count - 1, 0))
+    }
+
+    private func goBack() {
+        switch screen {
+        case .detail, .settings:
+            detailScrolled = false
+            screen = .browse
+            rebuildLanes()
+            lane = lanes.isEmpty ? -1 : 0
+            column = 0
+        case .browse:
+            if lane >= 0 && tab != .home {
+                show(tab: .home, system: nil)
+            } else if lane >= 0 {
+                lane = -1
+            } else {
+                onExit?()
+            }
+        }
+    }
+
+    private func activate() {
+        if lane < 0 {
+            if tabBarIndex == 0 { openSidebar() }
+            else if !lanes.isEmpty { lane = 0; column = 0 }
+            return
+        }
+        guard lanes.indices.contains(lane) else { return }
+        switch lanes[lane].kind {
+        case .heroActions:
+            guard let game = heroGame else { return }
+            if column == 0 { onLaunch?(game) } else { open(game) }
+        case .games(let games):
+            guard games.indices.contains(column) else { return }
+            open(games[column])
+        case .saveStates(let states):
+            guard states.indices.contains(column) else { return }
+            onLaunchState?(states[column])
+        }
+    }
+
+    private func open(_ game: OEDBGame) {
+        detailScrolled = false
+        screen = .detail(game)
+        rebuildLanes()
+        lane = 0
+        column = 0
     }
 
     /// Mouse hover moves the highlight, but only when the pointer really moved.
     /// Without the check, items scrolling under a resting pointer would steal
     /// the highlight from the controller.
-    func hover(row: Int, column: Int) {
+    func hover(lane newLane: Int, column newColumn: Int) {
         let location = NSEvent.mouseLocation
         guard hypot(location.x - mouseAnchor.x, location.y - mouseAnchor.y) > 4 else { return }
         mouseAnchor = location
-        selectedRow = row
-        selectedColumn = column
+        lane = newLane
+        column = newColumn
         lastInput = "hover  ·  mouse"
     }
 
-    func click(row: Int, column: Int) {
-        selectedRow = row
-        selectedColumn = column
+    func click(lane newLane: Int, column newColumn: Int) {
+        lane = newLane
+        column = newColumn
         lastInput = "click  ·  mouse"
-        launchSelected()
+        activate()
     }
 
-    private func launchSelected() {
-        guard rows.indices.contains(selectedRow), rows[selectedRow].items.indices.contains(selectedColumn) else { return }
-        onLaunch?(rows[selectedRow].items[selectedColumn].game)
+    func clickTab(_ index: Int) {
+        tabBarIndex = index
+        lane = -1
+        if index == 0 { openSidebar() }
+        else if let newTab = BigPictureTab(rawValue: index - 1) { show(tab: newTab, system: nil); lane = -1 }
     }
-}
 
-// MARK: - View
-
-struct BigPictureView: View {
-
-    @ObservedObject var model: BigPictureModel
-
-    var body: some View {
-        ZStack {
-            Color(red: 0.05, green: 0.05, blue: 0.07).ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Big Picture")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 64)
-                    .padding(.top, 48)
-                    .padding(.bottom, 24)
-
-                if model.rows.isEmpty {
-                    Spacer()
-                    Text("No games in the library yet.")
-                        .font(.system(size: 22))
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                    Spacer()
-                } else {
-                    ScrollViewReader { proxy in
-                        ScrollView(.vertical, showsIndicators: false) {
-                            LazyVStack(alignment: .leading, spacing: 40) {
-                                ForEach(Array(model.rows.enumerated()), id: \.element.id) { rowIndex, row in
-                                    BigPictureRowView(model: model, row: row, rowIndex: rowIndex)
-                                        .id(row.id)
-                                }
-                            }
-                            .padding(.vertical, 24)
-                        }
-                        .onChange(of: model.selectedRow) { newRow in
-                            guard model.rows.indices.contains(newRow) else { return }
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                proxy.scrollTo(model.rows[newRow].id, anchor: .center)
-                            }
-                        }
-                    }
-                }
-
-                TestReadout(model: model)
-            }
-        }
-    }
-}
-
-private struct BigPictureRowView: View {
-
-    @ObservedObject var model: BigPictureModel
-    let row: BigPictureModel.Row
-    let rowIndex: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(row.title)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
-                .padding(.horizontal, 64)
-
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 28) {
-                        ForEach(Array(row.items.enumerated()), id: \.element.id) { column, item in
-                            BigPictureCard(
-                                game: item.game,
-                                isSelected: rowIndex == model.selectedRow && column == model.selectedColumn,
-                                coverTick: model.coverTick
-                            )
-                            .id(item.id)
-                            .onHover { inside in
-                                if inside { model.hover(row: rowIndex, column: column) }
-                            }
-                            .onTapGesture { model.click(row: rowIndex, column: column) }
-                        }
-                    }
-                    // Room for the selected card to scale up without clipping.
-                    .padding(.horizontal, 64)
-                    .padding(.vertical, 24)
-                }
-                .onChange(of: model.selectedColumn) { newColumn in
-                    guard rowIndex == model.selectedRow, row.items.indices.contains(newColumn) else { return }
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(row.items[newColumn].id, anchor: .center)
-                    }
-                }
-                .onChange(of: model.selectedRow) { newRow in
-                    guard newRow == rowIndex, row.items.indices.contains(model.selectedColumn) else { return }
-                    proxy.scrollTo(row.items[model.selectedColumn].id, anchor: .center)
-                }
-            }
-        }
-    }
-}
-
-private struct BigPictureCard: View {
-
-    let game: OEDBGame
-    let isSelected: Bool
-    let coverTick: Int
-
-    private let width: CGFloat = 200
-    private let height: CGFloat = 200
-
-    var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.08))
-                if let image = game.boxImage?.image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .padding(6)
-                } else {
-                    Image(systemName: "gamecontroller.fill")
-                        .font(.system(size: 44))
-                        .foregroundColor(.white.opacity(0.25))
-                }
-            }
-            .frame(width: width, height: height)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white, lineWidth: isSelected ? 4 : 0)
-            )
-
-            Text(game.displayName)
-                .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(.white.opacity(isSelected ? 1 : 0.65))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: width)
-        }
-        .scaleEffect(isSelected ? 1.12 : 1)
-        .shadow(color: .black.opacity(isSelected ? 0.6 : 0), radius: 18, y: 8)
-        .animation(.easeOut(duration: 0.12), value: isSelected)
-        // Read so SwiftUI redraws when a cover finishes decoding.
-        .id("\(game.objectID)-\(coverTick)")
-    }
-}
-
-/// Spike-only: shows what the app thinks the input is doing, for hardware testing.
-private struct TestReadout: View {
-
-    @ObservedObject var model: BigPictureModel
-
-    var body: some View {
-        HStack(spacing: 24) {
-            Text("Last input: \(model.lastInput)")
-            Text(model.controllers.isEmpty ? "No controller detected" : "Controllers: \(model.controllers.joined(separator: ", "))")
-            if model.gameRunning {
-                Text("Game running — press Guide/Home to return here")
-            }
-            Spacer()
-            Text("Arrows / D-pad move · Return / A play · Esc / B exit")
-        }
-        .font(.system(size: 13, design: .monospaced))
-        .foregroundColor(.white.opacity(0.55))
-        .padding(.horizontal, 64)
-        .padding(.vertical, 14)
+    func clickSidebar(_ index: Int) {
+        let entries = sidebarEntries
+        guard entries.indices.contains(index) else { return }
+        sidebarIndex = index
+        chooseSidebar(entries[index])
     }
 }
 
 // MARK: - Window
+
+/// Draws edge to edge. Without this the notch's safe area pushes the design down and clips its bottom.
+private final class BigPictureHostingView<Content: View>: NSHostingView<Content> {
+    override var safeAreaInsets: NSEdgeInsets { NSEdgeInsetsZero }
+    override var safeAreaRect: NSRect { bounds }
+}
 
 private final class BigPictureWindow: NSWindow {
     // Borderless windows refuse key status by default.
@@ -369,9 +470,14 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
 
         window.delegate = self
-        window.contentView = NSHostingView(rootView: BigPictureView(model: model))
+        window.contentView = BigPictureHostingView(rootView: BigPictureView(model: model))
 
-        model.onLaunch = { [weak self] game in self?.launch(game) }
+        model.onLaunch = { [weak self] game in
+            self?.launch { handler in GameDocumentController.shared.openGameDocument(with: game, display: true, fullScreen: true, completionHandler: handler) }
+        }
+        model.onLaunchState = { [weak self] state in
+            self?.launch { handler in GameDocumentController.shared.openGameDocument(with: state, display: true, fullScreen: true, completionHandler: handler) }
+        }
         model.onExit = { [weak self] in self?.hide() }
 
         input.isActive = { [weak window] in window?.isKeyWindow ?? false }
@@ -430,11 +536,11 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Launching a game and coming back
 
-    private func launch(_ game: OEDBGame) {
+    private func launch(_ open: (@escaping (OEGameDocument?, Error?) -> Void) -> Void) {
         launchedFromBigPicture = true
         model.setGameRunning(true)
 
-        GameDocumentController.shared.openGameDocument(with: game, display: true, fullScreen: true) { [weak self] document, error in
+        open { [weak self] document, error in
             guard let self = self else { return }
             if document == nil {
                 os_log(.error, log: .default, "Big picture could not start game: %{public}@", String(describing: error))
@@ -500,6 +606,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
                 case 124: action = .right
                 case 36, 76: action = .select
                 case 53: action = .back
+                case 46: action = .menu
                 case 48: action = event.modifierFlags.contains(.shift) ? .tabPrevious : .tabNext
                 default: action = nil
                 }
