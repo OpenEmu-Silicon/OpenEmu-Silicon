@@ -822,6 +822,10 @@ final class OEGameDocument: NSDocument {
                     return
                 }
                 
+                // The window title embeds the core name (see displayName); corePlugin just
+                // changed, so refresh the title AppKit cached from the previous core.
+                self.windowControllers.forEach { $0.synchronizeWindowTitleWithDocumentName() }
+                
                 completionHandler()
             }
         }
@@ -1185,7 +1189,7 @@ final class OEGameDocument: NSDocument {
             self.emulationStatus = .playing
             // Cheats are disabled in hardcore mode (RA spec).
             if HardcoreModePolicy.allows(.cheats, hardcoreEnabled: self.isHardcoreModeEnabled) {
-                self.cheats.filter(\.isEnabled).forEach { self.setCheat($0) }
+                self.visibleCheats.filter(\.isEnabled).forEach { self.setCheat($0) }
             }
             (self.gameWindowController as? GameWindowController)?.gameDidStartPlaying()
         }
@@ -1352,7 +1356,7 @@ final class OEGameDocument: NSDocument {
                         // setHardcoreEnabled(true) blocks the document's setCheat guard,
                         // but core cheat lists persist across a reset — they must be
                         // cleared first so the restarted session is clean (#447).
-                        self.cheats.filter(\.isEnabled).forEach {
+                        self.visibleCheats.filter(\.isEnabled).forEach {
                             self.gameCoreManager?.setCheat($0.code, withType: $0.type, enabled: false)
                         }
                         self.gameCoreManager?.setHardcoreEnabled(true)
@@ -1466,7 +1470,15 @@ final class OEGameDocument: NSDocument {
             return
         }
         
-        isEmulationPaused = true
+        // Switching cores tears down the session and restarts the game (progress is lost, as the
+        // alert warns), so the hardcore anti-cheat pause protection doesn't apply here. Bypass it
+        // so the confirmation pause isn't blocked, which would otherwise abort the switch.
+        let wasEmulationPaused = isEmulationPaused
+        do {
+            retroAchievementsHardcorePausePreflightSatisfied = true
+            defer { retroAchievementsHardcorePausePreflightSatisfied = false }
+            isEmulationPaused = true
+        }
         guard isEmulationPaused else { return }
         
         let alert = OEAlert()
@@ -1477,6 +1489,9 @@ final class OEGameDocument: NSDocument {
         
         alert.callbackHandler = { alert, result in
             if result != .alertFirstButtonReturn {
+                if !wasEmulationPaused {
+                    self.isEmulationPaused = false
+                }
                 return
             }
             
@@ -1667,7 +1682,7 @@ final class OEGameDocument: NSDocument {
     }
 
     func addCheatFromSearch(code: String, type: String, name: String, enabled: Bool) {
-        let cheat = Cheat(code: code, type: type, name: name)
+        let cheat = Cheat(code: code, type: type, name: name, coreIdentifier: cheatCoreIdentifierForNewCheat)
         if enabled {
             cheat.isEnabled = true
             setCheat(cheat)
@@ -1683,10 +1698,16 @@ final class OEGameDocument: NSDocument {
         // BSNES is the only core that reads the cheat type — it strips ':' from raw
         // address:value codes only when tagged Raw/Action Replay. Everyone else ignores
         // the type or strips the colon itself, so the code shape is all we need.
-        let type = systemPlugin.systemIdentifier == OESystemIdentifierPSP
-            ? OECheatTypeCWCheat
-            : (code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark)
-        let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode)
+        let type: String
+        switch systemPlugin.systemIdentifier {
+        case OESystemIdentifierPSP:
+            type = OECheatTypeCWCheat
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            type = OECheatTypeActionReplay
+        default:
+            type = code.contains(":") ? OECheatTypeRaw : OECheatTypeGameShark
+        }
+        let cheat = Cheat(code: code, type: type, name: name, cheatSource: providerName, rawCode: rawCode, coreIdentifier: cheatCoreIdentifierForNewCheat)
         cheat.isEnabled = true
         setCheat(cheat)
         cheats.append(cheat)
@@ -1697,7 +1718,8 @@ final class OEGameDocument: NSDocument {
     /// Only removes a cheat that was itself imported, so a matching manual/Cheat Search entry is never touched.
     func removeImportedCheat(code: String) {
         let key = CheatFeedbackService.key(for: code)
-        guard let index = cheats.firstIndex(where: { $0.cheatSource != nil && CheatFeedbackService.key(for: $0.code) == key })
+        // Scope to the current core so a per-core system doesn't remove another core's imported cheat on a code match.
+        guard let index = cheats.firstIndex(where: { $0.cheatSource != nil && self.cheatBelongsToCurrentCore($0) && CheatFeedbackService.key(for: $0.code) == key })
         else { return }
 
         let cheat = cheats[index]
@@ -1726,6 +1748,37 @@ final class OEGameDocument: NSDocument {
                 code: cheat.code, systemIdentifier: systemID, coreIdentifier: coreID
             )
         }
+    }
+
+    /// True when cheats are kept private per core for this system (OEGameCoreCheatsArePerCore,
+    /// e.g. arcade MAME vs FBNeo). Decided from *any* installed core for the system, not just the
+    /// running one, so isolation still applies when another arcade core (e.g. MAME) is an older
+    /// build whose plist predates the flag.
+    private var systemUsesPerCoreCheats: Bool {
+        let systemID = systemPlugin.systemIdentifier
+        return OECorePlugin.allPlugins.contains { $0.cheatsArePerCore(forSystemIdentifier: systemID) }
+    }
+
+    /// coreIdentifier to stamp on a newly created cheat: the running core when cheats are
+    /// per-core for this system, otherwise nil (shared across the system's cores).
+    private var cheatCoreIdentifierForNewCheat: String? {
+        systemUsesPerCoreCheats ? corePlugin.bundleIdentifier : nil
+    }
+
+    /// Whether a cheat should be shown/applied under the current core. Shared systems: always.
+    /// Per-core systems: the cheat's owner must match. A legacy arcade cheat (nil owner) is
+    /// treated as MAME, the only arcade core that existed before this split.
+    private func cheatBelongsToCurrentCore(_ cheat: Cheat) -> Bool {
+        guard systemUsesPerCoreCheats else { return true }
+        let legacyOwner = systemPlugin.systemIdentifier == OESystemIdentifierArcade ? "org.openemu.MAME" : corePlugin.bundleIdentifier
+        let owner = cheat.coreIdentifier ?? legacyOwner
+        return owner.caseInsensitiveCompare(corePlugin.bundleIdentifier) == .orderedSame
+    }
+
+    /// Cheats visible/applicable under the current core. For per-core systems this hides
+    /// other cores' cheats; the full `cheats` array is still used for persistence.
+    var visibleCheats: [Cheat] {
+        cheats.filter(cheatBelongsToCurrentCore)
     }
 
     // MARK: - User Cheat Persistence
@@ -1811,8 +1864,16 @@ final class OEGameDocument: NSDocument {
                 }
             }
 
-            let cheatType = systemPlugin.systemIdentifier == OESystemIdentifierPSP ? OECheatTypeCWCheat : OECheatTypeGameShark
-            let cheat = Cheat(code: code, type: cheatType, name: name)
+            let cheatType: String
+            switch systemPlugin.systemIdentifier {
+            case OESystemIdentifierPSP:
+                cheatType = OECheatTypeCWCheat
+            case OESystemIdentifierGameCube, OESystemIdentifierWii:
+                cheatType = OECheatTypeActionReplay
+            default:
+                cheatType = OECheatTypeGameShark
+            }
+            let cheat = Cheat(code: code, type: cheatType, name: name, coreIdentifier: cheatCoreIdentifierForNewCheat)
 
             if shouldEnable {
                 cheat.isEnabled = true
@@ -1875,6 +1936,12 @@ final class OEGameDocument: NSDocument {
                 placeholder: NSLocalizedString("Game Genie or raw hex (XXXX:YY). Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, NES"),
                 validationHint: "",
                 validator: nil
+            )
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Action Replay code (pairs of 8 hex chars), e.g. 003CC531 00000050. Paste the whole code; join lines with a newline or '+'.", comment: "Add Cheat dialog placeholder, GameCube/Wii"),
+                validationHint: NSLocalizedString("GameCube and Wii cheats use the Action Replay format: one or more pairs of 8 hex characters (address then value), or encrypted XXXX-XXXX-XXXXX lines. Enter the entire code — multi-line codes are supported; separate lines with a newline or '+'.", comment: "Add Cheat validation hint, GameCube/Wii"),
+                validator: { code in CheatCodeValidator.isActionReplayCodeGC(code) }
             )
         case OESystemIdentifierSNES:
             return CheatFormat(
@@ -1959,6 +2026,18 @@ final class OEGameDocument: NSDocument {
             return rawAddressValueFormat(
                 placeholder: NSLocalizedString("Hex address + hex value, e.g. C123:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, MSX"),
                 hint: NSLocalizedString("MSX codes must be a hex address plus a hex value (max 4 and 2 hex digits), e.g. C123:05. No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, MSX"))
+        case OESystemIdentifierIntellivision:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex word address + hex value, e.g. 015B:02. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Intellivision"),
+                validationHint: NSLocalizedString("Intellivision codes must be a hex word address plus a hex value (max 4 and 4 hex digits), e.g. 015B:02. Addresses target the 16-bit RAM (0100-01EF scratchpad, 0200-035F system RAM). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Intellivision"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 4, maxValueHexChars: 4) }
+                }
+            )
         case OESystemIdentifierVB:
             return CheatFormat(
                 placeholder: NSLocalizedString("8 hex digit address + 2 hex digit value, e.g. 05001234:FF. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Virtual Boy"),
@@ -1971,12 +2050,32 @@ final class OEGameDocument: NSDocument {
                     return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), addressHexChars: 8, valueHexChars: 2) }
                 }
             )
+        case OESystemIdentifierJaguar:
+            return CheatFormat(
+                placeholder: NSLocalizedString("Hex address + hex value, e.g. 1CC80B:05. Join multi-line cheats with '+'.", comment: "Add Cheat dialog placeholder, Atari Jaguar"),
+                validationHint: NSLocalizedString("Atari Jaguar codes must be a hex address plus a hex value (max 6 and 8 hex digits), e.g. 1CC80B:05. Addresses target the 2 MB main RAM (000000-1FFFFF). No Game Genie/GameShark format exists for this system.", comment: "Add Cheat validation hint, Atari Jaguar"),
+                validator: { code in
+                    let parts = code.replacingOccurrences(of: " ", with: "")
+                                    .replacingOccurrences(of: "\n", with: "")
+                                    .split(separator: "+")
+                    guard !parts.isEmpty else { return false }
+                    return parts.allSatisfy { CheatCodeValidator.isRawAddressValue(String($0), maxAddressHexChars: 6, maxValueHexChars: 8) }
+                }
+            )
         case OESystemIdentifierPSP:
             return CheatFormat(
                 placeholder: NSLocalizedString("CwCheat code, e.g. _L 0x2024DA44 0x3F800000. Paste the whole code, including every _L line.", comment: "Add Cheat dialog placeholder, PSP"),
                 validationHint: NSLocalizedString("PSP codes use the CwCheat/TempAR format: one or more _L (or _M) lines, each followed by two hex words, e.g. _L 0x2024DA44 0x3F800000. Paste the code exactly as published — don't strip the _L tags or split multi-line codes.", comment: "Add Cheat validation hint, PSP"),
                 validator: { code in
                     CheatCodeValidator.isCWCheatCode(code)
+                }
+            )
+        case OESystemIdentifierDreamcast:
+            return CheatFormat(
+                placeholder: NSLocalizedString("GameShark/Action Replay code, e.g. 021EC4C8 0098967F. Paste every line of the code.", comment: "Add Cheat dialog placeholder, Dreamcast"),
+                validationHint: NSLocalizedString("Dreamcast codes use the GameShark/Action Replay format: one or more 8 hex digit words, e.g. 021EC4C8 0098967F. The leading byte is the write type (00/01/02 = 8/16/32-bit); enable-only codes (e.g. 0C…) are accepted but have no effect. Paste the code exactly as published, including every line — don't add 0x prefixes or '+' separators.", comment: "Add Cheat validation hint, Dreamcast"),
+                validator: { code in
+                    CheatCodeValidator.isDreamcastGameSharkCode(code)
                 }
             )
         default:
@@ -2006,6 +2105,12 @@ final class OEGameDocument: NSDocument {
             return ConvertedCheat(code: Self.convertToSaturnAR(code), type: OECheatTypeActionReplay)
         case OESystemIdentifierPSP:
             return ConvertedCheat(code: Self.convertToCWCheat(code), type: OECheatTypeCWCheat)
+        case OESystemIdentifierDreamcast:
+            return ConvertedCheat(code: Self.convertToGameSharkDreamcast(code), type: OECheatTypeGameShark)
+        case OESystemIdentifierGameCube, OESystemIdentifierWii:
+            return ConvertedCheat(code: Self.convertToActionReplayGC(code), type: OECheatTypeActionReplay)
+        case OESystemIdentifierIntellivision:
+            return ConvertedCheat(code: Self.convertToIntellivision(code), type: OECheatTypeRaw)
         default:
             return ConvertedCheat(code: Self.convertToRaw(code, addressBytes: addressBytes, minDataBytes: minDataBytes), type: OECheatTypeRaw)
         }
@@ -2079,6 +2184,76 @@ final class OEGameDocument: NSDocument {
         }
     }
 
+    // MARK: Dreamcast GameShark/Action Replay (00/01/02 AAAAAA VVVVVVVV)
+
+    /// Cheat-search addresses are plain 24-bit RAM offsets (the search region is based at 0, which
+    /// matches the GameShark address field). The code's top byte is the write type: 00 = 8-bit,
+    /// 01 = 16-bit, 02 = 32-bit. Values up to 4 bytes fit a single write.
+    private static func convertToGameSharkDreamcast(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let address = (UInt32(addressPart, radix: 16) ?? 0) & 0x00FF_FFFF
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        func line(op: UInt32, value: UInt32) -> String {
+            String(format: "%08X %08X", (op << 24) | address, value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(op: 0x00, value: UInt32(value & 0xFF))
+        case 2:
+            return line(op: 0x01, value: UInt32(value & 0xFFFF))
+        default:
+            // 3- and 4-byte values both ride in a single 32-bit write (a 3-byte value keeps a zero
+            // high byte). Wider values aren't produced by the search for this system.
+            return line(op: 0x02, value: UInt32(value & 0xFFFF_FFFF))
+        }
+    }
+
+    // MARK: GameCube Action Replay write (0tXXXXXX VVVVVVVV)
+
+    /// Converts a cheat-search hit into an Action Replay RAM-write code. The search already reads
+    /// MEM1 big-endian (GameCube is big-endian), so the value is in the console's natural byte order
+    /// and is written as-is — matching how published Action Replay codes store it. The AR first word
+    /// is `(size << 25) | (offset & 0x01FFFFFF)` with the base address 0x80000000 implied; size 0/1/2
+    /// selects an 8/16/32-bit write. Sizes other than 1/2/4 are emitted as consecutive 8-bit writes.
+    private static func convertToActionReplayGC(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let offset = (UInt32(addressPart, radix: 16) ?? 0) & 0x01FF_FFFF
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+
+        func line(size: UInt32, offset: UInt32, value: UInt32) -> String {
+            String(format: "%08X %08X", (size << 25) | (offset & 0x01FF_FFFF), value)
+        }
+
+        switch byteCount {
+        case 1:
+            return line(size: 0, offset: offset, value: UInt32(value & 0xFF))
+        case 2:
+            return line(size: 1, offset: offset, value: UInt32(value & 0xFFFF))
+        case 4:
+            return line(size: 2, offset: offset, value: UInt32(value & 0xFFFF_FFFF))
+        default:
+            // No native 3-byte (or wider) write: emit one 8-bit write per memory byte, most
+            // significant first (big-endian), so the bytes land in the console's natural order.
+            var codes: [String] = []
+            for i in 0..<byteCount {
+                let shift = UInt64((byteCount - 1 - i) * 8)
+                let byte = UInt32((value >> shift) & 0xFF)
+                codes.append(line(size: 0, offset: offset &+ UInt32(i), value: byte))
+            }
+            return codes.joined(separator: "+")
+        }
+    }
+
     // MARK: Raw format (ADDRESS:VALUE with padding and multi-byte splitting)
 
     private static func convertToRaw(_ code: String, addressBytes: UInt8, minDataBytes: UInt8) -> String {
@@ -2107,6 +2282,32 @@ final class OEGameDocument: NSDocument {
             let addrStr = String(format: "%0\(hexDigits)llX", addr)
             let valStr = String(format: "%0\(Int(minDataBytes) * 2)X", chunk)
             codes.append("\(addrStr):\(valStr)")
+        }
+        return codes.joined(separator: "+")
+    }
+
+    // MARK: Intellivision raw word address:value (WWWW:VVVV)
+
+    /// Converts a cheat-search hit into the native Intellivision raw code. The search exposes each
+    /// 16-bit word as 2 bytes with the region base doubled, so the hit's byte address is exactly
+    /// twice the real CP1610 word address; halving recovers it. A value wider than one word (a 4-byte
+    /// search) spans consecutive words little-endian — the same way the search read them — so emit one
+    /// WWWW:VVVV poke per word, joined with '+', which the Bliss core's setCheat applies in turn.
+    private static func convertToIntellivision(_ code: String) -> String {
+        guard let colonIdx = code.firstIndex(of: ":") else { return code }
+        let addressPart = String(code[code.startIndex..<colonIdx])
+        let valuePart = String(code[code.index(after: colonIdx)...])
+
+        let byteAddress = UInt32(addressPart, radix: 16) ?? 0
+        let wordAddress = byteAddress / 2
+        let value = UInt64(valuePart, radix: 16) ?? 0
+        let byteCount = max(1, (valuePart.count + 1) / 2)
+        let wordCount = max(1, (byteCount + 1) / 2)
+
+        var codes: [String] = []
+        for i in 0..<wordCount {
+            let word = UInt32((value >> (UInt64(i) * 16)) & 0xFFFF)
+            codes.append(String(format: "%04X:%04X", (wordAddress &+ UInt32(i)) & 0xFFFF, word))
         }
         return codes.joined(separator: "+")
     }
@@ -2274,7 +2475,7 @@ final class OEGameDocument: NSDocument {
 
             guard let currentIndex = cheats.firstIndex(where: { $0 === cheat }) else { return }
 
-            let edited = Cheat(code: newCode, type: cheat.type, name: alert.otherStringValue)
+            let edited = Cheat(code: newCode, type: cheat.type, name: alert.otherStringValue, cheatSource: cheat.cheatSource, rawCode: cheat.rawCode, coreIdentifier: cheat.coreIdentifier)
             edited.isEnabled = cheat.isEnabled
 
             if cheat.isEnabled {
@@ -3363,58 +3564,41 @@ extension OEGameDocument {
             completion()
             return
         }
-        // Chain: Google Drive check → folder backup check → launch.
-        performGoogleDriveSyncCheck(systemId: systemId, gameName: gameName) { [weak self] in
-            guard let self else { completion(); return }
-            self.performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
-        }
-    }
-
-    private func performGoogleDriveSyncCheck(systemId: String, gameName: String, completion: @escaping () -> Void) {
-        let syncManager = OESaveSyncManager.shared
-        guard syncManager.isSignedIn else { completion(); return }
-
-        syncManager.checkForNewerCloudSave(
-            systemIdentifier: systemId,
-            gameName: gameName
-        ) { [weak self] shouldSync, cloudDate in
-            guard shouldSync else { completion(); return }
-            guard let self else { completion(); return }
-            self.presentSyncAlert(
-                providerName: "Google Drive", gameName: gameName, cloudDate: cloudDate,
-                defaultButtonTitle: NSLocalizedString("Download & Play", comment: "Save Sync: download and play"),
-                alternateButtonTitle: NSLocalizedString("Play Without Syncing", comment: "Save Sync: skip sync")
-            ) { download in
-                if download {
-                    syncManager.downloadCloudSave(systemIdentifier: systemId, gameName: gameName) { _, _ in
-                        completion()
-                    }
-                } else {
-                    completion()
-                }
-            }
-        }
+        performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
     }
 
     private func performFolderBackupSyncCheck(systemId: String, gameName: String, completion: @escaping () -> Void) {
         let backupManager = OEFolderBackupManager.shared
-        guard backupManager.isEnabled else { completion(); return }
+        guard backupManager.backupFolderURL != nil else { completion(); return }
 
-        backupManager.checkForNewerBackup(
-            systemIdentifier: systemId,
-            gameName: gameName
-        ) { [weak self] shouldRestore, backupDate in
-            guard shouldRestore else { completion(); return }
+        let aliases = [rom?.url?.deletingPathExtension().lastPathComponent].compactMap { $0 }
+        backupManager.checkForNewerBackup(systemIdentifier: systemId, gameName: gameName, aliases: aliases, discID: rom?.serial) { [weak self] result in
             guard let self else { completion(); return }
-            self.presentSyncAlert(
-                providerName: "backup folder", gameName: gameName, cloudDate: backupDate,
-                defaultButtonTitle: NSLocalizedString("Restore & Play", comment: "Save Sync: restore and play"),
-                alternateButtonTitle: NSLocalizedString("Play Without Restoring", comment: "Save Sync: skip restore")
-            ) { restore in
+            switch result {
+            case .upToDate:
+                completion()
+
+            case .newerBackup(let backupDate, let machineName):
+                let restore = self.presentNewerSaveAlert(gameName: gameName, backupDate: backupDate, machineName: machineName)
                 if restore {
-                    backupManager.restoreFromBackup(systemIdentifier: systemId, gameName: gameName) { _ in
-                        completion()
-                    }
+                    backupManager.restoreFromBackup(systemIdentifier: systemId, gameName: gameName) { _ in completion() }
+                } else {
+                    completion()
+                }
+
+            case .conflict(let localDate, let backupDate, let machineName):
+                switch self.presentConflictAlert(gameName: gameName, localDate: localDate, backupDate: backupDate, machineName: machineName) {
+                case .alertFirstButtonReturn:
+                    backupManager.keepLocalSave(systemIdentifier: systemId, gameName: gameName) { _ in completion() }
+                case .alertSecondButtonReturn:
+                    backupManager.restoreFromBackup(systemIdentifier: systemId, gameName: gameName) { _ in completion() }
+                default:
+                    completion()
+                }
+
+            case .stillSyncing:
+                if self.presentStillSyncingAlert(gameName: gameName) {
+                    self.performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
                 } else {
                     completion()
                 }
@@ -3422,34 +3606,60 @@ extension OEGameDocument {
         }
     }
 
-    private func presentSyncAlert(
-        providerName: String,
-        gameName: String,
-        cloudDate: Date?,
-        defaultButtonTitle: String,
-        alternateButtonTitle: String,
-        completion: @escaping (_ download: Bool) -> Void
-    ) {
-        let dateStr: String
-        if let cloudDate {
-            let fmt = DateFormatter()
-            fmt.dateStyle = .medium
-            fmt.timeStyle = .short
-            dateStr = fmt.string(from: cloudDate)
-        } else {
-            dateStr = "unknown date"
-        }
+    private static let syncDateFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateStyle = .medium
+        fmt.timeStyle = .short
+        return fmt
+    }()
+
+    private func presentNewerSaveAlert(gameName: String, backupDate: Date, machineName: String?) -> Bool {
+        let from = machineName.map { String(format: NSLocalizedString("%@, saved on %@", comment: "Save Sync: date and Mac name"), Self.syncDateFormatter.string(from: backupDate), $0) }
+            ?? Self.syncDateFormatter.string(from: backupDate)
         let alert = OEAlert()
         alert.messageText = NSLocalizedString("Newer Save Available", comment: "Save Sync alert title")
         alert.informativeText = String(
             format: NSLocalizedString(
-                "A newer save for '%@' is available in your %@ (from %@). Restore it before playing?",
-                comment: "Save Sync alert body: game name, provider, date"
+                "A newer save for '%@' is available in your backup folder (from %@). Restore it before playing? Your current save is kept in a .versions folder.",
+                comment: "Save Sync alert body: game name, date and Mac name"
             ),
-            gameName, providerName, dateStr
+            gameName, from
         )
-        alert.defaultButtonTitle   = defaultButtonTitle
-        alert.alternateButtonTitle = alternateButtonTitle
-        completion(alert.runModal() == .alertFirstButtonReturn)
+        alert.defaultButtonTitle   = NSLocalizedString("Restore & Play", comment: "Save Sync: restore and play")
+        alert.alternateButtonTitle = NSLocalizedString("Play Without Restoring", comment: "Save Sync: skip restore")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func presentConflictAlert(gameName: String, localDate: Date, backupDate: Date, machineName: String?) -> NSApplication.ModalResponse {
+        let other = machineName ?? NSLocalizedString("Another Mac", comment: "Save Sync: name used when the other Mac is unknown")
+        let thisMac = Host.current().localizedName ?? NSLocalizedString("This Mac", comment: "Save Sync: this Mac")
+        let alert = OEAlert()
+        alert.messageText = NSLocalizedString("Saves Don't Match", comment: "Save Sync conflict title")
+        alert.informativeText = String(
+            format: NSLocalizedString(
+                "'%@' was changed on two Macs since they last synced.\n\n%@: %@\n%@: %@\n\nWhich save do you want to keep? The other one is kept in a .versions folder.",
+                comment: "Save Sync conflict body: game, this Mac, its date, other Mac, its date"
+            ),
+            gameName, thisMac, Self.syncDateFormatter.string(from: localDate), other, Self.syncDateFormatter.string(from: backupDate)
+        )
+        alert.defaultButtonTitle   = String(format: NSLocalizedString("Keep %@'s Save", comment: "Save Sync conflict: keep this Mac's save"), thisMac)
+        alert.alternateButtonTitle = String(format: NSLocalizedString("Use %@'s Save", comment: "Save Sync conflict: use the other Mac's save"), other)
+        alert.otherButtonTitle     = NSLocalizedString("Decide Later", comment: "Save Sync conflict: play without choosing")
+        return alert.runModal()
+    }
+
+    private func presentStillSyncingAlert(gameName: String) -> Bool {
+        let alert = OEAlert()
+        alert.messageText = NSLocalizedString("Still Syncing", comment: "Save Sync still downloading title")
+        alert.informativeText = String(
+            format: NSLocalizedString(
+                "Saves for '%@' are still downloading from your backup folder. Wait a moment and check again, or play now with the save on this Mac?",
+                comment: "Save Sync still downloading body: game name"
+            ),
+            gameName
+        )
+        alert.defaultButtonTitle   = NSLocalizedString("Wait & Check Again", comment: "Save Sync: wait for downloads")
+        alert.alternateButtonTitle = NSLocalizedString("Play Anyway", comment: "Save Sync: play without waiting")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 }

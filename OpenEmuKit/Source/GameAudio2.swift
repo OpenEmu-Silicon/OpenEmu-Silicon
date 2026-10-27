@@ -153,21 +153,36 @@ final public class GameAudio2: GameAudioProtocol {
         let bytesPerFrame = sd.mBytesPerFrame
         let channelCount  = sd.mChannelsPerFrame
         
-        src = AVAudioSourceNode(format: renderFormat) { _, _, frameCount, inputData in
-            let bytesRequested = UInt(frameCount * bytesPerFrame)
-            let bytesCopied    = read(inputData.pointee.mBuffers.mData, bytesRequested)
-            
-            inputData.pointee.mBuffers.mDataByteSize    = UInt32(bytesCopied)
-            inputData.pointee.mBuffers.mNumberChannels  = channelCount
-            
-            return noErr
-        }
-        
+        src = AVAudioSourceNode(format: renderFormat,
+                                renderBlock: Self.makeRenderBlock(read: read,
+                                                                 bytesPerFrame: bytesPerFrame,
+                                                                 channelCount: channelCount))
         if let src {
             engine.attach(src)
         }
     }
     
+    static func makeRenderBlock(read: @escaping OEAudioBufferReadBlock,
+                                bytesPerFrame: UInt32,
+                                channelCount: UInt32) -> AVAudioSourceNodeRenderBlock {
+        { isSilence, _, frameCount, outputData in
+            let bytesRequested = UInt(frameCount * bytesPerFrame)
+            let data = outputData.pointee.mBuffers.mData
+            let bytesCopied = read(data, bytesRequested)
+
+            // The audio engine requires a full buffer even when the core runs short.
+            // Preserve available samples and silence only the missing tail.
+            if bytesCopied < bytesRequested, let data {
+                memset(data.advanced(by: Int(bytesCopied)), 0, Int(bytesRequested - bytesCopied))
+            }
+
+            outputData.pointee.mBuffers.mDataByteSize = UInt32(bytesRequested)
+            outputData.pointee.mBuffers.mNumberChannels = channelCount
+            isSilence.pointee = ObjCBool(bytesCopied == 0)
+            return noErr
+        }
+    }
+
     private func destroyNodes() {
         if let src {
             engine.detach(src)

@@ -35,6 +35,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0JCV00BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0JCV00FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
+		OE0JCV00BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0JCV00FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0JCV00BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0JCV00FILEREF000000003 /* OERetroAchievementsBridge.m */; };
 		87374E2B29629C5E000D8B3B /* JollyCVGameCore.m in Sources */ = {isa = PBXBuildFile; fileRef = 87374E2A29629C5E000D8B3B /* JollyCVGameCore.m */; };
 		87374E412962A510000D8B3B /* jcv_z80.c in Sources */ = {isa = PBXBuildFile; fileRef = 87374E302962A510000D8B3B /* jcv_z80.c */; };
 		87374E422962A510000D8B3B /* jcv_vdp.c in Sources */ = {isa = PBXBuildFile; fileRef = 87374E322962A510000D8B3B /* jcv_vdp.c */; };
@@ -81,6 +84,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		OE0JCV00FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		OE0JCV00FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0JCV00FILEREF000000003 /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
+		OE0JCV00FILEREF000000004 /* OERetroAchievementsBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsBridge.h; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.h; sourceTree = SOURCE_ROOT; };
 		089C1672FE841209C02AAC07 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		089C167EFE841241C02AAC07 /* en */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		089C167FFE841241C02AAC07 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
@@ -167,6 +174,10 @@
 				8701D2A71D19D30E00E8A7D8 /* OEColecoVisionSystemResponderClient.h */,
 				87374E2929629C5E000D8B3B /* JollyCVGameCore.h */,
 				87374E2A29629C5E000D8B3B /* JollyCVGameCore.m */,
+				OE0JCV00FILEREF000000001 /* rcheevos_build.c */,
+				OE0JCV00FILEREF000000002 /* OERetroAchievementsTransport.m */,
+				OE0JCV00FILEREF000000003 /* OERetroAchievementsBridge.m */,
+				OE0JCV00FILEREF000000004 /* OERetroAchievementsBridge.h */,
 			);
 			name = Classes;
 			sourceTree = "<group>";
@@ -353,6 +364,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				OE0JCV00BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0JCV00BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0JCV00BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				87374E2B29629C5E000D8B3B /* JollyCVGameCore.m in Sources */,
 				87374E4A2962A510000D8B3B /* jcv_memio.c in Sources */,
 				87374E462962A510000D8B3B /* jcv_mixer.c in Sources */,
@@ -405,6 +419,9 @@
 				HEADER_SEARCH_PATHS = (
 					"\"$(SRCROOT)/src\"",
 					"\"$(SRCROOT)/deps\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -426,6 +443,9 @@
 				HEADER_SEARCH_PATHS = (
 					"\"$(SRCROOT)/src\"",
 					"\"$(SRCROOT)/deps\"",
+					"$(SRCROOT)/../Vendor/rcheevos/include",
+					"$(SRCROOT)/../Vendor/rcheevos/src",
+					"$(SRCROOT)/../OpenEmuKit/Source",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";

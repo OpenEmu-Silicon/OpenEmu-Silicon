@@ -60,8 +60,6 @@ final class GameViewController: NSViewController {
     private var isRetroAchievementsTransportOffline = false
 
     // Save Sync status badge
-    private var syncStatusOverlay: OESyncStatusOverlayView!
-    private var syncStatusToken: NSObjectProtocol?
     
     var controlsWindow: GameControlsBar!
     weak var document: OEGameDocument!
@@ -106,16 +104,6 @@ final class GameViewController: NSViewController {
             notificationView.heightAnchor.constraint(equalToConstant: 28),
             notificationView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 60),
             notificationView.topAnchor.constraint(equalTo: view.topAnchor, constant: 10)
-        ])
-        
-        // Save Sync Status Badge
-        syncStatusOverlay = OESyncStatusOverlayView(frame: .zero)
-        syncStatusOverlay.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(syncStatusOverlay)
-        
-        NSLayoutConstraint.activate([
-            syncStatusOverlay.topAnchor.constraint(equalTo: notificationView.bottomAnchor, constant: 10),
-            syncStatusOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 60)
         ])
         
         achievementBannerView = OEAchievementBannerView(frame: .zero)
@@ -164,11 +152,6 @@ final class GameViewController: NSViewController {
             retroAchievementsNoticeView.centerYAnchor.constraint(equalTo: notificationView.centerYAnchor),
         ])
 
-        syncStatusToken = NotificationCenter.default.addObserver(forName: .OESaveSyncStatusDidChange, object: nil, queue: .main) { [weak self] notification in
-            guard let self = self, let obj = notification.object as? OESaveSyncManager else { return }
-            self.syncStatusOverlay.show(status: obj.syncStatus, message: obj.syncStatusMessage)
-        }
-
         networkMonitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -191,11 +174,6 @@ final class GameViewController: NSViewController {
             self.token = nil
         }
         
-        if let syncToken = syncStatusToken {
-            NotificationCenter.default.removeObserver(syncToken)
-            self.syncStatusToken = nil
-        }
-
         networkMonitor.cancel()
 
         shaderWindowController.close()

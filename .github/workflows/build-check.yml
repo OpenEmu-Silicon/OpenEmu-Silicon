@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
+    # ready_for_review makes the full build start when a draft is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
   # Direct pushes to main (small maintainer changes) get the same build.
   # Docs-only and bookkeeping pushes are skipped. This filter is on push only,
   # so it never affects the required checks on pull requests.
@@ -20,11 +22,18 @@ on:
       - '.claude/**'
       - '.cursor/**'
 
+# Cancel a PR's in-flight run when a newer commit is pushed to it. Pushes to
+# main are keyed by commit, so they are never cancelled by a later push.
+concurrency:
+  group: build-check-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   core-sources:
     # Fast guard (no Xcode): catches a flattened core submodule that was
     # committed without its vendored upstream source — the regression that
     # silently broke the Dolphin build for months because CI never compiled it.
+    # Covers every core's .gitmodules, not a hardcoded list.
     # Runs on every PR; it takes seconds and needs no build toolchain.
     name: Core sources present
     runs-on: ubuntu-latest
@@ -35,6 +44,12 @@ jobs:
       - name: Check vendored core externals are populated
         run: ./Scripts/check-core-sources.sh
 
+      - name: Test vendored core externals check
+        run: python3 Scripts/test-check-core-sources.py
+
+      - name: Test core change detection
+        run: python3 Scripts/test-detect-core-changes.py
+
   detect-core-changes:
     # The `OpenEmu` scheme only builds the main app plus its own dependencies
     # (OpenEmuKit/Base/System) — it never compiles core plugins, so a PR that
@@ -42,9 +57,12 @@ jobs:
     # built. Figure out which cores (if any) actually need building for this
     # PR, so the core matrix below only runs what changed.
     name: Detect changed cores
+    # Draft PRs skip the macOS builds; marking one ready for review starts them.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     outputs:
       cores: ${{ steps.detect.outputs.cores }}
+      fbneo: ${{ steps.detect.outputs.fbneo }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
@@ -80,21 +98,33 @@ jobs:
             base="${{ github.event.before }}"
           fi
 
+          # FBNeo builds via its own clone-and-build script (its deps/fbneo source
+          # isn't vendored and it's not a slot in the xcodebuild matrix — same
+          # situation as MAME). Track it with a separate flag.
+          fbneo=false
+
           if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
             echo "No usable diff base (event: ${{ github.event_name }}) - building all core schemes"
             cores="$all_cores"
+            fbneo=true
           else
-            changed=$(git diff --name-only "$base" "${{ github.sha }}")
+            # --no-renames lists both the old and new path of a move; quotePath=false
+            # keeps non-ASCII file names readable instead of octal-escaped.
+            changed=$(git -c core.quotePath=false diff --no-renames --name-only "$base" "${{ github.sha }}")
             echo "Changed files:"
             echo "$changed"
 
             # A change to shared framework code, the workspace, or scheme files
             # can affect every core's build — fall back to building all of them.
-            # OpenEmuKit/ is included because several cores (Gambatte, FCEU,
-            # GenesisPlus, Mednafen, mGBA, Mupen64Plus, Nestopia, SNES9x, BSNES)
-            # compile .m files directly out of OpenEmuKit/Source/ into their
-            # own plugin targets.
-            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/|Scripts/)'; then
+            # Scripts/ is deliberately not on this list: no Xcode project,
+            # scheme, or build phase references it, so a script change cannot
+            # change what a core compiles. (If a build phase ever starts
+            # calling a script, add that script's path here.)
+            # OpenEmuKit/ is included because about 19 cores compile .m files
+            # or import headers directly out of OpenEmuKit/Source/ into their
+            # own plugin targets (Scripts/detect-core-changes.py --print-map
+            # lists them).
+            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/)'; then
               echo "Shared code changed — building all core schemes"
               cores="$all_cores"
             else
@@ -107,10 +137,28 @@ jobs:
           print(json.dumps(selected))
           ")
             fi
+
+            # REPORT ONLY: Scripts/detect-core-changes.py narrows OpenEmuKit/
+            # changes using the cores' Xcode projects. Log what it would pick
+            # next to what this job actually builds, so we can compare over a
+            # few PRs before it is allowed to skip anything. Never fails the job.
+            echo "--- detect-core-changes.py (report only, not used) ---"
+            proposed=$(echo "$changed" | python3 Scripts/detect-core-changes.py --files - || echo "(script failed; ignored)")
+            echo "$proposed"
+            echo "--- actually building: $cores ---"
+            echo "::notice title=detect-core-changes (report only)::$proposed"
+
+            # FBNeo depends on FBNeo/ plus the frameworks it links (OpenEmu-SDK /
+            # OpenEmuBase) and compiles from (OpenEmuKit/Source: the RA bridge).
+            if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/|OpenEmuKit/)'; then
+              fbneo=true
+            fi
           fi
 
           echo "Core schemes to build: $cores"
           echo "cores=$cores" >> "$GITHUB_OUTPUT"
+          echo "Build FBNeo: $fbneo"
+          echo "fbneo=$fbneo" >> "$GITHUB_OUTPUT"
 
   build-cores:
     name: Build core (${{ matrix.core }})
@@ -119,6 +167,9 @@ jobs:
     runs-on: macos-latest
     strategy:
       fail-fast: false
+      # Cap parallel macOS runners so a full-matrix run does not exhaust
+      # runner capacity (the rest queue and start as slots free up).
+      max-parallel: 8
       matrix:
         core: ${{ fromJson(needs.detect-core-changes.outputs.cores) }}
 
@@ -137,7 +188,6 @@ jobs:
       - name: Generate credentials stubs
         run: |
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-          cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
           cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
       - name: Build ${{ matrix.core }} (arm64)
@@ -166,8 +216,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
 
-  build:
-    name: Build (arm64)
+  build-fbneo:
+    # FBNeo isn't a slot in the core matrix above: its deps/fbneo source isn't
+    # vendored (pulled from the OpenEmu-Silicon/fbneo fork at a pinned revision)
+    # and it builds the headless engine + plugin through its own script. Same
+    # clone-and-build shape MAME needs. Only runs when FBNeo-relevant files change.
+    name: Build FBNeo core
+    needs: detect-core-changes
+    if: needs.detect-core-changes.outputs.fbneo == 'true'
     runs-on: macos-latest
 
     steps:
@@ -185,7 +241,36 @@ jobs:
       - name: Generate credentials stubs
         run: |
           cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
-          cp OpenEmu/OEGoogleDriveSecrets.template.swift OpenEmu/OEGoogleDriveSecrets.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
+
+      - name: Build FBNeo (clone pinned fork, build dylib + plugin)
+        run: |
+          # build-fbneo-core.sh runs prepare-fbneo-core.sh (clones the pinned
+          # fork revision into FBNeo/deps/fbneo), builds fbneo_headless.dylib,
+          # then OpenEmuBase + FBNeo.oecoreplugin (adhoc-signed, no identity needed).
+          ./Scripts/build-fbneo-core.sh
+
+  build:
+    name: Build (arm64)
+    # Draft PRs skip the macOS builds; marking one ready for review starts them.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Generate credentials stubs
+        run: |
+          cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
           cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
       - name: Test DualSense Bluetooth report decoding
