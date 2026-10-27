@@ -175,18 +175,20 @@ private struct BPTabBar: View {
 /// purpose: inside the scaled design canvas they mis-position their content.
 private enum BPMetrics {
     static let top: CGFloat = 170
-    static let heroHeight: CGFloat = 520
+    static let heroHeight: CGFloat = 580
     static let headerHeight: CGFloat = 100
-    static let posterBody: CGFloat = 460
+    static let posterBody: CGFloat = 480
     static let stateBody: CGFloat = 400
+    /// Air between one shelf and the next.
+    static let laneGap: CGFloat = 64
     static let focusTarget: CGFloat = 150
 
     static func height(of lane: BigPictureLane) -> CGFloat {
         let header = lane.title == nil ? 0 : headerHeight
         switch lane.kind {
         case .heroActions: return 0
-        case .games: return header + posterBody
-        case .saveStates: return header + stateBody
+        case .games: return header + posterBody + laneGap
+        case .saveStates, .screenshots: return header + stateBody + laneGap
         }
     }
 }
@@ -390,6 +392,10 @@ private struct BPHero: View {
             if !facts.isEmpty {
                 Text(facts.joined(separator: "  ·  ")).font(BP.callout).foregroundColor(BP.secondary)
             }
+            if let stars = game.rating?.intValue, stars > 0 {
+                Text(String(repeating: "★", count: min(stars, 5)) + String(repeating: "☆", count: max(5 - stars, 0)))
+                    .font(BP.callout).foregroundColor(Color(hex: 0xF5A524))
+            }
             let played = game.playedSummary
             if !played.isEmpty {
                 Text(played).font(BP.callout).foregroundColor(BP.secondary)
@@ -402,7 +408,12 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
-    var isStates: Bool { if case .saveStates = kind { return true } else { return false } }
+    var isWide: Bool {
+        switch kind {
+        case .saveStates, .screenshots: return true
+        default: return false
+        }
+    }
 }
 
 private struct BPLane: View {
@@ -425,7 +436,7 @@ private struct BPLane: View {
                 .frame(height: 100, alignment: .bottomLeading)
             }
 
-            let step = (lane.isStates ? 410 : BP.posterSize.width) + BP.gutter
+            let step = (lane.isWide ? 410 : BP.posterSize.width) + BP.gutter
             let shift = model.lane == index ? -CGFloat(max(0, model.column - 4)) * step : 0
             HStack(alignment: .top, spacing: BP.gutter) {
                 switch lane.kind {
@@ -436,6 +447,10 @@ private struct BPLane: View {
                 case .saveStates(let states):
                     ForEach(Array(states.enumerated()), id: \.offset) { column, state in
                         stateCard(state, column: column)
+                    }
+                case .screenshots(let shots):
+                    ForEach(Array(shots.enumerated()), id: \.offset) { column, shot in
+                        screenshotCard(shot, column: column)
                     }
                 case .heroActions:
                     EmptyView()
@@ -448,6 +463,29 @@ private struct BPLane: View {
         }
     }
 
+    private static let ago: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
+    private func screenshotCard(_ shot: OEDBScreenshot, column: Int) -> some View {
+        let focused = isFocused(column)
+        let image = NSImage(contentsOf: shot.url)
+        return ZStack {
+            Color.white.opacity(0.06)
+            if let image = image { Image(nsImage: image).resizable().aspectRatio(contentMode: .fill) }
+        }
+        .frame(width: 410, height: 231).clipped()
+        .clipShape(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous).strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? 5 : 1))
+        .scaleEffect(focused ? 1.05 : 1, anchor: .top)
+        .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 24, y: 14)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
+    }
+
     private func isFocused(_ column: Int) -> Bool {
         !model.sidebarOpen && model.lane == index && model.column == column
     }
@@ -456,10 +494,17 @@ private struct BPLane: View {
         let focused = isFocused(column)
         return VStack(alignment: .leading, spacing: 12) {
             BPPoster(game: game, size: BP.posterSize, coverTick: model.coverTick, art: art)
-            Text(game.cleanDisplayName)
-                .font(BP.captionBold).foregroundColor(BP.primary)
-                .lineLimit(1).frame(width: BP.posterSize.width, alignment: .leading)
-                .opacity(focused ? 1 : 0)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(game.cleanDisplayName)
+                    .font(BP.captionBold).foregroundColor(BP.primary)
+                    .lineLimit(1)
+                if lane.id == "recent", let played = game.lastPlayed {
+                    Text(Self.ago.localizedString(for: played, relativeTo: Date()))
+                        .font(BP.caption).foregroundColor(BP.tertiary).lineLimit(1)
+                }
+            }
+            .frame(width: BP.posterSize.width, alignment: .leading)
+            .opacity(focused ? 1 : 0.8)
         }
         .overlay(alignment: .top) {
             RoundedRectangle(cornerRadius: BP.posterRadius + 5, style: .continuous)
@@ -569,9 +614,11 @@ private struct BPSidebar: View {
             Color.black.opacity(0.35).onTapGesture { model.perform(.back, source: "mouse") }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("OpenEmu")
-                    .font(BP.headline).foregroundColor(BP.primary)
-                    .frame(height: 78, alignment: .leading).padding(.leading, 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("OpenEmu").font(BP.headline).foregroundColor(BP.primary)
+                    Text(model.librarySummary).font(BP.caption).foregroundColor(BP.secondary)
+                }
+                .frame(height: 96, alignment: .leading).padding(.leading, 28)
 
                 ForEach(Array(model.sidebarEntries.enumerated()), id: \.offset) { index, entry in
                     if index == 4 {
@@ -611,6 +658,9 @@ private struct BPSidebar: View {
             }
             Text(title(entry)).font(BP.callout).lineLimit(1)
             Spacer(minLength: 0)
+            if case .system(let id) = entry, let count = model.systems.first(where: { $0.id == id })?.count {
+                Text("\(count)").font(BP.caption).foregroundColor(focused ? BP.focusText.opacity(0.8) : BP.tertiary)
+            }
         }
         .foregroundColor(focused ? BP.focusText : BP.primary)
         .padding(.horizontal, 20)

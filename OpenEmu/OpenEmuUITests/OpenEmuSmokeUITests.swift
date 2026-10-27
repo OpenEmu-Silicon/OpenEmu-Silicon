@@ -298,6 +298,12 @@ final class OpenEmuSmokeUITests: XCTestCase {
         let quit = app.dialogs.buttons["Quit"]
         if quit.waitForExistence(timeout: 10) { quit.click() }
         XCTAssertTrue(bigPicture.waitForExistence(timeout: 20), "Big picture did not return after the game quit")
+        sleep(3)
+        // The whole display, not just the window: a window that came back on the wrong Space still "exists".
+        let display = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        display.name = "bigpicture-returned-display"
+        display.lifetime = .keepAlways
+        add(display)
         attachScreenshot(named: "bigpicture-returned")
 
         // The first Escape moves the highlight up to the tab bar; the second leaves the mode.

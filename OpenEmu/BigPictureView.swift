@@ -51,6 +51,7 @@ struct BigPictureLane: Identifiable {
         case heroActions
         case games([OEDBGame])
         case saveStates([OEDBSaveState])
+        case screenshots([OEDBScreenshot])
     }
 
     let id: String
@@ -65,6 +66,7 @@ struct BigPictureLane: Identifiable {
         case .heroActions: return 2
         case .games(let games): return games.count
         case .saveStates(let states): return states.count
+        case .screenshots(let shots): return shots.count
         }
     }
 }
@@ -196,6 +198,10 @@ final class BigPictureModel: ObservableObject {
             if !states.isEmpty {
                 built.append(BigPictureLane(id: "states", title: "Save States", subtitle: "\(states.count) saved", kind: .saveStates(states)))
             }
+            let shots = (game.defaultROM?.screenShots ?? []).sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+            if !shots.isEmpty {
+                built.append(BigPictureLane(id: "shots", title: "Gameplay", subtitle: "\(shots.count) screenshots", kind: .screenshots(Array(shots.prefix(12)))))
+            }
             lanes = built
         case .browse:
             switch tab {
@@ -204,7 +210,13 @@ final class BigPictureModel: ObservableObject {
                 let recent = sortedByRecent(allGames)
                 if !allGames.isEmpty { built.append(BigPictureLane(id: "actions", title: nil, subtitle: nil, kind: .heroActions)) }
                 if !recent.isEmpty {
-                    built.append(BigPictureLane(id: "recent", title: "Recent", subtitle: "\(min(recent.count, 20)) games", kind: .games(Array(recent.prefix(20)))))
+                    built.append(BigPictureLane(id: "recent", title: "Recent", subtitle: min(recent.count, 20) == 1 ? "1 game" : "\(min(recent.count, 20)) games", kind: .games(Array(recent.prefix(20)))))
+                }
+                let recentStates = allGames
+                    .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
+                    .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+                if !recentStates.isEmpty {
+                    built.append(BigPictureLane(id: "recent-saves", title: "Recent Saves", subtitle: nil, kind: .saveStates(Array(recentStates.prefix(8))), showsGame: true))
                 }
                 for system in systems {
                     let games = byName(allGames.filter { $0.system?.systemIdentifier == system.id })
@@ -249,6 +261,11 @@ final class BigPictureModel: ObservableObject {
 
     var sidebarEntries: [SidebarEntry] {
         [.tab(.home), .tab(.recent), .tab(.favorites), .settings] + systems.map { .system($0.id) }
+    }
+
+    /// "77 games · 18 systems", for the sidebar header.
+    var librarySummary: String {
+        "\(allGames.count) \(allGames.count == 1 ? "game" : "games") · \(systems.count) \(systems.count == 1 ? "system" : "systems")"
     }
 
     var isTabBarFocused: Bool { lane < 0 && !sidebarOpen }
@@ -387,6 +404,8 @@ final class BigPictureModel: ObservableObject {
         case .saveStates(let states):
             guard states.indices.contains(column) else { return }
             onLaunchState?(states[column])
+        case .screenshots:
+            return
         }
     }
 
@@ -457,6 +476,8 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     private var keyMonitor: Any?
     private var closeObserver: NSObjectProtocol?
     private var launchedFromBigPicture = false
+    /// Keys typed into the quit confirmation or the closing game must not land on the menu and leave the mode.
+    private var ignoreInputUntil = Date.distantPast
 
     private init() {
         let window = BigPictureWindow(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
@@ -466,7 +487,8 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
         window.identifier = NSUserInterfaceItemIdentifier("BigPictureWindow")
         window.isReleasedWhenClosed = false
-        window.collectionBehavior = [.fullScreenAuxiliary]
+        // On every Space, so it can come back over the game or on the desktop once the game's fullscreen Space is gone.
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         super.init(window: window)
 
         window.delegate = self
@@ -523,6 +545,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Actions
 
     private func handle(_ action: BigPictureAction, source: String) {
+        if Date() < ignoreInputUntil, action != .home { return }
         if action == .home {
             returnFromGame(source: source)
             return
@@ -569,8 +592,8 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
             // `queue: .main` runs this on the main thread.
             MainActor.assumeIsolated {
                 guard let self = self, self.launchedFromBigPicture, note.object as? NSWindow !== self.window else { return }
-                // Let the document finish tearing down before checking.
-                DispatchQueue.main.async {
+                // Let the document finish tearing down, and the game's fullscreen Space finish closing, before checking.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     MainActor.assumeIsolated { self.showAfterGameEnded() }
                 }
             }
@@ -585,10 +608,23 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     private func showAfterGameEnded() {
         guard launchedFromBigPicture, GameDocumentController.shared.gameDocuments.isEmpty, let window = window else { return }
         launchedFromBigPicture = false
+        ignoreInputUntil = Date().addingTimeInterval(1.5)
         model.setGameRunning(false)
+        bringToFront(window)
+        input.start()
+        // The Space change can still be settling; make sure the menu ends up in front.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self = self, !self.launchedFromBigPicture, let window = self.window, !window.isKeyWindow else { return }
+                self.bringToFront(window)
+            }
+        }
+    }
+
+    private func bringToFront(_ window: NSWindow) {
+        window.setFrame((window.screen ?? NSScreen.main ?? NSScreen.screens[0]).frame, display: true)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
-        input.start()
     }
 
     // MARK: Keyboard
@@ -598,6 +634,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             MainActor.assumeIsolated {
                 guard let self = self, self.window?.isKeyWindow == true else { return event }
+                if Date() < self.ignoreInputUntil { return nil }
                 let action: BigPictureAction?
                 switch event.keyCode {
                 case 126: action = .up
