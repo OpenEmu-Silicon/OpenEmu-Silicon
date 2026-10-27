@@ -86,7 +86,7 @@ A bug is not fixed because the code compiles or the change looks right. It is fi
 
 1. **Reproduce first.** Write the smallest check that fails for the reason in the issue, and run it. A failing check you cannot get is a finding in itself: say so.
 2. **Fix.** Change the code until that same check passes.
-3. **Show it.** Paste the before and after output into the PR description.
+3. **Show it.** Paste the before and after output into the PR description. When the proof is something you can see (a picture that changed, a window that now looks right, an alert that no longer appears), also post screenshots with `./Scripts/pr-evidence.sh --claim "<what this proves>" --from-playtest` (or `--before`/`--after`, or named files). It shows a dry run first; add `--post` once you have looked at every picture. The same goes for a feature: post pictures that show it built the way the agreed spec says.
 
 Pick the cheapest check that can really see the bug:
 
