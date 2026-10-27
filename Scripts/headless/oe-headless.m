@@ -5,7 +5,7 @@
 //   oe-headless --core <X.oecoreplugin> --rom <file> --frames N [--input FRAME:SELECTOR:INT ...]
 //               [--hash-at FRAME ...] [--save-state-at FRAME] [--load-state-at FRAME] [--audio]
 //               [--search-byte FRAME:HEXVALUE ...] [--cheat-at FRAME:CODE ...] [--reset-at FRAME ...]
-//               [--buffer-once]
+//               [--buffer-once] [--save-file-at FRAME:PATH ...] [--load-file-at FRAME:PATH ...]
 //
 // --buffer-once asks the core for its video buffer only before the first frame, the way Release builds
 // of the app do (Debug builds ask again every frame from an assert), so a core that loses the buffer
@@ -19,6 +19,9 @@
 //   state-loaded
 //   cheat-set <code>
 //   reset
+//   file-saved ok|failed exists=yes|no [<error>]   (for --save-file-at: what the core reported, and
+//                                                   whether the file is really there afterwards)
+//   file-loaded ok|failed [<error>]                 (for --load-file-at)
 //   region <name> address=<hex> bytes=<n>  (for --search-byte, once per readable memory region)
 //   hit <hex address>                      (for --search-byte, every byte equal to the value, addressed
 //                                           the way the cheat search window addresses it)
@@ -110,6 +113,8 @@ int main(int argc, char **argv)
         NSMutableDictionary<NSNumber *, NSNumber *> *searchAt = [NSMutableDictionary dictionary];
         NSMutableDictionary<NSNumber *, NSMutableArray<NSString *> *> *cheatsAt = [NSMutableDictionary dictionary];
         NSMutableSet<NSNumber *> *resetAt = [NSMutableSet set];
+        NSMutableDictionary<NSNumber *, NSString *> *saveFileAt = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSNumber *, NSString *> *loadFileAt = [NSMutableDictionary dictionary];
         BOOL bufferOnce = NO;
         NSMutableDictionary<NSNumber *, NSMutableArray<NSArray *> *> *inputs = [NSMutableDictionary dictionary];
 
@@ -125,6 +130,13 @@ int main(int argc, char **argv)
             else if ([arg isEqual:@"--audio"]) { wantAudio = YES; }
             else if ([arg isEqual:@"--buffer-once"]) { bufferOnce = YES; }
             else if ([arg isEqual:@"--reset-at"] && next) { [resetAt addObject:@(next.integerValue)]; i++; }
+            else if (([arg isEqual:@"--save-file-at"] || [arg isEqual:@"--load-file-at"]) && next) {
+                NSRange colon = [next rangeOfString:@":"];
+                if (colon.location == NSNotFound) return Fail([arg stringByAppendingString:@" wants FRAME:PATH"]);
+                NSMutableDictionary *target = [arg isEqual:@"--save-file-at"] ? saveFileAt : loadFileAt;
+                target[@([next substringToIndex:colon.location].integerValue)] = [next substringFromIndex:colon.location + 1];
+                i++;
+            }
             else if ([arg isEqual:@"--cheat-at"] && next) {
                 NSRange colon = [next rangeOfString:@":"];
                 if (colon.location == NSNotFound) return Fail(@"--cheat-at wants FRAME:CODE");
@@ -225,6 +237,28 @@ int main(int argc, char **argv)
             if ([resetAt containsObject:@(frame)]) {
                 [core resetEmulation];
                 printf("reset\n");
+            }
+            if (saveFileAt[@(frame)] || loadFileAt[@(frame)]) {
+                BOOL saving = saveFileAt[@(frame)] != nil;
+                NSString *path = saving ? saveFileAt[@(frame)] : loadFileAt[@(frame)];
+                __block BOOL ok = NO;
+                __block NSError *fileError = nil;
+                dispatch_semaphore_t done = dispatch_semaphore_create(0);
+                void (^handler)(BOOL, NSError *) = ^(BOOL success, NSError *e) {
+                    ok = success; fileError = e; dispatch_semaphore_signal(done);
+                };
+                if (saving) [core saveStateToFileAtPath:path completionHandler:handler];
+                else [core loadStateFromFileAtPath:path completionHandler:handler];
+                while (dispatch_semaphore_wait(done, DISPATCH_TIME_NOW) != 0) {
+                    [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+                }
+                NSString *detail = fileError ? [NSString stringWithFormat:@" %@ %@", fileError.localizedDescription, fileError.localizedRecoverySuggestion ?: @""] : @"";
+                if (saving) {
+                    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+                    printf("file-saved %s exists=%s%s\n", ok ? "ok" : "failed", exists ? "yes" : "no", detail.UTF8String);
+                } else {
+                    printf("file-loaded %s%s\n", ok ? "ok" : "failed", detail.UTF8String);
+                }
             }
             if (!bufferOnce || frame == 1) {
                 videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
