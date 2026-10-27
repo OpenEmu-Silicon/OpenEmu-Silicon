@@ -41,6 +41,9 @@
 
 set -uo pipefail
 
+# The plain app mode (no --core, no --test) duplicates CI and Scripts/check.sh, which both build the app.
+case " $* " in *" --core "*|*" --test "*) ;; *) echo "NOTE  plain verify.sh is redundant with CI and Scripts/check.sh; prefer check.sh. Continuing." >&2 ;; esac
+
 # Ignore SIGPIPE. A truncated consumer (e.g. `verify.sh | head -30`,
 # `... | grep ... | head`) closes its stdin partway through; without this trap,
 # the next echo from verify.sh receives SIGPIPE and terminates the script

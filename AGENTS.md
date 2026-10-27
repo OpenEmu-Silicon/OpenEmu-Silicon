@@ -36,16 +36,24 @@ The maintainer is not a professional developer. Write commit messages, PR descri
 
 ## Build and Verify
 
-`Scripts/verify.sh` is the local check. It builds, runs the static analyzer, validates Info.plist and entitlements, and checks codesign.
+CI (`build-check.yml`) builds every PR, including every core the PR touches, and the test scripts below build the app themselves. A separate local build-and-analyze pass is not a step any more. Use the script that fits the change:
 
 ```bash
-./Scripts/verify.sh                 # build + analyze + plist + codesign
-./Scripts/verify.sh --launch        # above + 5s smoke launch with log and crash-report scan
-./Scripts/verify.sh --test          # above + run the OpenEmuTests unit target
+./Scripts/check.sh                  # build, then drive the real app (windows, panes, Cores) against your real library
+./Scripts/check.sh --no-build       # same, reusing the last build
+./Scripts/check.sh --rom <file>     # also load a game: draws, moves, quick save, quit (uses a throwaway library)
+./Scripts/playtest.sh --game "<name>"   # play a game from your real library, then report frame rate, audio, errors
+./Scripts/doctor.sh                 # a few seconds: signing certificate, credential stubs, running app, test runner signature
+./Scripts/prove.sh                  # the checks the diff touches, ends with PROVEN or NOT PROVEN (--all runs every step)
 ./Scripts/verify.sh --core <Name>   # build, install, and check one core (add --release for Release-only bugs)
+./Scripts/verify.sh --test          # run the OpenEmuTests unit target
 ```
 
-Read the whole output and note any new warnings even on a passing build. GitHub CI (`build-check.yml`) rebuilds every PR, including every core the PR touches, so a local build is a way to catch problems early, not the only gate.
+`check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either.
+
+`verify.sh` without `--core` or `--test` (build, analyze, plist, codesign) still works but is redundant with CI and the scripts above.
+
+Read the whole output and note any new warnings even on a passing build.
 
 To launch the debug app, use `./Scripts/launch-debug.sh` instead of `open <path>`. It picks the build that matches your current branch and refuses to launch a stale one.
 
@@ -203,7 +211,7 @@ Use the issue templates (`bug_report`, `feature_request`, `core_integration`, `c
 What has worked well here:
 
 - **Point the agent at this file first**, then at `CONTEXT.md` so it uses the right words.
-- **Let the agent build and check its own work** with `verify.sh` before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
+- **Let the agent build and check its own work** with `check.sh` (and `verify.sh --core` for cores) before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
 - **Do core testing through the scripts above.** The stale-plugin mistake is the one agents make most.
 - **Ask for plain-language summaries.** The maintainer and most testers are not developers.
 - **Say in the PR that AI helped** (the template asks). Nobody minds. Transparency is the point.

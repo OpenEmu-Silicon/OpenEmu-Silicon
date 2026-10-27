@@ -12,7 +12,7 @@ Do not use this lane for `.github/workflows/`, for another contributor's work, o
 
 ## 2. Check before shipping
 
-- Code changed: run `/verify` now if you have not since the last edit.
+- Code changed: run `/verify` (check.sh, not a separate build) if you have not since the last edit. CI builds the PR anyway.
 - Bug fix: it needs proof, not just a build. Follow "Proving a fix" in `AGENTS.md` (a check that failed before and passes now) and put the before and after output in the PR. `./Scripts/prove.sh` runs the whole set. If part of it cannot be automated, say which part in the PR.
 - Read `git diff` once. Never commit secrets or build output.
 - Run the adversarial reviewer (`.claude/agents/adversarial-reviewer.md`) only when the diff touches a core, input handling, or threading, or is over about 50 lines of code. Show `git diff main...HEAD | wc -l` first. Skip it for docs, scripts, and small fixes. Fix `block` findings or rebut them with evidence; `note` findings go in the PR body.
