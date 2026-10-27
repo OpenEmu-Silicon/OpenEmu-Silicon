@@ -8,7 +8,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 MAME_DIR="$REPO_ROOT/MAME"
 DEPS_DIR="$MAME_DIR/deps"
 SRC_DIR="$DEPS_DIR/mame"
-REVISION="72ebfc634aa125b5d46471e123ca7eedf92ba652"
+REVISION="9fa67ad9430c6fc97c4a6febe36f5e741e5d9200"
 REMOTE="https://github.com/OpenEmu-Silicon/mame.git"
 
 mkdir -p "$DEPS_DIR"
