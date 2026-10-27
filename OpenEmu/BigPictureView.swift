@@ -480,15 +480,18 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     private var ignoreInputUntil = Date.distantPast
 
     private init() {
-        let window = BigPictureWindow(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
-        window.backgroundColor = .black
-        // Above the menu bar and Dock, so the mode covers the whole screen without changing system presentation
-        // options (AppKit raises an exception if those conflict with a fullscreen game window).
-        window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
+        // A normal window that goes native fullscreen, so big picture is its own Space like a fullscreen game or app:
+        // it shows in Mission Control, Cmd-Tab and the Space switcher, and the desktop stays reachable if it hangs.
+        let window = BigPictureWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 720),
+                                      styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                                      backing: .buffered, defer: false)
+        window.backgroundColor = NSColor(red: 0.039, green: 0.039, blue: 0.047, alpha: 1)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.title = "Big Picture"
         window.identifier = NSUserInterfaceItemIdentifier("BigPictureWindow")
         window.isReleasedWhenClosed = false
-        // On every Space, so it can come back over the game or on the desktop once the game's fullscreen Space is gone.
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.collectionBehavior = [.fullScreenPrimary]
         super.init(window: window)
 
         window.delegate = self
@@ -522,10 +525,11 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         refreshControllers()
 
         let screen = NSApp.keyWindow?.screen ?? NSScreen.main ?? NSScreen.screens[0]
-        window.setFrame(screen.frame, display: true)
+        if !window.isVisible { window.setFrame(screen.visibleFrame, display: true) }
 
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        if !window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
 
         input.start()
         installKeyMonitor()
@@ -537,9 +541,10 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         input.stop()
         removeKeyMonitor()
         stopWatchingForGameEnd()
-        window?.orderOut(nil)
         launchedFromBigPicture = false
         model.setGameRunning(false)
+        // Closing a fullscreen window leaves its Space.
+        window?.close()
     }
 
     // MARK: Actions
@@ -571,13 +576,12 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
                 self.model.setGameRunning(false)
                 return
             }
-            // The game owns the screen and the controller now. Step aside.
+            // The game opens in its own fullscreen Space and owns the controller. Big picture stays in its Space behind it.
             self.input.releaseAll()
-            self.window?.orderOut(nil)
         }
     }
 
-    /// Guide / Home while a game runs: bring the menu back in front without quitting the game.
+    /// Guide / Home while a game runs: switch back to the menu's Space without quitting the game.
     private func returnFromGame(source: String) {
         guard launchedFromBigPicture, let window = window, !window.isKeyWindow else { return }
         model.perform(.home, source: source)
@@ -610,21 +614,10 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         launchedFromBigPicture = false
         ignoreInputUntil = Date().addingTimeInterval(1.5)
         model.setGameRunning(false)
-        bringToFront(window)
-        input.start()
-        // The Space change can still be settling; make sure the menu ends up in front.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self = self, !self.launchedFromBigPicture, let window = self.window, !window.isKeyWindow else { return }
-                self.bringToFront(window)
-            }
-        }
-    }
-
-    private func bringToFront(_ window: NSWindow) {
-        window.setFrame((window.screen ?? NSScreen.main ?? NSScreen.screens[0]).frame, display: true)
+        // macOS usually returns to the menu's Space by itself when the game's Space closes; this covers the rest.
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        input.start()
     }
 
     // MARK: Keyboard
@@ -663,5 +656,15 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         input.releaseAll()
+    }
+
+    /// Closed with the red button or Cmd-W: leave the mode cleanly.
+    func windowWillClose(_ notification: Notification) {
+        input.releaseAll()
+        input.stop()
+        removeKeyMonitor()
+        stopWatchingForGameEnd()
+        launchedFromBigPicture = false
+        model.setGameRunning(false)
     }
 }
