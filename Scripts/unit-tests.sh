@@ -24,9 +24,12 @@ cd "$REPO_ROOT"
 echo "----  running OpenEmuTests (xcodebuild test)"
 TEST_LOG=$(mktemp -t oe_unit_tests.XXXXXX)
 
-SIGN_ARGS=()
+# A named identity only works with manual signing; under the project's automatic signing xcodebuild stops
+# with "Signing for <target> requires a development team". Without the certificate, sign ad hoc.
 if "$REPO_ROOT/Scripts/setup-debug-signing.sh" --check >/dev/null 2>&1; then
-  SIGN_ARGS=(CODE_SIGN_IDENTITY="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}")
+  SIGN_ARGS=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}" DEVELOPMENT_TEAM="")
+else
+  SIGN_ARGS=(CODE_SIGN_IDENTITY="-")
 fi
 
 if xcodebuild test \
@@ -35,7 +38,7 @@ if xcodebuild test \
      -configuration Debug \
      -destination 'platform=macOS,arch=arm64' \
      -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
-     ${SIGN_ARGS[@]+"${SIGN_ARGS[@]}"} \
+     "${SIGN_ARGS[@]}" \
      > "$TEST_LOG" 2>&1; then
   PASS_COUNT=$(grep -c 'passed' "$TEST_LOG" 2>/dev/null || true)
   echo "PASS  OpenEmuTests ($PASS_COUNT tests passed)"
