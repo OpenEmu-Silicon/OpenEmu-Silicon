@@ -233,16 +233,19 @@ def built_projects(repo_root=REPO_ROOT, workspace="OpenEmu-metal.xcworkspace"):
     """
     with open(os.path.join(repo_root, workspace, "contents.xcworkspacedata"), encoding="utf-8") as f:
         todo = [m.group(1) for m in re.finditer(r'location\s*=\s*"(?:group|container):([^"]+\.xcodeproj)"', f.read())]
-    seen, usage = set(), {}
+    seen, usage, missing = set(), {}, []
     while todo:
         proj = _norm(todo.pop())
-        pbx = os.path.join(repo_root, proj, "project.pbxproj")
-        if proj in seen or not os.path.isfile(pbx):
+        if proj in seen:
             continue
         seen.add(proj)
+        pbx = os.path.join(repo_root, proj, "project.pbxproj")
+        if not os.path.isfile(pbx):
+            missing.append(proj)
+            continue
         usage[proj] = project_usage(pbx, repo_root)
         todo.extend(usage[proj][3])
-    return usage
+    return usage, missing
 
 
 # --- the check -------------------------------------------------------------
@@ -266,17 +269,24 @@ def check(repo_root=REPO_ROOT, verbose=False, out=sys.stdout, err=sys.stderr):
     """Return the number of failures (0 means the check passed)."""
     gitmodules = [p for p in _git_ls("*.gitmodules", repo_root) if "/" in p]
     try:
-        usage = built_projects(repo_root)
+        usage, missing_projects = built_projects(repo_root)
     except (OSError, ValueError, KeyError, AssertionError, IndexError) as e:
         print(f"ERROR: could not read the workspace's Xcode projects: {e!r}", file=err)
         return 1
     failures = checked = unused = 0
+    # A project the build expects but that is gone would also silently turn
+    # this check off for its core, so it is an error in its own right.
+    for proj in missing_projects:
+        print(f"ERROR: Xcode project '{proj}' is referenced by the build but its project.pbxproj is missing.", file=err)
+        failures += 1
 
     for gm in gitmodules:
         core = gm.split("/", 1)[0]
         srcroot = os.path.dirname(gm)
         core_usage = [u for proj, u in usage.items() if proj.startswith(core + "/")]
         if not core_usage:
+            if verbose:
+                print(f"skip: [{core}] {gm} — no Xcode project for {core} in the workspace", file=out)
             continue
         build_files = set().union(*(u[0] for u in core_usage))
         build_folders = set().union(*(u[1] for u in core_usage))

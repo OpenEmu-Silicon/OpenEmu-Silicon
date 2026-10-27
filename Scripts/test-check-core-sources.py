@@ -17,7 +17,7 @@ ccs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ccs)
 
 
-def pbxproj(build_paths=(), sidebar_paths=(), header_search=(), variant=False):
+def pbxproj(build_paths=(), sidebar_paths=(), header_search=(), variant=False, folder_paths=(), subprojects=()):
     """A minimal project: one target whose Sources phase compiles build_paths.
 
     All paths are relative to the project directory (SOURCE_ROOT).
@@ -31,6 +31,14 @@ def pbxproj(build_paths=(), sidebar_paths=(), header_search=(), variant=False):
     for i, p in enumerate(sidebar_paths):
         objs.append(f'S{i} = {{isa = PBXGroup; children = (); path = "{p}"; sourceTree = "<group>"; }};')
         children.append(f"S{i}")
+    for i, p in enumerate(folder_paths):
+        objs.append(f'D{i} = {{isa = PBXFileReference; lastKnownFileType = folder; path = "{p}"; sourceTree = SOURCE_ROOT; }};')
+        objs.append(f'DB{i} = {{isa = PBXBuildFile; fileRef = D{i}; }};')
+        children.append(f"D{i}")
+        phase.append(f"DB{i}")
+    for i, p in enumerate(subprojects):
+        objs.append(f'P{i} = {{isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = "{p}"; sourceTree = SOURCE_ROOT; }};')
+        children.append(f"P{i}")
     if variant:
         objs.append('V0 = {isa = PBXVariantGroup; children = (V1); name = InfoPlist.strings; sourceTree = "<group>"; };')
         objs.append('V1 = {isa = PBXFileReference; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };')
@@ -130,6 +138,22 @@ class CheckCoreSources(unittest.TestCase):
         fx = Fixture(self, ["ext/foo"], workspace=())
         fx.write("Core/Core.xcodeproj/project.pbxproj", pbxproj(build_paths=["ext/foo/a.c"]))
         self.assertEqual(fx.run()[0], 0)
+
+    def test_folder_reference_containing_external_counts_as_used(self):
+        failures, _, err = Fixture(self, ["data/ext/foo"], folder_paths=["data"]).run()
+        self.assertEqual(failures, 1)
+        self.assertIn("Core/data/ext/foo", err)
+
+    def test_embedded_subproject_is_read(self):
+        fx = Fixture(self, ["ext/foo"], subprojects=["Sub/Sub.xcodeproj"])
+        fx.write("Core/Sub/Sub.xcodeproj/project.pbxproj", pbxproj(build_paths=["../ext/foo/a.c"]))
+        self.assertEqual(fx.run()[0], 1)
+
+    def test_missing_workspace_project_fails(self):
+        fx = Fixture(self, ["ext/foo"], workspace=("Core/Core.xcodeproj", "Gone/Gone.xcodeproj"))
+        failures, _, err = fx.run()
+        self.assertEqual(failures, 1)
+        self.assertIn("Gone/Gone.xcodeproj", err)
 
     def test_parser_handles_comments_escapes_and_lists(self):
         data = ccs.parse_pbxproj('// !$*UTF8*$!\n{ a = "x \\"y\\""; /* c */ b = (1, 2,); c = {d = e;}; }')
