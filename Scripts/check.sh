@@ -49,7 +49,6 @@ touch "$OUT_DIR/.start"
 harness_ensure_stubs "$REPO_ROOT"
 
 # Never leave a debug OpenEmu or a test runner behind, whatever way the script ends.
-harness_acquire_lock || exit 2
 cleanup() { pkill -TERM -f "OpenEmuUITests-Runner" 2>/dev/null; harness_kill_debug_app "$BUILD_DIR"; harness_release_lock; }
 trap cleanup EXIT
 
