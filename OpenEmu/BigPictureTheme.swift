@@ -26,17 +26,18 @@ import SwiftUI
 
 /// Values for the big-picture screens.
 ///
-/// The look comes from the OpenEmu alternative UI designs (dark `#0a0a0c` ground, blue accent, soft white surfaces,
-/// big cover art over a faded hero). Sizes come from the tvOS rules: a 1920 × 1080 canvas, 80 pt margins, and type big
-/// enough to read from a couch. `BigPictureCanvas` scales the canvas to the screen, so these numbers are used as written.
+/// The design is the OpenEmu alternative UI at the size it was drawn: a 1280 × 720 canvas with its type, pills, cards
+/// and gaps. `BigPictureCanvas` scales that canvas to the screen, so a laptop, a monitor and a 4K TV all get the same
+/// layout, only larger. Change `canvas` to make everything bigger or smaller relative to the screen; nothing else moves.
 enum BP {
 
     // MARK: Canvas
 
-    static let canvas = CGSize(width: 1920, height: 1080)
-    /// Left and right margin of the tvOS safe area (90 pt; 60 pt top and bottom).
-    static let margin: CGFloat = 90
-    static let gutter: CGFloat = 36
+    static let canvas = CGSize(width: 1280, height: 720)
+    /// Side margin. Keeps content inside the area a TV may crop.
+    static let margin: CGFloat = 56
+    /// Space between neighbouring cards in a shelf.
+    static let gutter: CGFloat = 22
 
     // MARK: Color
 
@@ -57,26 +58,36 @@ enum BP {
     static let focusFill = Color(hex: 0x3B82F6)
     static let focusText = Color.white
 
-    // MARK: Type (tvOS text styles at 1× on a 1080p canvas)
+    // MARK: Type (AltUI sizes)
 
-    // Sizes are the tvOS text styles: Title 1 76, Headline 38, Callout 31, Caption 1 25.
-    static let display = Font.system(size: 76, weight: .heavy)
-    static let title = Font.system(size: 62, weight: .bold)
-    static let headline = Font.system(size: 38, weight: .bold)
-    static let callout = Font.system(size: 31, weight: .regular)
-    static let calloutBold = Font.system(size: 31, weight: .semibold)
-    static let caption = Font.system(size: 25, weight: .regular)
-    static let captionBold = Font.system(size: 25, weight: .semibold)
+    static let display = Font.system(size: 44, weight: .heavy)
+    static let title = Font.system(size: 32, weight: .bold)
+    static let headline = Font.system(size: 20, weight: .bold)
+    static let callout = Font.system(size: 14, weight: .regular)
+    static let calloutBold = Font.system(size: 14, weight: .semibold)
+    static let caption = Font.system(size: 12, weight: .regular)
+    static let captionBold = Font.system(size: 12, weight: .semibold)
+
+    // MARK: Spacing scale (use these, not loose numbers, so the rhythm stays consistent)
+
+    static let space4: CGFloat = 4
+    static let space8: CGFloat = 8
+    static let space12: CGFloat = 12
+    static let space16: CGFloat = 16
+    static let space28: CGFloat = 28
+    /// Between one shelf and the next.
+    static let sectionGap: CGFloat = 40
 
     // MARK: Size
 
-    static let tabBarHeight: CGFloat = 68
-    static let buttonSize = CGSize(width: 300, height: 80)
-    static let posterSize = CGSize(width: 260, height: 361)
-    static let posterRadius: CGFloat = 8
-    static let cardRadius: CGFloat = 16
-    static let sidebarWidth: CGFloat = 420
-    static let sidebarRowPitch: CGFloat = 78
+    static let tabBarHeight: CGFloat = 40
+    static let buttonSize = CGSize(width: 150, height: 36)
+    static let posterSize = CGSize(width: 140, height: 194)
+    static let posterRadius: CGFloat = 5
+    static let cardRadius: CGFloat = 8
+    static let wideCard = CGSize(width: 260, height: 146)
+    static let sidebarWidth: CGFloat = 260
+    static let focusLine: CGFloat = 3
 
     /// Colors for a system's badge, taken from the home-screen designs.
     static func systemColors(_ identifier: String?) -> [Color] {
@@ -101,7 +112,7 @@ extension Color {
     }
 }
 
-/// Lays the 1920 × 1080 design canvas out at whatever size the screen is.
+/// Lays the design canvas (BP.canvas) out at whatever size the screen is.
 struct BigPictureCanvas<Content: View>: View {
 
     let content: Content

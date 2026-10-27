@@ -181,7 +181,7 @@ final class BigPictureModel: ObservableObject {
     }
 
     private func grid(_ games: [OEDBGame], id: String, title: String?, subtitle: String?) -> [BigPictureLane] {
-        let perRow = 6
+        let perRow = 7
         return stride(from: 0, to: games.count, by: perRow).enumerated().map { index, start in
             BigPictureLane(id: "\(id)-\(index)", title: index == 0 ? title : nil, subtitle: index == 0 ? subtitle : nil,
                            kind: .games(Array(games[start..<min(start + perRow, games.count)])))
