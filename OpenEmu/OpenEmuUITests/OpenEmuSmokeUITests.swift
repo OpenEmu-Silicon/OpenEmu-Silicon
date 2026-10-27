@@ -267,7 +267,7 @@ final class OpenEmuSmokeUITests: XCTestCase {
         sleep(1)
         attachScreenshot(named: "bigpicture-shelf")
         app.typeKey("m", modifierFlags: [])
-        XCTAssertTrue(bigPicture.staticTexts["Systems"].waitForExistence(timeout: 5), "Sidebar did not open")
+        XCTAssertTrue(bigPicture.staticTexts["SYSTEMS"].waitForExistence(timeout: 5), "Sidebar did not open")
         sleep(1)
         attachScreenshot(named: "bigpicture-sidebar")
         app.typeKey(.escape, modifierFlags: [])
@@ -286,8 +286,7 @@ final class OpenEmuSmokeUITests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
         sleep(1)
 
-        app.typeKey(.upArrow, modifierFlags: [])
-        app.typeKey(.upArrow, modifierFlags: [])
+        // Leaving Settings puts the highlight on the hero's Resume button, so Return launches the game.
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game did not launch from big picture")
         XCTAssertTrue(bigPicture.waitForNonExistence(timeout: 10), "Big-picture window stayed up over the game")
@@ -295,10 +294,14 @@ final class OpenEmuSmokeUITests: XCTestCase {
 
         // The game is fullscreen and hides the menu bar, so use the Close Window shortcut.
         app.typeKey("w", modifierFlags: .command)
-        confirmQuitIfAsked()
+        // The "Are you sure?" dialog can take a few seconds to show over a fullscreen game.
+        let quit = app.dialogs.buttons["Quit"]
+        if quit.waitForExistence(timeout: 10) { quit.click() }
         XCTAssertTrue(bigPicture.waitForExistence(timeout: 20), "Big picture did not return after the game quit")
         attachScreenshot(named: "bigpicture-returned")
 
+        // The first Escape moves the highlight up to the tab bar; the second leaves the mode.
+        app.typeKey(.escape, modifierFlags: [])
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(bigPicture.waitForNonExistence(timeout: 10), "Escape did not close big picture")
     }

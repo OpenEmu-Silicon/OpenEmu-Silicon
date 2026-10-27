@@ -107,37 +107,25 @@ private struct BPPoster: View {
     }
 }
 
-private struct BPSystemTile: View {
-
-    let game: OEDBGame
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
-            if let icon = game.system?.icon {
-                Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).padding(size * 0.2)
-            }
-        }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
-    }
-}
-
 private struct BPButton: View {
 
     let title: String
+    let symbol: String
+    let isPrimary: Bool
     let focused: Bool
 
     var body: some View {
-        Text(title)
-            .font(BP.calloutBold)
-            .foregroundColor(focused ? BP.focusText : BP.primary)
-            .frame(width: BP.buttonSize.width, height: BP.buttonSize.height)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(focused ? BP.focusFill : BP.idleFill))
-            .scaleEffect(focused ? 1.06 : 1)
-            .shadow(color: .black.opacity(focused ? 0.4 : 0), radius: 20, y: 10)
-            .animation(.easeOut(duration: 0.12), value: focused)
+        HStack(spacing: 14) {
+            Image(systemName: symbol).font(.system(size: 26, weight: .semibold))
+            Text(title).font(BP.calloutBold)
+        }
+        .foregroundColor(isPrimary ? Color.black.opacity(0.9) : BP.primary)
+        .frame(width: BP.buttonSize.width, height: BP.buttonSize.height)
+        .background(Capsule().fill(isPrimary ? Color.white : BP.surfaceStrong))
+        .overlay(Capsule().strokeBorder(BP.focusRing, lineWidth: focused ? 5 : 0).padding(-7))
+        .scaleEffect(focused ? 1.06 : 1)
+        .shadow(color: .black.opacity(focused ? 0.45 : 0), radius: 20, y: 10)
+        .animation(.easeOut(duration: 0.12), value: focused)
     }
 }
 
@@ -154,7 +142,8 @@ private struct BPTabBar: View {
                 .font(.system(size: 30, weight: .medium))
                 .foregroundColor(sidebarFocused ? BP.focusText : BP.primary)
                 .frame(width: BP.tabBarHeight, height: BP.tabBarHeight)
-                .background(Circle().fill(sidebarFocused ? BP.focusFill : BP.idleFill))
+                .background(Circle().fill(sidebarFocused ? BP.focusFill : BP.surface))
+                .overlay(Circle().strokeBorder(BP.border, lineWidth: sidebarFocused ? 0 : 1))
                 .onTapGesture { model.clickTab(0) }
 
             HStack(spacing: 0) {
@@ -166,12 +155,13 @@ private struct BPTabBar: View {
                         .foregroundColor(focused ? BP.focusText : BP.primary)
                         .padding(.horizontal, 36)
                         .frame(height: BP.tabBarHeight - 12)
-                        .background(Capsule().fill(focused ? BP.focusFill : (current ? Color.white.opacity(0.2) : Color.clear)))
+                        .background(Capsule().fill(focused ? BP.focusFill : (current ? BP.surfaceStrong : Color.clear)))
                         .onTapGesture { model.clickTab(tab.rawValue + 1) }
                 }
             }
             .padding(6)
-            .background(Capsule().fill(Color.white.opacity(0.1)))
+            .background(Capsule().fill(BP.surface))
+            .overlay(Capsule().strokeBorder(BP.border, lineWidth: 1))
         }
         .frame(width: BP.canvas.width)
         .offset(y: 56)
@@ -188,7 +178,7 @@ private enum BPMetrics {
     static let heroHeight: CGFloat = 520
     static let headerHeight: CGFloat = 100
     static let posterBody: CGFloat = 460
-    static let stateBody: CGFloat = 380
+    static let stateBody: CGFloat = 400
     static let focusTarget: CGFloat = 150
 
     static func height(of lane: BigPictureLane) -> CGFloat {
@@ -353,27 +343,27 @@ private struct BPHero: View {
                 .frame(width: 396, height: 330, alignment: .bottomLeading)
                 .offset(x: BP.margin, y: 68 - 41)
 
-            BPSystemTile(game: game, size: 44).offset(x: 560, y: 52)
-            Text(game.systemName.uppercased())
-                .font(BP.calloutBold).foregroundColor(BP.primary)
-                .offset(x: 616, y: 58)
+            Text(eyebrow)
+                .font(BP.captionBold).tracking(3).foregroundColor(BP.secondary)
+                .lineLimit(1).frame(width: 1200, alignment: .leading)
+                .offset(x: 560, y: 58)
 
             Text(game.cleanDisplayName)
-                .font(BP.title).foregroundColor(BP.primary)
-                .lineLimit(1).frame(width: 1200, alignment: .leading)
-                .offset(x: 560, y: 96)
+                .font(BP.display).tracking(-1.5).foregroundColor(BP.primary)
+                .lineLimit(1).minimumScaleFactor(0.6).frame(width: 1240, alignment: .leading)
+                .offset(x: 560, y: 94)
 
             metaRow(details: details).offset(x: 560, y: 180)
 
             Text(details?.summary ?? game.gameDescription ?? "")
-                .font(BP.callout).foregroundColor(BP.primary)
+                .font(BP.callout).foregroundColor(BP.secondary)
                 .lineLimit(2).frame(width: 980, alignment: .topLeading)
                 .offset(x: 560, y: 232)
 
             HStack(spacing: 24) {
-                BPButton(title: "Resume", focused: actionsFocused && model.column == 0)
+                BPButton(title: "Resume", symbol: "play.fill", isPrimary: true, focused: actionsFocused && model.column == 0)
                     .onTapGesture { model.click(lane: 0, column: 0) }
-                BPButton(title: "Save States", focused: actionsFocused && model.column == 1)
+                BPButton(title: "Save States", symbol: "square.and.arrow.down", isPrimary: false, focused: actionsFocused && model.column == 1)
                     .onTapGesture { model.click(lane: 0, column: 1) }
             }
             .offset(x: 560, y: 340)
@@ -381,9 +371,16 @@ private struct BPHero: View {
         .onAppear { art.load(key) }
     }
 
+    private var eyebrow: String {
+        let place: String
+        if case .detail = model.screen { place = game.systemName } else { place = "\(game.systemName) · RECENTLY PLAYED" }
+        return place.uppercased()
+    }
+
     /// The same poster as the shelves, so a game looks the same everywhere.
     private var heroCover: some View {
         BPPoster(game: game, size: CGSize(width: 220, height: 330), coverTick: model.coverTick, art: art)
+            .overlay(RoundedRectangle(cornerRadius: BP.posterRadius, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
             .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
     }
 
@@ -391,11 +388,11 @@ private struct BPHero: View {
         HStack(spacing: 28) {
             let facts = [details?.genres.first, details?.releaseDate.map { String($0.suffix(4)) }, details?.developer].compactMap { $0 }
             if !facts.isEmpty {
-                Text(facts.joined(separator: "  ·  ")).font(BP.callout).foregroundColor(BP.primary)
+                Text(facts.joined(separator: "  ·  ")).font(BP.callout).foregroundColor(BP.secondary)
             }
             let played = game.playedSummary
             if !played.isEmpty {
-                Text(played).font(BP.callout).foregroundColor(BP.primary)
+                Text(played).font(BP.callout).foregroundColor(BP.secondary)
             }
         }
         .lineLimit(1)
@@ -464,6 +461,12 @@ private struct BPLane: View {
                 .lineLimit(1).frame(width: BP.posterSize.width, alignment: .leading)
                 .opacity(focused ? 1 : 0)
         }
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: BP.posterRadius + 5, style: .continuous)
+                .strokeBorder(BP.focusRing, lineWidth: focused ? 5 : 0)
+                .frame(width: BP.posterSize.width + 14, height: BP.posterSize.height + 14)
+                .offset(y: -7)
+        }
         .scaleEffect(focused ? 1.08 : 1, anchor: .top)
         .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 24, y: 14)
         .animation(.easeOut(duration: 0.12), value: focused)
@@ -474,21 +477,27 @@ private struct BPLane: View {
     private func stateCard(_ state: OEDBSaveState, column: Int) -> some View {
         let focused = isFocused(column)
         let image = NSImage(contentsOf: state.screenshotURL)
-        return VStack(alignment: .leading, spacing: 8) {
+        let title = lane.showsGame ? (state.rom?.game?.cleanDisplayName ?? state.displayName) : state.displayName
+        let detail = [lane.showsGame ? state.displayName : nil, state.timestamp.map { $0.formatted(.dateTime.month().day().hour().minute()) }]
+            .compactMap { $0 }.joined(separator: "  ·  ")
+        return VStack(alignment: .leading, spacing: 0) {
             ZStack {
-                Color.white.opacity(0.08)
-                if let image = image { Image(nsImage: image).resizable().aspectRatio(contentMode: .fit) }
+                Color.white.opacity(0.06)
+                if let image = image { Image(nsImage: image).resizable().aspectRatio(contentMode: .fill) }
             }
-            .frame(width: 410, height: 231)
-            .clipShape(RoundedRectangle(cornerRadius: BP.posterRadius, style: .continuous))
-            Text(lane.showsGame ? (state.rom?.game?.cleanDisplayName ?? state.displayName) : state.displayName)
-                .font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
-            let detail = [lane.showsGame ? state.displayName : nil, state.timestamp.map { $0.formatted(.dateTime.month().day().hour().minute()) }]
-                .compactMap { $0 }.joined(separator: "  ·  ")
-            Text(detail).font(BP.caption).foregroundColor(BP.secondary).lineLimit(1)
+            .frame(width: 410, height: 231).clipped()
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                Text(detail).font(BP.caption).foregroundColor(BP.secondary).lineLimit(1)
+            }
+            .padding(.horizontal, 22).padding(.vertical, 16)
+            .frame(width: 410, height: 100, alignment: .leading)
         }
+        .background(BP.material)
+        .clipShape(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous).strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? 5 : 1))
         .frame(width: 410, alignment: .leading)
-        .scaleEffect(focused ? 1.06 : 1, anchor: .top)
+        .scaleEffect(focused ? 1.05 : 1, anchor: .top)
         .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 24, y: 14)
         .animation(.easeOut(duration: 0.12), value: focused)
         .onHover { inside in if inside { model.hover(lane: index, column: column) } }
@@ -566,7 +575,7 @@ private struct BPSidebar: View {
 
                 ForEach(Array(model.sidebarEntries.enumerated()), id: \.offset) { index, entry in
                     if index == 4 {
-                        Text("Systems").font(BP.captionBold).foregroundColor(BP.tertiary)
+                        Text("SYSTEMS").font(BP.captionBold).tracking(3).foregroundColor(BP.tertiary)
                             .padding(.leading, 28).padding(.top, 24).padding(.bottom, 6)
                     }
                     row(index: index, entry: entry)
@@ -577,8 +586,9 @@ private struct BPSidebar: View {
             .animation(.easeOut(duration: 0.15), value: model.sidebarIndex)
             .frame(width: BP.sidebarWidth, height: 1056, alignment: .topLeading)
             .clipped()
-            .background(BP.material.opacity(0.96))
-            .clipShape(RoundedRectangle(cornerRadius: 44, style: .continuous))
+            .background(BP.material)
+            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 36, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
             .shadow(color: .black.opacity(0.5), radius: 48, y: 12)
             .offset(x: 28, y: 12)
         }
@@ -643,7 +653,7 @@ private struct BPSettingsPage: View {
 
     private func group(_ title: String, rows: [(String, String, String)]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(BP.captionBold).foregroundColor(BP.tertiary).padding(.leading, 8)
+            Text(title).font(BP.captionBold).tracking(3).foregroundColor(BP.tertiary).padding(.leading, 8)
             VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     if index > 0 { Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1).padding(.horizontal, 28) }
@@ -653,12 +663,13 @@ private struct BPSettingsPage: View {
                             Text(row.2).font(BP.caption).foregroundColor(BP.secondary)
                         }
                         Spacer()
-                        Text(row.1).font(BP.callout).foregroundColor(row.1 == "Connected" || row.1 == "Always on" ? Color(hex: 0x22C55E) : BP.secondary)
+                        Text(row.1).font(BP.callout).foregroundColor(row.1 == "Connected" || row.1 == "Always on" ? BP.success : BP.secondary)
                     }
                     .padding(.horizontal, 28).padding(.vertical, 22)
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(BP.material))
+            .background(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous).fill(BP.material))
+            .overlay(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
         }
     }
 }

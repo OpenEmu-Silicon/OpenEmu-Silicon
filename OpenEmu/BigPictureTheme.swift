@@ -24,10 +24,11 @@
 
 import SwiftUI
 
-/// Values read from the big-picture designs (Sketch, built on the Apple tvOS UI kit).
+/// Values for the big-picture screens.
 ///
-/// Everything is expressed on the kit's 1920 × 1080 canvas. `BigPictureCanvas` scales that canvas to the screen,
-/// so these numbers can be used exactly as the design gives them.
+/// The look comes from the OpenEmu alternative UI designs (dark `#0a0a0c` ground, blue accent, soft white surfaces,
+/// big cover art over a faded hero). Sizes come from the tvOS rules: a 1920 × 1080 canvas, 80 pt margins, and type big
+/// enough to read from a couch. `BigPictureCanvas` scales the canvas to the screen, so these numbers are used as written.
 enum BP {
 
     // MARK: Canvas
@@ -35,35 +36,44 @@ enum BP {
     static let canvas = CGSize(width: 1920, height: 1080)
     /// Left and right margin of the tvOS safe area.
     static let margin: CGFloat = 80
-    static let gutter: CGFloat = 40
+    static let gutter: CGFloat = 36
 
     // MARK: Color
 
-    static let background = Color(red: 0.039, green: 0.039, blue: 0.047)
-    static let primary = Color.white
-    static let secondary = Color.white.opacity(0.6)
-    static let tertiary = Color.white.opacity(0.4)
-    /// tvOS focus: a light fill with dark text.
-    static let focusFill = Color(white: 0.9)
-    static let focusText = Color.black.opacity(0.85)
-    static let idleFill = Color.white.opacity(0.1)
-    static let material = Color(red: 0.11, green: 0.11, blue: 0.118)
+    static let background = Color(hex: 0x0A0A0C)
+    static let primary = Color(hex: 0xF5F5F7)
+    static let secondary = Color(hex: 0xF5F5F7).opacity(0.6)
+    static let tertiary = Color(hex: 0xF5F5F7).opacity(0.4)
+    static let accent = Color(hex: 0x3B82F6)
+    static let success = Color(hex: 0x22C55E)
+    /// Soft surface and its hairline border, for pills, cards and groups.
+    static let surface = Color.white.opacity(0.07)
+    static let surfaceStrong = Color.white.opacity(0.14)
+    static let border = Color.white.opacity(0.08)
+    /// Panels that sit over the page (sidebar, save-state cards).
+    static let material = Color(hex: 0x131318)
+    /// Focus is the accent: a ring on art and buttons, a fill on small rows.
+    static let focusRing = Color(hex: 0x3B82F6)
+    static let focusFill = Color(hex: 0x3B82F6)
+    static let focusText = Color.white
 
     // MARK: Type (tvOS text styles at 1× on a 1080p canvas)
 
+    static let display = Font.system(size: 76, weight: .heavy)
     static let title = Font.system(size: 62, weight: .bold)
-    static let headline = Font.system(size: 38, weight: .semibold)
-    static let callout = Font.system(size: 31, weight: .regular)
-    static let calloutBold = Font.system(size: 31, weight: .semibold)
-    static let caption = Font.system(size: 25, weight: .regular)
-    static let captionBold = Font.system(size: 25, weight: .semibold)
+    static let headline = Font.system(size: 40, weight: .bold)
+    static let callout = Font.system(size: 30, weight: .regular)
+    static let calloutBold = Font.system(size: 30, weight: .semibold)
+    static let caption = Font.system(size: 24, weight: .regular)
+    static let captionBold = Font.system(size: 24, weight: .semibold)
 
     // MARK: Size
 
     static let tabBarHeight: CGFloat = 68
-    static let buttonSize = CGSize(width: 384, height: 84)
+    static let buttonSize = CGSize(width: 300, height: 80)
     static let posterSize = CGSize(width: 260, height: 361)
-    static let posterRadius: CGFloat = 12
+    static let posterRadius: CGFloat = 8
+    static let cardRadius: CGFloat = 16
     static let sidebarWidth: CGFloat = 420
     static let sidebarRowPitch: CGFloat = 78
 
