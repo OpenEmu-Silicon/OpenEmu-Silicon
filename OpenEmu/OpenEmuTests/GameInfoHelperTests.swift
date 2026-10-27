@@ -27,7 +27,8 @@ import XCTest
 
 class GameInfoHelperTests: XCTestCase {
     
-    func testROMChecks() {
+    func testROMChecks() throws {
+        try XCTSkipUnless(OpenVGDB.shared.isAvailable, "Needs the game database (openvgdb.sqlite), which the app downloads; a fresh CI machine does not have it")
         let helper = GameInfoHelper.shared
         
         let arcade = "openemu.system.arcade"

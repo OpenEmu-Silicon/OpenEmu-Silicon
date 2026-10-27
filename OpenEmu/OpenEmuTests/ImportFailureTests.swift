@@ -39,6 +39,7 @@ class ImportFailureTests: XCTestCase, ROMImporterDelegate {
     
     @available(macOS 13.0, *)
     func testBundleResources() throws {
+        try XCTSkipUnless(OpenVGDB.shared.isAvailable, "Needs the game database (openvgdb.sqlite), which the app downloads; a fresh CI machine does not have it")
         let url = URL(filePath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
