@@ -55,10 +55,10 @@ xcodebuild build \
   CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Or use the project's verify script, which also runs a codesign check:
+Or use the project's build script, which builds to a stable per-branch folder:
 
 ```bash
-./Scripts/verify.sh
+./Scripts/build-for-worktree.sh
 ```
 
 ### Common Setup Issues
@@ -73,7 +73,7 @@ Or use the project's verify script, which also runs a codesign check:
 
 ### Worktree builds
 
-If you're working in a git worktree, use `./Scripts/build-for-worktree.sh` and `./Scripts/verify.sh --worktree`. Plain `xcodebuild` will break permission persistence between builds. See [docs/worktree-workflow.md](../docs/worktree-workflow.md) for the full workflow.
+If you're working in a git worktree, use `./Scripts/build-for-worktree.sh` (and `./Scripts/core.sh <Name>` for cores). Plain `xcodebuild` will break permission persistence between builds. See [docs/worktree-workflow.md](../docs/worktree-workflow.md) for the full workflow.
 
 ---
 
@@ -119,7 +119,7 @@ git fetch origin pull/$PR/head:pr-$PR && git checkout pr-$PR
 **Step 3: Build.** The first build takes a while. If it fails, copy the last 30 lines of output into your report.
 
 ```bash
-./Scripts/verify.sh
+./Scripts/build-for-worktree.sh
 ```
 
 **Step 4: Launch the build you just made.** This refuses to open an out-of-date build, which prevents the most common mistake: testing an old version by accident.
@@ -142,7 +142,7 @@ Check the PR's "Which cores or systems are affected?" section. If it names a cor
 
 ```bash
 CORE=REPLACE_WITH_CORE_NAME   # CHANGE THIS, for example CORE=Flycast
-./Scripts/verify.sh --core $CORE
+./Scripts/core.sh $CORE
 ./Scripts/verify-core-installed.sh $CORE
 ```
 
@@ -160,7 +160,7 @@ Read AGENTS.md and .github/CONTRIBUTING.md in this repo first.
 
 Then:
 1. Make sure the credential stub files exist (see CONTRIBUTING.md).
-2. Check out the PR with gh, build it with ./Scripts/verify.sh, and launch it with
+2. Check out the PR with gh, build it with ./Scripts/build-for-worktree.sh, and launch it with
    ./Scripts/launch-debug.sh. If the PR changes a core, build and install that core
    and confirm ./Scripts/verify-core-installed.sh prints OK.
 3. Read the PR description and give me a short, numbered list of exact steps to
@@ -199,7 +199,7 @@ Say so if you couldn't fully test something. "I couldn't try this with a second 
 
 ### PR Checklist
 
-- [ ] Builds cleanly on Apple Silicon with no new warnings (`./Scripts/verify.sh`)
+- [ ] Builds cleanly on Apple Silicon with no new warnings (`./Scripts/build-for-worktree.sh`)
 - [ ] Tested the affected core or system with at least one game
 - [ ] Submodules pinned correctly if cores were updated
 - [ ] AI tool use disclosed in PR description if applicable

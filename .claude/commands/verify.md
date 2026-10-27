@@ -6,12 +6,14 @@ CI builds every PR, and `check.sh` and `playtest.sh` build the app themselves, s
 
 ## Which mode
 
+Start with `./Scripts/prove.sh`. It runs the checks the diff touches (build, unit tests, headless Game Boy checks, crash scan) and ends with `PROVEN` or `NOT PROVEN`, listing what it could not cover. Add `--ui` to also drive the real app, or `--core <Name> --rom <file>` to run a core headless. Use the single commands below when you only need one piece.
+
 | Change touched | Command |
 |---|---|
 | Main app code (`OpenEmu/`, `OpenEmuKit/`, `OpenEmu-SDK/`, `OpenEmu-Shaders/`) | `./Scripts/check.sh` (real library; add `--no-build` if nothing changed since the last run) |
 | Gameplay, rendering, audio, input | `./Scripts/playtest.sh --game "<name>"` or `./Scripts/check.sh --rom <file>` |
-| Code covered by `OpenEmu/OpenEmuTests/` | add `./Scripts/verify.sh --test` |
-| A core plugin (`Dolphin/`, `Flycast/`, `mGBA/`, etc.) | `./Scripts/verify.sh --core <CoreName>` (add `--release` for Release-only bugs) |
+| Code covered by `OpenEmu/OpenEmuTests/` | `./Scripts/unit-tests.sh` |
+| A core plugin (`Dolphin/`, `Flycast/`, `mGBA/`, etc.) | `./Scripts/core.sh <CoreName>` (add `--release` for Release-only bugs) |
 | Scripts, CI, docs only | skip |
 
 ## Reading the output

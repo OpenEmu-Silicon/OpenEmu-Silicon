@@ -40,8 +40,9 @@ final class OpenEmuSmokeUITests: XCTestCase {
         libraryPath = "/private/tmp/openemu-ui-\(UUID().uuidString)"
         app = XCUIApplication(bundleIdentifier: "org.openemu.OpenEmu.debug")
         if Self.usesRealLibrary {
-            // Play tests (Scripts/playtest.sh --game ...) use the real library, so no library arguments.
-            app.launchArguments = []
+            // Real-library runs (Scripts/playtest.sh --game ..., Scripts/check.sh --game ...) use the player's library,
+            // so no library arguments. Closing a game must not replace the player's auto save (debug builds only).
+            app.launchArguments = ["-OESkipAutosaveOnStop", "1"]
         } else {
             // Both keys must match, otherwise the app refuses to create a library at a non-default path.
             // The empty backup folder keeps the tests away from any Cloud Sync folder set in the debug app.
@@ -111,21 +112,8 @@ final class OpenEmuSmokeUITests: XCTestCase {
     /// Loads the ROM named by OE_TEST_ROM (set with `check.sh --rom <path>`), then checks that the game
     /// draws, keeps changing, can quick save, can take a screenshot, and quits cleanly.
     func testGameLoadsAndRuns() throws {
-        guard let rom = ProcessInfo.processInfo.environment["OE_TEST_ROM"], !rom.isEmpty else {
-            throw XCTSkip("Set OE_TEST_ROM to a ROM path (check.sh --rom <path>) to run this test")
-        }
-        // Reopen the app with the ROM so the file-open path is exercised.
-        app.terminate()
-        app.launchArguments += [rom]
-        app.launch()
-        dismissFirstRunAlert()
-        let play = app.sheets.buttons["Play Game"]
-        XCTAssertTrue(play.waitForExistence(timeout: 60), "Import-finished prompt did not appear")
-        play.click()
-
-        let gameWindow = app.windows.matching(NSPredicate(
-            format: "identifier != 'LibraryWindow' AND title != '' AND title != 'OpenEmu'")).firstMatch
-        XCTAssertTrue(gameWindow.waitForExistence(timeout: 30), "Game window did not open")
+        // Reopens the app with the ROM so the file-open path is exercised.
+        let gameWindow = try openGameWindow()
 
         // Give the core time to boot, then sample three frames a few seconds apart.
         sleep(5)
@@ -143,12 +131,14 @@ final class OpenEmuSmokeUITests: XCTestCase {
         XCTAssertTrue(Self.differs(frames[0], frames[1]) || Self.differs(frames[1], frames[2]),
                       "Game picture did not change across 6 seconds (frozen, or a static screen: try another ROM)")
 
-        // Quick save should enable Quick Load.
-        chooseMenu("Controls", "Quick Save")
-        app.menuBars.menuBarItems["Controls"].click()
-        XCTAssertTrue(app.menuBars.menuItems["Quick Load"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.menuBars.menuItems["Quick Load"].isEnabled, "Quick Load stayed disabled after Quick Save")
-        app.typeKey(.escape, modifierFlags: [])
+        // Quick save should enable Quick Load. Skipped on a real library: it would write a save state into it.
+        if !Self.usesRealLibrary {
+            chooseMenu("Controls", "Quick Save")
+            app.menuBars.menuBarItems["Controls"].click()
+            XCTAssertTrue(app.menuBars.menuItems["Quick Load"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.menuBars.menuItems["Quick Load"].isEnabled, "Quick Load stayed disabled after Quick Save")
+            app.typeKey(.escape, modifierFlags: [])
+        }
 
         chooseMenu("Controls", "Take Screenshot")
         sleep(2)
@@ -252,6 +242,7 @@ final class OpenEmuSmokeUITests: XCTestCase {
     /// copied into the folder with a "which Mac saved this" file, and that saving again keeps the
     /// replaced copy in a .versions folder.
     func testQuickSaveIsBackedUpWithVersions() throws {
+        try XCTSkipIf(Self.usesRealLibrary, "Writes save states, so it only runs against the throwaway library")
         guard let rom = ProcessInfo.processInfo.environment["OE_TEST_ROM"], !rom.isEmpty else {
             throw XCTSkip("Set OE_TEST_ROM to a ROM path (check.sh --rom <path>) to run this test")
         }

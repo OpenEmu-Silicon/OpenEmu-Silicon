@@ -1,39 +1,17 @@
 #!/usr/bin/env bash
 # .githooks/pre-push — lightweight advisory before any push reaches origin.
 #
-# Does NOT run Scripts/verify.sh. Build verification runs on GitHub CI
-# (build-check.yml) on every pull request — running a local build here too
-# was redundant and caused repeated "database is locked" failures from
-# concurrent xcodebuild invocations.
-#
-# This hook checks whether ./Scripts/verify.sh was run on the current code
-# during this session. If it was, it says so. If not, it prints a reminder
-# and lets the push through anyway — CI is the build gate.
+# Never blocks a push. GitHub CI (build-check.yml) is the build gate and builds every pull request, so a
+# local build here would be redundant (and concurrent xcodebuild runs caused "database is locked" failures).
+# This only prints a reminder of how to check the change locally.
 #
 # Bypass: git push --no-verify  or  SKIP_VERIFY=1 git push
 #
 # Setup (once per clone):  ./Scripts/install-hooks.sh
 
-set -uo pipefail
-
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "$REPO_ROOT"
-
 if [ "${SKIP_VERIFY:-0}" = "1" ]; then
   exit 0
 fi
 
-STAMP_FILE=$(git rev-parse --git-path verify-passed 2>/dev/null || true)
-TREE_SHA=$(git rev-parse HEAD^{tree} 2>/dev/null || echo "")
-
-if [ -n "$STAMP_FILE" ] && [ -f "$STAMP_FILE" ] && [ -n "$TREE_SHA" ]; then
-  STAMPED_SHA=$(cat "$STAMP_FILE" 2>/dev/null || echo "")
-  if [ "$STAMPED_SHA" = "$TREE_SHA" ] && git diff --quiet && git diff --cached --quiet; then
-    echo "[pre-push] verify.sh passed for this code — push allowed"
-    exit 0
-  fi
-fi
-
-echo "[pre-push] Note: verify.sh has not been run on this code."
-echo "[pre-push] Build check will run on GitHub CI. To verify locally: ./Scripts/verify.sh"
+echo "[pre-push] CI builds this on the pull request. To check it locally first: ./Scripts/prove.sh"
 exit 0

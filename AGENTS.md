@@ -42,17 +42,18 @@ CI (`build-check.yml`) builds every PR, including every core the PR touches, and
 ```bash
 ./Scripts/check.sh                  # build, then drive the real app (windows, panes, Cores) against your real library
 ./Scripts/check.sh --no-build       # same, reusing the last build
-./Scripts/check.sh --rom <file>     # also load a game: draws, moves, quick save, quit (uses a throwaway library)
+./Scripts/check.sh --rom <file>     # also load a game from a file: draws, moves, quick save, quit (uses a throwaway library)
+./Scripts/check.sh --game "<name>"  # same checks on a game already in your real library, found by name; writes no saves
 ./Scripts/playtest.sh --game "<name>"   # play a game from your real library, then report frame rate, audio, errors
 ./Scripts/doctor.sh                 # a few seconds: signing certificate, credential stubs, running app, test runner signature
 ./Scripts/prove.sh                  # the checks the diff touches, ends with PROVEN or NOT PROVEN (--all runs every step)
-./Scripts/verify.sh --core <Name>   # build, install, and check one core (add --release for Release-only bugs)
-./Scripts/verify.sh --test          # run the OpenEmuTests unit target
+./Scripts/core.sh <Name>            # build, install, and check one core (add --release for Release-only bugs)
+./Scripts/unit-tests.sh             # run the OpenEmuTests unit target
 ```
 
-`check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either.
+To test a particular game, add it to your OpenEmu library the normal way and name it with `--game`; no file path is needed. `check.sh --game` and `prove.sh --game` skip quick save and keep the game's auto save unchanged, so your saves stay as they were (they do update play count and last-played time). `playtest.sh` still leaves an auto save when the game closes.
 
-`verify.sh` without `--core` or `--test` (build, analyze, plist, codesign) still works but is redundant with CI and the scripts above.
+`check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either.
 
 Read the whole output and note any new warnings even on a passing build.
 
@@ -73,11 +74,11 @@ cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
 
 OpenEmu loads cores from `~/Library/Application Support/OpenEmu/Cores/`, **not** from the build folder. Building a core does not change what the app runs. The most expensive mistake in this repo is reporting "still broken" or "now working" after testing an old installed copy.
 
-1. Build the core's own scheme. The main `OpenEmu` scheme does not build cores. (`verify.sh --core <Name>` does steps 1 and 2.)
+1. Build the core's own scheme. The main `OpenEmu` scheme does not build cores. (`./Scripts/core.sh <Name>` does all three steps.)
 2. Install with `./Scripts/install-core.sh <Name>`. It quits OpenEmu and copies the binary and Info.plist correctly. **Never use `cp -R` or `cp -Rf` on a plugin.** macOS merges bundle folders instead of replacing them, so old files stay.
 3. Run `./Scripts/verify-core-installed.sh <Name>` and confirm it prints `OK` before you report any in-game result.
 
-Working in a git worktree? Use `Scripts/build-for-worktree.sh` or `verify.sh --worktree`, and run the three-way hash check. Both are explained in [`docs/worktree-workflow.md`](docs/worktree-workflow.md).
+Working in a git worktree? Use `Scripts/build-for-worktree.sh` (`core.sh` picks the worktree build folder on its own), and run the three-way hash check. Both are explained in [`docs/worktree-workflow.md`](docs/worktree-workflow.md).
 
 ---
 
@@ -93,7 +94,7 @@ Pick the cheapest check that can really see the bug:
 
 | The bug lives in | Use |
 |------------------|-----|
-| A pure function, parser, or data rule | A unit test in the matching `*Tests` target (`./Scripts/verify.sh --test`) |
+| A pure function, parser, or data rule | A unit test in the matching `*Tests` target (`./Scripts/unit-tests.sh`) |
 | A core: loading, picture, sound, button input, save states | `./Scripts/headless/gb-checks.sh` for Game Boy, or `./Scripts/headless/run.sh <Core> --rom <file> ...` for any core. It runs the core with no window, so no one has to play the game |
 | The app window, menus, preferences, import, quick save | `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
 | A crash | The crash report plus `./Scripts/collect-diagnostics.sh`. Write the check that triggers it, then fix |
@@ -212,7 +213,7 @@ Use the issue templates (`bug_report`, `feature_request`, `core_integration`, `c
 What has worked well here:
 
 - **Point the agent at this file first**, then at `CONTEXT.md` so it uses the right words.
-- **Let the agent build and check its own work** with `check.sh` (and `verify.sh --core` for cores) before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
+- **Let the agent build and check its own work** with `check.sh` (and `core.sh` for cores) before it hands anything to you. Ask a person to test only what needs hands, ears, or eyes: controllers, gameplay, audio, rendering.
 - **Do core testing through the scripts above.** The stale-plugin mistake is the one agents make most.
 - **Ask for plain-language summaries.** The maintainer and most testers are not developers.
 - **Say in the PR that AI helped** (the template asks). Nobody minds. Transparency is the point.
@@ -249,7 +250,7 @@ Rules:
 
 - Never re-introduce `OpenEmu-Update`, `raw.github.com/OpenEmu`, or `appcast.openemu.org` URLs into a core `Info.plist`. That update channel is upstream-owned and dormant; updates published here will not reach users.
 - When adding a new core, add its appcast file to `Appcasts/<core>.xml` *and* set the `Info.plist` `SUFeedURL` to the canonical URL above in the same commit.
-- `Scripts/check-core-feed-urls.sh` enforces both rules and is wired into `Scripts/verify.sh --core` as a precondition.
+- `Scripts/check-core-feed-urls.sh` enforces both rules. It runs in CI (the `Core sources present` job) and as the first step of `Scripts/core.sh`.
 - Core appcast entries should be EdDSA-signed when newly published. `Scripts/update_core_appcast.py --sign-zip <path-to-zip>` runs Sparkle's `sign_update` against the local zip and embeds `sparkle:edSignature` on the new `<enclosure>`. The host app's existing Sparkle keypair is reused — do not generate a new one.
 
 ---

@@ -6,7 +6,7 @@ Arguments: $PR_NUMBER [$ROM_PATH]
    gh pr checkout $PR_NUMBER --repo OpenEmu-Silicon/OpenEmu-Silicon
 
 2. CI already builds the PR, so skip a separate build check. Run
-   `Scripts/verify.sh --test` only when the PR adds or touches unit tests, and report the result. If a unit test file is new or
+   `Scripts/unit-tests.sh` only when the PR adds or touches unit tests, and report the result. If a unit test file is new or
    changed, also run it scoped (`-only-testing:OpenEmuTests/<ClassName>`) and
    report per-test pass/fail — don't just read the test code and assume it
    passes.

@@ -2919,6 +2919,13 @@ final class OEGameDocument: NSDocument {
     }
     
     private func saveState(name stateName: String, completionHandler handler: (() -> Void)? = nil) {
+        #if DEBUG
+        // Automated runs against a real library (-OESkipAutosaveOnStop 1) must not replace the player's auto save.
+        if stateName == OEDBSaveState.autosaveName, UserDefaults.standard.bool(forKey: "OESkipAutosaveOnStop") {
+            handler?()
+            return
+        }
+        #endif
         guard
             supportsSaveStates,
             emulationStatus.rawValue > EmulationStatus.starting.rawValue,
