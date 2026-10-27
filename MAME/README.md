@@ -45,7 +45,7 @@ MAME/build/XcodeDerived/Build/Products/Release/MAME.oecoreplugin
 cd MAME/deps/mame
 make NOWERROR=1 REGENIE=1 macosx_arm64_clang \
   OSD="headless" verbose=1 TARGETOS="macosx" CONFIG="release" \
-  TARGET=mame SUBTARGET=arcade MACOSX_DEPLOYMENT_TARGET=11.0 \
+  TARGET=mame SUBTARGET=arcade MACOSX_DEPLOYMENT_TARGET=12.0 \
   -j"$(sysctl -n hw.ncpu)"
 install_name_tool -id mamearcade_headless.dylib mamearcade_headless.dylib
 ```
