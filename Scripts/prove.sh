@@ -83,8 +83,8 @@ echo "branch: $(git rev-parse --abbrev-ref HEAD)   commit: $(git rev-parse --sho
 echo "output: $OUT"
 echo ""
 
-# 1. Build, analyze, plist/entitlements/codesign checks, OpenEmuTests (the app's own unit tests).
-step "app-build-and-unit-tests" ./Scripts/verify.sh --test
+# 1. Build and run OpenEmuTests (the app's own unit tests).
+step "app-build-and-unit-tests" ./Scripts/unit-tests.sh
 
 # 2. SDK tests (includes the RetroAchievements hardcore regression suite).
 step "sdk-unit-tests" xcodebuild test \

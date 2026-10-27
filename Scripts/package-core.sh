@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # package-core.sh — Sign, upload dSYM to Sentry, and zip a built core plugin for release.
 #
-# Run this after verify.sh --core <Name> --release confirms a clean build.
+# Run this after core.sh <Name> --release confirms a clean build.
 # It produces a signed, verified zip at /tmp/<CoreName>.oecoreplugin.zip ready
 # for upload to the GitHub Release, and prints the byte count needed for the appcast.
 #
@@ -12,7 +12,7 @@
 #   ./Scripts/package-core.sh Gambatte 0.5.3
 #
 # Prerequisites:
-#   - Core built in Release config (verify.sh --core <Name> --release passes)
+#   - Core built in Release config (core.sh <Name> --release passes)
 #   - Developer ID Application cert in keychain
 #   - sentry-cli installed and authenticated (non-fatal if absent — warns and continues)
 
@@ -34,10 +34,10 @@ step "Locating Release artifact"
 
 DERIVED_DATA=$(find ~/Library/Developer/Xcode/DerivedData -maxdepth 1 \
   -name "OpenEmu-metal-*" -type d 2>/dev/null | head -1)
-[ -n "$DERIVED_DATA" ] || die "DerivedData for OpenEmu-metal not found. Build via: ./Scripts/verify.sh --core $CORE --release"
+[ -n "$DERIVED_DATA" ] || die "DerivedData for OpenEmu-metal not found. Build via: ./Scripts/core.sh $CORE --release"
 
 PLUGIN="$DERIVED_DATA/Build/Products/Release/${CORE}.oecoreplugin"
-[ -d "$PLUGIN" ] || die "Plugin not found: $PLUGIN — run ./Scripts/verify.sh --core $CORE --release first."
+[ -d "$PLUGIN" ] || die "Plugin not found: $PLUGIN — run ./Scripts/core.sh $CORE --release first."
 ok "Found: $PLUGIN"
 
 # ── 2. Verify CFBundleVersion matches ────────────────────────────────────────
@@ -47,7 +47,7 @@ BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" \
   "$PLUGIN/Contents/Info.plist" 2>/dev/null || true)
 [ "$BUILT_VERSION" = "$VERSION" ] \
   || die "CFBundleVersion mismatch: plugin has '$BUILT_VERSION', expected '$VERSION'.
-  Did the plist bump land in this build? Re-run: ./Scripts/verify.sh --core $CORE --release"
+  Did the plist bump land in this build? Re-run: ./Scripts/core.sh $CORE --release"
 ok "CFBundleVersion = $BUILT_VERSION"
 
 # ── 3. Sign with Developer ID Application ────────────────────────────────────
