@@ -38,6 +38,18 @@ enum CheatCodeValidator {
         if systemIdentifier == OESystemIdentifierPSP {
             return isCWCheatCode(code)
         }
+        // Dreamcast (Flycast GameShark/Action Replay): whitespace/newline-separated 8-hex words.
+        // Whitespace is structural between words and a code can span several lines, so validate the
+        // raw token stream instead of space-stripping and '+'-splitting like the other systems.
+        if systemIdentifier == OESystemIdentifierDreamcast {
+            return isDreamcastGameSharkCode(code)
+        }
+        // GameCube / Wii (Dolphin Action Replay): "address value" 8-hex word pairs, or encrypted
+        // XXXX-XXXX-XXXXX lines, which may span several lines or be '+'-joined. Validate the raw
+        // token stream before space-stripping/'+'-splitting.
+        if systemIdentifier == OESystemIdentifierGameCube || systemIdentifier == OESystemIdentifierWii {
+            return isActionReplayCodeGC(code)
+        }
         let normalized = code.replacingOccurrences(of: " ", with: "")
         // NDS: each '+'-separated part must be a 16-hex AR line (already normalized by provider)
         if systemIdentifier == OESystemIdentifierNDS {
@@ -82,6 +94,11 @@ enum CheatCodeValidator {
             // O2EM: raw poke into intRAM (0x000-0x03F) or extRAM (0x100-0x1FF, cart-dependent).
             // Max 4 (not 3) hex digits so zero-padded addresses like 0032:19 still validate.
             return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 2)
+
+        case OESystemIdentifierIntellivision:
+            // Bliss: raw poke into the CP1610 16-bit word address space (scratchpad RAM 0100-01EF,
+            // system RAM 0200-035F). Address and value are each a 16-bit word (up to 4 hex digits).
+            return isRawAddressValue(code, maxAddressHexChars: 4, maxValueHexChars: 4)
 
         case OESystemIdentifierNES, OESystemIdentifierFDS:
             // FCEU: raw XXXX:XX, XXXX?XX:XX, NES Game Genie — no Pro Action Rocky
@@ -146,6 +163,11 @@ enum CheatCodeValidator {
             // Mednafen (vb module): no named format, only raw WRAM address:value (8 hex address + 2 hex value)
             return isRawAddressValue(code, addressHexChars: 8, valueHexChars: 2)
 
+        case OESystemIdentifierJaguar:
+            // VirtualJaguar: raw poke into the 2 MB main RAM (68000 address 0x000000-0x1FFFFF).
+            // Up to 6 hex address digits (24-bit) and up to 4 bytes of value.
+            return isRawAddressValue(code, maxAddressHexChars: 6, maxValueHexChars: 8)
+
         case OESystemIdentifierArcade:
             // MAME (Pugsy cheats): raw ADDRESS:VALUE hex pokes, joined with '+'. Address up to
             // 32-bit and value up to 4 bytes; the value's hex width encodes the poke size.
@@ -183,6 +205,44 @@ enum CheatCodeValidator {
         var hex = token
         if hex.hasPrefix("0x") || hex.hasPrefix("0X") { hex = hex.dropFirst(2) }
         return !hex.isEmpty && hex.count <= 8 && hex.allSatisfy(\.isHexDigit)
+    }
+
+    /// Dreamcast GameShark/Action Replay code: a whitespace/newline-separated stream of hex words.
+    /// Flycast's parser consumes hex digits and splits every 8, throwing if a run ends on a non-8
+    /// boundary, so each token must be all-hex with a length that's a positive multiple of 8 (a 0x
+    /// prefix is rejected, matching the core). At least one token is required.
+    static func isDreamcastGameSharkCode(_ code: String) -> Bool {
+        let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" })
+        guard !tokens.isEmpty else { return false }
+        return tokens.allSatisfy { token in
+            !token.isEmpty && token.count % 8 == 0 && token.allSatisfy(\.isHexDigit)
+        }
+    }
+
+    /// GameCube / Wii Action Replay code: either decrypted "address value" word pairs (an even,
+    /// non-empty sequence of 8-hex-digit words) or encrypted `XXXX-XXXX-XXXXX` lines. Words/lines are
+    /// separated by whitespace, newlines or '+'. A 0x prefix is rejected.
+    ///
+    /// Gecko is intentionally NOT accepted: the Dolphin core applies Action Replay only (see
+    /// DolHost::SetCheat), so a contiguous 16-hex Gecko line is correctly rejected rather than
+    /// silently stored as an inert code.
+    static func isActionReplayCodeGC(_ code: String) -> Bool {
+        let tokens = code.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" || $0 == "+" })
+        guard !tokens.isEmpty else { return false }
+
+        // Encrypted AR lines: XXXX-XXXX-XXXXX (4-4-5 hex, dash-separated).
+        if tokens.contains(where: { $0.contains("-") }) {
+            return tokens.allSatisfy { token in
+                let parts = token.split(separator: "-", omittingEmptySubsequences: false)
+                guard parts.count == 3, parts[0].count == 4, parts[1].count == 4, parts[2].count == 5
+                else { return false }
+                return parts.allSatisfy { $0.allSatisfy(\.isHexDigit) }
+            }
+        }
+
+        // Decrypted AR: even number of 8-hex-digit words (address/value pairs).
+        guard tokens.count % 2 == 0 else { return false }
+        return tokens.allSatisfy { $0.count == 8 && $0.allSatisfy(\.isHexDigit) }
     }
 
     /// Raw address:value hex format. Accepts optional exact or max size constraints.

@@ -28,6 +28,8 @@
 	<dict>
 		<key>openemu.system.arcade</key>
 		<dict>
+			<key>OEGameCoreCheatsArePerCore</key>
+			<true/>
 			<key>OEGameCoreRewindBufferSeconds</key>
 			<integer>10</integer>
 			<key>OEGameCoreRewindInterval</key>

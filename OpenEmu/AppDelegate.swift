@@ -146,6 +146,7 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             OEGameVolumeKey: 0.5,
             "defaultCore.openemu.system.nes": "org.openemu.Nestopia",
             "defaultCore.openemu.system.snes": "org.openemu.SNES9x",
+            "defaultCore.openemu.system.arcade": "org.openemu.MAME",
             OEDBGame.displayGameTitleKey: true,
             OEBackgroundPauseKey: true,
             OEBackgroundControllerPlayKey: true,

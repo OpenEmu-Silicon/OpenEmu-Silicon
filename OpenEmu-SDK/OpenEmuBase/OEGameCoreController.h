@@ -71,6 +71,13 @@ extern NSString *const OEGameCoreSupportsDisplayModeChangeKey;
 /// games are loaded. The flag describes wiring, not per-game coverage.
 extern NSString *const OEGameCoreSupportsRetroAchievementsKey;
 
+/// Boolean key. When YES, user cheats (manual, Cheat Search, imported) are private
+/// to the core that created them: the host tags each cheat with its core and hides
+/// cheats from other cores for the same ROM. Used where cores for one system have
+/// incompatible cheat address schemes (arcade: MAME vs FBNeo). Default NO = cheats
+/// are shared across the system's cores.
+extern NSString *const OEGameCoreCheatsArePerCoreKey;
+
 @class OEGameCore, OESystemResponder;
 
 #if TARGET_OS_OSX
