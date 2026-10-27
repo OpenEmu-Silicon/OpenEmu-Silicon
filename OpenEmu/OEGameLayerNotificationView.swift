@@ -385,6 +385,15 @@ final class OERetroAchievementsIndicatorStackView: NSStackView {
 
     private var hasActiveChallenge: Bool { !challengeOrder.isEmpty }
 
+    /// When true the chips are kept off screen. State is still tracked, so
+    /// turning this off brings back whatever is currently active.
+    var isSuppressed = false {
+        didSet {
+            guard isSuppressed != oldValue else { return }
+            updateArrangedSubviews()
+        }
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         orientation = .vertical
@@ -531,7 +540,7 @@ final class OERetroAchievementsIndicatorStackView: NSStackView {
         if !progressLabel.isHidden { addArrangedSubview(progressLabel) }
         for label in leaderboardViews.values { addArrangedSubview(label) }
 
-        isHidden = arrangedSubviews.isEmpty
+        isHidden = arrangedSubviews.isEmpty || isSuppressed
     }
 
     private func makeChip(color: NSColor) -> OERetroAchievementsChipLabel {

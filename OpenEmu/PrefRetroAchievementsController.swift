@@ -57,16 +57,25 @@ final class PrefRetroAchievementsController: NSViewController {
     private let hardcoreDivider = NSBox()
     private let hardcoreCheckbox = NSButton(checkboxWithTitle: "Hardcore mode (recommended)", target: nil, action: nil)
     private let hardcoreSubtitle = NSTextField(wrappingLabelWithString: "")
+    private let trackersCheckbox = NSButton(checkboxWithTitle: "Show on-screen trackers in softcore mode", target: nil, action: nil)
+    private let trackersSubtitle = NSTextField(wrappingLabelWithString: "")
 
     private let supportedDivider = NSBox()
     private let supportedLabel   = NSTextField(labelWithString: "")
     private let supportedGrid    = NSGridView()
+    private let supportedScrollView = NSScrollView()
 
     private var hardcoreObserver: Any?
 
     // MARK: - Lifecycle
 
     override func loadView() {
+        // OEGameDocument registers these too, but only once a game has opened,
+        // so without this the checkboxes read "off" the first time Settings opens.
+        UserDefaults.standard.register(defaults: [
+            RAHardcoreEnabledKey      : true,
+            RAShowTrackersSoftcoreKey : true,
+        ])
         view = NSView(frame: NSRect(x: 0, y: 0, width: 468, height: 610))
         buildUI()
     }
@@ -104,6 +113,7 @@ final class PrefRetroAchievementsController: NSViewController {
         // wasn't loaded (e.g. another controller wrote to UserDefaults). The
         // observer above handles in-session changes; this handles the gap.
         hardcoreCheckbox.state = UserDefaults.standard.bool(forKey: RAHardcoreEnabledKey) ? .on : .off
+        trackersCheckbox.state = UserDefaults.standard.bool(forKey: RAShowTrackersSoftcoreKey) ? .on : .off
     }
 
     // MARK: - Build UI
@@ -181,6 +191,18 @@ final class PrefRetroAchievementsController: NSViewController {
         hardcoreSubtitle.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(hardcoreSubtitle)
 
+        trackersCheckbox.target = self
+        trackersCheckbox.action = #selector(toggleTrackers(_:))
+        trackersCheckbox.state = UserDefaults.standard.bool(forKey: RAShowTrackersSoftcoreKey) ? .on : .off
+        trackersCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(trackersCheckbox)
+
+        trackersSubtitle.stringValue = "Challenge, leaderboard, and progress indicators in the top-right corner. Always shown in hardcore mode, as RetroAchievements requires."
+        trackersSubtitle.font = .systemFont(ofSize: 11)
+        trackersSubtitle.textColor = .secondaryLabelColor
+        trackersSubtitle.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(trackersSubtitle)
+
         NSLayoutConstraint.activate([
             headerLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 32),
             headerLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
@@ -234,6 +256,14 @@ final class PrefRetroAchievementsController: NSViewController {
             hardcoreSubtitle.topAnchor.constraint(equalTo: hardcoreCheckbox.bottomAnchor, constant: 4),
             hardcoreSubtitle.leadingAnchor.constraint(equalTo: hardcoreCheckbox.leadingAnchor, constant: 20),
             hardcoreSubtitle.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
+
+            trackersCheckbox.topAnchor.constraint(equalTo: hardcoreSubtitle.bottomAnchor, constant: 14),
+            trackersCheckbox.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
+            trackersCheckbox.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
+
+            trackersSubtitle.topAnchor.constraint(equalTo: trackersCheckbox.bottomAnchor, constant: 4),
+            trackersSubtitle.leadingAnchor.constraint(equalTo: trackersCheckbox.leadingAnchor, constant: 20),
+            trackersSubtitle.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
         ])
 
         // ── Supported Systems ────────────────────────────────────────────────
@@ -249,10 +279,18 @@ final class PrefRetroAchievementsController: NSViewController {
         supportedGrid.rowSpacing = 6
         supportedGrid.columnSpacing = 16
         supportedGrid.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(supportedGrid)
+        // The list keeps growing as systems are added, so it scrolls in a
+        // fixed-height box instead of stretching the whole pane.
+        supportedScrollView.hasVerticalScroller = true
+        supportedScrollView.autohidesScrollers = true
+        supportedScrollView.drawsBackground = false
+        supportedScrollView.borderType = .noBorder
+        supportedScrollView.documentView = supportedGrid
+        supportedScrollView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(supportedScrollView)
 
         NSLayoutConstraint.activate([
-            supportedDivider.topAnchor.constraint(equalTo: hardcoreSubtitle.bottomAnchor, constant: 24),
+            supportedDivider.topAnchor.constraint(equalTo: trackersSubtitle.bottomAnchor, constant: 24),
             supportedDivider.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
             supportedDivider.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
             supportedDivider.heightAnchor.constraint(equalToConstant: 1),
@@ -261,10 +299,14 @@ final class PrefRetroAchievementsController: NSViewController {
             supportedLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
             supportedLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
 
-            supportedGrid.topAnchor.constraint(equalTo: supportedLabel.bottomAnchor, constant: 12),
-            supportedGrid.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
-            supportedGrid.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
-            supportedGrid.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -24),
+            supportedScrollView.topAnchor.constraint(equalTo: supportedLabel.bottomAnchor, constant: 12),
+            supportedScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
+            supportedScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
+            supportedScrollView.heightAnchor.constraint(equalToConstant: 140),
+            supportedScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -24),
+
+            supportedGrid.topAnchor.constraint(equalTo: supportedScrollView.contentView.topAnchor),
+            supportedGrid.leadingAnchor.constraint(equalTo: supportedScrollView.contentView.leadingAnchor),
         ])
     }
 
@@ -358,6 +400,10 @@ final class PrefRetroAchievementsController: NSViewController {
             object: nil,
             userInfo: [OEHardcoreEnabledKey: enabled]
         )
+    }
+
+    @objc private func toggleTrackers(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: RAShowTrackersSoftcoreKey)
     }
 
     // MARK: - Credential Management
