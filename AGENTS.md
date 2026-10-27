@@ -22,6 +22,7 @@ The maintainer is not a professional developer. Write commit messages, PR descri
 4. **Never commit secrets or build output.** No `.o` files, DerivedData, `.app` bundles, logs, binaries, or the real credential files listed below.
 5. **Never publish a GitHub Release.** Drafts are fine. Going live is the maintainer's action.
 6. **Keep copyright headers** on every file you touch (see License Rules).
+7. **No AI attribution in commits, PRs, or issues.** Never add `Co-Authored-By: Claude`, `Claude-Session:`, or "Generated with Claude Code" lines. The maintainer is the sole author. Disclose AI use in the PR text instead.
 
 ---
 
