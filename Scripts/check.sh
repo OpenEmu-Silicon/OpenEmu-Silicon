@@ -13,8 +13,9 @@
 # --rom imports the ROM, so it switches to a throwaway empty library (add --real-library to import into yours).
 # --game plays a game from your real library (a read-only lookup, no import, no file path). It runs only the tests that
 # make sense for any game (loads and runs, pause and resume) and never writes saves: no quick save, and closing the game
-# does not replace its auto save. It does update play count and last-played time. If a game sits on a static screen the
-# picture check fails; that is the game, not the app.
+# does not replace its auto save, and the run fails if any of that game's save states changed. It does update play count and
+# last-played time. If a game sits on a static screen the picture check fails; that is the game, not the app.
+# Only one check.sh or playtest.sh run may use the library at a time; a second one refuses to start.
 # The ROM file itself is not modified or copied into the repo.
 # The build folder is shared with playtest.sh (override with OE_BUILD_DIR), so one build serves both.
 # The tests click and type, so leave the mouse and keyboard alone while this runs (about 30 seconds).
@@ -35,6 +36,8 @@ RESULT="$OUT_DIR/result.xcresult"
 LOG="$OUT_DIR/xcodebuild.log"
 CRASH_DIR="$HOME/Library/Logs/DiagnosticReports"
 
+harness_take_lock || exit 2
+trap harness_release_lock EXIT
 if pgrep -x OpenEmu >/dev/null; then
   echo "FAIL  OpenEmu is running. Quit it first so the tests do not clobber your session." >&2
   harness_describe_running >&2
@@ -46,7 +49,7 @@ touch "$OUT_DIR/.start"
 harness_ensure_stubs "$REPO_ROOT"
 
 # Never leave a debug OpenEmu or a test runner behind, whatever way the script ends.
-cleanup() { pkill -TERM -f "OpenEmuUITests-Runner" 2>/dev/null; harness_kill_debug_app "$BUILD_DIR"; }
+cleanup() { pkill -TERM -f "OpenEmuUITests-Runner" 2>/dev/null; harness_kill_debug_app "$BUILD_DIR"; harness_release_lock; }
 trap cleanup EXIT
 
 ONLY=(); NO_BUILD=0; LIBRARY=""; HAS_ROM=0; GAME=
@@ -72,6 +75,14 @@ if [ -n "$GAME" ]; then
   GAME_NAME="$(printf '%s' "$MATCH" | cut -f2)"; GAME_PATH="$(printf '%s' "$MATCH" | cut -f3)"
   [ -f "$GAME_PATH" ] || { echo "FAIL  \"$GAME_NAME\" is in your library but its file is missing: $GAME_PATH" >&2; exit 2; }
   echo "----  game: $GAME_NAME ($GAME_PATH)"
+  # "find" takes the first match. Say so when the name also matches other games, so the wrong game is easy to spot.
+  OTHER_MATCHES="$(python3 "$REPO_ROOT/Scripts/playtest/library.py" list | awk -F'\t' -v q="$(printf '%s' "$GAME" | tr '[:upper:]' '[:lower:]')" \
+    'index(tolower($2), q) { print $2 }' | grep -vxF "$GAME_NAME" | head -3)"
+  [ -z "$OTHER_MATCHES" ] || echo "      also matches: $(printf '%s' "$OTHER_MATCHES" | paste -sd ';' - | sed 's/;/; /g') (use more of the name to pick another)"
+  # Snapshot this game's save states so the run can prove it left them alone.
+  SAVES_DIR="$(find "$HOME/Library/Application Support/OpenEmu/Save States" -maxdepth 2 -type d -name "$GAME_NAME" 2>/dev/null | head -1)"
+  saves_snapshot() { [ -n "$SAVES_DIR" ] && find "$SAVES_DIR" -exec stat -f '%m %z %N' {} + 2>/dev/null | sort; }
+  SAVES_BEFORE="$(saves_snapshot)"
   export TEST_RUNNER_OE_TEST_ROM="$GAME_PATH"; LIBRARY=real
   if [ ${#ONLY[@]} -eq 0 ]; then
     ONLY=(-only-testing:OpenEmuUITests/OpenEmuSmokeUITests/testGameLoadsAndRuns
@@ -195,6 +206,16 @@ if grep -q "opcode not implemented\|(Error)" "$OUT_DIR/core-errors.log"; then
   FAILURES=1
 else
   echo "PASS  no emulator core errors"
+fi
+
+# --game promises to write no saves. Prove it: this game's save states must be exactly as they were.
+if [ -n "$GAME" ]; then
+  if [ "$(saves_snapshot)" = "$SAVES_BEFORE" ]; then
+    echo "PASS  no save state of \"$GAME_NAME\" changed"
+  else
+    echo "FAIL  save states of \"$GAME_NAME\" changed during the run (another OpenEmu session may have played it, or the no-autosave switch broke)"
+    FAILURES=1
+  fi
 fi
 
 if [ "$XC_STATUS" -ne 0 ]; then FAILURES=1; echo "FAIL  xcodebuild exited $XC_STATUS (log: $LOG)"; fi
