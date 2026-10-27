@@ -53,3 +53,21 @@ harness_describe_running() {
     echo "      pid $pid: $(ps -o comm= -p "$pid")"
   done
 }
+
+# Two sessions (or one session in two worktrees) must not build into the shared build folder at the same time: the
+# second build replaces the app the first one is about to start, so a run can test someone else's code. One run at a
+# time takes this lock; a lock left by a run that is gone is taken over.
+HARNESS_LOCK="${OE_HARNESS_LOCK:-$HOME/Builds/openemu/harness.lock}"
+harness_acquire_lock() {
+  mkdir -p "$(dirname "$HARNESS_LOCK")"
+  if ! mkdir "$HARNESS_LOCK" 2>/dev/null; then
+    local pid; pid="$(cat "$HARNESS_LOCK/pid" 2>/dev/null)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      echo "FAIL  another harness run (pid $pid, from $(cat "$HARNESS_LOCK/where" 2>/dev/null)) is using the shared build folder. Wait for it, or use OE_BUILD_DIR=<other folder>." >&2
+      return 1
+    fi
+    rm -rf "$HARNESS_LOCK"; mkdir "$HARNESS_LOCK" || return 1
+  fi
+  echo "$$" > "$HARNESS_LOCK/pid"; pwd > "$HARNESS_LOCK/where"
+}
+harness_release_lock() { [ "$(cat "$HARNESS_LOCK/pid" 2>/dev/null)" = "$$" ] && rm -rf "$HARNESS_LOCK"; return 0; }
