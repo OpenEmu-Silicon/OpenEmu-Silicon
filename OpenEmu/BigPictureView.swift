@@ -52,7 +52,7 @@ struct BigPictureLane: Identifiable {
         case games([OEDBGame])
         case saveStates([OEDBSaveState])
         case genres([BigPictureGenre])
-        case chips([BigPictureChip])
+        case filters([BigPictureFilter])
     }
 
     let id: String
@@ -68,12 +68,21 @@ struct BigPictureLane: Identifiable {
         case .games(let games): return games.count
         case .saveStates(let states): return states.count
         case .genres(let genres): return genres.count
-        case .chips(let chips): return chips.count
+        case .filters(let filters): return filters.count
         }
     }
 }
 
-/// A filter or sort choice in the Library's filter bar.
+/// One drop-down button in the Library's filter bar.
+struct BigPictureFilter: Identifiable {
+    let menu: BigPictureModel.FilterMenu
+    let label: String
+    let icon: NSImage?
+    let active: Bool
+    var id: Int { menu.rawValue }
+}
+
+/// One choice inside a drop-down.
 struct BigPictureChip: Identifiable {
     enum Action {
         case system(String?)
@@ -133,13 +142,20 @@ final class BigPictureModel: ObservableObject {
     /// A system chosen in the sidebar. Filters the library tab.
     @Published private(set) var systemFilter: String?
     @Published private(set) var genreFilter: String?
+    @Published private(set) var heroIndex = 0
     @Published private(set) var sortOrder = SortOrder.recentlyPlayed
 
     enum SortOrder: String, CaseIterable {
         case recentlyPlayed = "Recently Played"
         case name = "A–Z"
         case added = "Recently Added"
+        case favorites = "Favorites First"
+        case rating = "Top Rated"
     }
+
+    enum FilterMenu: Int { case system, genre, sort }
+    @Published private(set) var openMenu: FilterMenu?
+    @Published private(set) var menuIndex = 0
     @Published private(set) var lanes = [BigPictureLane]()
     /// -1 is the tab bar.
     @Published private(set) var lane = 0
@@ -261,6 +277,11 @@ final class BigPictureModel: ObservableObject {
                 if !mostPlayed.isEmpty {
                     built.append(BigPictureLane(id: "most-played", title: "Most Played", subtitle: nil, kind: .games(Array(mostPlayed.prefix(12)))))
                 }
+                // A game you put plenty of time into and have not touched for a while.
+                let cutoff = Date().addingTimeInterval(-14 * 24 * 3600)
+                if let again = mostPlayed.first(where: { ($0.lastPlayed ?? .distantFuture) < cutoff }) {
+                    built.append(BigPictureLane(id: "rediscover", title: nil, subtitle: nil, kind: .games([again])))
+                }
                 lanes = built
             case .recent:
                 lanes = grid(Array(sortedByRecent(allGames).prefix(60)), id: "recent", title: "Recent", subtitle: nil)
@@ -273,7 +294,7 @@ final class BigPictureModel: ObservableObject {
                 let games = sorted(inScope)
                 let name = genreFilter ?? systems.first { $0.id == systemFilter }?.name ?? "Library"
                 let count = games.count == 1 ? "1 game" : "\(games.count) games"
-                lanes = filterLanes() + grid(games, id: "library", title: name, subtitle: "\(count) · sorted by \(sortOrder.rawValue.lowercased())")
+                lanes = [filterLane()] + grid(games, id: "library", title: name, subtitle: "\(count) · sorted by \(sortOrder.rawValue.lowercased())")
             case .saveStates:
                 let states = allGames
                     .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
@@ -298,7 +319,24 @@ final class BigPictureModel: ObservableObject {
         if lane >= 0, lanes.indices.contains(lane), case .games(let games) = lanes[lane].kind, games.indices.contains(column) {
             return games[column]
         }
-        return sortedByRecent(allGames).first ?? byName(allGames).first
+        let featured = self.featured
+        if !featured.isEmpty { return featured[heroIndex % featured.count] }
+        return byName(allGames).first
+    }
+
+    /// The games the hero rotates through when nothing on a shelf is highlighted.
+    var featured: [OEDBGame] { Array(sortedByRecent(allGames).prefix(5)) }
+
+    /// True when the hero shows a featured game (and its pager dots), false when it follows a highlighted poster.
+    var heroIsFeatured: Bool {
+        if case .detail = screen { return false }
+        if lane >= 0, lanes.indices.contains(lane), case .games = lanes[lane].kind { return false }
+        return true
+    }
+
+    func advanceHero() {
+        guard tab == .home, screen == .browse, openMenu == nil, !sidebarOpen, heroIsFeatured, featured.count > 1 else { return }
+        heroIndex = (heroIndex + 1) % featured.count
     }
 
     var sidebarEntries: [SidebarEntry] {
@@ -319,6 +357,7 @@ final class BigPictureModel: ObservableObject {
         lastInput = "\(action.rawValue)  ·  \(source)"
         mouseAnchor = NSEvent.mouseLocation
 
+        if openMenu != nil { performMenu(action); return }
         if sidebarOpen { performSidebar(action); return }
 
         switch action {
@@ -369,25 +408,77 @@ final class BigPictureModel: ObservableObject {
             return byName(games)
         case .added:
             return games.sorted { ($0.importDate ?? .distantPast) > ($1.importDate ?? .distantPast) }
+        case .favorites:
+            func loved(_ game: OEDBGame) -> Bool { (game.rating?.intValue ?? 0) >= 4 }
+            return games.sorted { loved($0) != loved($1) ? loved($0) : ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
+        case .rating:
+            return games.sorted { ($0.rating?.intValue ?? 0) != ($1.rating?.intValue ?? 0)
+                ? ($0.rating?.intValue ?? 0) > ($1.rating?.intValue ?? 0)
+                : $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
         }
     }
 
-    /// The Library's filter bar: a row of systems, a row of genres, and the sort order.
-    private func filterLanes() -> [BigPictureLane] {
-        let systemChips = [BigPictureChip(id: "sys-all", title: "All", icon: nil, selected: systemFilter == nil, action: .system(nil))]
-            + systems.map { BigPictureChip(id: "sys-\($0.id)", title: $0.name, icon: $0.icon, selected: systemFilter == $0.id, action: .system($0.id)) }
-        let scope = systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames
-        let genreNames = Set(scope.compactMap { genre(of: $0) }).sorted()
-        let genreChips = [BigPictureChip(id: "genre-all", title: "Any genre", icon: nil, selected: genreFilter == nil, action: .genre(nil))]
-            + genreNames.map { BigPictureChip(id: "genre-\($0)", title: $0, icon: nil, selected: genreFilter == $0, action: .genre($0)) }
-        let sortChips = SortOrder.allCases.map {
-            BigPictureChip(id: "sort-\($0.rawValue)", title: $0.rawValue, icon: nil, selected: sortOrder == $0, action: .sort($0))
+    /// The Library's filter bar: one drop-down each for system, genre and sort order.
+    private func filterLane() -> BigPictureLane {
+        let system = systems.first { $0.id == systemFilter }
+        return BigPictureLane(id: "filters", title: nil, subtitle: nil, kind: .filters([
+            BigPictureFilter(menu: .system, label: system?.name ?? "All Systems", icon: system?.icon, active: system != nil),
+            BigPictureFilter(menu: .genre, label: genreFilter ?? "Any Genre", icon: nil, active: genreFilter != nil),
+            BigPictureFilter(menu: .sort, label: sortOrder.rawValue, icon: nil, active: false),
+        ]))
+    }
+
+    /// What a drop-down offers, with the current choice marked.
+    func menuOptions(_ menu: FilterMenu) -> [BigPictureChip] {
+        switch menu {
+        case .system:
+            return [BigPictureChip(id: "sys-all", title: "All Systems", icon: nil, selected: systemFilter == nil, action: .system(nil))]
+                + systems.map { BigPictureChip(id: "sys-\($0.id)", title: $0.name, icon: $0.icon, selected: systemFilter == $0.id, action: .system($0.id)) }
+        case .genre:
+            let scope = systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames
+            let names = Set(scope.compactMap { genre(of: $0) }).sorted()
+            return [BigPictureChip(id: "genre-all", title: "Any Genre", icon: nil, selected: genreFilter == nil, action: .genre(nil))]
+                + names.map { BigPictureChip(id: "genre-\($0)", title: $0, icon: nil, selected: genreFilter == $0, action: .genre($0)) }
+        case .sort:
+            return SortOrder.allCases.map {
+                BigPictureChip(id: "sort-\($0.rawValue)", title: $0.rawValue, icon: nil, selected: sortOrder == $0, action: .sort($0))
+            }
         }
-        return [
-            BigPictureLane(id: "filter-system", title: nil, subtitle: nil, kind: .chips(systemChips)),
-            BigPictureLane(id: "filter-genre", title: nil, subtitle: nil, kind: .chips(genreChips)),
-            BigPictureLane(id: "filter-sort", title: nil, subtitle: nil, kind: .chips(sortChips)),
-        ]
+    }
+
+    private func apply(_ action: BigPictureChip.Action) {
+        switch action {
+        case .system(let id): systemFilter = id; genreFilter = nil
+        case .genre(let name): genreFilter = name
+        case .sort(let order): sortOrder = order
+        }
+        rebuildLanes()
+    }
+
+    func openFilterMenu(_ menu: FilterMenu) {
+        let options = menuOptions(menu)
+        menuIndex = options.firstIndex { $0.selected } ?? 0
+        openMenu = menu
+    }
+
+    func closeFilterMenu() { openMenu = nil }
+
+    func clickMenu(_ index: Int) {
+        guard let menu = openMenu, menuOptions(menu).indices.contains(index) else { return }
+        apply(menuOptions(menu)[index].action)
+        openMenu = nil
+    }
+
+    private func performMenu(_ action: BigPictureAction) {
+        guard let menu = openMenu else { return }
+        let options = menuOptions(menu)
+        switch action {
+        case .up: menuIndex = max(menuIndex - 1, 0)
+        case .down: menuIndex = min(menuIndex + 1, options.count - 1)
+        case .select: clickMenu(menuIndex)
+        case .back, .menu, .left, .right: openMenu = nil
+        default: break
+        }
     }
 
     /// The game's main genre, from OpenVGDB.
@@ -404,7 +495,7 @@ final class BigPictureModel: ObservableObject {
         tabBarIndex = newTab.rawValue + 1
         rebuildLanes()
         // Start on the games, not the filter bar.
-        lane = lanes.isEmpty ? -1 : (lanes.firstIndex { if case .chips = $0.kind { return false } else { return true } } ?? 0)
+        lane = lanes.isEmpty ? -1 : (lanes.firstIndex { if case .filters = $0.kind { return false } else { return true } } ?? 0)
         column = 0
     }
 
@@ -487,15 +578,9 @@ final class BigPictureModel: ObservableObject {
         case .genres(let genres):
             guard genres.indices.contains(column) else { return }
             show(tab: .library, system: nil, genre: genres[column].name)
-        case .chips(let chips):
-            guard chips.indices.contains(column) else { return }
-            switch chips[column].action {
-            case .system(let id): systemFilter = id; genreFilter = nil
-            case .genre(let name): genreFilter = name
-            case .sort(let order): sortOrder = order
-            }
-            rebuildLanes()
-            column = min(column, max((lanes.indices.contains(lane) ? lanes[lane].count : 1) - 1, 0))
+        case .filters(let filters):
+            guard filters.indices.contains(column) else { return }
+            openFilterMenu(filters[column].menu)
         }
     }
 
@@ -741,6 +826,24 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         if let keyMonitor = keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
     }
+
+    #if DEBUG
+    // MARK: Play-test hooks (PlaytestDriver)
+
+    /// Sends one action ("up", "select", "back", ...) as if it came from a controller.
+    func playtestPerform(_ name: String) {
+        guard let action = BigPictureAction(rawValue: name) else { return }
+        model.perform(action, source: "playtest")
+    }
+
+    /// A picture of the big-picture window as it is on screen.
+    func playtestSnapshot() -> NSImage? {
+        guard let window = window,
+              let image = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(window.windowNumber),
+                                                  [.boundsIgnoreFraming, .bestResolution]) else { return nil }
+        return NSImage(cgImage: image, size: window.frame.size)
+    }
+    #endif
 
     // MARK: NSWindowDelegate
 

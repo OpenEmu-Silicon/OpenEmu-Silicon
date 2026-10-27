@@ -49,6 +49,11 @@ struct BigPictureView: View {
                     BPSidebar(model: model)
                         .transition(.opacity)
                 }
+
+                if let menu = model.openMenu {
+                    BPFilterMenu(model: model, menu: menu)
+                        .transition(.opacity)
+                }
             }
             .animation(.easeOut(duration: 0.18), value: model.sidebarOpen)
         }
@@ -211,11 +216,12 @@ private enum BPMetrics {
             switch lane.style {
             case .icons: return header + iconBody + laneGap
             case .featured: return header + featuredBody + laneGap
+            case .banner: return 140 + laneGap
             default: return header + gridBody + laneGap
             }
         case .saveStates: return header + stateBody + laneGap
         case .genres: return header + genreBody + laneGap
-        case .chips: return 46
+        case .filters: return 50
         }
     }
 }
@@ -397,6 +403,20 @@ private struct BPHero: View {
             }
             .offset(x: heroTextX, y: 282)
         }
+        .overlay(alignment: .topLeading) {
+            if model.heroIsFeatured, model.featured.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(0..<model.featured.count, id: \.self) { dot in
+                        Capsule().fill(dot == model.heroIndex % model.featured.count ? Color.white : Color.white.opacity(0.35))
+                            .frame(width: dot == model.heroIndex % model.featured.count ? 22 : 6, height: 6)
+                    }
+                }
+                .frame(width: BP.canvas.width - 2 * BP.margin, alignment: .trailing)
+                .offset(x: BP.margin, y: 298)
+                .animation(.easeInOut(duration: 0.2), value: model.heroIndex)
+            }
+        }
+        .onReceive(Timer.publish(every: 8, on: .main, in: .common).autoconnect()) { _ in model.advanceHero() }
         .onAppear { art.load(key) }
     }
 
@@ -451,18 +471,19 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
-    enum Style { case icons, grid, featured, wide, genre, chips }
+    enum Style { case icons, grid, featured, wide, genre, filters, banner }
 
     /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
     var style: Style {
         switch kind {
         case .saveStates: return .wide
         case .genres: return .genre
-        case .chips: return .chips
+        case .filters: return .filters
         default:
             switch id {
             case "recent": return .icons
             case "most-played", "added": return .featured
+            case "rediscover": return .banner
             default: return .grid
             }
         }
@@ -475,11 +496,12 @@ private extension BigPictureLane {
         case .featured: return BP.featuredSize.width
         case .wide: return BP.wideCard.width
         case .genre: return 180
-        case .chips: return 120
+        case .filters: return 210
+        case .banner: return BP.canvas.width - 2 * BP.margin
         }
     }
 
-    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : (style == .chips ? 10 : BP.gutter)))) }
+    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : (style == .filters ? 12 : (style == .banner ? 0 : BP.gutter))))) }
 
     /// Columns that fit on screen before the shelf starts to slide.
     var visibleColumns: Int {
@@ -489,7 +511,8 @@ private extension BigPictureLane {
         case .featured: return 5
         case .wide: return 4
         case .genre: return 6
-        case .chips: return 6
+        case .filters: return 3
+        case .banner: return 1
         }
     }
 
@@ -524,12 +547,6 @@ private struct BPLane: View {
             let step = lane.itemWidth + lane.itemGap
             let shift: CGFloat = {
                 guard model.lane == index else { return 0 }
-                if case .chips(let chips) = lane.kind {
-                    // Chips differ in width, so slide just far enough to keep the highlighted one on screen.
-                    let widths = chips.map { 28 + CGFloat($0.title.count) * 7.6 + ($0.icon == nil ? 0 : 25) + lane.itemGap }
-                    let rightEdge = widths.prefix(model.column + 1).reduce(0, +)
-                    return min(0, BP.canvas.width - 2 * BP.margin - rightEdge)
-                }
                 return -CGFloat(max(0, model.column - (lane.visibleColumns - 1))) * step
             }()
             HStack(alignment: .top, spacing: lane.itemGap) {
@@ -539,6 +556,7 @@ private struct BPLane: View {
                         switch lane.style {
                         case .icons: iconTile(game, column: column)
                         case .featured: featuredCard(game, column: column)
+                        case .banner: bannerCard(game, column: column)
                         default: poster(game, column: column)
                         }
                     }
@@ -550,9 +568,9 @@ private struct BPLane: View {
                     ForEach(Array(genres.enumerated()), id: \.offset) { column, genre in
                         genreTile(genre, column: column)
                     }
-                case .chips(let chips):
-                    ForEach(Array(chips.enumerated()), id: \.offset) { column, chip in
-                        chipView(chip, column: column)
+                case .filters(let filters):
+                    ForEach(Array(filters.enumerated()), id: \.offset) { column, filter in
+                        filterButton(filter, column: column)
                     }
                 case .heroActions:
                     EmptyView()
@@ -610,12 +628,12 @@ private struct BPLane: View {
         let focused = isFocused(column)
         return ZStack(alignment: .bottomLeading) {
             BP.genreColor(genre.name)
-            HStack(spacing: -22) {
+            HStack(spacing: -18) {
                 ForEach(Array(genre.games.prefix(3).enumerated()), id: \.offset) { offset, game in
                     let key = OEBigPictureArt.GameKey(game)
                     if let image = art.grid(for: key) ?? game.boxImage?.image {
                         Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 54, height: 74).clipped()
+                            .frame(width: 46, height: 64).clipped()
                             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                             .rotationEffect(.degrees(Double(offset - 1) * 7))
@@ -623,7 +641,7 @@ private struct BPLane: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.top, 12).padding(.trailing, 14)
+            .padding(.top, 10).padding(.trailing, 12)
             Text(genre.name).font(.system(size: 15, weight: .bold)).foregroundColor(.white)
                 .lineLimit(1).padding(.horizontal, 14).padding(.bottom, 12)
         }
@@ -638,21 +656,68 @@ private struct BPLane: View {
         .onTapGesture { model.click(lane: index, column: column) }
     }
 
-    /// A filter or sort choice: white when chosen, like the selected system in the AltUI library bar.
-    private func chipView(_ chip: BigPictureChip, column: Int) -> some View {
+    /// A drop-down button: white when a filter is on, like the selected system in the AltUI library bar.
+    private func filterButton(_ filter: BigPictureFilter, column: Int) -> some View {
         let focused = isFocused(column)
-        return HStack(spacing: 7) {
-            if let icon = chip.icon {
+        return HStack(spacing: 8) {
+            if let icon = filter.icon {
                 Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(width: 18, height: 18)
+            } else if filter.menu == .sort {
+                Image(systemName: "line.3.horizontal.decrease").font(.system(size: 12, weight: .semibold))
             }
-            Text(chip.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+            Text(filter.label).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).opacity(0.7)
         }
-        .foregroundColor(chip.selected ? Color.black.opacity(0.88) : BP.primary)
-        .padding(.horizontal, 14).frame(height: 32)
-        .background(Capsule().fill(chip.selected ? Color.white : BP.surface))
+        .foregroundColor(filter.active ? Color.black.opacity(0.88) : BP.primary)
+        .padding(.horizontal, 14).frame(width: 210, height: 32)
+        .background(Capsule().fill(filter.active ? Color.white : BP.surface))
         .overlay(Capsule().strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
-        .scaleEffect(focused ? 1.04 : 1)
+        .scaleEffect(focused ? 1.03 : 1)
         .animation(.easeOut(duration: 0.12), value: focused)
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
+    }
+
+    /// "Rediscover": a game you spent time in and have left alone for a while.
+    private func bannerCard(_ game: OEDBGame, column: Int) -> some View {
+        let focused = isFocused(column)
+        let key = OEBigPictureArt.GameKey(game)
+        let width = BP.canvas.width - 2 * BP.margin
+        let ago = game.lastPlayed.map { Self.ago.localizedString(for: $0, relativeTo: Date()) }
+        let played = game.playTime >= 3600 ? String(format: "%.0f hrs played", game.playTime / 3600) : String(format: "%.0f min played", game.playTime / 60)
+        return ZStack(alignment: .leading) {
+            if let hero = art.hero(for: key) {
+                Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).frame(width: width, height: 140).clipped().opacity(0.55)
+            } else {
+                BP.material
+            }
+            LinearGradient(colors: [BP.background.opacity(0.85), .clear], startPoint: .leading, endPoint: .trailing)
+            HStack(spacing: 18) {
+                if let cover = game.boxImage?.image ?? art.grid(for: key) {
+                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).frame(width: 80, height: 100)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("REDISCOVER").font(.system(size: 10, weight: .bold)).tracking(1.2).foregroundColor(BP.accent)
+                    Text(game.cleanDisplayName).font(.system(size: 24, weight: .heavy)).foregroundColor(BP.primary).lineLimit(1)
+                    Text([ago.map { "Last played \($0)" }, played].compactMap { $0 }.joined(separator: "  ·  "))
+                        .font(BP.callout).foregroundColor(BP.secondary)
+                }
+                Spacer(minLength: 0)
+                Text("View").font(.system(size: 13, weight: .semibold)).foregroundColor(Color.black.opacity(0.88))
+                    .padding(.horizontal, 20).frame(height: 34).background(Capsule().fill(Color.white))
+            }
+            .padding(.horizontal, 20)
+        }
+        .frame(width: width, height: 140)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+        .scaleEffect(focused ? 1.01 : 1)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onAppear { art.load(key) }
         .onHover { inside in if inside { model.hover(lane: index, column: column) } }
         .onTapGesture { model.click(lane: index, column: column) }
     }
@@ -700,7 +765,7 @@ private struct BPLane: View {
             BPPoster(game: game, size: BP.featuredSize, coverTick: model.coverTick, art: art)
                 .clipShape(Rectangle())
                 .overlay(alignment: .topLeading) {
-                    if lane.id == "added", isNew(game) {
+                    if lane.id == "added", column < 4, isNew(game) {
                         Text("NEW").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundColor(.white)
                             .padding(.horizontal, 6).padding(.vertical, 3)
                             .background(Capsule().fill(BP.accent)).padding(8)
@@ -734,8 +799,9 @@ private struct BPLane: View {
     private func poster(_ game: OEDBGame, column: Int) -> some View {
         let focused = isFocused(column)
         let details = art.details(for: OEBigPictureArt.GameKey(game))
-        let caption = [details?.developer, details?.releaseDate.map { String($0.suffix(4)) }, details?.primaryGenre]
+        let facts = [details?.developer, details?.releaseDate.map { String($0.suffix(4)) }, details?.primaryGenre]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        let caption = facts.isEmpty ? game.systemName : facts
         return VStack(alignment: .leading, spacing: BP.space8) {
             BPPoster(game: game, size: BP.gridSize, coverTick: model.coverTick, art: art)
                 .overlay(alignment: .topTrailing) {
@@ -786,9 +852,12 @@ private struct BPLane: View {
         let focused = isFocused(column)
         let shot = NSImage(contentsOf: state.screenshotURL)
         let image = Self.isBlank(shot) ? nil : shot
-        let fallback = state.rom?.game?.boxImage?.image
-        let title = lane.showsGame ? (state.rom?.game?.cleanDisplayName ?? state.displayName) : state.displayName
-        let detail = [lane.showsGame ? state.displayName : nil, state.timestamp.map { $0.formatted(.dateTime.month().day().hour().minute()) }]
+        let game = state.rom?.game
+        let fallback = game.flatMap { art.grid(for: OEBigPictureArt.GameKey($0)) ?? $0.boxImage?.image }
+        // Save names carry a long timestamp ("Save-Game-2 2026-10-26 11:42:15 -0700"); show the name and a short date.
+        let label = state.displayName.split(separator: " ").first.map { $0.replacingOccurrences(of: "-", with: " ") } ?? state.displayName
+        let title = lane.showsGame ? (game?.cleanDisplayName ?? label) : label
+        let detail = [lane.showsGame ? label : nil, state.timestamp.map { $0.formatted(.dateTime.month().day().hour().minute()) }]
             .compactMap { $0 }.joined(separator: "  ·  ")
         return VStack(alignment: .leading, spacing: 0) {
             ZStack {
@@ -995,6 +1064,56 @@ private struct BPSidebar: View {
         .frame(height: 40)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(focused ? BP.focusFill : Color.clear))
         .onTapGesture { model.clickSidebar(index) }
+    }
+}
+
+// MARK: - Filter drop-down
+
+/// The list a filter button opens, under that button. Up and down move, Select chooses, Back closes.
+private struct BPFilterMenu: View {
+
+    @ObservedObject var model: BigPictureModel
+    let menu: BigPictureModel.FilterMenu
+
+    private let rowHeight: CGFloat = 38
+    private let maxRows = 9
+
+    var body: some View {
+        let options = model.menuOptions(menu)
+        let visible = min(options.count, maxRows)
+        let x = BP.margin + CGFloat(menu.rawValue) * (210 + 12)
+        ZStack(alignment: .topLeading) {
+            Color.black.opacity(0.35).onTapGesture { model.closeFilterMenu() }
+
+            VStack(spacing: 2) {
+                ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                    let focused = model.menuIndex == index
+                    HStack(spacing: 10) {
+                        if let icon = option.icon {
+                            Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(width: 20, height: 20)
+                        }
+                        Text(option.title).font(.system(size: 14, weight: .medium)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        if option.selected { Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)) }
+                    }
+                    .foregroundColor(focused ? BP.focusText : BP.primary)
+                    .padding(.horizontal, 12).frame(height: rowHeight - 2)
+                    .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(focused ? BP.focusFill : Color.clear))
+                    .onTapGesture { model.clickMenu(index) }
+                }
+            }
+            .padding(8)
+            .offset(y: -CGFloat(max(0, model.menuIndex - (maxRows - 1))) * rowHeight)
+            .animation(.easeOut(duration: 0.12), value: model.menuIndex)
+            .frame(width: 280, height: CGFloat(visible) * rowHeight + 16, alignment: .topLeading)
+            .clipped()
+            .background(BP.material)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
+            .shadow(color: .black.opacity(0.5), radius: 24, y: 10)
+            .offset(x: x, y: BPMetrics.top + 52)
+        }
+        .frame(width: BP.canvas.width, height: BP.canvas.height)
     }
 }
 

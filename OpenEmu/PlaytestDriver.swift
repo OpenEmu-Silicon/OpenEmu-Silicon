@@ -55,6 +55,9 @@ final class PlaytestDriver {
         var steps: [Step]
         /// Also restore from the backup and compare. This rewrites the local saves, so it is off unless asked for.
         var auditRestore: Bool?
+        /// Look at big picture instead of playing a game: actions ("up", "select", "back") and "shot:<name>" /
+        /// "wait:<seconds>" steps. Nothing is launched and nothing is saved.
+        var bigPicture: [String]?
     }
 
     private struct Step: Decodable {
@@ -144,7 +147,54 @@ final class PlaytestDriver {
         }
         RunLoop.main.add(stall, forMode: .common)
         self.stallTimer = stall
-        DispatchQueue.main.async { self.openGame() }
+        if let steps = plan?.bigPicture {
+            DispatchQueue.main.async { MainActor.assumeIsolated { self.runBigPicture(steps) } }
+        } else {
+            DispatchQueue.main.async { self.openGame() }
+        }
+    }
+
+    // MARK: - Big picture
+
+    /// Opens big picture on the real library and walks through `steps`, saving a screenshot at each "shot:<name>".
+    @MainActor private func runBigPicture(_ steps: [String]) {
+        guard let plan else { return }
+        gameName = "big picture"
+        runStart = Date()
+        BigPictureWindowController.shared.show()
+        var index = 0
+        func next(after delay: TimeInterval) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in MainActor.assumeIsolated {
+                guard let self else { return }
+                guard index < steps.count else {
+                    BigPictureWindowController.shared.hide()
+                    self.finish(status: "ok", message: "big picture walked through \(steps.count) steps")
+                    return
+                }
+                let step = steps[index]
+                index += 1
+                if step.hasPrefix("shot:") {
+                    let name = String(step.dropFirst(5))
+                    if let image = BigPictureWindowController.shared.playtestSnapshot(),
+                       let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+                       let png = rep.representation(using: .png, properties: [:]) {
+                        self.shotCounter += 1
+                        let file = String(format: "bp-%02d-%@.png", self.shotCounter, name)
+                        try? png.write(to: URL(fileURLWithPath: plan.outputDirectory).appendingPathComponent(file))
+                        self.keysSent.append(step)
+                    }
+                    next(after: 0.3)
+                } else if step.hasPrefix("wait:") {
+                    next(after: Double(step.dropFirst(5)) ?? 1)
+                } else {
+                    BigPictureWindowController.shared.playtestPerform(step)
+                    self.keysSent.append(step)
+                    next(after: 0.9)
+                }
+            } }
+        }
+        // The window goes fullscreen first, which takes a moment.
+        next(after: 3.5)
     }
 
     // MARK: - Steps
