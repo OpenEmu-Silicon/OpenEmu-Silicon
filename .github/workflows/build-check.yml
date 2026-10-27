@@ -50,6 +50,11 @@ jobs:
       - name: Test core change detection
         run: python3 Scripts/test-detect-core-changes.py
 
+      # No upstream update URLs in core plists, every SUFeedURL has an Appcasts/ file,
+      # every core plist has a SUFeedURL. Seconds; no toolchain needed.
+      - name: Check core update feed URLs
+        run: ./Scripts/check-core-feed-urls.sh
+
   detect-core-changes:
     # The `OpenEmu` scheme only builds the main app plus its own dependencies
     # (OpenEmuKit/Base/System) — it never compiles core plugins, so a PR that
