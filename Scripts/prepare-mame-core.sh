@@ -28,23 +28,29 @@ git fetch --no-tags origin "$REVISION"
 
 # Checkouts prepared for MAME 0.250 still carry the old local patch
 # (patches/mame-headless-clang21-apple.patch). Its fixes are upstream in the
-# pinned revision, so drop those edits; refuse to touch any other local change.
+# pinned revision, so drop those edits, but only on a revision that patch was
+# applied to. Any other local change, staged or not, is left alone.
+LEGACY_REVISIONS=(
+  4fc1f9f16b0dfba6be670367330028635613b04b
+  fac13e827b7b8cfa4ee4f5760198d31241e2a544
+)
 LEGACY_PATCHED=(
   3rdparty/sol2/sol/sol.hpp
   3rdparty/zlib/zutil.h
   src/devices/cpu/v60/op2.hxx
 )
-CHANGED="$(git status --porcelain --untracked-files=no | awk '{print $2}')"
+CHANGED="$(git diff --name-only HEAD)"
 if [ -n "$CHANGED" ]; then
-  for f in $CHANGED; do
-    if ! printf '%s\n' "${LEGACY_PATCHED[@]}" | grep -qx "$f"; then
-      echo "error: $SRC_DIR has local changes; commit, stash, or discard them first:" >&2
-      git status --short --untracked-files=no >&2
-      exit 1
-    fi
-  done
-  echo "Dropping the old 0.250 local patch..."
-  git checkout -- "${LEGACY_PATCHED[@]}"
+  HEAD_REVISION="$(git rev-parse HEAD)"
+  OTHER_CHANGES="$(printf '%s\n' "$CHANGED" | grep -vxF -f <(printf '%s\n' "${LEGACY_PATCHED[@]}") || true)"
+  if printf '%s\n' "${LEGACY_REVISIONS[@]}" | grep -qxF "$HEAD_REVISION" && [ -z "$OTHER_CHANGES" ]; then
+    echo "Dropping the old 0.250 local patch..."
+    git checkout HEAD -- "${LEGACY_PATCHED[@]}"
+  else
+    echo "error: $SRC_DIR has local changes; commit, stash, or discard them first:" >&2
+    git status --short --untracked-files=no >&2
+    exit 1
+  fi
 fi
 
 git checkout --detach "$REVISION"
