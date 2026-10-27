@@ -624,7 +624,15 @@ enum OEExtraSaveLocations {
     @discardableResult
     /// Debug builds only: `-OEBackupSimulateLatencyMs 1500` makes every backup folder listing and copy take that much
     /// longer, like a slow iCloud Drive, so a play test can show the app stays responsive and the waits stay bounded.
+    /// How many folder listings and copies have run, to tell how much work a launch check does (see the "Pre-launch"
+    /// log line). Plain counter under its own lock: it is touched from background queues.
+    private let operationCountLock = NSLock()
+    private var operationCountValue = 0
+    private var operationCount: Int { operationCountLock.lock(); defer { operationCountLock.unlock() }; return operationCountValue }
+    private func countOperation() { operationCountLock.lock(); operationCountValue += 1; operationCountLock.unlock() }
+
     private func simulateSlowFolder() {
+        countOperation()
         #if DEBUG
         let ms = UserDefaults.standard.integer(forKey: "OEBackupSimulateLatencyMs")
         if ms > 0 { Thread.sleep(forTimeInterval: Double(ms) / 1000) }
@@ -692,6 +700,7 @@ enum OEExtraSaveLocations {
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { DispatchQueue.main.async { deliver(.upToDate) }; return }
+            let checkStart = Date(), operationsBefore = self.operationCount
             self.reloadSettingsCaches()
             // Not on the caller's thread: this takes `recordsLock`, and the caller is the main thread. The background sync
             // holds that lock while it writes to UserDefaults, which can wait for the main thread, so taking it on the
@@ -718,6 +727,8 @@ enum OEExtraSaveLocations {
             )
             os_log(.debug, log: log, "Pre-launch '%@': backup=%@, local=%@, decision=%@",
                    gameName, state.backupDate?.description ?? "none", state.localDate?.description ?? "none", String(describing: decision))
+            os_log(.info, log: log, "Pre-launch check took %d ms and made %d folder operations",
+                   Int(Date().timeIntervalSince(checkStart) * 1000), self.operationCount - operationsBefore)
 
             let result: OEBackupLaunchCheck
             switch decision {
