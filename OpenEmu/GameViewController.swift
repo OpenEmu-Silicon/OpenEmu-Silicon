@@ -398,35 +398,50 @@ extension GameViewController {
         retroAchievementsEventToastView.show(title: title, subtitle: subtitle, badgeURL: badgeURL, symbolName: symbolName)
     }
 
+    /// Hardcore always shows the trackers (RetroAchievements asks for it);
+    /// softcore follows the user's preference.
+    private func refreshRetroAchievementsIndicatorVisibility() {
+        let showInSoftcore = UserDefaults.standard.bool(forKey: RAShowTrackersSoftcoreKey)
+        retroAchievementsIndicatorStackView.isSuppressed = !(document.isHardcoreModeEnabled || showInSoftcore)
+    }
+
     func showRetroAchievementsChallenge(id: UInt32, title: String) {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.showChallenge(id: id, title: title)
     }
 
     func hideRetroAchievementsChallenge(id: UInt32) {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.hideChallenge(id: id)
     }
 
     func showRetroAchievementsLeaderboard(id: UInt32, display: String) {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.showLeaderboard(id: id, display: display)
     }
 
     func updateRetroAchievementsLeaderboard(id: UInt32, display: String) {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.updateLeaderboard(id: id, display: display)
     }
 
     func hideRetroAchievementsLeaderboard(id: UInt32) {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.hideLeaderboard(id: id)
     }
 
     func hideAllRetroAchievementsLeaderboards() {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.hideAllLeaderboards()
     }
 
     func showRetroAchievementsProgress(title: String, progress: String) {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.showProgress(title: title, progress: progress)
     }
 
     func hideRetroAchievementsProgress() {
+        refreshRetroAchievementsIndicatorVisibility()
         retroAchievementsIndicatorStackView.hideProgress()
     }
 

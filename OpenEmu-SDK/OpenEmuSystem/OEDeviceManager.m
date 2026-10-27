@@ -390,6 +390,12 @@ static const void * kOEBluetoothDevicePairSyncStyleKey = &kOEBluetoothDevicePair
 
 #pragma mark - Keyboard management
 
+- (void)sendKeyboardKeyWithUsage:(NSUInteger)usage pressed:(BOOL)pressed
+{
+    OEHIDEvent *event = [OEHIDEvent keyEventWithTimestamp:[[NSProcessInfo processInfo] systemUptime] keyCode:usage state:pressed cookie:OEUndefinedCookie];
+    [self deviceHandler:nil didReceiveEvent:event];
+}
+
 - (void)OE_addKeyboardEventMonitor;
 {
     _keyEventMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown | NSEventMaskKeyUp handler:^ NSEvent * (NSEvent *anEvent) {

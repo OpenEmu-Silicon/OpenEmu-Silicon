@@ -63,7 +63,7 @@ while IFS= read -r p; do APPS+=("$p"); done < <(
 
 if [[ ${#APPS[@]} -eq 0 ]]; then
     echo "launch-debug: no OpenEmu.app found in DerivedData or ~/Builds/openemu for config $CONFIG." >&2
-    echo "  build first: ./Scripts/verify.sh" >&2
+    echo "  build first: ./Scripts/build-for-worktree.sh" >&2
     exit 1
 fi
 
@@ -110,7 +110,7 @@ if [[ $FORCE -eq 0 ]]; then
             echo "launch-debug: source newer than build — refusing to launch a stale binary." >&2
             echo "  newest source : $SRC_PATH" >&2
             echo "  newest build  : $NEWEST" >&2
-            echo "  fix: ./Scripts/verify.sh   (or pass --force to launch anyway)" >&2
+            echo "  fix: ./Scripts/build-for-worktree.sh   (or pass --force to launch anyway)" >&2
             exit 1
         fi
     fi

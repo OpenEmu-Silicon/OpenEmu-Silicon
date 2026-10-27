@@ -11,8 +11,8 @@
 #      shipped without any SUFeedURL at all, leaving it dependent on
 #      CoreUpdater's oecores.xml override for updates.
 #
-# Wired into Scripts/verify.sh as a precondition for --core runs. Cheap to run
-# everywhere else too.
+# Runs in CI (build-check.yml, the "Core sources present" job) and as the first step of
+# Scripts/core.sh. Cheap to run anywhere else too.
 
 set -euo pipefail
 

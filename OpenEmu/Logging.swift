@@ -32,6 +32,10 @@ extension OSLog {
     static let `import` = OSLog(subsystem: "org.openemu.OpenEmu", category: "import")
     static let library = OSLog(subsystem: "org.openemu.OpenEmu", category: "library")
     static let download = OSLog(subsystem: "org.openemu.OpenEmu", category: "download")
+    /// Emulation lifecycle: which core and game started, and when it stopped.
+    static let core = OSLog(subsystem: "org.openemu.OpenEmu", category: "core")
+    /// Input permission state and controller connect/disconnect.
+    static let input = OSLog(subsystem: "org.openemu.OpenEmu", category: "input")
     
     static let event_keyboard = OSLog(subsystem: "org.openemu.OpenEmu.event", category: "keyboard")
     static let event_hid = OSLog(subsystem: "org.openemu.OpenEmu.event", category: "hid")

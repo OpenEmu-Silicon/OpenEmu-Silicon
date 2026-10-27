@@ -32,7 +32,7 @@ class DetectCoreChanges(unittest.TestCase):
         self.assertEqual(pick("Potator-Core/x.c"), ["Potator"])
 
     def test_scripts_select_nothing(self):
-        self.assertEqual(pick("Scripts/verify.sh"), [])
+        self.assertEqual(pick("Scripts/check.sh"), [])
 
     def test_sdk_and_workspace_select_everything(self):
         self.assertEqual(pick("OpenEmu-SDK/x.m"), dcc.ALL_CORES)

@@ -29,11 +29,11 @@ The PR number below is filled in automatically — just paste the whole block. F
 ```bash
 cd <path to your OpenEmu-Silicon clone>
 gh pr checkout NUMBER --repo OpenEmu-Silicon/OpenEmu-Silicon
-./Scripts/verify.sh
+./Scripts/build-for-worktree.sh
 ./Scripts/launch-debug.sh
 ```
 
-`verify.sh` builds, prunes stale DerivedData, and runs a codesign check. `launch-debug.sh` picks the freshest Debug build without using a glob (which opens multiple instances when DerivedData has more than one hash directory).
+`build-for-worktree.sh` builds to a stable per-branch folder. `launch-debug.sh` picks the freshest Debug build without using a glob (which opens multiple instances when DerivedData has more than one hash directory).
 
 If this PR touches a core, install it before launching:
 
@@ -51,7 +51,7 @@ If this PR touches a core, install it before launching:
 ## PR checklist
 
 - [ ] Branched from an up-to-date `main` (ran `git fetch origin && git merge origin/main`)
-- [ ] Build passes: `./Scripts/verify.sh` (or `xcodebuild -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu -configuration Debug -destination 'platform=macOS,arch=arm64' build`)
+- [ ] Build passes: `./Scripts/build-for-worktree.sh` (or `xcodebuild -workspace OpenEmu-metal.xcworkspace -scheme OpenEmu -configuration Debug -destination 'platform=macOS,arch=arm64' build`)
 - [ ] Tested on Apple Silicon (M1 / M2 / M3 / M4 Mac)
 - [ ] No build logs, binaries, or credentials committed
 - [ ] Copyright headers preserved on all modified files

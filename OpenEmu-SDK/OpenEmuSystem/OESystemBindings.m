@@ -88,6 +88,9 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
     NSMutableDictionary<NSString *, OEDevicePlayerBindings *> *_defaultDeviceBindings;
 
     OEDevicePlayerBindings *_emptyConfiguration;
+
+    BOOL _needsDevicePlayerCompaction;
+    NSMutableSet<OEDevicePlayerBindings *> *_manuallyAssignedBindings;
 }
 
 - (void)OE_notifyObserversDidSetEvent:(OEHIDEvent *)anEvent forBindingKey:(id)bindingKey playerNumber:(NSUInteger)playerNumber  __attribute__((nonnull));
@@ -111,6 +114,7 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
 
         _keyboardPlayerBindings     = [NSMutableDictionary dictionary];
         _devicePlayerBindings       = [NSMutableDictionary dictionary];
+        _manuallyAssignedBindings   = [NSMutableSet        set];
 
         _bindingsObservers          = [NSMutableSet        set];
 
@@ -492,6 +496,9 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
     NSAssert(newBindings != nil, @"A device handler without device player bindings?!");
     if([newBindings playerNumber] == playerNumber) return;
 
+    // The user chose this layout by hand, so a pending compaction must not undo it.
+    _needsDevicePlayerCompaction = NO;
+
     OEDevicePlayerBindings *oldBindings = [self devicePlayerBindingsForPlayer:playerNumber];
 
     // Notify observers to remove all bindings to the old player number of each devices.
@@ -513,6 +520,10 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
     // Notify observers to add all bindings for the new player layout.
     if(oldBindings != nil) [self OE_notifyObserversForAddedDeviceBindings:oldBindings];
     [self OE_notifyObserversForAddedDeviceBindings:newBindings];
+
+    // Both bindings now sit where the user put them; keep them there.
+    [_manuallyAssignedBindings addObject:newBindings];
+    if(oldBindings != nil) [_manuallyAssignedBindings addObject:oldBindings];
 }
 
 #pragma mark -
@@ -994,6 +1005,71 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
 
     [controller OE_setDeviceHandler:nil];
     [controller OE_setPlayerNumber:0];
+
+    [_manuallyAssignedBindings removeObject:controller];
+
+    [self OE_compactDevicePlayerBindings];
+}
+
+- (void)OE_compactDevicePlayerBindings
+{
+    // Moves are not announced to observers, so compaction only runs while there
+    // are none. Today OEGameDocument is the only observer and it removes itself
+    // when the game closes. A long-lived observer would defer compaction
+    // forever; a future change that adds one must handle that case.
+    if([_bindingsObservers count] > 0)
+    {
+        _needsDevicePlayerCompaction = YES;
+        return;
+    }
+
+    _needsDevicePlayerCompaction = NO;
+
+    NSUInteger count = [_devicePlayerBindings count];
+    if(count == 0) return;
+
+    NSArray<NSNumber *> *players = [[_devicePlayerBindings allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    // The players already fill 1..count, nothing to do.
+    if([[players lastObject] unsignedIntegerValue] == count) return;
+
+    // Manual bindings stay where the user put them. Only automatic bindings
+    // move down to fill the first free players.
+    NSMutableArray<OEDevicePlayerBindings *> *automaticBindings = [NSMutableArray array];
+    NSMutableSet<NSNumber *> *manualPlayers = [NSMutableSet set];
+    for(NSNumber *player in players)
+    {
+        OEDevicePlayerBindings *bindings = _devicePlayerBindings[player];
+        if([_manuallyAssignedBindings containsObject:bindings]) [manualPlayers addObject:player];
+        else [automaticBindings addObject:bindings];
+    }
+
+    if([automaticBindings count] == 0) return;
+
+    BOOL didMove = NO;
+    NSUInteger nextPlayerNumber = 1;
+    for(OEDevicePlayerBindings *bindings in automaticBindings)
+    {
+        while([manualPlayers containsObject:@(nextPlayerNumber)])
+            nextPlayerNumber++;
+
+        NSUInteger playerNumber = [bindings playerNumber];
+        if(playerNumber != nextPlayerNumber)
+        {
+            if(!didMove)
+            {
+                [self willChangeValueForKey:@"devicePlayerBindings"];
+                didMove = YES;
+            }
+
+            [_devicePlayerBindings removeObjectForKey:@(playerNumber)];
+            [bindings OE_setPlayerNumber:nextPlayerNumber];
+            _devicePlayerBindings[@(nextPlayerNumber)] = bindings;
+        }
+
+        nextPlayerNumber++;
+    }
+
+    if(didMove) [self didChangeValueForKey:@"devicePlayerBindings"];
 }
 
 - (void)OE_notifyObserversForAddedDeviceBindings:(OEDevicePlayerBindings *)aHandler;
@@ -1169,6 +1245,8 @@ NSString *const OEGlobalButtonRapidFireReset    = @"OEGlobalButtonRapidFireReset
 {
     // No need to tell it to unset everything
     [_bindingsObservers removeObject:observer];
+
+    if(_needsDevicePlayerCompaction) [self OE_compactDevicePlayerBindings];
 }
 
 @end
