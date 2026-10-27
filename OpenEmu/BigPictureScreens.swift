@@ -61,6 +61,18 @@ struct BigPictureView: View {
     }
 }
 
+// MARK: - Artwork
+
+extension OEBigPictureArt {
+
+    /// The one rule for game art: SteamGridDB's portrait poster first, the library's own cover if it has none.
+    /// Every poster, hero cover, banner and save-state fallback goes through this, so a game looks the same everywhere.
+    func poster(for game: OEDBGame) -> NSImage? { grid(for: GameKey(game)) ?? game.boxImage?.image }
+
+    /// The small square tile (Continue Playing, genre tiles): SteamGridDB's icon, then the poster.
+    func tile(for game: OEDBGame) -> NSImage? { icon(for: GameKey(game)) ?? poster(for: game) }
+}
+
 // MARK: - Helpers
 
 private extension OEDBGame {
@@ -91,7 +103,7 @@ private struct BPPoster: View {
 
     var body: some View {
         let key = OEBigPictureArt.GameKey(game)
-        let image = art.grid(for: key) ?? game.boxImage?.image
+        let image = art.poster(for: game)
         ZStack {
             if let image = image {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill).blur(radius: 24).opacity(0.7)
@@ -197,6 +209,8 @@ private enum BPMetrics {
     static let top: CGFloat = 92
     /// The hero block: art, cover, title, buttons, plus the air below it before the first shelf.
     static let heroHeight: CGFloat = 508
+    /// A game page has more to show (saves, about), so its hero is shorter and the first shelf is already on screen.
+    static let detailHeroHeight: CGFloat = 340
     static let headerHeight: CGFloat = 56
     static let posterBody: CGFloat = 262
     static let stateBody: CGFloat = 228
@@ -222,6 +236,7 @@ private enum BPMetrics {
         case .saveStates: return header + stateBody + laneGap
         case .genres: return header + genreBody + laneGap
         case .filters: return 50
+        case .keys: return header + 52
         }
     }
 }
@@ -231,13 +246,18 @@ private struct BPPage: View {
     @ObservedObject var model: BigPictureModel
     @ObservedObject var art: OEBigPictureArt
 
+    private var heroHeight: CGFloat {
+        if case .detail = model.screen { return BPMetrics.detailHeroHeight }
+        return BPMetrics.heroHeight
+    }
+
     private var showsHero: Bool {
         if case .detail = model.screen { return true }
         return model.tab == .home && model.heroGame != nil
     }
 
     private var laneTops: [CGFloat] {
-        var y = BPMetrics.top + (showsHero ? BPMetrics.heroHeight : 0)
+        var y = BPMetrics.top + (showsHero ? heroHeight : 0)
         return model.lanes.map { lane in
             defer { y += BPMetrics.height(of: lane) }
             return y
@@ -256,14 +276,18 @@ private struct BPPage: View {
     var body: some View {
         let tops = laneTops
         ZStack(alignment: .topLeading) {
+            // The hero art scrolls with the page but is not faded under the tab bar: it should run to the top edge.
+            if showsHero, let game = model.heroGame {
+                BPBackdrop(game: game, art: art, heroHeight: heroHeight)
+                    .frame(width: BP.canvas.width, height: BP.canvas.height, alignment: .topLeading)
+                    .offset(y: pageOffset)
+                    .animation(.easeOut(duration: 0.22), value: pageOffset)
+            }
+
             ZStack(alignment: .topLeading) {
                 if showsHero, let game = model.heroGame {
-                    BPBackdrop(game: game, art: art)
-                }
-
-                if showsHero, let game = model.heroGame {
                     BPHero(model: model, game: game, art: art)
-                        .frame(width: BP.canvas.width, height: BPMetrics.heroHeight, alignment: .topLeading)
+                        .frame(width: BP.canvas.width, height: heroHeight, alignment: .topLeading)
                         .offset(y: BPMetrics.top)
                 }
 
@@ -282,8 +306,8 @@ private struct BPPage: View {
                         .offset(y: lastTop + BPMetrics.height(of: last))
                 }
 
-                if model.lanes.isEmpty {
-                    BPEmpty(model: model).offset(y: BPMetrics.top)
+                if model.lanes.isEmpty || model.hasNoItems {
+                    BPEmpty(model: model).offset(y: BPMetrics.top + (model.tab == .search ? 230 : (model.lanes.isEmpty ? 0 : 56)))
                 }
             }
             .frame(width: BP.canvas.width, height: BP.canvas.height, alignment: .topLeading)
@@ -315,9 +339,10 @@ private struct BPEmpty: View {
     var body: some View {
         let message: String
         switch model.tab {
-        case .saveStates: message = "No save states yet."
-        case .search: message = "Search is not available yet."
+        case .saveStates: message = model.hasActiveFilters ? "No save states match these filters." : "No save states yet."
+        case .search: message = model.searchQuery.isEmpty ? "" : "No games match \u{201C}\(model.searchQuery)\u{201D}."
         case .favorites: message = "Rate a game 4 stars or more to see it here."
+        case .library: message = model.hasActiveFilters ? "No games match these filters." : "No games in the library yet."
         default: message = "No games in the library yet."
         }
         return Text(message)
@@ -328,20 +353,21 @@ private struct BPEmpty: View {
     }
 }
 
-/// The hero's art. It belongs to the page, so it scrolls away with the hero like the AltUI home does.
 private struct BPBackdrop: View {
 
     let game: OEDBGame
     @ObservedObject var art: OEBigPictureArt
 
-    private var height: CGFloat { BPMetrics.top + BPMetrics.heroHeight }
+    let heroHeight: CGFloat
+
+    private var height: CGFloat { BPMetrics.top + heroHeight }
 
     var body: some View {
         ZStack {
             let key = OEBigPictureArt.GameKey(game)
             if let hero = art.hero(for: key) {
                 Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).opacity(0.6)
-            } else if let cover = game.boxImage?.image {
+            } else if let cover = art.poster(for: game) {
                 Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 40).opacity(0.35)
             } else {
                 LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .topTrailing, endPoint: .bottomLeading).opacity(0.45)
@@ -430,7 +456,7 @@ private struct BPHero: View {
     }
 
     /// Box art at its own shape (a SNES box is wide, a poster tall), like the AltUI hero; the shelf poster if there is none.
-    private var coverImage: NSImage? { game.boxImage?.image }
+    private var coverImage: NSImage? { art.poster(for: game) }
 
     private var coverWidth: CGFloat {
         guard let image = coverImage, image.size.height > 0 else { return 150 }
@@ -471,7 +497,7 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
-    enum Style { case icons, grid, featured, wide, genre, filters, banner }
+    enum Style { case icons, grid, featured, wide, genre, filters, banner, keys }
 
     /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
     var style: Style {
@@ -479,6 +505,7 @@ private extension BigPictureLane {
         case .saveStates: return .wide
         case .genres: return .genre
         case .filters: return .filters
+        case .keys: return .keys
         default:
             switch id {
             case "recent": return .icons
@@ -497,11 +524,12 @@ private extension BigPictureLane {
         case .wide: return BP.wideCard.width
         case .genre: return 180
         case .filters: return 210
+        case .keys: return 40
         case .banner: return BP.canvas.width - 2 * BP.margin
         }
     }
 
-    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : (style == .filters ? 12 : (style == .banner ? 0 : BP.gutter))))) }
+    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : (style == .filters ? 12 : (style == .banner ? 0 : (style == .keys ? 8 : BP.gutter)))))) }
 
     /// Columns that fit on screen before the shelf starts to slide.
     var visibleColumns: Int {
@@ -511,9 +539,18 @@ private extension BigPictureLane {
         case .featured: return 5
         case .wide: return 4
         case .genre: return 6
-        case .filters: return 3
+        case .filters: return 4
         case .banner: return 1
+        case .keys: return 14
         }
+    }
+
+    /// The filter bar sits in the middle of the page; everything else starts at the margin.
+    var leadingInset: CGFloat {
+        guard case .filters(let filters) = kind else { return BP.margin }
+        let buttons = filters.filter { $0.menu != nil }.count
+        let width = CGFloat(buttons) * 210 + CGFloat(max(buttons - 1, 0)) * 12 + (filters.contains { $0.menu == nil } ? 12 + 96 : 0)
+        return (BP.canvas.width - width) / 2
     }
 
     var isWide: Bool {
@@ -534,10 +571,17 @@ private struct BPLane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let title = lane.title {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(BP.headline).foregroundColor(BP.primary)
-                    if let subtitle = lane.subtitle {
-                        Text(subtitle).font(BP.callout).foregroundColor(BP.secondary)
+                HStack(spacing: 12) {
+                    if let game = lane.game, let tile = art.tile(for: game) {
+                        Image(nsImage: tile).resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: 40, height: 40).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title).font(BP.headline).foregroundColor(BP.primary)
+                        if let subtitle = lane.subtitle {
+                            Text(subtitle).font(BP.callout).foregroundColor(BP.secondary)
+                        }
                     }
                 }
                 .padding(.horizontal, BP.margin)
@@ -572,11 +616,15 @@ private struct BPLane: View {
                     ForEach(Array(filters.enumerated()), id: \.offset) { column, filter in
                         filterButton(filter, column: column)
                     }
+                case .keys(let keys):
+                    ForEach(Array(keys.enumerated()), id: \.offset) { column, key in
+                        keyButton(key, column: column)
+                    }
                 case .heroActions:
                     EmptyView()
                 }
             }
-            .padding(.leading, BP.margin)
+            .padding(.leading, lane.leadingInset)
             .padding(.top, BP.space12)
             .offset(x: shift)
             .animation(.easeOut(duration: 0.2), value: shift)
@@ -628,13 +676,12 @@ private struct BPLane: View {
         let focused = isFocused(column)
         return ZStack(alignment: .bottomLeading) {
             BP.genreColor(genre.name)
-            HStack(spacing: -18) {
+            HStack(spacing: -16) {
                 ForEach(Array(genre.games.prefix(3).enumerated()), id: \.offset) { offset, game in
-                    let key = OEBigPictureArt.GameKey(game)
-                    if let image = art.grid(for: key) ?? game.boxImage?.image {
+                    if let image = art.tile(for: game) {
                         Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 46, height: 64).clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .frame(width: 50, height: 50).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                             .rotationEffect(.degrees(Double(offset - 1) * 7))
                     }
@@ -657,26 +704,46 @@ private struct BPLane: View {
     }
 
     /// A drop-down button: white when a filter is on, like the selected system in the AltUI library bar.
+    /// The last button, when any filter is on, is Clear.
     private func filterButton(_ filter: BigPictureFilter, column: Int) -> some View {
         let focused = isFocused(column)
+        let isClear = filter.menu == nil
         return HStack(spacing: 8) {
-            if let icon = filter.icon {
+            if isClear {
+                Image(systemName: "xmark.circle.fill").font(.system(size: 13, weight: .semibold))
+            } else if let icon = filter.icon {
                 Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(width: 18, height: 18)
             } else if filter.menu == .sort {
                 Image(systemName: "line.3.horizontal.decrease").font(.system(size: 12, weight: .semibold))
             }
             Text(filter.label).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).opacity(0.7)
+            if !isClear {
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).opacity(0.7)
+            }
         }
         .foregroundColor(filter.active ? Color.black.opacity(0.88) : BP.primary)
-        .padding(.horizontal, 14).frame(width: 210, height: 32)
+        .padding(.horizontal, 14).frame(width: isClear ? 96 : 210, height: 32)
         .background(Capsule().fill(filter.active ? Color.white : BP.surface))
         .overlay(Capsule().strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
         .scaleEffect(focused ? 1.03 : 1)
         .animation(.easeOut(duration: 0.12), value: focused)
         .onHover { inside in if inside { model.hover(lane: index, column: column) } }
         .onTapGesture { model.click(lane: index, column: column) }
+    }
+
+    /// A key on the Search tab's on-screen keyboard.
+    private func keyButton(_ key: BigPictureKey, column: Int) -> some View {
+        let focused = isFocused(column)
+        return Text(key.label).font(.system(size: 14, weight: .semibold)).foregroundColor(BP.primary)
+            .frame(width: key.label.count > 1 ? 84 : 40, height: 40)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(BP.surface))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+            .scaleEffect(focused ? 1.06 : 1)
+            .animation(.easeOut(duration: 0.12), value: focused)
+            .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+            .onTapGesture { model.click(lane: index, column: column) }
     }
 
     /// "Rediscover": a game you spent time in and have left alone for a while.
@@ -694,7 +761,7 @@ private struct BPLane: View {
             }
             LinearGradient(colors: [BP.background.opacity(0.85), .clear], startPoint: .leading, endPoint: .trailing)
             HStack(spacing: 18) {
-                if let cover = game.boxImage?.image ?? art.grid(for: key) {
+                if let cover = art.poster(for: game) {
                     Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).frame(width: 80, height: 100)
                         .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
@@ -730,7 +797,7 @@ private struct BPLane: View {
     private func iconTile(_ game: OEDBGame, column: Int) -> some View {
         let focused = isFocused(column)
         let key = OEBigPictureArt.GameKey(game)
-        let image = art.icon(for: key) ?? art.grid(for: key) ?? game.boxImage?.image
+        let image = art.tile(for: game)
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if let image = image {
@@ -853,7 +920,7 @@ private struct BPLane: View {
         let shot = NSImage(contentsOf: state.screenshotURL)
         let image = Self.isBlank(shot) ? nil : shot
         let game = state.rom?.game
-        let fallback = game.flatMap { art.grid(for: OEBigPictureArt.GameKey($0)) ?? $0.boxImage?.image }
+        let fallback = game.flatMap { art.poster(for: $0) }
         // Save names carry a long timestamp ("Save-Game-2 2026-10-26 11:42:15 -0700"); show the name and a short date.
         let label = state.displayName.split(separator: " ").first.map { $0.replacingOccurrences(of: "-", with: " ") } ?? state.displayName
         let title = lane.showsGame ? (game?.cleanDisplayName ?? label) : label
@@ -1081,7 +1148,8 @@ private struct BPFilterMenu: View {
     var body: some View {
         let options = model.menuOptions(menu)
         let visible = min(options.count, maxRows)
-        let x = BP.margin + CGFloat(menu.rawValue) * (210 + 12)
+        let inset = model.lanes.first { $0.id == "filters" }?.leadingInset ?? BP.margin
+        let x = inset + CGFloat(model.filterMenus.firstIndex(of: menu) ?? 0) * (210 + 12)
         ZStack(alignment: .topLeading) {
             Color.black.opacity(0.35).onTapGesture { model.closeFilterMenu() }
 

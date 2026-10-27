@@ -3,12 +3,14 @@
 #
 # Usage:
 #   ./Scripts/bigpicture-look.sh                       # a standard tour: home, shelves, sidebar, library, filters
+#   ./Scripts/bigpicture-look.sh --steps "shot:home,play:10,shot:returned"   # launch the featured game and come back
 #   ./Scripts/bigpicture-look.sh --steps "shot:a,down,shot:b,select,shot:c"
 #   ./Scripts/bigpicture-look.sh --no-build
 #
 # Steps are controller actions (up down left right select back menu) plus "shot:<name>" to save a picture of the
-# screen and "wait:<seconds>". It uses your real library read-only: no game is launched, nothing is saved, nothing is
-# imported. OpenEmu must be closed. The debug app has a built-in driver (OpenEmu/PlaytestDriver.swift) and no
+# screen, "wait:<seconds>", and "play:<seconds>" to choose what is highlighted (Resume on the hero), let that real game
+# run, save what it drew, close it and check big picture comes back. Closing skips the auto save, so nothing is written
+# to your library saves (play count and last-played time do change). Nothing is imported. OpenEmu must be closed. The debug app has a built-in driver (OpenEmu/PlaytestDriver.swift) and no
 # UI-test runner is involved, so there are no permission prompts. Pictures are in the folder it prints.
 
 set -uo pipefail
@@ -58,7 +60,7 @@ json.dump(plan, open(os.path.join(os.environ["OUTDIR"], "plan.json"), "w"), inde
 PY
 
 echo "----  walking through big picture (${STEPS})"
-APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1 -stopEmulationWithoutConfirmation 1)
+APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1 -stopEmulationWithoutConfirmation 1 -loadAutosaveDialogChoice 1)
 /usr/bin/open -n -W --stdout "$OUT/app.log" --stderr "$OUT/app.log" "$APP" --args "${APP_ARGS[@]}" &
 LAUNCHER_PID=$!
 WAITED=0

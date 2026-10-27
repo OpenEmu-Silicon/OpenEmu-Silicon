@@ -186,6 +186,9 @@ final class PlaytestDriver {
                     next(after: 0.3)
                 } else if step.hasPrefix("wait:") {
                     next(after: Double(step.dropFirst(5)) ?? 1)
+                } else if step.hasPrefix("play:") {
+                    // Choose what is highlighted (Resume on the hero), let the real game run, then close it.
+                    self.bigPicturePlay(seconds: Double(step.dropFirst(5)) ?? 8) { next(after: 0.5) }
                 } else {
                     BigPictureWindowController.shared.playtestPerform(step)
                     self.keysSent.append(step)
@@ -195,6 +198,46 @@ final class PlaytestDriver {
         }
         // The window goes fullscreen first, which takes a moment.
         next(after: 3.5)
+    }
+
+    /// Launches the highlighted game from big picture, plays it for `seconds`, saves what the core drew, closes it the
+    /// normal way (the auto save is skipped by -OESkipAutosaveOnStop) and checks that big picture comes back.
+    @MainActor private func bigPicturePlay(seconds: Double, then resume: @escaping () -> Void) {
+        BigPictureWindowController.shared.playtestPerform("select")
+        func waitForGame(deadline: Date) {
+            if failIfAlertIsShowing(during: "waiting for the game to start") { return }
+            if let document = currentDocument(), document.isPlaying {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated {
+                    self.lastKey = "play"
+                    self.takeShot(document)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { MainActor.assumeIsolated {
+                        self.takeShot(document)
+                        document.stopEmulation(nil)
+                        waitForReturn(deadline: Date().addingTimeInterval(30))
+                    } }
+                } }
+                return
+            }
+            if Date() > deadline { finish(status: "error", message: "The game did not start from big picture within 120 seconds"); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { MainActor.assumeIsolated { waitForGame(deadline: deadline) } }
+        }
+        func waitForReturn(deadline: Date) {
+            if failIfAlertIsShowing(during: "closing the game") { return }
+            if currentDocument() == nil {
+                // Give the fullscreen Space time to close, then big picture should be back in front.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { MainActor.assumeIsolated {
+                    let window = BigPictureWindowController.shared.window
+                    let back = window?.isVisible == true && window?.isKeyWindow == true
+                    self.keysSent.append(back ? "returned-to-big-picture" : "DID-NOT-RETURN")
+                    if !back { self.finish(status: "error", message: "Big picture did not come back after the game closed"); return }
+                    resume()
+                } }
+                return
+            }
+            if Date() > deadline { finish(status: "error", message: "The game did not close within 30 seconds"); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { MainActor.assumeIsolated { waitForReturn(deadline: deadline) } }
+        }
+        waitForGame(deadline: Date().addingTimeInterval(120))
     }
 
     // MARK: - Steps
