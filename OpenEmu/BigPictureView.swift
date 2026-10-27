@@ -337,7 +337,7 @@ final class BigPictureModel: ObservableObject {
 
     /// The game's main genre, from OpenVGDB.
     private func genre(of game: OEDBGame) -> String? {
-        OEBigPictureArt.shared.details(for: OEBigPictureArt.GameKey(game))?.genres.first
+        OEBigPictureArt.shared.details(for: OEBigPictureArt.GameKey(game))?.primaryGenre
     }
 
     private func show(tab newTab: BigPictureTab, system: String?, genre: String? = nil) {

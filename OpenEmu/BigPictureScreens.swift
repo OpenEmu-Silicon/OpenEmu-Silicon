@@ -685,7 +685,7 @@ private struct BPLane: View {
     private func poster(_ game: OEDBGame, column: Int) -> some View {
         let focused = isFocused(column)
         let details = art.details(for: OEBigPictureArt.GameKey(game))
-        let caption = [details?.developer, details?.releaseDate.map { String($0.suffix(4)) }, details?.genres.first]
+        let caption = [details?.developer, details?.releaseDate.map { String($0.suffix(4)) }, details?.primaryGenre]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
         return VStack(alignment: .leading, spacing: BP.space8) {
             BPPoster(game: game, size: BP.gridSize, coverTick: model.coverTick, art: art)

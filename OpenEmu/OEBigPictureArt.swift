@@ -46,6 +46,14 @@ final class OEBigPictureArt: ObservableObject {
         var publisher: String?
         var releaseDate: String?
         var summary: String?
+
+        /// OpenVGDB genres are layered ("Action,Platformer,2D"), and "Action" alone describes half the library.
+        /// Use the next level down for the broad buckets, so tiles read Platformer, Shooter, Beat-'Em-Up.
+        var primaryGenre: String? {
+            guard let top = genres.first else { return nil }
+            if ["Action", "Miscellaneous"].contains(top), genres.count > 1 { return genres[1] }
+            return top
+        }
     }
 
     /// Bumped whenever something new arrives so views redraw.
