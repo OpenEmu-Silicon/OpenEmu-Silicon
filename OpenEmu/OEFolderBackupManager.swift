@@ -621,9 +621,6 @@ enum OEExtraSaveLocations {
             .replacingOccurrences(of: "..", with: "__")
     }
 
-    @discardableResult
-    /// Debug builds only: `-OEBackupSimulateLatencyMs 1500` makes every backup folder listing and copy take that much
-    /// longer, like a slow iCloud Drive, so a play test can show the app stays responsive and the waits stay bounded.
     /// How many folder listings and copies have run, to tell how much work a launch check does (see the "Pre-launch"
     /// log line). Plain counter under its own lock: it is touched from background queues.
     private let operationCountLock = NSLock()
@@ -631,6 +628,9 @@ enum OEExtraSaveLocations {
     private var operationCount: Int { operationCountLock.lock(); defer { operationCountLock.unlock() }; return operationCountValue }
     private func countOperation() { operationCountLock.lock(); operationCountValue += 1; operationCountLock.unlock() }
 
+    /// Counts the operation and, in debug builds only, `-OEBackupSimulateLatencyMs 1500` makes every backup folder
+    /// listing and copy take that much longer, like a slow iCloud Drive, so a play test can show the app stays
+    /// responsive and the waits stay bounded.
     private func simulateSlowFolder() {
         countOperation()
         #if DEBUG
@@ -639,6 +639,7 @@ enum OEExtraSaveLocations {
         #endif
     }
 
+    @discardableResult
     private func copyFile(from src: URL, to dest: URL, direction: String) -> Bool {
         simulateSlowFolder()
         let fm = FileManager.default
