@@ -1,0 +1,1 @@
+Screenshots posted as proof on pull requests by Scripts/pr-evidence.sh. Not part of the app.
