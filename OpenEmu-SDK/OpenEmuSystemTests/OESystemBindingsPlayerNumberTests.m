@@ -326,10 +326,11 @@
     [self assertPlayers:@[third]];
 }
 
-- (void)testManualPlayerAssignmentIsLostAfterDisconnect
+- (void)testManualPlayerAssignmentSurvivesDisconnect
 {
     OEDeviceHandler *first = [self connectController];
     OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
 
     [_bindings setDeviceHandler:second forPlayer:4];
     XCTAssertEqual([_bindings playerForDeviceHandler:second], 4);
@@ -337,7 +338,67 @@
 
     [_bindings OE_didRemoveDeviceHandler:first];
 
-    [self assertPlayers:@[second]];
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 4);
+    XCTAssertEqual([_bindings playerForDeviceHandler:third], 1);
+    XCTAssertEqualObjects([_bindings deviceHandlerForPlayer:1], third);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:2]);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:3]);
+    XCTAssertEqualObjects([_bindings deviceHandlerForPlayer:4], second);
+}
+
+- (void)testManualReassignmentDuringGameIsNotUndoneWhenGameEnds
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+
+    OETestBindingsObserver *game = [[OETestBindingsObserver alloc] init];
+    [_bindings addBindingsObserver:game];
+
+    [_bindings OE_didRemoveDeviceHandler:first];
+
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:1]);
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 2);
+    XCTAssertEqual([_bindings playerForDeviceHandler:third], 3);
+
+    [_bindings setDeviceHandler:third forPlayer:4];
+    XCTAssertEqual([_bindings playerForDeviceHandler:third], 4);
+
+    [_bindings removeBindingsObserver:game];
+
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 2);
+    XCTAssertEqual([_bindings playerForDeviceHandler:third], 4);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:1]);
+}
+
+- (void)testDisconnectingManuallyAssignedControllerFreesItsPlayer
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+    OEDeviceHandler *third = [self connectController];
+
+    [_bindings setDeviceHandler:second forPlayer:4];
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 4);
+
+    [_bindings OE_didRemoveDeviceHandler:second];
+
+    [self assertPlayers:@[first, third]];
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:4]);
+}
+
+- (void)testDisconnectingOneOfTwoManuallyAssignedControllersKeepsTheOther
+{
+    OEDeviceHandler *first = [self connectController];
+    OEDeviceHandler *second = [self connectController];
+
+    [_bindings setDeviceHandler:first forPlayer:2];
+    XCTAssertEqual([_bindings playerForDeviceHandler:first], 2);
+    XCTAssertEqual([_bindings playerForDeviceHandler:second], 1);
+
+    [_bindings OE_didRemoveDeviceHandler:second];
+
+    XCTAssertEqual([_bindings playerForDeviceHandler:first], 2);
+    XCTAssertNil([_bindings devicePlayerBindingsForPlayer:1]);
 }
 
 - (void)testControllersAbovePlayerLimitMoveIntoFreedPlayers
