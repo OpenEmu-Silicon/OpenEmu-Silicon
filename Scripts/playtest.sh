@@ -34,7 +34,7 @@ cd "$REPO_ROOT"
 . "$REPO_ROOT/Scripts/lib/harness.sh"
 harness_ensure_stubs "$REPO_ROOT"
 
-GAME=""; AUDIT_RESTORE=0; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
+GAME=""; AUDIT_RESTORE=0; SLOW_ICLOUD=0; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --game) GAME="${2:-}"; shift 2 ;;
@@ -44,6 +44,7 @@ while [ $# -gt 0 ]; do
     --direct) LAUNCH=direct; shift ;;
     --no-backup) NO_BACKUP=1; shift ;;
     --audit-restore) AUDIT_RESTORE=1; shift ;;
+    --slow-icloud) SLOW_ICLOUD="${2:-}"; shift 2 ;;
     --no-build) NO_BUILD=1; shift ;;
     -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -114,6 +115,8 @@ APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -loadAutosaveDialogChoice "$RESUME" -
           -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1)
 # --no-backup turns the save backup folder off for this run only (a launch argument is never saved to preferences).
 [ "$NO_BACKUP" -eq 1 ] && APP_ARGS+=(-OEBackupFolderPath "")
+# --slow-icloud MS makes every backup folder listing and copy take MS longer (debug builds), like a slow iCloud Drive.
+[ "$SLOW_ICLOUD" -gt 0 ] 2>/dev/null && APP_ARGS+=(-OEBackupSimulateLatencyMs "$SLOW_ICLOUD")
 if [ "$LAUNCH" = "direct" ]; then
   "$APP/Contents/MacOS/OpenEmu" "${APP_ARGS[@]}" > "$OUT/app.log" 2>&1 &
 else
@@ -151,6 +154,10 @@ else:
     print("driver: %s, %s. Played %.0fs, sent keys: %s" % (result["status"], result["message"], result["secondsPlayed"], ", ".join(result["keysSent"]) or "none"))
     if result["status"] != "ok": ok = False
     for line in result.get("backupAudit", []): print("backup audit: " + line)
+    stall = result.get("longestMainThreadStallMs")
+    if stall is not None:
+        print("main thread: longest stall %d ms%s" % (stall, "" if stall <= 3000 else "  <-- the app would have shown the spinning wheel"))
+        if stall > 3000: ok = False
     opening = [re.sub(r"^.*\[org.openemu.OpenEmu:core\]\s*", "", l) for l in log if "] Opening '" in l]
     if opening: print("start: " + opening[-1])
     shots = result["shots"]

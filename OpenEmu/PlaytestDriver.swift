@@ -82,10 +82,15 @@ final class PlaytestDriver {
         var keysSent: [String]
         var shots: [Shot]
         var backupAudit: [String]
+        /// The longest time the main thread went without running the 50 ms stall timer, in milliseconds. A long one is
+        /// a window that would show the spinning wheel (for example while waiting on a slow iCloud folder).
+        var longestMainThreadStallMs: Int
     }
 
     private var plan: Plan?
     private var watchdog: Timer?
+    private var stallTimer: Timer?
+    private var longestStall: TimeInterval = 0
     private var started = false
     private var shots: [Shot] = []
     private var keysSent: [String] = []
@@ -130,6 +135,15 @@ final class PlaytestDriver {
         }
         RunLoop.main.add(watchdog, forMode: .common)
         self.watchdog = watchdog
+        var lastTick = Date()
+        let stall = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let now = Date()
+            self.longestStall = max(self.longestStall, now.timeIntervalSince(lastTick) - 0.05)
+            lastTick = now
+        }
+        RunLoop.main.add(stall, forMode: .common)
+        self.stallTimer = stall
         DispatchQueue.main.async { self.openGame() }
     }
 
@@ -420,9 +434,11 @@ final class PlaytestDriver {
         guard !finished else { return }
         finished = true
         watchdog?.invalidate()
+        stallTimer?.invalidate()
         let result = Result(status: status, message: message, game: gameName,
                             secondsPlayed: Date().timeIntervalSince(runStart),
-                            keysSent: keysSent, shots: shots, backupAudit: backupAudit)
+                            keysSent: keysSent, shots: shots, backupAudit: backupAudit,
+                            longestMainThreadStallMs: Int(longestStall * 1000))
         if let directory = plan?.outputDirectory ?? UserDefaults.standard.string(forKey: "OEPlaytestOutput") {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
