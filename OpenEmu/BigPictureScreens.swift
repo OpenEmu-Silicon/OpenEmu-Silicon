@@ -225,11 +225,11 @@ private struct BPPage: View {
     var body: some View {
         let tops = laneTops
         ZStack(alignment: .topLeading) {
-            if showsHero, let game = model.heroGame {
-                BPBackdrop(game: game, art: art)
-            }
-
             ZStack(alignment: .topLeading) {
+                if showsHero, let game = model.heroGame {
+                    BPBackdrop(game: game, art: art)
+                }
+
                 if showsHero, let game = model.heroGame {
                     BPHero(model: model, game: game, art: art)
                         .frame(width: BP.canvas.width, height: BPMetrics.heroHeight, alignment: .topLeading)
@@ -297,32 +297,32 @@ private struct BPEmpty: View {
     }
 }
 
+/// The hero's art. It belongs to the page, so it scrolls away with the hero like the AltUI home does.
 private struct BPBackdrop: View {
 
     let game: OEDBGame
     @ObservedObject var art: OEBigPictureArt
 
+    private var height: CGFloat { BPMetrics.top + BPMetrics.heroHeight }
+
     var body: some View {
         ZStack {
             let key = OEBigPictureArt.GameKey(game)
             if let hero = art.hero(for: key) {
-                Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill)
+                Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).opacity(0.6)
             } else if let cover = game.boxImage?.image {
-                Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 60).opacity(0.5)
+                Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 40).opacity(0.35)
             } else {
-                LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .topTrailing, endPoint: .bottomLeading).opacity(0.5)
+                LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .topTrailing, endPoint: .bottomLeading).opacity(0.45)
             }
-            LinearGradient(stops: [
-                .init(color: BP.background.opacity(0.95), location: 0),
-                .init(color: BP.background.opacity(0.82), location: 0.5),
-                .init(color: BP.background.opacity(0.3), location: 1),
-            ], startPoint: .leading, endPoint: .trailing)
-            LinearGradient(stops: [
-                .init(color: .clear, location: 0.35),
-                .init(color: BP.background, location: 0.72),
-            ], startPoint: .top, endPoint: .bottom)
+            // Dim under the tab bar, a soft pool behind the text, and a fade into the page below.
+            LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: 90).frame(maxHeight: .infinity, alignment: .top)
+            LinearGradient(colors: [BP.background.opacity(0.6), .clear], startPoint: .leading, endPoint: .trailing)
+            LinearGradient(colors: [.clear, BP.background], startPoint: .top, endPoint: .bottom)
+                .frame(height: 170).frame(maxHeight: .infinity, alignment: .bottom)
         }
-        .frame(width: BP.canvas.width, height: BP.canvas.height)
+        .frame(width: BP.canvas.width, height: height)
         .clipped()
         .allowsHitTesting(false)
         .animation(.easeOut(duration: 0.3), value: art.tick)
@@ -344,7 +344,6 @@ private struct BPHero: View {
 
         ZStack(alignment: .topLeading) {
             heroCover
-                .frame(width: 150, height: 220, alignment: .bottomLeading)
                 .offset(x: BP.margin, y: 24)
 
             Text(eyebrow)
@@ -376,7 +375,7 @@ private struct BPHero: View {
     }
 
     /// Text starts after the cover and its gap.
-    private var heroTextX: CGFloat { BP.margin + 150 + 28 }
+    private var heroTextX: CGFloat { BP.margin + coverWidth + 28 }
 
     private var eyebrow: String {
         let place: String
@@ -384,11 +383,24 @@ private struct BPHero: View {
         return place.uppercased()
     }
 
-    /// The same poster as the shelves, so a game looks the same everywhere.
-    private var heroCover: some View {
-        BPPoster(game: game, size: CGSize(width: 150, height: 220), coverTick: model.coverTick, art: art)
-            .overlay(RoundedRectangle(cornerRadius: BP.posterRadius, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
-            .shadow(color: .black.opacity(0.55), radius: 16, y: 8)
+    /// Box art at its own shape (a SNES box is wide, a poster tall), like the AltUI hero; the shelf poster if there is none.
+    private var coverImage: NSImage? { game.boxImage?.image }
+
+    private var coverWidth: CGFloat {
+        guard let image = coverImage, image.size.height > 0 else { return 150 }
+        return min(max(220 * image.size.width / image.size.height, 130), 320)
+    }
+
+    @ViewBuilder private var heroCover: some View {
+        if let image = coverImage {
+            Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                .frame(width: coverWidth, height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: BP.posterRadius, style: .continuous))
+                .shadow(color: .black.opacity(0.65), radius: 16, y: 8)
+        } else {
+            BPPoster(game: game, size: CGSize(width: 150, height: 220), coverTick: model.coverTick, art: art)
+                .shadow(color: .black.opacity(0.55), radius: 16, y: 8)
+        }
     }
 
     private func metaRow(details: OEBigPictureArt.Details?) -> some View {
@@ -468,6 +480,27 @@ private struct BPLane: View {
         }
     }
 
+    private func isNew(_ game: OEDBGame) -> Bool {
+        guard let date = game.importDate else { return false }
+        return date > Date().addingTimeInterval(-14 * 24 * 3600)
+    }
+
+    /// The small line under a poster's title: when it was played, how long, or its system, depending on the shelf.
+    private func secondaryLine(for game: OEDBGame) -> String? {
+        switch lane.id {
+        case "recent":
+            return game.lastPlayed.map { Self.ago.localizedString(for: $0, relativeTo: Date()) }
+        case "most-played":
+            let hours = Int(game.playTime / 3600), minutes = Int(game.playTime.truncatingRemainder(dividingBy: 3600) / 60)
+            let played = hours > 0 ? "\(hours) hrs played" : (minutes > 0 ? "\(minutes)m played" : nil)
+            return [game.system?.name, played].compactMap { $0 }.joined(separator: " · ")
+        case "added":
+            return game.system?.name
+        default:
+            return nil
+        }
+    }
+
     private static let ago: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -499,13 +532,19 @@ private struct BPLane: View {
         let focused = isFocused(column)
         return VStack(alignment: .leading, spacing: BP.space8) {
             BPPoster(game: game, size: BP.posterSize, coverTick: model.coverTick, art: art)
+                .overlay(alignment: .topLeading) {
+                    if lane.id == "added", isNew(game) {
+                        Text("NEW").font(.system(size: 9, weight: .bold)).tracking(0.8).foregroundColor(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(Capsule().fill(BP.accent)).padding(6)
+                    }
+                }
             VStack(alignment: .leading, spacing: 4) {
                 Text(game.cleanDisplayName)
                     .font(BP.captionBold).foregroundColor(BP.primary)
                     .lineLimit(1)
-                if lane.id == "recent", let played = game.lastPlayed {
-                    Text(Self.ago.localizedString(for: played, relativeTo: Date()))
-                        .font(BP.caption).foregroundColor(BP.tertiary).lineLimit(1)
+                if let line = secondaryLine(for: game) {
+                    Text(line).font(BP.caption).foregroundColor(BP.tertiary).lineLimit(1)
                 }
             }
             .frame(width: BP.posterSize.width, alignment: .leading)

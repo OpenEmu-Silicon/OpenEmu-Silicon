@@ -210,7 +210,7 @@ final class BigPictureModel: ObservableObject {
                 let recent = sortedByRecent(allGames)
                 if !allGames.isEmpty { built.append(BigPictureLane(id: "actions", title: nil, subtitle: nil, kind: .heroActions)) }
                 if !recent.isEmpty {
-                    built.append(BigPictureLane(id: "recent", title: "Recent", subtitle: min(recent.count, 20) == 1 ? "1 game" : "\(min(recent.count, 20)) games", kind: .games(Array(recent.prefix(20)))))
+                    built.append(BigPictureLane(id: "recent", title: "Continue Playing", subtitle: nil, kind: .games(Array(recent.prefix(20)))))
                 }
                 let recentStates = allGames
                     .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
@@ -218,9 +218,13 @@ final class BigPictureModel: ObservableObject {
                 if !recentStates.isEmpty {
                     built.append(BigPictureLane(id: "recent-saves", title: "Recent Saves", subtitle: nil, kind: .saveStates(Array(recentStates.prefix(8))), showsGame: true))
                 }
-                for system in systems {
-                    let games = byName(allGames.filter { $0.system?.systemIdentifier == system.id })
-                    built.append(BigPictureLane(id: system.id, title: system.name, subtitle: games.count == 1 ? "1 game" : "\(games.count) games", kind: .games(games)))
+                let added = allGames.filter { $0.importDate != nil }.sorted { ($0.importDate ?? .distantPast) > ($1.importDate ?? .distantPast) }
+                if !added.isEmpty {
+                    built.append(BigPictureLane(id: "added", title: "Recently Added", subtitle: nil, kind: .games(Array(added.prefix(12)))))
+                }
+                let mostPlayed = allGames.filter { $0.playTime > 0 }.sorted { $0.playTime > $1.playTime }
+                if !mostPlayed.isEmpty {
+                    built.append(BigPictureLane(id: "most-played", title: "Most Played", subtitle: nil, kind: .games(Array(mostPlayed.prefix(12)))))
                 }
                 lanes = built
             case .recent:
