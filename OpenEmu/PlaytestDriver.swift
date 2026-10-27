@@ -199,10 +199,12 @@ final class PlaytestDriver {
             DispatchQueue.main.asyncAfter(deadline: .now() + step.at) {
                 self.lastKey = step.key
                 self.keysSent.append(step.key)
-                OEDeviceManager.shared.sendKeyboardKey(withUsage: usage, pressed: true)
+                // Keys go in inside the helper process, where the game reads its input; the app's own device manager
+                // is not connected to the game.
+                document.gameCoreHelper?.injectKeyboardKey(usage: UInt(usage), pressed: true)
                 // Hold long enough for several frames; a tap shorter than a frame can be missed by the game.
                 DispatchQueue.main.asyncAfter(deadline: .now() + (step.hold ?? 0.15)) {
-                    OEDeviceManager.shared.sendKeyboardKey(withUsage: usage, pressed: false)
+                    document.gameCoreHelper?.injectKeyboardKey(usage: UInt(usage), pressed: false)
                 }
             }
         }
