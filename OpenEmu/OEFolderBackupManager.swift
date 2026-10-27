@@ -277,6 +277,24 @@ enum OEExtraSaveLocations {
     private var recordsCache: [String: [String: Double]]?
     private var aliasesCache: [String: String]?
 
+    /// Waits until the settings writes queued so far are done. Bounded: a write that waits on the main thread must
+    /// never be able to hold up quitting.
+    private func drainPersistQueue(timeout: TimeInterval) {
+        let done = DispatchSemaphore(value: 0)
+        persistQueue.async { done.signal() }
+        _ = done.wait(timeout: .now() + timeout)
+    }
+
+    /// Forgets the in-memory copies so the next read comes from UserDefaults, which can have been changed from outside
+    /// (another copy of the app, the `defaults` tool). Pending writes are let through first so none is lost.
+    private func reloadSettingsCaches() {
+        drainPersistQueue(timeout: 2)
+        recordsLock.lock()
+        recordsCache = nil
+        aliasesCache = nil
+        recordsLock.unlock()
+    }
+
     private override init() { super.init() }
 
     deinit { stopFSEventStream() }
@@ -314,6 +332,8 @@ enum OEExtraSaveLocations {
         let mainRunLoop = CFRunLoopGetMain()
         copyQueue.async { [weak self] in
             self?.performInitialSync()
+            // The app may quit as soon as this completes: let the sync records reach UserDefaults first.
+            self?.drainPersistQueue(timeout: 2)
             CFRunLoopPerformBlock(mainRunLoop, CFRunLoopMode.commonModes.rawValue, completion)
             CFRunLoopWakeUp(mainRunLoop)
         }
@@ -650,6 +670,7 @@ enum OEExtraSaveLocations {
         let safeName = sanitizedName(gameName)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { DispatchQueue.main.async { completion(.upToDate) }; return }
+            self.reloadSettingsCaches()
             // Not on the caller's thread: this takes `recordsLock`, and the caller is the main thread. The background sync
             // holds that lock while it writes to UserDefaults, which can wait for the main thread, so taking it on the
             // main thread could freeze the app for good (seen when a game was started right after launch).
@@ -962,9 +983,15 @@ enum OEExtraSaveLocations {
         // A folder reports its own status, which stays "not current" while anything inside it
         // changes. Only the files inside decide whether the save is ready to read.
         if values.isDirectory == true { return false }
-        // No status means the file is a normal local one (for example just written by this Mac's own upload).
-        guard let status = values.ubiquitousItemDownloadingStatus else { return false }
-        return status != .current
+        if let status = values.ubiquitousItemDownloadingStatus { return status != .current }
+        // No status: a normal local file, for example one this Mac's own upload just wrote. A file that has size but no
+        // disk space behind it is a placeholder whose contents are still in iCloud, so it is not ready.
+        let sizes = try? url.resourceValues(forKeys: [.fileSizeKey, .fileAllocatedSizeKey])
+        if let size = sizes?.fileSize, size > 0, sizes?.fileAllocatedSize == 0 {
+            os_log(.info, log: log, "No download status, but no disk space behind it: %{public}@", url.path)
+            return true
+        }
+        return false
     }
 
     // MARK: - Path mapping
@@ -1126,17 +1153,25 @@ enum OEExtraSaveLocations {
     }
 
     private func gameName(fromRelativePath relative: String) -> (name: String, system: String?)? {
+        Self.gameName(fromRelativePath: relative, canonical: canonicalName(_:), batteryGame: gameName(forBatteryFile:))
+    }
+
+    /// Which game a path under the support or backup folder belongs to. The closures say how a name maps to the
+    /// library title and how a battery save file maps to a game, so the rules can be tested without app settings.
+    static func gameName(fromRelativePath relative: String,
+                         canonical: (String) -> String,
+                         batteryGame: (String) -> String) -> (name: String, system: String?)? {
         let parts = relative.split(separator: "/").map(String.init)
         guard !parts.contains(where: { $0.hasPrefix(".") && !$0.hasSuffix(".icloud") }) else { return nil }
-        if let key = OEExtraSaveLocations.gameKey(for: parts) { return (canonicalName(key), nil) }
+        if let key = OEExtraSaveLocations.gameKey(for: parts) { return (canonical(key), nil) }
         if parts.count >= 4, parts[0] == "Save States" {
             // The folder is named after the ROM file ("Space Invaders (USA)"). Sync records and the "which Mac wrote
             // this" file are kept under the library title ("Space Invaders"), as the launch check looks them up,
             // so the two must agree or a game this Mac just synced is reported as changed on two Macs.
-            return (canonicalName(parts[2]), parts[1])
+            return (canonical(parts[2]), parts[1])
         }
         if parts.count >= 3, parts[1] == "Battery Saves" {
-            return (gameName(forBatteryFile: parts[2]), nil)
+            return (batteryGame(parts[2]), nil)
         }
         return nil
     }

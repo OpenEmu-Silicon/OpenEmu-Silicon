@@ -38,6 +38,34 @@ final class FolderBackupTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDir)
     }
 
+    // MARK: - Game names from paths
+
+    /// Sync records and the "which Mac wrote this" file are kept under the library title, so a save state folder named
+    /// after the ROM file must map to that title. If it did not, a game this Mac had just synced was reported as
+    /// changed on two Macs.
+    func testSaveStateFolderMapsToLibraryTitle() {
+        let titles = ["Space Invaders (USA)": "Space Invaders"]
+        let game = OEFolderBackupManager.gameName(
+            fromRelativePath: "Save States/Atari 2600/Space Invaders (USA)/Auto Save State.oesavestate/State",
+            canonical: { titles[$0] ?? $0 }, batteryGame: { $0 })
+        XCTAssertEqual(game?.name, "Space Invaders")
+        XCTAssertEqual(game?.system, "Atari 2600")
+    }
+
+    func testSaveStateFolderWithNoKnownTitleKeepsItsFolderName() {
+        let game = OEFolderBackupManager.gameName(
+            fromRelativePath: "Save States/Atari 2600/Unknown Game/Quick Save.oesavestate/State",
+            canonical: { $0 }, batteryGame: { $0 })
+        XCTAssertEqual(game?.name, "Unknown Game")
+    }
+
+    func testHiddenFoldersAreNotGames() {
+        let game = OEFolderBackupManager.gameName(
+            fromRelativePath: "Save States/Atari 2600/Space Invaders (USA)/.versions/x.oesavestate/State",
+            canonical: { $0 }, batteryGame: { $0 })
+        XCTAssertNil(game)
+    }
+
     // MARK: - Versions
 
     func testArchiveKeepsOldSave() throws {
