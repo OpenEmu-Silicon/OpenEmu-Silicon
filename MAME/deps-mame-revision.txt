@@ -1,3 +1,3 @@
-OpenEmu-Silicon/mame commit: 8c76ad8c177ac9ef4bd735e7e04bd7609b9a8c31
+OpenEmu-Silicon/mame commit: 03d423c25ec27de365e358cfd1851d772dc32b19
 branch: mame0289-headless
 source: https://github.com/OpenEmu-Silicon/mame.git
