@@ -51,6 +51,7 @@ struct BigPictureLane: Identifiable {
         case heroActions
         case games([OEDBGame])
         case saveStates([OEDBSaveState])
+        case genres([BigPictureGenre])
     }
 
     let id: String
@@ -65,8 +66,16 @@ struct BigPictureLane: Identifiable {
         case .heroActions: return 2
         case .games(let games): return games.count
         case .saveStates(let states): return states.count
+        case .genres(let genres): return genres.count
         }
     }
+}
+
+/// A group of games that share a genre, for the Browse by Genre tiles.
+struct BigPictureGenre: Identifiable {
+    let name: String
+    let games: [OEDBGame]
+    var id: String { name }
 }
 
 /// What is on screen and which item is highlighted.
@@ -107,6 +116,7 @@ final class BigPictureModel: ObservableObject {
     @Published private(set) var tab = BigPictureTab.home
     /// A system chosen in the sidebar. Filters the library tab.
     @Published private(set) var systemFilter: String?
+    @Published private(set) var genreFilter: String?
     @Published private(set) var lanes = [BigPictureLane]()
     /// -1 is the tab bar.
     @Published private(set) var lane = 0
@@ -160,6 +170,7 @@ final class BigPictureModel: ObservableObject {
         screen = .browse
         tab = .home
         systemFilter = nil
+        genreFilter = nil
         sidebarOpen = false
         tabBarIndex = 1
         rebuildLanes()
@@ -212,6 +223,13 @@ final class BigPictureModel: ObservableObject {
                 if !recentStates.isEmpty {
                     built.append(BigPictureLane(id: "recent-saves", title: "Recent Saves", subtitle: nil, kind: .saveStates(Array(recentStates.prefix(8))), showsGame: true))
                 }
+                let groups = Dictionary(grouping: allGames) { genre(of: $0) ?? "" }.filter { !$0.key.isEmpty }
+                let tiles = groups
+                    .map { BigPictureGenre(name: $0.key, games: byName($0.value)) }
+                    .sorted { $0.games.count != $1.games.count ? $0.games.count > $1.games.count : $0.name < $1.name }
+                if tiles.count >= 2 {
+                    built.append(BigPictureLane(id: "genres", title: "Browse by Genre", subtitle: nil, kind: .genres(Array(tiles.prefix(12)))))
+                }
                 let added = allGames.filter { $0.importDate != nil }.sorted { ($0.importDate ?? .distantPast) > ($1.importDate ?? .distantPast) }
                 if !added.isEmpty {
                     built.append(BigPictureLane(id: "added", title: "Recently Added", subtitle: nil, kind: .games(Array(added.prefix(12)))))
@@ -227,8 +245,10 @@ final class BigPictureModel: ObservableObject {
                 let rated = byName(allGames.filter { ($0.rating?.intValue ?? 0) >= 4 })
                 lanes = grid(rated, id: "favorites", title: "Favorites", subtitle: "Games you rated 4 stars or more")
             case .library:
-                let games = byName(systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames)
-                let name = systems.first { $0.id == systemFilter }?.name ?? "Library"
+                var inScope = systemFilter.map { id in allGames.filter { $0.system?.systemIdentifier == id } } ?? allGames
+                if let genreFilter = genreFilter { inScope = inScope.filter { genre(of: $0) == genreFilter } }
+                let games = byName(inScope)
+                let name = genreFilter ?? systems.first { $0.id == systemFilter }?.name ?? "Library"
                 lanes = grid(games, id: "library", title: name, subtitle: games.count == 1 ? "1 game" : "\(games.count) games")
             case .saveStates:
                 let states = allGames
@@ -315,11 +335,17 @@ final class BigPictureModel: ObservableObject {
         }
     }
 
-    private func show(tab newTab: BigPictureTab, system: String?) {
+    /// The game's main genre, from OpenVGDB.
+    private func genre(of game: OEDBGame) -> String? {
+        OEBigPictureArt.shared.details(for: OEBigPictureArt.GameKey(game))?.genres.first
+    }
+
+    private func show(tab newTab: BigPictureTab, system: String?, genre: String? = nil) {
         detailScrolled = false
         screen = .browse
         tab = newTab
         systemFilter = system
+        genreFilter = genre
         tabBarIndex = newTab.rawValue + 1
         rebuildLanes()
         lane = lanes.isEmpty ? -1 : 0
@@ -402,6 +428,9 @@ final class BigPictureModel: ObservableObject {
         case .saveStates(let states):
             guard states.indices.contains(column) else { return }
             onLaunchState?(states[column])
+        case .genres(let genres):
+            guard genres.indices.contains(column) else { return }
+            show(tab: .library, system: nil, genre: genres[column].name)
         }
     }
 

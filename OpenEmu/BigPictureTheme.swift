@@ -97,6 +97,19 @@ enum BP {
     static let sidebarWidth: CGFloat = 260
     static let focusLine: CGFloat = 3
 
+    /// Tile color for a genre, from the AltUI genre tiles.
+    static func genreColor(_ name: String) -> Color {
+        let key = name.lowercased()
+        let table: [(String, UInt32)] = [
+            ("action", 0x6B1A1A), ("role", 0x1A2A6B), ("rpg", 0x1A2A6B), ("platform", 0x1E4D2B), ("adventure", 0x2A5A2A),
+            ("racing", 0x5A3D0F), ("driving", 0x5A3D0F), ("fight", 0x4A1A5A), ("shoot", 0x5A1A3A), ("puzzle", 0x1A4A5A),
+            ("sport", 0x1A3A5A), ("strategy", 0x3A3A1A), ("simulation", 0x1A4A4A),
+        ]
+        if let match = table.first(where: { key.contains($0.0) }) { return Color(hex: match.1) }
+        let fallback: [UInt32] = [0x3A2A5A, 0x2A4A5A, 0x5A2A3A, 0x2A5A4A, 0x4A3A2A]
+        return Color(hex: fallback[abs(key.hashValue) % fallback.count])
+    }
+
     /// Colors for a system's badge, taken from the home-screen designs.
     static func systemColors(_ identifier: String?) -> [Color] {
         func pair(_ a: UInt32, _ b: UInt32) -> [Color] { [Color(hex: a), Color(hex: b)] }

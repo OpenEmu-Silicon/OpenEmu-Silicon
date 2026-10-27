@@ -198,6 +198,7 @@ private enum BPMetrics {
     static let iconBody: CGFloat = 176
     static let featuredBody: CGFloat = 372
     static let gridBody: CGFloat = 372
+    static let genreBody: CGFloat = 116
     static let laneGap: CGFloat = BP.sectionGap
     /// Where a shelf's top sits on screen when it has the highlight.
     static let focusTarget: CGFloat = 84
@@ -213,6 +214,7 @@ private enum BPMetrics {
             default: return header + gridBody + laneGap
             }
         case .saveStates: return header + stateBody + laneGap
+        case .genres: return header + genreBody + laneGap
         }
     }
 }
@@ -448,12 +450,13 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
-    enum Style { case icons, grid, featured, wide }
+    enum Style { case icons, grid, featured, wide, genre }
 
     /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
     var style: Style {
         switch kind {
         case .saveStates: return .wide
+        case .genres: return .genre
         default:
             switch id {
             case "recent": return .icons
@@ -469,10 +472,11 @@ private extension BigPictureLane {
         case .grid: return BP.gridSize.width
         case .featured: return BP.featuredSize.width
         case .wide: return BP.wideCard.width
+        case .genre: return 180
         }
     }
 
-    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : BP.gutter)) }
+    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : BP.gutter))) }
 
     /// Columns that fit on screen before the shelf starts to slide.
     var visibleColumns: Int {
@@ -481,6 +485,7 @@ private extension BigPictureLane {
         case .grid: return 5
         case .featured: return 5
         case .wide: return 4
+        case .genre: return 6
         }
     }
 
@@ -528,6 +533,10 @@ private struct BPLane: View {
                     ForEach(Array(states.enumerated()), id: \.offset) { column, state in
                         stateCard(state, column: column)
                     }
+                case .genres(let genres):
+                    ForEach(Array(genres.enumerated()), id: \.offset) { column, genre in
+                        genreTile(genre, column: column)
+                    }
                 case .heroActions:
                     EmptyView()
                 }
@@ -565,6 +574,39 @@ private struct BPLane: View {
         formatter.unitsStyle = .abbreviated
         return formatter
     }()
+
+    /// A colored tile with the genre name and a small fan of covers, like the AltUI Browse by Genre row.
+    private func genreTile(_ genre: BigPictureGenre, column: Int) -> some View {
+        let focused = isFocused(column)
+        return ZStack(alignment: .bottomLeading) {
+            BP.genreColor(genre.name)
+            HStack(spacing: -22) {
+                ForEach(Array(genre.games.prefix(3).enumerated()), id: \.offset) { offset, game in
+                    let key = OEBigPictureArt.GameKey(game)
+                    if let image = art.grid(for: key) ?? game.boxImage?.image {
+                        Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: 54, height: 74).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+                            .rotationEffect(.degrees(Double(offset - 1) * 7))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, 12).padding(.trailing, 14)
+            Text(genre.name).font(.system(size: 15, weight: .bold)).foregroundColor(.white)
+                .lineLimit(1).padding(.horizontal, 14).padding(.bottom, 12)
+        }
+        .frame(width: 180, height: 100)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+        .scaleEffect(focused ? 1.05 : 1, anchor: .top)
+        .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 14, y: 8)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
+    }
 
     private func isFocused(_ column: Int) -> Bool {
         !model.sidebarOpen && model.lane == index && model.column == column
@@ -840,9 +882,13 @@ private struct BPSidebar: View {
             Color.black.opacity(0.35).onTapGesture { model.perform(.back, source: "mouse") }
 
             VStack(alignment: .leading, spacing: 4) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("OpenEmu").font(BP.headline).foregroundColor(BP.primary)
-                    Text(model.librarySummary).font(BP.caption).foregroundColor(BP.secondary)
+                HStack(spacing: 10) {
+                    Image(nsImage: NSApp.applicationIconImage).resizable().aspectRatio(contentMode: .fit)
+                        .frame(width: 38, height: 38)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("OpenEmu").font(BP.headline).foregroundColor(BP.primary)
+                        Text(model.librarySummary).font(BP.caption).foregroundColor(BP.secondary)
+                    }
                 }
                 .frame(height: 56, alignment: .leading).padding(.leading, 12)
 
