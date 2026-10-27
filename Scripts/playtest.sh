@@ -48,6 +48,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$GAME" ] || { echo "FAIL  need --game <name of a game in your library>" >&2; exit 2; }
+harness_take_lock || exit 2
+trap harness_release_lock EXIT
 if pgrep -x OpenEmu > /dev/null; then
   echo "FAIL  OpenEmu is running. Quit it first: it shares the library with the play test." >&2
   harness_describe_running >&2
@@ -83,7 +85,7 @@ mkdir -p "$OUT"
 # One build folder shared with check.sh, so a single build serves both and permissions persist.
 # OE_BUILD_DIR (or the older OE_PLAYTEST_BUILD) overrides it.
 BUILD="$(harness_build_dir)"
-trap 'harness_kill_debug_app "$BUILD"' EXIT
+trap 'harness_kill_debug_app "$BUILD"; harness_release_lock' EXIT
 APP="$BUILD/Build/Products/Debug/OpenEmu.app"
 
 if [ "$NO_BUILD" -eq 1 ] && [ -d "$APP" ]; then

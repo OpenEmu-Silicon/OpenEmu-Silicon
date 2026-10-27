@@ -46,7 +46,10 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$CORE" ] || { echo "usage: Scripts/core.sh <CoreName> [--release]" >&2; exit 2; }
-[ -d "$CORE" ] || { echo "FAIL  no folder named '$CORE' in the repo root" >&2; exit 2; }
+
+# The core's source folder usually has the core's name, but not always (Potator lives in Potator-Core).
+CORE_DIR=""
+for _d in "$CORE" "$CORE-Core"; do [ -d "$_d" ] && { CORE_DIR="$_d"; break; }; done
 
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1"; FAILURES=$((FAILURES+1)); }
@@ -106,7 +109,7 @@ fi
 
 BUILD_LOG=$(mktemp -t core_build.XXXXXX)
 if [ -n "$CORE_BUILD_SCRIPT" ]; then
-  info "Building core via $CORE_BUILD_SCRIPT (Release; clones the pinned source)"
+  info "Building core via $CORE_BUILD_SCRIPT (Release only for this core; clones the pinned source)"
   wait_for_build_db
   if "$CORE_BUILD_SCRIPT" > "$BUILD_LOG" 2>&1; then
     pass "build ($CORE_BUILD_SCRIPT)"
@@ -155,12 +158,12 @@ while IFS= read -r p; do
     fail "plutil $p"
     plutil -lint "$p" || true
   fi
-done < <(find "$CORE" -maxdepth 3 -name 'Info.plist' 2>/dev/null)
+done < <([ -n "$CORE_DIR" ] && find "$CORE_DIR" -maxdepth 3 -name 'Info.plist' 2>/dev/null)
 
 # --- Locate the built plugin and codesign it ---
 
 if [ -n "$CORE_BUILD_SCRIPT" ]; then
-  ARTIFACT="$CORE/build/XcodeDerived/Build/Products/${CONFIG}/${CORE}.oecoreplugin"
+  ARTIFACT="${CORE_DIR:-$CORE}/build/XcodeDerived/Build/Products/${CONFIG}/${CORE}.oecoreplugin"
   [ -e "$ARTIFACT" ] || ARTIFACT=""
 elif [ -n "$BUILD_DIR_OVERRIDE" ]; then
   ARTIFACT="$BUILD_DIR_OVERRIDE/Build/Products/${CONFIG}/${CORE}.oecoreplugin"

@@ -211,8 +211,16 @@ final class OpenEmuSmokeUITests: XCTestCase {
         dismissFirstRunAlert()
         let play = app.sheets.buttons["Play Game"]
         if Self.usesRealLibrary {
-            // The game is already in the library, so there may be no import prompt: press Play if it shows up.
-            if play.waitForExistence(timeout: 20) { play.click() }
+            // The game is usually already in the library, so there may be no import prompt. A game that was just
+            // imported (the built-in test ROM) can take a while to finish, so wait up to 60 seconds for the prompt,
+            // but stop waiting as soon as the game window or the resume question is up.
+            let deadline = Date().addingTimeInterval(60)
+            while Date() < deadline {
+                if play.exists { play.click(); break }
+                if app.windows.matching(NSPredicate(format: "identifier != 'LibraryWindow' AND title != '' AND title != 'OpenEmu'")).firstMatch.exists
+                    || app.buttons["Resume"].firstMatch.exists { break }
+                usleep(500_000)
+            }
         } else {
             XCTAssertTrue(play.waitForExistence(timeout: 60), "Import-finished prompt did not appear")
             play.click()

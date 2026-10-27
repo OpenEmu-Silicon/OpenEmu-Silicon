@@ -50,9 +50,9 @@ CI (`build-check.yml`) builds every PR, including every core the PR touches, and
 ./Scripts/unit-tests.sh             # run the OpenEmuTests unit target
 ```
 
-To test a particular game, add it to your OpenEmu library the normal way and name it with `--game`; no file path is needed. `check.sh --game` and `prove.sh --game` skip quick save and keep the game's auto save unchanged, so your saves stay as they were (they do update play count and last-played time). `playtest.sh` still leaves an auto save when the game closes.
+To test a particular game, add it to your OpenEmu library the normal way and name it with `--game`; no file path is needed. `check.sh --game` and `prove.sh --game` skip quick save and keep the game's auto save unchanged, and fail if any of that game's save states changed (they do update play count and last-played time). `playtest.sh` still leaves an auto save when the game closes.
 
-`check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either.
+`check.sh` and `playtest.sh` share one build folder (`~/Builds/openemu/harness`, override with `OE_BUILD_DIR`), so the second one reuses the first one's build. Quit OpenEmu before either. Only one `check.sh` or `playtest.sh` run can go at a time (a second one refuses to start), because two runs on one library overwrite each other's auto saves.
 
 Read the whole output and note any new warnings even on a passing build.
 
