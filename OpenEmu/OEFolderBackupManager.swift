@@ -664,7 +664,7 @@ enum OEExtraSaveLocations {
 
     /// Looks at the backup folder before a game starts. If other Macs saved newer progress,
     /// or both Macs changed the game, the result says so. If files are still downloading it
-    /// waits a few seconds, then reports `.stillSyncing`. Completion is called on the main thread.
+    /// waits a few seconds, then reports `.stillSyncing`; a slow folder cannot hold the answer back for longer than the timeout plus 7 seconds. Completion is called once, on the main thread.
     func checkForNewerBackup(
         systemIdentifier: String,
         gameName: String,
@@ -678,8 +678,20 @@ enum OEExtraSaveLocations {
             return
         }
         let safeName = sanitizedName(gameName)
+
+        // The answer arrives once, on the main thread, and never later than `downloadTimeout` plus a short grace. The
+        // download wait below is only checked between passes, and one pass over a slow iCloud folder can take far longer
+        // than the timeout, so without this the game could sit unstarted, with no alert, for minutes.
+        var answered = false
+        let deliver: (OEBackupLaunchCheck) -> Void = { result in
+            guard !answered else { return }
+            answered = true
+            completion(result)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + downloadTimeout + 7) { deliver(.stillSyncing) }
+
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self else { DispatchQueue.main.async { completion(.upToDate) }; return }
+            guard let self else { DispatchQueue.main.async { deliver(.upToDate) }; return }
             self.reloadSettingsCaches()
             // Not on the caller's thread: this takes `recordsLock`, and the caller is the main thread. The background sync
             // holds that lock while it writes to UserDefaults, which can wait for the main thread, so taking it on the
@@ -693,7 +705,7 @@ enum OEExtraSaveLocations {
                 pending = self.requestDownloads(backupFolder: backupFolder, safeName: safeName, systemShort: nil)
             }
             if pending {
-                DispatchQueue.main.async { completion(.stillSyncing) }
+                DispatchQueue.main.async { deliver(.stillSyncing) }
                 return
             }
 
@@ -716,7 +728,7 @@ enum OEExtraSaveLocations {
             case .conflict:
                 result = .conflict(localDate: state.localDate ?? Date(), backupDate: state.backupDate ?? Date(), machineName: state.metadata?.machineName)
             }
-            DispatchQueue.main.async { completion(result) }
+            DispatchQueue.main.async { deliver(result) }
         }
     }
 
