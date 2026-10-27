@@ -8,8 +8,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 MAME_DIR="$REPO_ROOT/MAME"
 DEPS_DIR="$MAME_DIR/deps"
 SRC_DIR="$DEPS_DIR/mame"
-PATCH_FILE="$MAME_DIR/patches/mame-headless-clang21-apple.patch"
-REVISION="fac13e827b7b8cfa4ee4f5760198d31241e2a544"
+REVISION="8c76ad8c177ac9ef4bd735e7e04bd7609b9a8c31"
 REMOTE="https://github.com/OpenEmu-Silicon/mame.git"
 
 mkdir -p "$DEPS_DIR"
@@ -26,17 +25,28 @@ cd "$SRC_DIR"
 git remote set-url origin "$REMOTE"
 
 git fetch --no-tags origin "$REVISION"
-git checkout --detach "$REVISION"
 
-if git apply --check "$PATCH_FILE" >/dev/null 2>&1; then
-  echo "Applying Apple Silicon / Clang 21 patch..."
-  git apply "$PATCH_FILE"
-elif git apply --reverse --check "$PATCH_FILE" >/dev/null 2>&1; then
-  echo "Patch already applied."
-else
-  echo "error: patch does not apply cleanly and is not already applied: $PATCH_FILE" >&2
-  git status --short >&2 || true
-  exit 1
+# Checkouts prepared for MAME 0.250 still carry the old local patch
+# (patches/mame-headless-clang21-apple.patch). Its fixes are upstream in the
+# pinned revision, so drop those edits; refuse to touch any other local change.
+LEGACY_PATCHED=(
+  3rdparty/sol2/sol/sol.hpp
+  3rdparty/zlib/zutil.h
+  src/devices/cpu/v60/op2.hxx
+)
+CHANGED="$(git status --porcelain --untracked-files=no | awk '{print $2}')"
+if [ -n "$CHANGED" ]; then
+  for f in $CHANGED; do
+    if ! printf '%s\n' "${LEGACY_PATCHED[@]}" | grep -qx "$f"; then
+      echo "error: $SRC_DIR has local changes; commit, stash, or discard them first:" >&2
+      git status --short --untracked-files=no >&2
+      exit 1
+    fi
+  done
+  echo "Dropping the old 0.250 local patch..."
+  git checkout -- "${LEGACY_PATCHED[@]}"
 fi
+
+git checkout --detach "$REVISION"
 
 echo "MAME source ready at $SRC_DIR"

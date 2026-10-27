@@ -12,9 +12,9 @@ The MAME headless source is intentionally not committed here because it is very 
 ./Scripts/prepare-mame-core.sh
 ```
 
-That clones `stuartcarnie/mame` at the pinned commit in `deps-mame-revision.txt` into `MAME/deps/mame` and applies `patches/mame-headless-clang21-apple.patch`.
+That clones `OpenEmu-Silicon/mame` (MAME 0.289 plus the headless OSD, branch `mame0289-headless`) at the pinned commit in `deps-mame-revision.txt` into `MAME/deps/mame`. No local patches are applied; the fixes the old 0.250 patch carried (including the V60 fix for Virtua Racing / Sega Model 1 graphics on aarch64) are upstream in 0.289. Checkouts that still carry that old patch are cleaned up automatically.
 
-The patch also backports MAME commit `b5fafba307ba7acc2aea90681c71a3d43aa9cac3`, which fixes a V60 float-to-integer conversion issue reported upstream as causing glitched Virtua Racing / Sega Model 1 graphics on aarch64.
+MAME no longer ships an arcade-only subtarget, so the fork generates `src/mame/arcade.flt` with `src/osd/headless/generate-arcade-flt.sh`. Re-run it when moving the fork to a newer MAME version.
 
 ## Build
 
