@@ -4,6 +4,7 @@
 // Usage:
 //   oe-headless --core <X.oecoreplugin> --rom <file> --frames N [--input FRAME:SELECTOR:INT ...]
 //               [--hash-at FRAME ...] [--save-state-at FRAME] [--load-state-at FRAME] [--audio]
+//               [--search-byte FRAME:HEXVALUE ...]
 //
 // Output is one line per event, easy to grep:
 //   core-loaded <class>
@@ -11,6 +12,9 @@
 //   frame <n> video=<hash> audio=<hash>    (for every --hash-at frame, and the last frame)
 //   state-saved <bytes>
 //   state-loaded
+//   region <name> address=<hex> bytes=<n>  (for --search-byte, once per readable memory region)
+//   hit <hex address>                      (for --search-byte, every byte equal to the value, addressed
+//                                           the way the cheat search window addresses it)
 //   done frames=<n>
 // Any failure prints "error: <reason>" and exits non-zero.
 
@@ -96,6 +100,7 @@ int main(int argc, char **argv)
         BOOL wantAudio = NO;
         NSInteger saveAt = -1, loadAt = -1;
         NSMutableSet<NSNumber *> *hashAt = [NSMutableSet set];
+        NSMutableDictionary<NSNumber *, NSNumber *> *searchAt = [NSMutableDictionary dictionary];
         NSMutableDictionary<NSNumber *, NSMutableArray<NSArray *> *> *inputs = [NSMutableDictionary dictionary];
 
         for (int i = 1; i < argc; i++) {
@@ -108,6 +113,14 @@ int main(int argc, char **argv)
             else if ([arg isEqual:@"--save-state-at"] && next) { saveAt = next.integerValue; i++; }
             else if ([arg isEqual:@"--load-state-at"] && next) { loadAt = next.integerValue; i++; }
             else if ([arg isEqual:@"--audio"]) { wantAudio = YES; }
+            else if ([arg isEqual:@"--search-byte"] && next) {
+                NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
+                if (parts.count != 2) return Fail(@"--search-byte wants FRAME:HEXVALUE");
+                unsigned value = 0;
+                [[NSScanner scannerWithString:parts[1]] scanHexInt:&value];
+                searchAt[@(parts[0].integerValue)] = @(value & 0xFF);
+                i++;
+            }
             else if ([arg isEqual:@"--input"] && next) {
                 NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
                 if (parts.count < 3) return Fail(@"--input wants FRAME:SELECTOR:INT");
@@ -193,6 +206,16 @@ int main(int argc, char **argv)
             }
             [core executeFrame];
             DrainAudio(core, &audioDigest, &audioBytes);
+            if (searchAt[@(frame)]) {
+                uint8_t wanted = searchAt[@(frame)].unsignedCharValue;
+                for (OEMemoryRegionDescriptor *region in [core readableMemoryRegions]) {
+                    printf("region %s address=%08X bytes=%lu\n", region.name.UTF8String, region.address, (unsigned long)region.data.length);
+                    const uint8_t *bytes = region.data.bytes;
+                    for (NSUInteger offset = 0; offset < region.data.length; offset++) {
+                        if (bytes[offset] == wanted) printf("hit %08X\n", [region addressForOffset:offset]);
+                    }
+                }
+            }
             if ([hashAt containsObject:@(frame)] || frame == frames) {
                 printf("frame %ld video=%s audio=%s\n", (long)frame, VideoHash(core, videoBuffer).UTF8String,
                        wantAudio ? DigestString(audioDigest, audioBytes).UTF8String : "-");
