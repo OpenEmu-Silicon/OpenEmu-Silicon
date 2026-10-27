@@ -43,6 +43,7 @@ final public class GameAudio2: GameAudioProtocol {
     private weak var gameCore: OEGameCore!
     private var isDefaultOutputDevice = true
     private var isRunning = false
+    private var currentSampleRate: Double = 0
     
     public init(withCore gameCore: OEGameCore) {
         self.gameCore = gameCore
@@ -54,7 +55,12 @@ final public class GameAudio2: GameAudioProtocol {
     }
     
     @objc public func audioSampleRateDidChange() {
+        let newRate = gameCore.audioSampleRate(forBuffer: 0)
+        log.info("Sample rate changed to \(newRate); engine running: \(self.isRunning)")
         guard isRunning else { return }
+        // Some games announce the same rate again (Mario 64 does, about a second after it starts). Rebuilding the
+        // engine for that stops the sound for roughly 100 ms while the core keeps writing, so the buffer overflows.
+        guard newRate != currentSampleRate else { return }
         
         engine.stop()
         updateSourceNode()
@@ -64,6 +70,7 @@ final public class GameAudio2: GameAudioProtocol {
     }
     
     public func startAudio() {
+        log.info("startAudio")
         precondition(gameCore.audioBufferCount == 1,
                      "nly one buffer supported; got \(gameCore.audioBufferCount)")
         
@@ -100,6 +107,7 @@ final public class GameAudio2: GameAudioProtocol {
         isRunning = true
         do {
             try engine.start()
+            log.info("Audio engine started")
         } catch {
             log.error("Unable to start AVAudioEngine: \(error.localizedDescription, privacy: .public)")
         }
@@ -150,6 +158,7 @@ final public class GameAudio2: GameAudioProtocol {
         
         let read = readBlockForBuffer(gameCore.audioBuffer(at: 0))
         let sd   = streamDescription
+        currentSampleRate = sd.mSampleRate
         let bytesPerFrame = sd.mBytesPerFrame
         let channelCount  = sd.mChannelsPerFrame
         

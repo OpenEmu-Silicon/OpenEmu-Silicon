@@ -23,6 +23,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import os.log
 import OpenEmuKit
 
 let OEForcePopoutGameWindowKey = "forcePopout"
@@ -231,6 +232,14 @@ final class MainWindowController: NSWindowController {
     @objc func startGame(_ game: OEDBGame?) {
         openGameDocument(with: game, saveState: game?.autosaveForLastPlayedRom)
     }
+    
+    #if DEBUG
+    /// Starts a game the way a double-click does: no save state is passed in, so the "continue your last game?"
+    /// question decides whether the auto save state loads. `startGame` above always loads it. Used by the play test driver.
+    func startGameAsPlayer(_ game: OEDBGame) {
+        openGameDocument(with: game, core: nil, saveState: nil)
+    }
+    #endif
 }
 
 extension MainWindowController: LibraryControllerDelegate {
@@ -286,6 +295,9 @@ extension MainWindowController: LibraryControllerDelegate {
         if !noAutoReload {
             openWithSaveState = openWithSaveState || (state != nil && OEAlert.loadAutoSaveGame().runModal() == .alertFirstButtonReturn)
         }
+        
+        os_log(.info, log: .core, "Opening '%{public}@' %{public}@", game?.displayName ?? state?.rom?.game?.displayName ?? "a game",
+               openWithSaveState ? "from a save state" : "from a fresh start")
         
         shouldExitFullScreenWhenGameFinishes = false
         let openDocument: ((OEGameDocument?, Error?) -> Void) = { document, error in

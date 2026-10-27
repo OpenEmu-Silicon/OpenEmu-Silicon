@@ -33,6 +33,7 @@ jobs:
     # Fast guard (no Xcode): catches a flattened core submodule that was
     # committed without its vendored upstream source — the regression that
     # silently broke the Dolphin build for months because CI never compiled it.
+    # Covers every core's .gitmodules, not a hardcoded list.
     # Runs on every PR; it takes seconds and needs no build toolchain.
     name: Core sources present
     runs-on: ubuntu-latest
@@ -42,6 +43,9 @@ jobs:
 
       - name: Check vendored core externals are populated
         run: ./Scripts/check-core-sources.sh
+
+      - name: Test vendored core externals check
+        run: python3 Scripts/test-check-core-sources.py
 
       - name: Test core change detection
         run: python3 Scripts/test-detect-core-changes.py
@@ -296,3 +300,64 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+  # The two jobs below are new and kept apart from `build` on purpose: they are not required checks until the
+  # maintainer adds them to branch protection, so a flaky runner cannot block pull requests while they prove themselves.
+
+  app-unit-tests:
+    name: App unit tests (OpenEmuTests)
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Generate credentials stubs
+        run: |
+          cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
+
+      - name: Run OpenEmuTests
+        # The app is the test host and starts with no library; tests that need one make a throwaway
+        # library themselves (ensureTestLibrary in ROMImporterTests). A test that hangs fails after 2 minutes.
+        run: |
+          xcodebuild test \
+            -workspace OpenEmu-metal.xcworkspace \
+            -scheme OpenEmu \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+  headless-gameboy:
+    # Runs the Gambatte core with no window against a small test ROM written for this repo:
+    # loads, draws, takes button presses, and round-trips save states. See Scripts/headless/.
+    name: Headless core checks (Game Boy)
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Run headless Game Boy checks
+        run: ./Scripts/headless/gb-checks.sh
