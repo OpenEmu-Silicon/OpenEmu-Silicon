@@ -1,0 +1,497 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 53;
+	objects = {
+
+/* Begin PBXAggregateTarget section */
+		D0AADE271763813100759E26 /* Build & Install PCSX2 */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = D0AADE281763813100759E26 /* Build configuration list for PBXAggregateTarget "Build & Install PCSX2" */;
+			buildPhases = (
+				D0AADE2D1763815000759E26 /* ShellScript */,
+			);
+			dependencies = (
+				D0AADE2C1763813900759E26 /* PBXTargetDependency */,
+			);
+			name = "Build & Install PCSX2";
+			productName = "Build & Install PCSX2";
+		};
+/* End PBXAggregateTarget section */
+
+/* Begin PBXBuildFile section */
+		A1B2C3D4E5F600000000A008 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A007 /* fonts */; };
+		A1B2C3D4E5F600000000A00A /* patches.zip in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A009 /* patches.zip */; };
+		A1B2C3D4E5F600000000A006 /* Metal23.metallib in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A005 /* Metal23.metallib */; };
+		D00A068E1763763000C99008 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D00A068D1763763000C99008 /* Cocoa.framework */; };
+		D00A06A617637E9100C99008 /* PCSX2GameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = D00A06A517637E9100C99008 /* PCSX2GameCore.mm */; };
+		A1B2C3D4E5F600000000A002 /* OEHost.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A001 /* OEHost.cpp */; };
+		D0AADE31176382F900759E26 /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0AADE30176382F900759E26 /* OpenEmuBase.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D0AADE2B1763813900759E26 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D00A06821763762F00C99008 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D00A06891763763000C99008;
+			remoteInfo = PCSX2;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A1B2C3D4E5F600000000A007 /* fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fonts; path = build/resources/fonts; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F600000000A009 /* patches.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; name = patches.zip; path = build/resources/patches.zip; sourceTree = SOURCE_ROOT; };
+		A1B2C3D4E5F600000000A005 /* Metal23.metallib */ = {isa = PBXFileReference; lastKnownFileType = "archive.metal-library"; name = Metal23.metallib; path = build/shaders/Metal23.metallib; sourceTree = SOURCE_ROOT; };
+		05334A951C52AEEF0066D493 /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
+		05334A981C52AF0E0066D493 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		8C3132F7177F667D0002D0B9 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		D00A068A1763763000C99008 /* PCSX2.oecoreplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PCSX2.oecoreplugin; sourceTree = BUILT_PRODUCTS_DIR; };
+		D00A068D1763763000C99008 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		D00A06921763763000C99008 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		D00A069F17637AB600C99008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = SOURCE_ROOT; };
+		D00A06A417637E9100C99008 /* PCSX2GameCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PCSX2GameCore.h; sourceTree = "<group>"; };
+		D00A06A517637E9100C99008 /* PCSX2GameCore.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PCSX2GameCore.mm; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000A001 /* OEHost.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OEHost.cpp; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000A003 /* OEHost.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEHost.h; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000A004 /* engine.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = engine.xcconfig; path = build/engine.xcconfig; sourceTree = SOURCE_ROOT; };
+		D00A06A717637EB500C99008 /* OEPS2SystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = OEPS2SystemResponderClient.h; path = "../OpenEmu/SystemPlugins/PlayStation 2/OEPS2SystemResponderClient.h"; sourceTree = "<group>"; };
+		D0AADE30176382F900759E26 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuBase.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0AADE331763838A00759E26 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		D0AADE341763838A00759E26 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D00A06871763763000C99008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D00A068E1763763000C99008 /* Cocoa.framework in Frameworks */,
+				D0AADE31176382F900759E26 /* OpenEmuBase.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D00A06811763762F00C99008 = {
+			isa = PBXGroup;
+			children = (
+				D00A06A317637BDD00C99008 /* Classes */,
+				D0AADE2E176381E900759E26 /* Other Sources */,
+				D00A06931763763000C99008 /* Resources */,
+				D00A068C1763763000C99008 /* Frameworks */,
+				D00A068B1763763000C99008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D00A068B1763763000C99008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D00A068A1763763000C99008 /* PCSX2.oecoreplugin */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D00A068C1763763000C99008 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D0AADE30176382F900759E26 /* OpenEmuBase.framework */,
+				D00A068F1763763000C99008 /* Linked Frameworks */,
+				D0AADE321763833600759E26 /* Other Frameworks */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D00A068F1763763000C99008 /* Linked Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				05334A951C52AEEF0066D493 /* CoreMIDI.framework */,
+				05334A981C52AF0E0066D493 /* CoreAudio.framework */,
+				D00A068D1763763000C99008 /* Cocoa.framework */,
+				8C3132F7177F667D0002D0B9 /* OpenGL.framework */,
+			);
+			name = "Linked Frameworks";
+			sourceTree = "<group>";
+		};
+		D00A06931763763000C99008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D00A069F17637AB600C99008 /* Info.plist */,
+				A1B2C3D4E5F600000000A004 /* engine.xcconfig */,
+				A1B2C3D4E5F600000000A005 /* Metal23.metallib */,
+				A1B2C3D4E5F600000000A007 /* fonts */,
+				A1B2C3D4E5F600000000A009 /* patches.zip */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		D00A06A317637BDD00C99008 /* Classes */ = {
+			isa = PBXGroup;
+			children = (
+				D00A06A717637EB500C99008 /* OEPS2SystemResponderClient.h */,
+				D00A06A417637E9100C99008 /* PCSX2GameCore.h */,
+				D00A06A517637E9100C99008 /* PCSX2GameCore.mm */,
+				A1B2C3D4E5F600000000A001 /* OEHost.cpp */,
+				A1B2C3D4E5F600000000A003 /* OEHost.h */,
+				D0BA5A9517645D630033A910 /* osd */,
+			);
+			name = Classes;
+			sourceTree = "<group>";
+		};
+		D0AADE2E176381E900759E26 /* Other Sources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "Other Sources";
+			sourceTree = "<group>";
+		};
+		D0AADE321763833600759E26 /* Other Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D0AADE331763838A00759E26 /* AppKit.framework */,
+				D0AADE341763838A00759E26 /* CoreData.framework */,
+				D00A06921763763000C99008 /* Foundation.framework */,
+			);
+			name = "Other Frameworks";
+			sourceTree = "<group>";
+		};
+		D0BA5A9517645D630033A910 /* osd */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = osd;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D00A06891763763000C99008 /* PCSX2 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D00A069C1763763000C99008 /* Build configuration list for PBXNativeTarget "PCSX2" */;
+			buildPhases = (
+				D00A06861763763000C99008 /* Sources */,
+				D00A06871763763000C99008 /* Frameworks */,
+				D00A06881763763000C99008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PCSX2;
+			productName = PCSX2;
+			productReference = D00A068A1763763000C99008 /* PCSX2.oecoreplugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D00A06821763762F00C99008 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1330;
+				ORGANIZATIONNAME = OpenEmu;
+			};
+			buildConfigurationList = D00A06851763762F00C99008 /* Build configuration list for PBXProject "PCSX2" */;
+			compatibilityVersion = "Xcode 10.0";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				English,
+				en,
+			);
+			mainGroup = D00A06811763762F00C99008;
+			productRefGroup = D00A068B1763763000C99008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D00A06891763763000C99008 /* PCSX2 */,
+				D0AADE271763813100759E26 /* Build & Install PCSX2 */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D00A06881763763000C99008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F600000000A006 /* Metal23.metallib in Resources */,
+				A1B2C3D4E5F600000000A008 /* fonts in Resources */,
+				A1B2C3D4E5F600000000A00A /* patches.zip in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D0AADE2D1763815000759E26 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"$USER_LIBRARY_DIR/Application Support/OpenEmu/Cores\"\nrm -rf \"$USER_LIBRARY_DIR/Application Support/OpenEmu/Cores/$PROJECT_NAME.oecoreplugin\" \"$USER_LIBRARY_DIR/Application Support/OpenEmu/Cores/$PROJECT_NAME.oecoreplugin.dSYM\"\nditto \"$BUILT_PRODUCTS_DIR/$PROJECT_NAME.oecoreplugin\" \"$USER_LIBRARY_DIR/Application Support/OpenEmu/Cores/$PROJECT_NAME.oecoreplugin\"\nif [ -d \"$BUILT_PRODUCTS_DIR/$PROJECT_NAME.oecoreplugin.dSYM\" ]; then\n  ditto \"$BUILT_PRODUCTS_DIR/$PROJECT_NAME.oecoreplugin.dSYM\" \"$USER_LIBRARY_DIR/Application Support/OpenEmu/Cores/$PROJECT_NAME.oecoreplugin.dSYM\"\nfi";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D00A06861763763000C99008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D00A06A617637E9100C99008 /* PCSX2GameCore.mm in Sources */,
+				A1B2C3D4E5F600000000A002 /* OEHost.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D0AADE2C1763813900759E26 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D00A06891763763000C99008 /* PCSX2 */;
+			targetProxy = D0AADE2B1763813900759E26 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		D00A069A1763763000C99008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CLANG_CXX_LIBRARY = "compiler-default";
+				CLANG_DEBUG_INFORMATION_LEVEL = default;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEAD_CODE_STRIPPING = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu89;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
+				GCC_INPUT_FILETYPE = sourcecode.cpp.cpp;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "";
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRECOMPS_INCLUDE_HEADERS_FROM_BUILT_PRODUCTS_DIR = NO;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		D00A069B1763763000C99008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++14";
+				CLANG_CXX_LIBRARY = "compiler-default";
+				CLANG_DEBUG_INFORMATION_LEVEL = default;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEAD_CODE_STRIPPING = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu89;
+				GCC_INCREASE_PRECOMPILED_HEADER_SHARING = YES;
+				GCC_INPUT_FILETYPE = sourcecode.cpp.cpp;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = "";
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VALUE = NO;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRECOMPS_INCLUDE_HEADERS_FROM_BUILT_PRODUCTS_DIR = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		D00A069D1763763000C99008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F600000000A004 /* engine.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 0.1.0.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_INPUT_FILETYPE = automatic;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../OpenEmu/SystemPlugins/PlayStation 2\"",
+					"$(SRCROOT)",
+					"$(ENGINE_HEADER_SEARCH_PATHS)",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"$(ENGINE_DEFINES)",
+				);
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"$(ENGINE_CPLUSPLUSFLAGS)",
+				);
+				OTHER_LDFLAGS = "@$(SRCROOT)/build/engine-link.rsp";
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				WRAPPER_EXTENSION = oecoreplugin;
+			};
+			name = Debug;
+		};
+		D00A069E1763763000C99008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F600000000A004 /* engine.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 0.1.0.0;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_INPUT_FILETYPE = automatic;
+				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"$(SRCROOT)/../OpenEmu/SystemPlugins/PlayStation 2\"",
+					"$(SRCROOT)",
+					"$(ENGINE_HEADER_SEARCH_PATHS)",
+				);
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"$(ENGINE_DEFINES)",
+				);
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(inherited)",
+					"$(ENGINE_CPLUSPLUSFLAGS)",
+				);
+				OTHER_LDFLAGS = "@$(SRCROOT)/build/engine-link.rsp";
+				INFOPLIST_FILE = Info.plist;
+				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
+				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				WRAPPER_EXTENSION = oecoreplugin;
+			};
+			name = Release;
+		};
+		D0AADE291763813100759E26 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		D0AADE2A1763813100759E26 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D00A06851763762F00C99008 /* Build configuration list for PBXProject "PCSX2" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D00A069A1763763000C99008 /* Debug */,
+				D00A069B1763763000C99008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D00A069C1763763000C99008 /* Build configuration list for PBXNativeTarget "PCSX2" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D00A069D1763763000C99008 /* Debug */,
+				D00A069E1763763000C99008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D0AADE281763813100759E26 /* Build configuration list for PBXAggregateTarget "Build & Install PCSX2" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0AADE291763813100759E26 /* Debug */,
+				D0AADE2A1763813100759E26 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D00A06821763762F00C99008 /* Project object */;
+}

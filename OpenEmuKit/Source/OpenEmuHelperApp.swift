@@ -162,6 +162,7 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
 
     // Observer for achievement unlock notifications posted by the active core plugin.
     var _achievementObserver: Any?
+    var _rumbleObserver: Any?
     var _raSessionObserver: Any?
     var _raEventObserver: Any?
     var _raUnrecognizedObserver: Any?
@@ -394,6 +395,22 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
                                        ])
         }
 
+        // A core asks a controller to rumble by posting "OEGameCoreRumble" with the player
+        // (from 1) and the two motor strengths (0 to 1). Pass it on to the application.
+        _rumbleObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("OEGameCoreRumble"),
+            object: nil,
+            queue: nil
+        ) { [weak self] note in
+            guard let owner = self?.gameCoreOwner,
+                  let info = note.userInfo,
+                  let player = (info["player"] as? NSNumber)?.uintValue,
+                  let strong = (info["strongMotor"] as? NSNumber)?.floatValue,
+                  let weak   = (info["weakMotor"] as? NSNumber)?.floatValue
+            else { return }
+            owner.setRumble?(player: player, strongMotor: strong, weakMotor: weak)
+        }
+
         _achievementObserver = NotificationCenter.default.addObserver(
             forName: .OEAchievementUnlocked,
             object: nil,
@@ -611,6 +628,10 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
         if let observer = _achievementObserver {
             NotificationCenter.default.removeObserver(observer)
             _achievementObserver = nil
+        }
+        if let observer = _rumbleObserver {
+            NotificationCenter.default.removeObserver(observer)
+            _rumbleObserver = nil
         }
         if let observer = _raSessionObserver {
             NotificationCenter.default.removeObserver(observer)

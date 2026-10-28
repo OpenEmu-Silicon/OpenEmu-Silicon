@@ -643,6 +643,7 @@ final class OEGameDocument: NSDocument {
         
         saveState(name: OEDBSaveState.autosaveName) {
             self.emulationStatus = .terminating
+            self.silenceRumble()
             // TODO: #567 and #568 need to be fixed first
             //removeDeviceNotificationObservers()
             
@@ -818,6 +819,7 @@ final class OEGameDocument: NSDocument {
         retroAchievementsActiveProgressByAchievementID.removeAll()
         gameViewController?.clearRetroAchievementsIndicators()
         didShowRetroAchievementsBootPlacard = false
+        silenceRumble()
         gameCoreManager?.stopEmulation() {
             OEBindingsController.default.systemBindings(for: self.systemPlugin.controller).remove(self)
             
@@ -1234,6 +1236,7 @@ final class OEGameDocument: NSDocument {
                     return
                 }
                 SentryService.addBreadcrumb(message: "Emulation paused", category: "emulation")
+                silenceRumble()
                 enableOSSleep()
                 emulationStatus = .paused
                 if let lastPlayStartDate = lastPlayStartDate {
@@ -3380,7 +3383,36 @@ extension OEGameDocument: OESystemBindingsObserver {
         gameViewController.setRemoteContextID(contextID)
     }
     
+    func setRumble(player: UInt, strongMotor: Float, weakMotor: Float) {
+        DispatchQueue.main.async {
+            self.applyRumble(player: Int(player), strong: strongMotor, weak: weakMotor)
+        }
+    }
+
+    /// Rumbles the controller assigned to a player (player numbers start at 1). Only
+    /// controllers that support force feedback respond; keyboards and others ignore it.
+    private func applyRumble(player: Int, strong: Float, weak: Float) {
+        let enabled = UserDefaults.standard.object(forKey: "OERumbleEnabled") as? Bool ?? true
+        let strength = enabled ? CGFloat(strong) : 0
+        let softness = enabled ? CGFloat(weak) : 0
+        let bindings = OEBindingsController.default.systemBindings(for: systemPlugin.controller)
+        // Not deviceHandler(forPlayer:), which asserts when the player has no controller
+        // (for example keyboard only). This returns nil in that case.
+        guard let handler = bindings.devicePlayerBindings(forPlayer: UInt(player))?.deviceHandler else { return }
+        handler.forceFeedback(withStrongIntensity: strength, weakIntensity: softness)
+    }
+
+    /// Stops every controller's motors, for pause, quit and a crashed core, so one never stays on.
+    func silenceRumble() {
+        let players = Int(systemPlugin.controller.numberOfPlayers)
+        guard players >= 1 else { return }
+        for player in 1...players {
+            applyRumble(player: player, strong: 0, weak: 0)
+        }
+    }
+
     func gameCoreDidTerminate() {
+        silenceRumble()
         if !(emulationStatus == .starting || emulationStatus == .paused) {
             return
         }

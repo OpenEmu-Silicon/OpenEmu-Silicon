@@ -43,6 +43,7 @@
 				87BD9E211C2A663B006722DF /* PBXTargetDependency */,
 				87BD9E1F1C2A662D006722DF /* PBXTargetDependency */,
 				87BD9E1D1C2A661A006722DF /* PBXTargetDependency */,
+				A1B2C3D4E5F700000000B003 /* PBXTargetDependency */,
 				87BD9E1B1C2A660C006722DF /* PBXTargetDependency */,
 				87BD9E191C2A65FD006722DF /* PBXTargetDependency */,
 				87BD9E171C2A65EE006722DF /* PBXTargetDependency */,
@@ -345,6 +346,7 @@
 		87BD9E2E1C2A673F006722DF /* Sega CD.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 94A224931707542A00098DA0 /* Sega CD.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		87BD9E2F1C2A674D006722DF /* PSP.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 94454EB417860E1D006C057B /* PSP.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		87BD9E301C2A675A006722DF /* PlayStation.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 94A224F61707596100098DA0 /* PlayStation.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A1B2C3D4E5F700000000B001 /* PlayStation 2.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 3DB744BA1BD8BA9E00C23E74 /* PlayStation 2.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		87BD9E311C2A6774006722DF /* PC Engine CD.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 9405538417A34C6B009B505D /* PC Engine CD.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		87BD9E321C2A6788006722DF /* Vectrex.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 943F998B1707D51100270E89 /* Vectrex.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		87BD9E331C2A679B006722DF /* WonderSwan.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 94A224431707539D00098DA0 /* WonderSwan.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -917,6 +919,13 @@
 			remoteGlobalIDString = 94A224F51707596100098DA0;
 			remoteInfo = PlayStation;
 		};
+		A1B2C3D4E5F700000000B002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2A37F4A9FDCFA73011CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3DB744A51BD8BA9E00C23E74;
+			remoteInfo = "PlayStation 2";
+		};
 		87BD9E1E1C2A662D006722DF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 2A37F4A9FDCFA73011CA2CEA /* Project object */;
@@ -1104,6 +1113,7 @@
 				87BD9E321C2A6788006722DF /* Vectrex.oesystemplugin in Copy System Plugins to App Plugins */,
 				87BD9E311C2A6774006722DF /* PC Engine CD.oesystemplugin in Copy System Plugins to App Plugins */,
 				87BD9E301C2A675A006722DF /* PlayStation.oesystemplugin in Copy System Plugins to App Plugins */,
+				A1B2C3D4E5F700000000B001 /* PlayStation 2.oesystemplugin in Copy System Plugins to App Plugins */,
 				87BD9E2F1C2A674D006722DF /* PSP.oesystemplugin in Copy System Plugins to App Plugins */,
 				87BD9E2E1C2A673F006722DF /* Sega CD.oesystemplugin in Copy System Plugins to App Plugins */,
 				87BD9E2D1C2A672F006722DF /* SG-1000.oesystemplugin in Copy System Plugins to App Plugins */,
@@ -7045,6 +7055,11 @@
 			isa = PBXTargetDependency;
 			target = 94A224F51707596100098DA0 /* PlayStation */;
 			targetProxy = 87BD9E1C1C2A661A006722DF /* PBXContainerItemProxy */;
+		};
+		A1B2C3D4E5F700000000B003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3DB744A51BD8BA9E00C23E74 /* PlayStation 2 */;
+			targetProxy = A1B2C3D4E5F700000000B002 /* PBXContainerItemProxy */;
 		};
 		87BD9E1F1C2A662D006722DF /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

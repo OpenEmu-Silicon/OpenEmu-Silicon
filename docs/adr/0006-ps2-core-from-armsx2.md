@@ -26,7 +26,7 @@ A spike on 2026-10-21 (commit `65fd14b`, Apple Silicon Mac, macOS 26) found:
 
 Replace the PCSX2 plan with a native core built on ARMSX2. Reuse the existing OpenEmu `PCSX2-Core` bridge as the template for the OpenEmu side, and port it onto ARMSX2 instead of writing a new wrapper.
 
-- Do not use ARMSX2's libretro target. The libretro bridge is being removed.
+- Do not use ARMSX2's libretro target or API. The libretro bridge is being removed. We do build the engine with its `ENABLE_LIBRETRO` setting on, because that is the engine's "host owns pads, audio and video" mode (it declares `Host::SetPadVibration` and embeds the shaders); see `PCSX2/README.md`.
 - Do not copy the old bridge's forked copies of engine files (Metal device, SPU2 mixer, `Pad.cpp`). They are stale against ARMSX2. Patch ARMSX2's own files with small, flagged changes instead.
 - Pin ARMSX2 to a specific commit, never a branch or the nightly channel.
 - Develop on a long-lived integration branch, `feat/ps2-core`, and merge it into `main` in one PR once the core works end to end. This is an exception to the usual "no long-lived branches" habit, because the core cannot be released in pieces.
@@ -51,8 +51,10 @@ The full map and work breakdown are in [`docs/ps2-armsx2-port.md`](../ps2-armsx2
 - Threading between the engine's CPU, graphics and audio threads and OpenEmu's threads is the likeliest source of crashes.
 - Compatibility beyond one tested game is unknown.
 
-## Open decisions
+## Decisions on the open questions
 
-1. **How to vendor the engine.** ADR-0001 says cores are flattened into the repo. ARMSX2 is about 560 MB. Options: flatten a pruned copy, use a pinned submodule, or fetch a pinned archive at build time. This affects repo size, clone time and upgrade effort.
-2. **Whether to keep an OpenGL renderer** in the first release or ship Metal only (recommended: Metal only).
-3. **Where the engine and wrapper live.** In this repo as `PCSX2/` or `ARMSX2/`, or in a separate fork that the repo pins.
+Decided 2026-10-26 while starting work item 1.
+
+1. **How to vendor the engine:** do not copy it into the repo. This is the same pattern as the MAME and FBNeo cores. `PCSX2/deps-armsx2-revision.txt` and `Scripts/prepare-armsx2-core.sh` record a fork URL and a full commit SHA, and the script fetches exactly that commit (shallow) into the gitignored `PCSX2/deps/armsx2/`. `Scripts/build-armsx2-core.sh` builds it. The engine is about 560 MB and is not a core we edit wholesale, so ADR-0001's flattening does not fit it.
+2. **Renderer:** Metal only. The build sets `USE_VULKAN=OFF`, and OpenGL is already off on macOS.
+3. **Where the engine lives:** a fork that holds our small flagged patches, with this repo pinning it. The fork is `OpenEmu-Silicon/armsx2` (a fork of `ARMSX2/ARMSX2`), set by `REMOTE` in `Scripts/prepare-armsx2-core.sh`. A small patch that is not yet in the fork can sit in `PCSX2/patches/*.patch`, which the prepare script applies in name order.

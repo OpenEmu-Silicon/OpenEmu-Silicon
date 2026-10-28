@@ -1,0 +1,80 @@
+diff --git a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+index 23c13cc..1e0fe9a 100644
+--- a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
++++ b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+@@ -1786,6 +1786,31 @@ static bool ConvertShaderNotNeeded(ShaderConvert shader)
+ 
+ static bool s_capture_next = false;
+ 
++#ifdef OE_METAL_OUTPUT
++#include <atomic>
++
++// OpenEmu owns two output textures. When they are set, the final "present" pass renders
++// into one of them instead of into a window drawable, alternating each frame. OpenEmu
++// shows the one that GSDeviceMTLReadyOutputIndex() names, which is the newest frame the GPU
++// has finished, so the CPU never waits for the GPU.
++static MRCOwned<id<MTLTexture>> s_oe_output_textures[2];
++static std::atomic<int> s_oe_ready_index{0};
++static int s_oe_render_index = 0;
++
++void GSDeviceMTLSetOutputTextures(void* texture0, void* texture1)
++{
++	s_oe_output_textures[0] = MRCRetain((__bridge id<MTLTexture>)texture0);
++	s_oe_output_textures[1] = MRCRetain((__bridge id<MTLTexture>)texture1);
++	s_oe_ready_index = 0;
++	s_oe_render_index = 0;
++}
++
++int GSDeviceMTLReadyOutputIndex()
++{
++	return s_oe_ready_index.load(std::memory_order_acquire);
++}
++#endif
++
+ GSDevice::PresentResult GSDeviceMTL::DoBeginPresent(bool frame_skip)
+ { @autoreleasepool {
+ 	if (m_capture_start_frame && FrameNo() == m_capture_start_frame)
+@@ -1832,8 +1857,24 @@ static bool ConvertShaderNotNeeded(ShaderConvert shader)
+ 		return PresentResult::FrameSkipped;
+ 	}
+ 	id<MTLCommandBuffer> buf = GetRenderCmdBuf();
++#ifdef OE_METAL_OUTPUT
++	const bool oe_output = static_cast<bool>(s_oe_output_textures[0]) && static_cast<bool>(s_oe_output_textures[1]);
++	if (oe_output)
++		m_current_drawable = nullptr;
++	else
++#endif
+ 	m_current_drawable = MRCRetain([m_layer nextDrawable]);
+ 	EndRenderPass();
++#ifdef OE_METAL_OUTPUT
++	if (oe_output)
++	{
++		[m_pass_desc colorAttachments][0].texture = s_oe_output_textures[s_oe_render_index];
++		id<MTLRenderCommandEncoder> oe_enc = [buf renderCommandEncoderWithDescriptor:m_pass_desc];
++		[oe_enc setLabel:@"Present"];
++		m_current_render.encoder = MRCRetain(oe_enc);
++		return PresentResult::OK;
++	}
++#endif
+ 	if (!m_current_drawable)
+ 	{
+ 		[buf pushDebugGroup:@"Present Skipped"];
+@@ -1867,6 +1908,18 @@ static bool ConvertShaderNotNeeded(ShaderConvert shader)
+ 				[drawable present];
+ 			}];
+ 	}
++#ifdef OE_METAL_OUTPUT
++	// Tell OpenEmu which texture holds a finished frame once the GPU is done with it, then
++	// draw the next frame into the other texture.
++	if (s_oe_output_textures[0] && s_oe_output_textures[1] && m_current_render_cmdbuf)
++	{
++		const int finished_index = s_oe_render_index;
++		[m_current_render_cmdbuf addCompletedHandler:^(id<MTLCommandBuffer>) {
++			s_oe_ready_index.store(finished_index, std::memory_order_release);
++		}];
++		s_oe_render_index ^= 1;
++	}
++#endif
+ 	FlushEncoders();
+ 	FrameCompleted();
+ 	m_current_drawable = nullptr;
