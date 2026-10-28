@@ -6,6 +6,7 @@
 #   ./Scripts/bigpicture-look.sh --steps "shot:home,play:10,shot:returned"   # launch the featured game and come back
 #   ./Scripts/bigpicture-look.sh --steps "shot:a,down,shot:b,select,shot:c"
 #   ./Scripts/bigpicture-look.sh --no-build
+#   ./Scripts/bigpicture-look.sh --app-arg -OEBigPictureRediscoverDays 0   # pass a launch argument for this run only
 #   ./Scripts/bigpicture-look.sh --no-steamgriddb      # see the fallbacks a user without a SteamGridDB key gets
 #
 # Steps are controller actions (up down left right select back menu) plus "shot:<name>" to save a picture of the
@@ -25,11 +26,13 @@ harness_ensure_stubs "$REPO_ROOT"
 STEPS="shot:home,down,shot:shelf,up,up,right,right,shot:tabbar,left,left,left,right,right,right,right,shot:library,down,select,shot:menu,select,shot:filtered"
 NO_BUILD=0
 NO_SGDB=0
+EXTRA_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --steps) STEPS="${2:-}"; shift 2 ;;
     --no-build) NO_BUILD=1; shift ;;
     --no-steamgriddb) NO_SGDB=1; shift ;;
+    --app-arg) EXTRA_ARGS+=("${2:-}" "${3:-}"); shift 3 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -65,6 +68,7 @@ PY
 echo "----  walking through big picture (${STEPS})"
 APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1 -stopEmulationWithoutConfirmation 1 -loadAutosaveDialogChoice 1)
 [ "$NO_SGDB" -eq 1 ] && APP_ARGS+=(-OEBigPictureDisableSteamGridDB 1)
+[ "${#EXTRA_ARGS[@]}" -gt 0 ] && APP_ARGS+=("${EXTRA_ARGS[@]}")
 /usr/bin/open -n -W --stdout "$OUT/app.log" --stderr "$OUT/app.log" "$APP" --args "${APP_ARGS[@]}" &
 LAUNCHER_PID=$!
 WAITED=0

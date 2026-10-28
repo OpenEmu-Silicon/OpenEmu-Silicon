@@ -221,6 +221,7 @@ private enum BPMetrics {
     static let featuredBody: CGFloat = 372
     static let gridBody: CGFloat = 372
     static let genreBody: CGFloat = 116
+    static let recentBody: CGFloat = BP.recentSize.height + 16
     static let laneGap: CGFloat = BP.sectionGap
     /// Where a shelf's top sits on screen when it has the highlight.
     static let focusTarget: CGFloat = 84
@@ -233,13 +234,15 @@ private enum BPMetrics {
             switch lane.style {
             case .icons: return header + iconBody + laneGap
             case .featured: return header + featuredBody + laneGap
-            case .banner: return 140 + laneGap
+            case .banner: return 108 + laneGap
+            case .recent: return header + recentBody + laneGap
             default: return header + gridBody + laneGap
             }
         case .saveStates: return header + stateBody + laneGap
         case .genres: return header + genreBody + laneGap
         case .filters: return 64
         case .keys: return header + 52
+        case .achievements: return header + BP.badgeCard.height + 20 + laneGap
         }
     }
 }
@@ -508,7 +511,7 @@ private struct BPHero: View {
 // MARK: - Shelves
 
 private extension BigPictureLane {
-    enum Style { case icons, grid, featured, wide, genre, filters, banner, keys }
+    enum Style { case icons, grid, featured, wide, genre, filters, banner, keys, recent, badges }
 
     /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
     var style: Style {
@@ -517,10 +520,12 @@ private extension BigPictureLane {
         case .genres: return .genre
         case .filters: return .filters
         case .keys: return .keys
+        case .achievements: return .badges
         default:
             switch id {
             case "recent": return .icons
-            case "most-played", "added": return .featured
+            case "most-played": return .featured
+            case "added": return .recent
             case "rediscover": return .banner
             default: return .grid
             }
@@ -537,10 +542,12 @@ private extension BigPictureLane {
         case .filters: return 210
         case .keys: return 40
         case .banner: return BP.canvas.width - 2 * BP.margin
+        case .recent: return BP.recentSize.width
+        case .badges: return BP.badgeCard.width
         }
     }
 
-    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : (style == .filters ? 12 : (style == .banner ? 0 : (style == .keys ? 8 : BP.gutter)))))) }
+    var itemGap: CGFloat { style == .icons ? 18 : (style == .featured ? 14 : (style == .grid ? 20 : (style == .genre ? 14 : (style == .filters ? 12 : (style == .banner ? 0 : (style == .keys ? 8 : (style == .recent ? 18 : (style == .badges ? 14 : BP.gutter)))))))) }
 
     /// Columns that fit on screen before the shelf starts to slide.
     var visibleColumns: Int {
@@ -553,6 +560,8 @@ private extension BigPictureLane {
         case .filters: return 4
         case .banner: return 1
         case .keys: return 14
+        case .recent: return 3
+        case .badges: return 4
         }
     }
 
@@ -593,6 +602,15 @@ private struct BPLane: View {
                         if let subtitle = lane.subtitle {
                             Text(subtitle).font(BP.callout).foregroundColor(BP.secondary)
                         }
+                        if let progress = lane.progress {
+                            GeometryReader { bar in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(BP.border)
+                                    Capsule().fill(BP.accent).frame(width: bar.size.width * CGFloat(min(max(progress, 0), 1)))
+                                }
+                            }
+                            .frame(width: 420, height: 4).padding(.top, 4)
+                        }
                     }
                 }
                 .padding(.horizontal, BP.margin)
@@ -612,6 +630,7 @@ private struct BPLane: View {
                         case .icons: iconTile(game, column: column)
                         case .featured: featuredCard(game, column: column)
                         case .banner: bannerCard(game, column: column)
+                        case .recent: recentCard(game, column: column)
                         default: poster(game, column: column)
                         }
                     }
@@ -630,6 +649,10 @@ private struct BPLane: View {
                 case .keys(let keys):
                     ForEach(Array(keys.enumerated()), id: \.offset) { column, key in
                         keyButton(key, column: column)
+                    }
+                case .achievements(let items):
+                    ForEach(Array(items.enumerated()), id: \.offset) { column, item in
+                        achievementCard(item, column: column)
                     }
                 case .heroActions:
                     EmptyView()
@@ -763,45 +786,163 @@ private struct BPLane: View {
             .onTapGesture { model.click(lane: index, column: column) }
     }
 
-    /// "Rediscover": a game you spent time in and have left alone for a while.
+    /// "Rediscover": a game you spent time in and have left alone for a while. A wide, blue-tinted card with a
+    /// "Played 6 mos. ago" pill, the title, play time and last save, and a Play Now button.
     private func bannerCard(_ game: OEDBGame, column: Int) -> some View {
         let focused = isFocused(column)
         let key = OEBigPictureArt.GameKey(game)
         let width = BP.canvas.width - 2 * BP.margin
         let ago = game.lastPlayed.map { Self.ago.localizedString(for: $0, relativeTo: Date()) }
-        let played = game.playTime >= 3600 ? String(format: "%.0f hrs played", game.playTime / 3600) : String(format: "%.0f min played", game.playTime / 60)
+        let hours = game.playTime / 3600
+        let played = hours >= 1 ? String(format: "%.0fh played", hours) : String(format: "%.0fm played", max(game.playTime / 60, 1))
+        let lastSave = (game.defaultROM?.normalSaveStates ?? []).max { ($0.timestamp ?? .distantPast) < ($1.timestamp ?? .distantPast) }
+        let saveName = lastSave.flatMap { $0.displayName.split(separator: " ").first.map { $0.replacingOccurrences(of: "-", with: " ") } }
+        let accent = Color(hex: 0x3B82F6)
         return ZStack(alignment: .leading) {
+            Color(hex: 0x0E1B52)
             if let hero = art.hero(for: key) {
-                Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).frame(width: width, height: 140).clipped().opacity(0.55)
-            } else {
-                BP.material
+                Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).frame(width: width, height: 108).clipped().opacity(0.4)
             }
-            LinearGradient(colors: [BP.background.opacity(0.85), .clear], startPoint: .leading, endPoint: .trailing)
+            LinearGradient(colors: [Color(hex: 0x0E1B52).opacity(0.95), Color(hex: 0x0E1B52).opacity(0.35)], startPoint: .leading, endPoint: .trailing)
             HStack(spacing: 18) {
                 if let cover = art.poster(for: game) {
-                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).frame(width: 80, height: 100)
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).frame(width: 88, height: 84)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("REDISCOVER").font(.system(size: 10, weight: .bold)).tracking(1.2).foregroundColor(BP.accent)
-                    Text(game.bpTitle).font(.system(size: 24, weight: .heavy)).foregroundColor(BP.primary).lineLimit(1)
-                    Text([ago.map { "Last played \($0)" }, played].compactMap { $0 }.joined(separator: "  ·  "))
-                        .font(BP.callout).foregroundColor(BP.secondary)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ago.map { "Played \($0)" } ?? "Played a while ago")
+                        .font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: 0x7DB3FF))
+                        .padding(.horizontal, 10).frame(height: 22)
+                        .background(Capsule().fill(accent.opacity(0.28)))
+                        .overlay(Capsule().strokeBorder(accent.opacity(0.7), lineWidth: 1))
+                    Text(game.bpTitle).font(.system(size: 22, weight: .bold)).foregroundColor(BP.primary).lineLimit(1)
+                    Text([played, saveName.map { "Last save: \($0)" }].compactMap { $0 }.joined(separator: "  ·  "))
+                        .font(BP.callout).foregroundColor(BP.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                Text("View").font(.system(size: 13, weight: .semibold)).foregroundColor(Color.black.opacity(0.88))
-                    .padding(.horizontal, 20).frame(height: 34).background(Capsule().fill(Color.white))
+                HStack(spacing: 8) {
+                    Image(systemName: "play.fill").font(.system(size: 12, weight: .bold))
+                    Text("Play Now").font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(BP.primary)
+                .padding(.horizontal, 22).frame(height: 38)
+                .background(Capsule().fill(Color.white.opacity(0.14)))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
             }
             .padding(.horizontal, 20)
         }
-        .frame(width: width, height: 140)
+        .frame(width: width, height: 108)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+            .strokeBorder(focused ? BP.focusRing : accent.opacity(0.25), lineWidth: focused ? BP.focusLine : 1))
         .scaleEffect(focused ? 1.01 : 1)
         .animation(.easeOut(duration: 0.12), value: focused)
         .onAppear { art.load(key) }
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
+    }
+
+    /// Recently Added: a wide card with the game's art on top and an info bar with its box art, name, system and genre,
+    /// when it was added, and a Play pill. "New" marks anything added in the last two weeks.
+    private func recentCard(_ game: OEDBGame, column: Int) -> some View {
+        let focused = isFocused(column)
+        let key = OEBigPictureArt.GameKey(game)
+        let details = art.details(for: key)
+        let facts = [game.system?.name, details?.primaryGenre].compactMap { $0 }.joined(separator: " · ")
+        let added = game.importDate.map { date -> String in
+            if Calendar.current.isDateInToday(date) { return "Added today" }
+            return "Added " + Self.ago.localizedString(for: date, relativeTo: Date())
+        }
+        let size = BP.recentSize
+        return VStack(spacing: 0) {
+            ZStack {
+                BP.material
+                if let hero = art.hero(for: key) {
+                    Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill)
+                } else if let cover = art.poster(for: game) {
+                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 22).opacity(0.7)
+                }
+            }
+            .frame(width: size.width, height: size.height - BP.recentBarHeight).clipped()
+            .overlay(alignment: .topLeading) {
+                if isNew(game) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "star.fill").font(.system(size: 9, weight: .bold))
+                        Text("New").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(BP.primary).padding(.horizontal, 10).frame(height: 24)
+                    .background(Capsule().fill(Color.black.opacity(0.55))).padding(10)
+                }
+            }
+            HStack(spacing: 12) {
+                if let cover = art.poster(for: game) {
+                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).frame(width: 40, height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(game.bpTitle).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
+                    if !facts.isEmpty { Text(facts).font(.system(size: 11)).foregroundColor(BP.secondary).lineLimit(1) }
+                    if let added = added { Text(added).font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(1) }
+                }
+                Spacer(minLength: 0)
+                HStack(spacing: 5) {
+                    Image(systemName: "play.fill").font(.system(size: 9, weight: .bold))
+                    Text("Play").font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(BP.primary).padding(.horizontal, 14).frame(height: 28)
+                .background(Capsule().fill(Color.white.opacity(0.12)))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 1))
+            }
+            .padding(.horizontal, 12)
+            .frame(width: size.width, height: BP.recentBarHeight)
+            .background(BP.material)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: BP.cardRadius + 2, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: BP.cardRadius + 2, style: .continuous)
+            .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+        .scaleEffect(focused ? 1.03 : 1, anchor: .top)
+        .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: 14, y: 8)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onAppear { art.load(key) }
+        .onHover { inside in if inside { model.hover(lane: index, column: column) } }
+        .onTapGesture { model.click(lane: index, column: column) }
+    }
+
+    /// An achievement: its badge (dimmed while locked), title, description and points.
+    private func achievementCard(_ item: BigPictureAchievement, column: Int) -> some View {
+        let focused = isFocused(column)
+        let images = BigPictureRemoteImages.shared
+        return HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                BP.surface
+                if let badge = images.image(item.badgeURL) {
+                    Image(nsImage: badge).resizable().aspectRatio(contentMode: .fill)
+                }
+            }
+            .frame(width: 60, height: 60).clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .opacity(item.earned ? 1 : 0.4)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title).font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(item.earned ? BP.primary : BP.secondary).lineLimit(1)
+                Text(item.detail).font(.system(size: 11)).foregroundColor(BP.tertiary).lineLimit(2)
+                Spacer(minLength: 0)
+                Text("\(item.points) PTS").font(.system(size: 10, weight: .bold)).tracking(0.6)
+                    .foregroundColor(item.earned ? BP.accent : BP.tertiary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(width: BP.badgeCard.width, height: BP.badgeCard.height, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous).fill(BP.material))
+        .overlay(RoundedRectangle(cornerRadius: BP.cardRadius, style: .continuous)
+            .strokeBorder(focused ? BP.focusRing : BP.border, lineWidth: focused ? BP.focusLine : 1))
+        .opacity(item.earned ? 1 : 0.8)
+        .scaleEffect(focused ? 1.03 : 1, anchor: .top)
+        .animation(.easeOut(duration: 0.12), value: focused)
+        .onAppear { images.load(item.badgeURL) }
+        .onReceive(images.$tick) { _ in }
         .onHover { inside in if inside { model.hover(lane: index, column: column) } }
         .onTapGesture { model.click(lane: index, column: column) }
     }

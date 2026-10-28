@@ -1303,6 +1303,9 @@ extension AppDelegate: NSMenuDelegate {
         // Get the “Customize Touch Bar…” menu to display in the View menu.
         NSApp.isAutomaticCustomizeTouchBarMenuItemEnabled = true
 
+        // Keep each game's latest RetroAchievements session, so big picture can show achievements without a running game.
+        MainActor.assumeIsolated { OEBigPictureAchievements.shared.start() }
+
         #if DEBUG
         // Big-picture mode spike (#789): debug builds only, until it has a proper entry point.
         let bigPictureItem = NSMenuItem(title: "Big Picture (Spike)", action: #selector(toggleBigPicture(_:)), keyEquivalent: "b")

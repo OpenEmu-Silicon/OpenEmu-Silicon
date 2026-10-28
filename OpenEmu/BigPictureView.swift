@@ -54,6 +54,7 @@ struct BigPictureLane: Identifiable {
         case genres([BigPictureGenre])
         case filters([BigPictureFilter])
         case keys([BigPictureKey])
+        case achievements([BigPictureAchievement])
     }
 
     let id: String
@@ -66,6 +67,8 @@ struct BigPictureLane: Identifiable {
     var game: OEDBGame?
     /// How many pager dots follow the hero buttons as extra stops (Home only).
     var heroDots = 0
+    /// Progress through a game's achievements, drawn as a bar under the shelf title.
+    var progress: Double?
 
     var count: Int {
         switch kind {
@@ -75,6 +78,7 @@ struct BigPictureLane: Identifiable {
         case .genres(let genres): return genres.count
         case .filters(let filters): return filters.count
         case .keys(let keys): return keys.count
+        case .achievements(let items): return items.count
         }
     }
 }
@@ -270,6 +274,13 @@ final class BigPictureModel: ObservableObject {
             if !states.isEmpty {
                 built.append(BigPictureLane(id: "states", title: "Save States", subtitle: "\(states.count) saved", kind: .saveStates(states)))
             }
+            if let summary = OEBigPictureAchievements.shared.summary(for: game) {
+                var lane = BigPictureLane(id: "achievements", title: "Achievements",
+                                          subtitle: "\(summary.unlocked) of \(summary.total) earned  ·  \(summary.unlockedPoints) of \(summary.totalPoints) points",
+                                          kind: .achievements(summary.achievements))
+                lane.progress = summary.total > 0 ? Double(summary.unlocked) / Double(summary.total) : 0
+                built.append(lane)
+            }
             lanes = built
         case .browse:
             switch tab {
@@ -302,7 +313,11 @@ final class BigPictureModel: ObservableObject {
                     built.append(BigPictureLane(id: "most-played", title: "Most Played", subtitle: nil, kind: .games(Array(mostPlayed.prefix(12)))))
                 }
                 // A game you put plenty of time into and have not touched for a while.
-                let cutoff = Date().addingTimeInterval(-14 * 24 * 3600)
+                var quietDays = 14.0
+                #if DEBUG
+                if UserDefaults.standard.object(forKey: "OEBigPictureRediscoverDays") != nil { quietDays = UserDefaults.standard.double(forKey: "OEBigPictureRediscoverDays") }
+                #endif
+                let cutoff = Date().addingTimeInterval(-quietDays * 24 * 3600)
                 if let again = mostPlayed.first(where: { ($0.lastPlayed ?? .distantFuture) < cutoff }) {
                     built.append(BigPictureLane(id: "rediscover", title: nil, subtitle: nil, kind: .games([again])))
                 }
@@ -686,7 +701,10 @@ final class BigPictureModel: ObservableObject {
             else { open(game) }
         case .games(let games):
             guard games.indices.contains(column) else { return }
-            open(games[column])
+            // The Rediscover banner says "Play Now": it launches the game; every other shelf opens its page.
+            if lanes[lane].id == "rediscover" { onLaunch?(games[column]) } else { open(games[column]) }
+        case .achievements:
+            return
         case .saveStates(let states):
             guard states.indices.contains(column) else { return }
             onLaunchState?(states[column])
