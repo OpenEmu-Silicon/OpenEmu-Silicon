@@ -117,8 +117,10 @@ START_TIME="$(date '+%Y-%m-%d %H:%M:%S')"
 echo "----  playing for ${SECONDS_TO_PLAY}s"
 # OESkipDiscGuideMessageKey: the library shows "Have you read the guide?" whenever it opens on a disc-based system
 # (the sidebar remembers the last one used), which would block the run. Launch arguments are never saved to preferences.
+# backgroundPause NO: OpenEmu pauses the game when it stops being the active app, so anyone clicking another window during
+# a run would freeze the game and spoil the result (frame pacing then shows one gap as long as the pause).
 APP_ARGS=(-OEPlaytestPlan "$OUT/plan.json" -loadAutosaveDialogChoice "$RESUME" -stopEmulationWithoutConfirmation 1
-          -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1)
+          -OESkipDiscGuideMessageKey 1 -OESkipAutosaveOnStop 1 -backgroundPause NO)
 # --no-backup turns the save backup folder off for this run only (a launch argument is never saved to preferences).
 [ "$NO_BACKUP" -eq 1 ] && APP_ARGS+=(-OEBackupFolderPath "")
 # --slow-icloud MS makes every backup folder listing and copy take MS longer (debug builds), like a slow iCloud Drive.
