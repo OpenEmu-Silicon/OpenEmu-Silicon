@@ -261,15 +261,19 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
 #pragma mark - Input
 
-// OEArcadeButton values (Up..Service) align with FBHeadlessButton; the fork maps
-// them to the active driver's inputs.
+// OEArcadeButton values (Up..Service, Configure) align with FBHeadlessButton; the
+// fork maps them to the active driver's inputs. Service drives the test switch
+// (settings menu) and Configure the separate service-credit input.
+static_assert((int)OEArcadeButtonService == (int)FBHeadlessButtonService &&
+              (int)OEArcadeUIConfigure == (int)FBHeadlessButtonConfigure,
+              "OEArcadeButton and FBHeadlessButton must stay aligned");
 - (void)setState:(BOOL)pressed ofButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
 {
     if (player == 0 || player > 4) {
         return;
     }
-    if (button >= OEArcadeUIConfigure) {
-        return; // UI command, not a game input
+    if (button > OEArcadeUIConfigure) {
+        return;
     }
     FBHeadlessSetInput((int)(player - 1), (int)button, pressed ? 1 : 0);
 }
