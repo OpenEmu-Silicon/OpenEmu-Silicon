@@ -17,7 +17,7 @@ SRC_DIR="$DEPS_DIR/fbneo"
 REMOTE="https://github.com/OpenEmu-Silicon/fbneo.git"
 BRANCH="fbneo-headless"
 # Keep in sync with FBNeo/deps-fbneo-revision.txt.
-REVISION="e746940065f3bb50ec788330064b765ec1ef3339"
+REVISION="23f29286048b95e7190f07aa7c888d6d85a440a0"
 
 mkdir -p "$DEPS_DIR"
 
