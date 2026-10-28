@@ -31,7 +31,11 @@ git fetch --no-tags origin "$REVISION"
 # pinned revision, so drop those edits, but only on a revision that patch was
 # applied to. Any other local change, staged or not, is left alone.
 LEGACY_REVISIONS=(
+  # stuartcarnie/mame mame0250-headless, "feat: updates for mame250": pinned
+  # from the first MAME integration (88d8126e5) until #687.
   4fc1f9f16b0dfba6be670367330028635613b04b
+  # OpenEmu-Silicon/mame mame0250-headless, "Expose cheat option as settable
+  # property": pinned by #687 until the 0.289 update.
   fac13e827b7b8cfa4ee4f5760198d31241e2a544
 )
 LEGACY_PATCHED=(

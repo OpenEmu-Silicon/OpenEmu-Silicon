@@ -564,7 +564,7 @@ BOOL driverIsNotWorking(GameDriverOptions o)
         NSData *bytes = dict[@"bytes"];
         BOOL bigEndian = [dict[@"bigEndian"] boolValue];
         int8_t addressShift = (int8_t)[dict[@"addressShift"] intValue];
-        if (!bytes) continue;
+        if (!bytes || bytes.length == 0) continue;
 
         // Size the address width to the region's highest address, not its base.
         uint64_t lastOffset = bytes.length - 1;
