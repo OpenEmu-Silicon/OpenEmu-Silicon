@@ -292,7 +292,14 @@ private struct BPPage: View {
         if case .heroActions = model.lanes[model.lane].kind { return 0 }
         // Moving around the search keyboard must not move the page: the whole keyboard stays in view.
         if model.tab == .search, model.screen == .browse, case .keys = model.lanes[model.lane].kind { return 0 }
-        return -max(0, laneTops[model.lane] - BPMetrics.focusTarget)
+        let wanted = max(0, laneTops[model.lane] - BPMetrics.focusTarget)
+        // On a game page the closing sections scroll separately (see detailScrolled), so only the browsing screens stop
+        // at the end: once the bottom of the content reaches the bottom of the screen, the last shelves stay where they
+        // are instead of scrolling up and leaving the lower half of the screen empty.
+        if case .detail = model.screen { return -wanted }
+        guard let lastTop = laneTops.last, let last = model.lanes.last else { return -wanted }
+        let contentBottom = lastTop + BPMetrics.height(of: last) - BPMetrics.laneGap + 32
+        return -min(wanted, max(0, contentBottom - canvasHeight))
     }
 
     var body: some View {
