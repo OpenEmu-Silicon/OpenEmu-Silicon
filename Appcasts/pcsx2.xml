@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+  xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+  xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>PCSX2</title>
+    <!-- No release yet. Add the first <item> when the PlayStation 2 plugin ships (Scripts/update_core_appcast.py). -->
+  </channel>
+</rss>
