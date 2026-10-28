@@ -113,7 +113,9 @@ bool OEHost::Initialize(const Folders& folders, std::string* error)
 
 		// Metal renderer; the picture is copied to OpenEmu's texture (patch 0001).
 		// Stretch fills that texture, and OpenEmu applies the 4:3 shape itself.
-		si.SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Metal));
+		// "Automatic" on macOS is Metal. Naming Metal here makes the engine show a "Graphics API is not
+		// set to Automatic" warning over the picture at every launch, so ask for Automatic instead.
+		si.SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Auto));
 		si.SetStringValue("EmuCore/GS", "AspectRatio", "Stretch");
 		// No SDL input and no audio device. The Null backend keeps the mixed sound in a
 		// ring, and the game core pulls it out each frame (PCSX2GameCore executeFrame).
