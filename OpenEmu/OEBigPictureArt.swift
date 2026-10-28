@@ -62,6 +62,7 @@ final class OEBigPictureArt: ObservableObject {
     private var heroes = [String: NSImage]()
     private var grids = [String: NSImage]()
     private var icons = [String: NSImage]()
+    private var logos = [String: NSImage]()
     private var details = [String: Details]()
     private var requested = Set<String>()
     private var known = [String: GameKey]()
@@ -69,6 +70,7 @@ final class OEBigPictureArt: ObservableObject {
     func hero(for key: GameKey) -> NSImage? { heroes[key.md5] }
     func grid(for key: GameKey) -> NSImage? { grids[key.md5] }
     func icon(for key: GameKey) -> NSImage? { icons[key.md5] }
+    func logo(for key: GameKey) -> NSImage? { logos[key.md5] }
     func details(for key: GameKey) -> Details? { details[key.md5] }
 
     /// Starts the lookups for a game once. Safe to call every time a game is shown.
@@ -87,8 +89,9 @@ final class OEBigPictureArt: ObservableObject {
             async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name)
             async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name)
             async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name)
-            let (heroImage, gridImage, iconImage) = await (hero, grid, icon)
-            self?.store(hero: heroImage, grid: gridImage, icon: iconImage, for: key.md5)
+            async let logo = OEHeroArtFetcher.shared.logoArt(md5: key.md5, displayName: key.name)
+            let (heroImage, gridImage, iconImage, logoImage) = await (hero, grid, icon, logo)
+            self?.store(hero: heroImage, grid: gridImage, icon: iconImage, logo: logoImage, for: key.md5)
         }
     }
 
@@ -111,10 +114,11 @@ final class OEBigPictureArt: ObservableObject {
 
     // MARK: -
 
-    private func store(hero: NSImage?, grid: NSImage?, icon: NSImage?, for md5: String) {
+    private func store(hero: NSImage?, grid: NSImage?, icon: NSImage?, logo: NSImage?, for md5: String) {
         if let hero = hero { heroes[md5] = hero }
         if let grid = grid { grids[md5] = grid }
         if let icon = icon { icons[md5] = icon }
+        if let logo = logo { logos[md5] = logo }
         tick += 1
     }
 

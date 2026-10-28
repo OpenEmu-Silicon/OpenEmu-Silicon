@@ -64,10 +64,12 @@ struct BigPictureLane: Identifiable {
     var showsGame = false
     /// The game a shelf belongs to (Save States groups by game), shown as a small icon beside the title.
     var game: OEDBGame?
+    /// How many pager dots follow the hero buttons as extra stops (Home only).
+    var heroDots = 0
 
     var count: Int {
         switch kind {
-        case .heroActions: return 2
+        case .heroActions: return 2 + heroDots
         case .games(let games): return games.count
         case .saveStates(let states): return states.count
         case .genres(let genres): return genres.count
@@ -274,7 +276,7 @@ final class BigPictureModel: ObservableObject {
             case .home:
                 var built = [BigPictureLane]()
                 let recent = sortedByRecent(allGames)
-                if !allGames.isEmpty { built.append(BigPictureLane(id: "actions", title: nil, subtitle: nil, kind: .heroActions)) }
+                if !allGames.isEmpty { built.append(BigPictureLane(id: "actions", title: nil, subtitle: nil, kind: .heroActions, heroDots: featured.count > 1 ? featured.count : 0)) }
                 if !recent.isEmpty {
                     built.append(BigPictureLane(id: "recent", title: "Continue Playing", subtitle: nil, kind: .games(Array(recent.prefix(20)))))
                 }
@@ -338,29 +340,33 @@ final class BigPictureModel: ObservableObject {
 
     // MARK: Derived
 
-    /// The game the hero describes: what is highlighted, else the one played most recently.
+    /// The game the hero describes: the game being viewed on a game page, otherwise the featured game. The hero
+    /// does not follow the highlight on the shelves below; it only changes with its own pager dots.
     var heroGame: OEDBGame? {
         if case .detail(let game) = screen { return game }
-        if lane >= 0, lanes.indices.contains(lane), case .games(let games) = lanes[lane].kind, games.indices.contains(column) {
-            return games[column]
-        }
         let featured = self.featured
         if !featured.isEmpty { return featured[heroIndex % featured.count] }
         return byName(allGames).first
     }
 
-    /// The games the hero rotates through when nothing on a shelf is highlighted.
+    /// The games the hero rotates through.
     var featured: [OEDBGame] { Array(sortedByRecent(allGames).prefix(5)) }
 
-    /// True when the hero shows a featured game (and its pager dots), false when it follows a highlighted poster.
+    /// True when the hero shows a featured game (and its pager dots) rather than a game page.
     var heroIsFeatured: Bool {
         if case .detail = screen { return false }
-        if lane >= 0, lanes.indices.contains(lane), case .games = lanes[lane].kind { return false }
         return true
     }
 
+    /// True while the highlight is on one of the hero's pager dots; the hero then stops rotating by itself.
+    var heroDotFocused: Bool {
+        guard lane >= 0, lanes.indices.contains(lane), case .heroActions = lanes[lane].kind else { return false }
+        return column >= 2
+    }
+
     func advanceHero() {
-        guard tab == .home, screen == .browse, !gameRunning, openMenu == nil, !sidebarOpen, heroIsFeatured, featured.count > 1 else { return }
+        guard tab == .home, screen == .browse, !gameRunning, openMenu == nil, !sidebarOpen, heroIsFeatured, !heroDotFocused,
+              featured.count > 1 else { return }
         heroIndex = (heroIndex + 1) % featured.count
     }
 
@@ -641,6 +647,8 @@ final class BigPictureModel: ObservableObject {
         }
         guard lanes.indices.contains(lane) else { return }
         column = min(max(column + delta, 0), max(lanes[lane].count - 1, 0))
+        // Landing on a pager dot shows that featured game.
+        if case .heroActions = lanes[lane].kind, column >= 2 { heroIndex = column - 2 }
     }
 
     private func goBack() {
@@ -671,6 +679,7 @@ final class BigPictureModel: ObservableObject {
         guard lanes.indices.contains(lane) else { return }
         switch lanes[lane].kind {
         case .heroActions:
+            if column >= 2 { heroIndex = column - 2; return }
             guard let game = heroGame else { return }
             if column == 0 { onLaunch?(game) }
             else if case .detail = screen, lanes.indices.contains(1) { lane = 1; column = 0 }   // jump to this game's saves

@@ -408,10 +408,19 @@ private struct BPHero: View {
                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.55), lineWidth: 1))
                 .offset(x: heroTextX, y: 100)
 
-            Text(game.bpTitle)
-                .font(BP.display).tracking(-0.5).foregroundColor(BP.primary)
-                .lineLimit(1).minimumScaleFactor(0.65).frame(width: 800, alignment: .leading)
-                .offset(x: heroTextX, y: 132)
+            Group {
+                if let logo = art.logo(for: key) {
+                    // The title lettering from SteamGridDB, when it has one.
+                    Image(nsImage: logo).resizable().aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: 560, maxHeight: 60, alignment: .leading)
+                } else {
+                    Text(game.bpTitle)
+                        .font(BP.display).tracking(-0.5).foregroundColor(BP.primary)
+                        .lineLimit(1).minimumScaleFactor(0.65)
+                }
+            }
+            .frame(width: 800, height: 60, alignment: .topLeading)
+            .offset(x: heroTextX, y: 130)
 
             metaRow(details: details).offset(x: heroTextX, y: 200)
 
@@ -432,8 +441,11 @@ private struct BPHero: View {
             if model.heroIsFeatured, model.featured.count > 1 {
                 HStack(spacing: 6) {
                     ForEach(0..<model.featured.count, id: \.self) { dot in
-                        Capsule().fill(dot == model.heroIndex % model.featured.count ? Color.white : Color.white.opacity(0.35))
-                            .frame(width: dot == model.heroIndex % model.featured.count ? 22 : 6, height: 6)
+                        let current = dot == model.heroIndex % model.featured.count
+                        Capsule().fill(current ? Color.white : Color.white.opacity(0.35))
+                            .frame(width: current ? 22 : 6, height: 6)
+                            .overlay(Capsule().strokeBorder(BP.focusRing, lineWidth: actionsFocused && model.column == 2 + dot ? BP.focusLine : 0).padding(-4))
+                            .onTapGesture { model.click(lane: 0, column: 2 + dot) }
                     }
                 }
                 .frame(width: BP.canvas.width - 2 * BP.margin, alignment: .trailing)

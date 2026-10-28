@@ -48,6 +48,13 @@ actor OEHeroArtFetcher {
         return dir
     }()
 
+    private let logoCacheDir: URL = {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = support.appendingPathComponent("OpenEmu/LogoArt", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
     private let gridCacheDir: URL = {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let dir = support.appendingPathComponent("OpenEmu/GridArt", isDirectory: true)
@@ -63,6 +70,7 @@ actor OEHeroArtFetcher {
     private var inFlight: [String: Task<ImageBox, Never>] = [:]
     private var iconInFlight: [String: Task<ImageBox, Never>] = [:]
     private var gridInFlight: [String: Task<ImageBox, Never>] = [:]
+    private var logoInFlight: [String: Task<ImageBox, Never>] = [:]
 
     func heroArt(md5: String, displayName: String) async -> NSImage? {
         guard !md5.isEmpty else { return nil }
@@ -116,6 +124,29 @@ actor OEHeroArtFetcher {
             return ImageBox(nil)
         }
         iconInFlight[md5] = task
+        return await task.value.image
+    }
+
+    /// The game's title logo, cached on disk by ROM MD5.
+    func logoArt(md5: String, displayName: String) async -> NSImage? {
+        guard !md5.isEmpty else { return nil }
+        let cachedPath = logoCacheDir.appendingPathComponent("\(md5).png")
+        if FileManager.default.fileExists(atPath: cachedPath.path),
+           let img = NSImage(contentsOf: cachedPath) { return img }
+        if let existing = logoInFlight[md5] { return await existing.value.image }
+        let task = Task<ImageBox, Never> {
+            defer { logoInFlight.removeValue(forKey: md5) }
+            guard !displayName.isEmpty else { return ImageBox(nil) }
+            if let id = await SteamGridDBClient.shared.gameID(for: displayName),
+               let artURL = await SteamGridDBClient.shared.logoURL(for: id),
+               let (data, _) = try? await URLSession.shared.data(from: artURL),
+               let img = NSImage(data: data) {
+                cacheToDisk(img, path: cachedPath)
+                return ImageBox(img)
+            }
+            return ImageBox(nil)
+        }
+        logoInFlight[md5] = task
         return await task.value.image
     }
 

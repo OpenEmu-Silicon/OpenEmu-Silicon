@@ -117,6 +117,20 @@ actor SteamGridDBClient {
         return URL(string: urlStr)
     }
 
+    /// The game's title logo (a transparent image of the title lettering), if SteamGridDB has one.
+    func logoURL(for gameID: Int) async -> URL? {
+        guard let url = URL(string: "\(base)/logos/game/\(gameID)") else { return nil }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(SteamGridDBClient.apiKey)", forHTTPHeaderField: "Authorization")
+
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataArray = json["data"] as? [[String: Any]],
+              let urlStr = dataArray.first?["url"] as? String else { return nil }
+        return URL(string: urlStr)
+    }
+
     /// A portrait poster. Asks for the standard poster sizes first, then takes any portrait grid the game has.
     func gridURL(for gameID: Int) async -> URL? {
         let sized = await gridItems(gameID: gameID, dimensions: "600x900,342x482,660x930")
