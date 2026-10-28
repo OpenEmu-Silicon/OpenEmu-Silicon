@@ -142,8 +142,13 @@ extension Color {
 struct BigPictureCanvas<Content: View>: View {
 
     let content: Content
+    /// False when the canvas is drawn over something else (the pause menu over a running game).
+    let opaque: Bool
 
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    init(opaque: Bool = true, @ViewBuilder content: () -> Content) {
+        self.opaque = opaque
+        self.content = content()
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -158,7 +163,7 @@ struct BigPictureCanvas<Content: View>: View {
                     .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
         }
-        .background(BP.background)
+        .background(opaque ? BP.background : Color.clear)
         .ignoresSafeArea()
     }
 }

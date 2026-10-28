@@ -50,8 +50,9 @@ struct BigPictureView: View {
                         .transition(.opacity)
                 }
 
-                if let game = model.pauseGame {
-                    BPPauseMenu(model: model, game: game, art: art)
+                // The game's pause menu is drawn over the game itself (see BigPicturePauseRoot); this one is for leaving.
+                if case .exit? = model.pauseKind {
+                    BPPauseMenu(model: model, kind: .exit, art: art)
                         .transition(.opacity)
                 }
 
@@ -63,6 +64,13 @@ struct BigPictureView: View {
             .animation(.easeOut(duration: 0.18), value: model.sidebarOpen)
         }
         .edgesIgnoringSafeArea(.all)
+    }
+}
+
+/// "5 min ago", but "just now" for anything within a minute, instead of "in 0s" when the clock puts a time slightly ahead.
+final class BPRelativeFormatter: RelativeDateTimeFormatter {
+    override func localizedString(for date: Date, relativeTo reference: Date) -> String {
+        abs(date.timeIntervalSince(reference)) < 60 ? "just now" : super.localizedString(for: date, relativeTo: reference)
     }
 }
 
@@ -93,7 +101,7 @@ private extension OEDBGame {
         if hours >= 1 { parts.append(String(format: "%.0f hrs", hours)) }
         else if playTime >= 60 { parts.append(String(format: "%.0f min", playTime / 60)) }
         if let lastPlayed = lastPlayed {
-            let formatter = RelativeDateTimeFormatter()
+            let formatter = BPRelativeFormatter()
             formatter.unitsStyle = .abbreviated
             parts.append(formatter.localizedString(for: lastPlayed, relativeTo: Date()))
         }
@@ -713,7 +721,7 @@ private struct BPLane: View {
     }
 
     private static let ago: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
+        let formatter = BPRelativeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter
     }()
@@ -883,9 +891,9 @@ private struct BPLane: View {
                 }
             }
             HStack(spacing: 12) {
-                if let cover = art.poster(for: game) {
-                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).frame(width: 40, height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                if let tile = art.tile(for: game) {
+                    Image(nsImage: tile).resizable().aspectRatio(contentMode: .fill).frame(width: 48, height: 48).clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(game.bpTitle).font(BP.calloutBold).foregroundColor(BP.primary).lineLimit(1)
@@ -1142,7 +1150,7 @@ private struct BPDetailSections: View {
     @ObservedObject var art: OEBigPictureArt
 
     private var ago: RelativeDateTimeFormatter {
-        let formatter = RelativeDateTimeFormatter()
+        let formatter = BPRelativeFormatter()
         formatter.unitsStyle = .full
         return formatter
     }
@@ -1227,6 +1235,7 @@ private struct BPSidebar: View {
         case .tab(.recent): return "clock"
         case .tab(.favorites): return "heart"
         case .settings: return "slider.horizontal.3"
+        case .exit: return "rectangle.portrait.and.arrow.right"
         default: return "circle"
         }
     }
@@ -1235,6 +1244,7 @@ private struct BPSidebar: View {
         switch entry {
         case .tab(let tab): return tab.title
         case .settings: return "Settings"
+        case .exit: return "Exit Big Picture"
         case .system(let id): return model.systems.first { $0.id == id }?.name ?? id
         }
     }
@@ -1255,7 +1265,7 @@ private struct BPSidebar: View {
                 .frame(height: 56, alignment: .leading).padding(.leading, 12)
 
                 ForEach(Array(model.sidebarEntries.enumerated()), id: \.offset) { index, entry in
-                    if index == 4 {
+                    if index == 5 {
                         Text("SYSTEMS").font(BP.captionBold).tracking(1.2).foregroundColor(BP.tertiary)
                             .padding(.leading, 12).padding(.top, 14).padding(.bottom, 4)
                     }
@@ -1306,12 +1316,38 @@ private struct BPSidebar: View {
 
 // MARK: - Pause menu
 
-/// Shown when the Home button or Start + Select is used during a game: Resume Game or Quit Game, chosen with the controller.
+/// The pause menu drawn over a running game, in a window of its own that sits on the game's window, so it never has to
+/// switch Spaces to get to or back from the game.
+struct BigPicturePauseRoot: View {
+
+    @ObservedObject var model: BigPictureModel
+    @ObservedObject private var art = OEBigPictureArt.shared
+
+    var body: some View {
+        BigPictureCanvas(opaque: false) {
+            if case .game(let game)? = model.pauseKind {
+                BPPauseMenu(model: model, kind: .game(game), art: art)
+            } else {
+                Color.clear
+            }
+        }
+    }
+}
+
+/// A two-choice dialog: Resume Game / Quit Game while a game runs, or Stay / Exit Big Picture. The first choice is the
+/// safe one and is where the highlight starts; Back and Home choose it too.
 private struct BPPauseMenu: View {
 
     @ObservedObject var model: BigPictureModel
-    let game: OEDBGame
+    let kind: BigPictureModel.PauseKind
     @ObservedObject var art: OEBigPictureArt
+
+    private var choices: [(String, String)] {
+        switch kind {
+        case .game: return [("Resume Game", "play.fill"), ("Quit Game", "xmark.circle")]
+        case .exit: return [("Stay in Big Picture", "arrow.uturn.backward"), ("Exit Big Picture", "rectangle.portrait.and.arrow.right")]
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -1319,24 +1355,19 @@ private struct BPPauseMenu: View {
 
             VStack(spacing: 22) {
                 HStack(spacing: 14) {
-                    if let tile = art.tile(for: game) {
-                        Image(nsImage: tile).resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 56, height: 56).clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(game.bpTitle).font(BP.headline).foregroundColor(BP.primary).lineLimit(1)
-                        Text("Game paused").font(BP.callout).foregroundColor(BP.secondary)
-                    }
+                    header
                     Spacer(minLength: 0)
                 }
                 .frame(width: 340)
 
                 VStack(spacing: 10) {
-                    choice("Resume Game", symbol: "play.fill", index: 0)
-                    choice("Quit Game", symbol: "xmark.circle", index: 1)
+                    ForEach(Array(choices.enumerated()), id: \.offset) { index, choice in
+                        row(choice.0, symbol: choice.1, index: index)
+                    }
                 }
-                Text("Your progress is saved when you quit.").font(BP.caption).foregroundColor(BP.tertiary)
+                if case .game = kind {
+                    Text("Your progress is saved when you quit.").font(BP.caption).foregroundColor(BP.tertiary)
+                }
             }
             .padding(30)
             .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(BP.material))
@@ -1346,7 +1377,28 @@ private struct BPPauseMenu: View {
         .frame(width: BP.canvas.width, height: BP.canvas.height)
     }
 
-    private func choice(_ title: String, symbol: String, index: Int) -> some View {
+    @ViewBuilder private var header: some View {
+        switch kind {
+        case .game(let game):
+            if let game = game, let tile = art.tile(for: game) {
+                Image(nsImage: tile).resizable().aspectRatio(contentMode: .fill)
+                    .frame(width: 56, height: 56).clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(game?.bpTitle ?? "Game").font(BP.headline).foregroundColor(BP.primary).lineLimit(1)
+                Text("Game paused").font(BP.callout).foregroundColor(BP.secondary)
+            }
+        case .exit:
+            Image(nsImage: NSApp.applicationIconImage).resizable().aspectRatio(contentMode: .fit).frame(width: 56, height: 56)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Big Picture").font(BP.headline).foregroundColor(BP.primary)
+                Text("Leave big picture mode?").font(BP.callout).foregroundColor(BP.secondary)
+            }
+        }
+    }
+
+    private func row(_ title: String, symbol: String, index: Int) -> some View {
         let focused = model.pauseIndex == index
         return HStack(spacing: 10) {
             Image(systemName: symbol).font(.system(size: 14, weight: .semibold))

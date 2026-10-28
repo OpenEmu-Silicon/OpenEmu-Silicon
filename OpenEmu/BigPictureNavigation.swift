@@ -32,6 +32,8 @@ enum BigPictureAction: String {
     case up, down, left, right
     case select, back, menu
     case tabPrevious, tabNext
+    /// Square on a PlayStation controller (X on an Xbox one): deletes a letter on the search keyboard.
+    case delete
     /// The Guide / Home button, or Start + Select held together. Opens the pause menu over a running game.
     case home
 
@@ -273,6 +275,7 @@ final class BigPictureInput {
         switch name {
         case "A", "✕", "1": return .select
         case "B", "◯", "2": return .back
+        case "□", "Square", "X": return .delete
         case "Start", "Menu", "+", "Options": return .menu
         case "L", "L1", "Left Shoulder", "ZL", "L2": return .tabPrevious
         case "R", "R1", "Right Shoulder", "ZR", "R2": return .tabNext

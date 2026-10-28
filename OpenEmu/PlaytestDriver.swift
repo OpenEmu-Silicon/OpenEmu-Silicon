@@ -194,7 +194,8 @@ final class PlaytestDriver {
                     let parts = step.dropFirst(10).split(separator: ":").map(String.init)
                     self.bigPicturePlay(seconds: Double(parts.first ?? "") ?? 6, via: parts.count > 1 ? parts[1] : "quit") { next(after: 0.5) }
                 } else {
-                    BigPictureWindowController.shared.playtestPerform(step)
+                    // "home" is the Home button as the window controller sees it; the rest are model actions.
+                    if step == "home" { BigPictureWindowController.shared.playtestHome() } else { BigPictureWindowController.shared.playtestPerform(step) }
                     self.keysSent.append(step)
                     next(after: 0.9)
                 }
@@ -225,6 +226,7 @@ final class PlaytestDriver {
                         BigPictureWindowController.shared.playtestHome()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated {
                             self.keysSent.append(document.isEmulationPaused ? "home:game-paused" : "home:GAME-NOT-PAUSED")
+                            self.keysSent.append(self.spaceReport(document, label: "after-home"))
                             self.saveBigPictureShot("pause-menu")
                             if via == "quit" {
                                 // Down to Quit Game, then Select: no "Are you sure?" alert may appear.
@@ -236,6 +238,7 @@ final class PlaytestDriver {
                                 BigPictureWindowController.shared.playtestPerform("select")
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { MainActor.assumeIsolated {
                                     self.keysSent.append(document.isEmulationPaused ? "resume:STILL-PAUSED" : "resume:game-running")
+                                    self.keysSent.append(self.spaceReport(document, label: "after-resume"))
                                     self.takeShot(document)
                                     document.stopEmulation(nil)
                                     waitForReturn(deadline: Date().addingTimeInterval(30))
@@ -346,6 +349,18 @@ final class PlaytestDriver {
             self.takeShot(document)
             self.closeGame(document)
         }
+    }
+
+    /// Which of the game window and the big-picture window is on the Space the player is looking at, and which is key.
+    @MainActor private func spaceReport(_ document: OEGameDocument, label: String) -> String {
+        let game = document.windowControllers.first?.window
+        let bp = BigPictureWindowController.shared.window
+        let overlay = BigPictureWindowController.shared.playtestPauseOverlay
+        func flags(_ window: NSWindow?) -> String {
+            guard let window = window else { return "none" }
+            return "\(window.isOnActiveSpace ? "ON-SCREEN" : "off-screen")/\(window.isKeyWindow ? "key" : "notkey")"
+        }
+        return "\(label): game=\(flags(game)) pause-menu=\(flags(overlay)) bigpicture=\(flags(bp))"
     }
 
     /// A picture of the big-picture window, saved next to the other pictures.
