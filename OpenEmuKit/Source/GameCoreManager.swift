@@ -251,6 +251,10 @@ extension GameCoreManager: OEGameCoreHelper {
     public func setHandleKeyboardEvents(_ handleKeyboardEvents: Bool) {
         gameCoreHelper?.setHandleKeyboardEvents(handleKeyboardEvents)
     }
+
+    public func injectKeyboardKey(usage: UInt, pressed: Bool) {
+        gameCoreHelper?.injectKeyboardKey(usage: usage, pressed: pressed)
+    }
     
     public func systemBindingsDidSetEvent(_ event: OEHIDEvent, forBinding bindingDescription: OEBindingDescription, playerNumber: UInt) {
         gameCoreHelper?.systemBindingsDidSetEvent(event, forBinding: bindingDescription, playerNumber: playerNumber)

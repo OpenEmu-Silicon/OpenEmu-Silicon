@@ -131,11 +131,12 @@ jobs:
             # scheme, or build phase references it, so a script change cannot
             # change what a core compiles. (If a build phase ever starts
             # calling a script, add that script's path here.)
-            # OpenEmuKit/ is included because about 19 cores compile .m files
-            # or import headers directly out of OpenEmuKit/Source/ into their
-            # own plugin targets (Scripts/detect-core-changes.py --print-map
-            # lists them).
-            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/)'; then
+            # OpenEmuKit/ is not on this list: about 19 cores compile .m files or
+            # import headers directly out of OpenEmuKit/Source/, but no core
+            # compiles its Swift, imports its Swift header, or links the
+            # framework. Scripts/detect-core-changes.py picks the affected cores
+            # from the cores' Xcode projects (see below).
+            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/)'; then
               echo "Shared code changed — building all core schemes"
               cores="$all_cores"
             else
@@ -149,19 +150,28 @@ jobs:
           ")
             fi
 
-            # REPORT ONLY: Scripts/detect-core-changes.py narrows OpenEmuKit/
-            # changes using the cores' Xcode projects. Log what it would pick
-            # next to what this job actually builds, so we can compare over a
-            # few PRs before it is allowed to skip anything. Never fails the job.
-            echo "--- detect-core-changes.py (report only, not used) ---"
-            proposed=$(echo "$changed" | python3 Scripts/detect-core-changes.py --files - || echo "(script failed; ignored)")
-            echo "$proposed"
-            echo "--- actually building: $cores ---"
-            echo "::notice title=detect-core-changes (report only)::$proposed"
+            # A change under OpenEmuKit/ adds the cores Scripts/detect-core-changes.py
+            # picks (a Swift or doc file picks none; a C-family file a core's
+            # project uses picks that core; anything unrecognised picks every
+            # core). If the script fails, build every core.
+            if echo "$changed" | grep -q '^OpenEmuKit/'; then
+              if kit_cores=$(echo "$changed" | python3 Scripts/detect-core-changes.py --files - | python3 -c "import json, sys; print(json.dumps(json.load(sys.stdin)['cores']))"); then
+                cores=$(KIT_CORES="$kit_cores" CORES="$cores" python3 -c "
+          import json, os
+          print(json.dumps(sorted(set(json.loads(os.environ['CORES'])) | set(json.loads(os.environ['KIT_CORES'])))))
+          ")
+              else
+                echo "detect-core-changes.py failed - building all core schemes"
+                cores="$all_cores"
+              fi
+            fi
+            echo "--- building: $cores ---"
 
             # FBNeo depends on FBNeo/ plus the frameworks it links (OpenEmu-SDK /
             # OpenEmuBase) and compiles from (OpenEmuKit/Source: the RA bridge).
-            if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/|OpenEmuKit/)'; then
+            # Only a non-Swift, non-doc OpenEmuKit file can reach it.
+            if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/)' \
+               || echo "$changed" | grep -E '^OpenEmuKit/' | grep -qvE '\.(swift|md|txt)$'; then
               fbneo=true
             fi
             if echo "$changed" | grep -qE '^(PCSX2/|Scripts/(prepare|build)-armsx2-core\.sh|Scripts/gen-armsx2-xcconfig\.py|OpenEmu-SDK/)'; then

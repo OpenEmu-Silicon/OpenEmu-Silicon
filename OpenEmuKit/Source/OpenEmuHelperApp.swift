@@ -793,6 +793,17 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     public func setHandleKeyboardEvents(_ handleKeyboardEvents: Bool) {
         _handleKeyboardEvents = handleKeyboardEvents
     }
+
+    public func injectKeyboardKey(usage: UInt, pressed: Bool) {
+        #if DEBUG
+        DispatchQueue.main.async {
+            // A script-started app is not the active app, and the app turns game input off then, so turn it on here.
+            self._handleEvents = true
+            self._handleKeyboardEvents = true
+            OEDeviceManager.shared.sendKeyboardKey(withUsage: usage, pressed: pressed)
+        }
+        #endif
+    }
     
     public func systemBindingsDidSetEvent(_ event: OEHIDEvent, forBinding bindingDescription: OEBindingDescription, playerNumber: UInt) {
         DispatchQueue.main.async {

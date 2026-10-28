@@ -32,7 +32,14 @@ extension XCTestCase {
     /// The saved library path is restored so the debug app does not keep pointing at the temporary folder.
     @discardableResult
     func ensureTestLibrary() throws -> OELibraryDatabase {
-        if let existing = OELibraryDatabase.default { return existing }
+        // Another test (CoverArtSyncTests) loads a library from a temporary folder and deletes the folder afterwards, but the
+        // app keeps that library as its default. Reusing it gives a library with no database, so only reuse one whose
+        // database file is still there.
+        if let existing = OELibraryDatabase.default,
+           let storeURL = existing.mainThreadContext.persistentStoreCoordinator?.persistentStores.first?.url,
+           FileManager.default.fileExists(atPath: storeURL.path) {
+            return existing
+        }
         let defaults = UserDefaults.standard
         let savedPath = defaults.object(forKey: OELibraryDatabase.databasePathKey)
         let folder = FileManager.default.temporaryDirectory

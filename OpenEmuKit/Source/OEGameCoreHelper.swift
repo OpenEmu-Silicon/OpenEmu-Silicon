@@ -86,6 +86,10 @@ import AudioToolbox
     func handleMouseEvent(_ event: OEEvent)
     func setHandleEvents(_ handleEvents: Bool)
     func setHandleKeyboardEvents(_ handleKeyboardEvents: Bool)
+
+    /// Debug builds only (a no-op in release): press or release a keyboard key (a HID usage code) inside the helper
+    /// process, where the game reads its input, as if it came from the keyboard. Used by the play-test driver.
+    func injectKeyboardKey(usage: UInt, pressed: Bool)
     func systemBindingsDidSetEvent(_ event: OEHIDEvent, forBinding bindingDescription: OEBindingDescription, playerNumber: UInt)
     func systemBindingsDidUnsetEvent(_ event: OEHIDEvent, forBinding bindingDescription: OEBindingDescription, playerNumber: UInt)
     
