@@ -10,7 +10,7 @@ How to help build the PS2 core. Read this first, then pick an issue from the [wo
 | Engine builds for arm64 | Proven in a spike (libretro target, no Qt) |
 | Engine runs a game fast on Apple Silicon | Proven standalone: one game, about 60 fps |
 | Engine pin and build script | Built and run on a Mac (`Scripts/build-armsx2-core.sh`) |
-| OpenEmu core plugin | Builds, installs, loads a BIOS and boots a game into its code (item 2). No picture, sound or input yet |
+| OpenEmu core plugin | Builds, installs, boots games, draws, plays sound, takes input, save states, rumble, speed controls and disc swap (items 2 to 5 and most of 6). Checked only on Dragon Quest VIII; see `PCSX2/README.md` |
 | Heavy 3D games | Untested |
 
 Nothing in this port is released. The first release will be marked Experimental.
