@@ -72,7 +72,7 @@ The core keeps FBNeo's runtime files under
 
 | Folder | Holds |
 |--------|-------|
-| `nvram/` | EEPROM saves (`.nv`), per-game DIP switch/input config (`.ini`), hiscore saves (`.hi`), hard-disk diffs. Created automatically. |
+| `nvram/` | EEPROM saves (`.nv`), battery-backed RAM (`.fs`, e.g. Mortal Kombat's settings), per-game DIP switch/input config (`.ini`), hiscore saves (`.hi`), hard-disk diffs. Created automatically. |
 | `samples/` | Optional sample packs (e.g. `invaders.zip` with WAV files) for games whose sounds FBNeo plays from recordings. Not shipped; without a pack those games are silent. |
 | `hiscore/`, `blend/`, `hdd/` | FBNeo's optional `hiscore.dat`, blend files and hard-disk images. |
 
