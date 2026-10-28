@@ -361,6 +361,21 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	desc.storageMode = MTLStorageModePrivate;
 	_outputTextures[0] = [device newTextureWithDescriptor:desc];
 	_outputTextures[1] = [device newTextureWithDescriptor:desc];
+
+	// Private GPU memory starts out undefined, and OpenEmu shows the first texture before the engine has drawn anything,
+	// which came up as a solid magenta window at launch. Clear both to black first.
+	id<MTLCommandBuffer> clear = [[device newCommandQueue] commandBuffer];
+	for (int i = 0; i < 2; i++) {
+		MTLRenderPassDescriptor *pass = [MTLRenderPassDescriptor renderPassDescriptor];
+		pass.colorAttachments[0].texture = _outputTextures[i];
+		pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+		pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+		pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
+		[[clear renderCommandEncoderWithDescriptor:pass] endEncoding];
+	}
+	[clear commit];
+	[clear waitUntilCompleted];
+
 	GSDeviceMTLSetOutputTextures((__bridge void *)_outputTextures[0], (__bridge void *)_outputTextures[1]);
 	[self ensureRenderView];
 }
