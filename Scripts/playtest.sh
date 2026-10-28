@@ -2,7 +2,7 @@
 # playtest.sh — Play a game in the real app without anyone at the keyboard, then report what happened.
 #
 # Usage:
-#   ./Scripts/playtest.sh --game "Super Mario 64" [--seconds 30] [--keys "start,ok,ok,up"] [--restart]
+#   ./Scripts/playtest.sh --game "Super Mario 64" [--seconds 30] [--keys "start,ok,ok,up"] [--restart] [--shot-every 2]
 #
 # --game finds the game in your real OpenEmu library by name (a read-only lookup) and plays it from there,
 # with your real library, settings and saved key bindings. Actions in --keys (up down left right start select
@@ -17,6 +17,10 @@
 # A run leaves the usual traces of playing in the library (play count, last-played time) but writes no saves: it never
 # uses Quick Save, closing the game skips the auto save state (debug builds only, -OESkipAutosaveOnStop), and the backup
 # check only reads. It never deletes anything. By default it answers "continue your last game?" with Resume;
+# --shot-every N takes a screenshot every N seconds (default 2). A screenshot runs on the game's own thread (the first
+# one also builds a Core Image context), so it holds the game up for a moment: the frame pacing line is only trustworthy
+# with sparse screenshots, for example --shot-every 60. Frame pacing from a default run can show stalls of several
+# seconds that the game itself did not have.
 # --restart answers Restart (the game boots fresh; the auto save state is not loaded). --no-backup switches the save
 # backup folder off for this run, which also avoids the save-sync prompts. The app is started through LaunchServices (`open`), the way a person starts it, so macOS
 # treats it as its own program (iCloud Drive and other privacy permissions apply to it, not to the Claude app that ran
@@ -34,11 +38,12 @@ cd "$REPO_ROOT"
 . "$REPO_ROOT/Scripts/lib/harness.sh"
 harness_ensure_stubs "$REPO_ROOT"
 
-GAME=""; AUDIT_RESTORE=0; SLOW_ICLOUD=0; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
+GAME=""; SHOT_EVERY=2; AUDIT_RESTORE=0; SLOW_ICLOUD=0; SECONDS_TO_PLAY=30; KEYS=""; RESUME=1; LAUNCH=open; NO_BACKUP=0; NO_BUILD=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --game) GAME="${2:-}"; shift 2 ;;
     --seconds) SECONDS_TO_PLAY="${2:-}"; shift 2 ;;
+    --shot-every) SHOT_EVERY="${2:-}"; shift 2 ;;
     --keys) KEYS="${2:-}"; shift 2 ;;
     --restart) RESUME=0; shift ;;
     --direct) LAUNCH=direct; shift ;;
@@ -46,7 +51,7 @@ while [ $# -gt 0 ]; do
     --audit-restore) AUDIT_RESTORE=1; shift ;;
     --slow-icloud) SLOW_ICLOUD="${2:-}"; shift 2 ;;
     --no-build) NO_BUILD=1; shift ;;
-    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -98,10 +103,10 @@ elif ! { echo "----  building the debug app"; xcodebuild build -workspace OpenEm
   echo "FAIL  build failed, see $OUT/build.log"; tail -15 "$OUT/build.log"; exit 1
 fi
 
-KEYLIST="$KEYLIST" ROM="$ROM" SECS="$SECONDS_TO_PLAY" OUTDIR="$OUT" AUDIT_RESTORE="$AUDIT_RESTORE" python3 - <<'PY'
+KEYLIST="$KEYLIST" ROM="$ROM" SECS="$SECONDS_TO_PLAY" SHOT_EVERY="$SHOT_EVERY" OUTDIR="$OUT" AUDIT_RESTORE="$AUDIT_RESTORE" python3 - <<'PY'
 import json, os
 keys = [k for k in os.environ["KEYLIST"].split(",") if k]
-plan = {"romPath": os.environ["ROM"], "seconds": float(os.environ["SECS"]), "screenshotEvery": 2,
+plan = {"romPath": os.environ["ROM"], "seconds": float(os.environ["SECS"]), "screenshotEvery": float(os.environ["SHOT_EVERY"]),
         "outputDirectory": os.environ["OUTDIR"], "auditRestore": os.environ["AUDIT_RESTORE"] == "1",
         "steps": [{"at": 2.0 + 2.0 * i, "key": k} for i, k in enumerate(keys)]}
 json.dump(plan, open(os.path.join(os.environ["OUTDIR"], "plan.json"), "w"), indent=2)
