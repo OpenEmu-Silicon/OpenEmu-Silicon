@@ -886,6 +886,9 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     /// The pause menu, drawn in its own window on top of the running game.
     private var pauseOverlay: NSWindow?
     private var keyMonitor: Any?
+    private var scrollMonitor: Any?
+    /// Two-finger scroll travel not yet turned into a move, per axis.
+    private var scrollTravel = CGSize.zero
     private var closeObserver: NSObjectProtocol?
     private var launchedFromBigPicture = false
     /// Keys typed into the quit confirmation or the closing game must not land on the menu and leave the mode.
@@ -1105,8 +1108,33 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Keyboard
 
+    /// Two-finger trackpad and mouse-wheel scrolling move the highlight a step at a time, like the arrow keys.
+    private func installScrollMonitor() {
+        guard scrollMonitor == nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self = self, self.interactive, event.window === self.window else { return event }
+                // Ignore the coasting after a swipe; one swipe is a few steps, not a long run.
+                if !event.momentumPhase.isEmpty { return nil }
+                if event.phase.contains(.began) { self.scrollTravel = .zero }
+                let step: CGFloat = event.hasPreciseScrollingDeltas ? 70 : 1
+                self.scrollTravel.width += event.scrollingDeltaX
+                self.scrollTravel.height += event.scrollingDeltaY
+                let horizontal = abs(self.scrollTravel.width) > abs(self.scrollTravel.height)
+                let travel = horizontal ? self.scrollTravel.width : self.scrollTravel.height
+                guard abs(travel) >= step else { return nil }
+                // Content follows the fingers, so a swipe left reveals what is to the right.
+                let action: BigPictureAction = horizontal ? (travel < 0 ? .right : .left) : (travel < 0 ? .down : .up)
+                self.scrollTravel = .zero
+                self.model.perform(action, source: "scroll")
+                return nil
+            }
+        }
+    }
+
     private func installKeyMonitor() {
         guard keyMonitor == nil else { return }
+        installScrollMonitor()
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             MainActor.assumeIsolated {
                 guard let self = self, self.interactive else { return event }
@@ -1141,6 +1169,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
 
     private func removeKeyMonitor() {
         if let keyMonitor = keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        if let scrollMonitor = scrollMonitor { NSEvent.removeMonitor(scrollMonitor); self.scrollMonitor = nil }
         keyMonitor = nil
     }
 

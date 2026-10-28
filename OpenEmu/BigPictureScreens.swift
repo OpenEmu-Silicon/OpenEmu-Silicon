@@ -122,7 +122,12 @@ private struct BPPoster: View {
         let image = art.poster(for: game)
         ZStack {
             if let image = image {
-                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill).blur(radius: 24).opacity(0.7)
+                if image.size.height >= image.size.width {
+                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fill).blur(radius: 24).opacity(0.7)
+                } else {
+                    // Landscape art in a portrait slot: the system's color behind it reads better than a blur.
+                    LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom).opacity(0.8)
+                }
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
             } else {
                 LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
@@ -885,8 +890,13 @@ private struct BPLane: View {
                 BP.material
                 if let hero = art.hero(for: key) {
                     Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill)
-                } else if let cover = art.poster(for: game) {
-                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 22).opacity(0.7)
+                } else {
+                    // No wide art: the system's color with the box art kept sharp, instead of a blurred smear.
+                    LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom).opacity(0.8)
+                    if let cover = art.poster(for: game) {
+                        Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit).padding(14)
+                            .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
+                    }
                 }
             }
             .frame(width: size.width, height: size.height - BP.recentBarHeight).clipped()
