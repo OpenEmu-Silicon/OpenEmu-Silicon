@@ -601,6 +601,8 @@ private struct BPLane: View {
 
     @ObservedObject var model: BigPictureModel
     @ObservedObject var art: OEBigPictureArt
+    /// Observed so the shelf redraws the moment a badge image finishes downloading.
+    @ObservedObject private var badgeImages = BigPictureRemoteImages.shared
     let lane: BigPictureLane
     let index: Int
 
@@ -928,7 +930,7 @@ private struct BPLane: View {
     /// An achievement: its badge (dimmed while locked), title, description and points.
     private func achievementCard(_ item: BigPictureAchievement, column: Int) -> some View {
         let focused = isFocused(column)
-        let images = BigPictureRemoteImages.shared
+        let images = badgeImages
         return HStack(alignment: .top, spacing: 12) {
             ZStack {
                 BP.surface
@@ -958,7 +960,6 @@ private struct BPLane: View {
         .scaleEffect(focused ? 1.03 : 1, anchor: .top)
         .animation(.easeOut(duration: 0.12), value: focused)
         .onAppear { images.load(item.badgeURL) }
-        .onReceive(images.$tick) { _ in }
         .onHover { inside in if inside { model.hover(lane: index, column: column) } }
         .onTapGesture { model.click(lane: index, column: column) }
     }

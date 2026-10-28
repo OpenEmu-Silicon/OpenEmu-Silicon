@@ -294,6 +294,8 @@ final class BigPictureModel: ObservableObject {
                 built.append(BigPictureLane(id: "states", title: "Save States", subtitle: "\(states.count) saved", kind: .saveStates(states)))
             }
             if let summary = OEBigPictureAchievements.shared.summary(for: game) {
+                // Start downloading the badges now, so they are ready when the shelf first draws.
+                summary.achievements.forEach { BigPictureRemoteImages.shared.load($0.badgeURL) }
                 var lane = BigPictureLane(id: "achievements", title: "Achievements",
                                           subtitle: "\(summary.unlocked) of \(summary.total) earned  ·  \(summary.unlockedPoints) of \(summary.totalPoints) points",
                                           kind: .achievements(summary.achievements))
@@ -310,11 +312,10 @@ final class BigPictureModel: ObservableObject {
                 if !recent.isEmpty {
                     built.append(BigPictureLane(id: "recent", title: "Continue Playing", subtitle: nil, kind: .games(Array(recent.prefix(20)))))
                 }
-                let recentStates = allGames
-                    .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
-                    .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
-                if !recentStates.isEmpty {
-                    built.append(BigPictureLane(id: "recent-saves", title: "Recent Saves", subtitle: nil, kind: .saveStates(Array(recentStates.prefix(8))), showsGame: true))
+                // Most Played comes straight after Continue Playing; Recent Saves, the quietest shelf, goes last.
+                let mostPlayed = allGames.filter { $0.playTime > 0 }.sorted { $0.playTime > $1.playTime }
+                if !mostPlayed.isEmpty {
+                    built.append(BigPictureLane(id: "most-played", title: "Most Played", subtitle: nil, kind: .games(Array(mostPlayed.prefix(12)))))
                 }
                 let groups = Dictionary(grouping: allGames) { genre(of: $0) ?? "" }.filter { !$0.key.isEmpty }
                 let tiles = groups
@@ -327,10 +328,6 @@ final class BigPictureModel: ObservableObject {
                 if !added.isEmpty {
                     built.append(BigPictureLane(id: "added", title: "Recently Added", subtitle: nil, kind: .games(Array(added.prefix(12)))))
                 }
-                let mostPlayed = allGames.filter { $0.playTime > 0 }.sorted { $0.playTime > $1.playTime }
-                if !mostPlayed.isEmpty {
-                    built.append(BigPictureLane(id: "most-played", title: "Most Played", subtitle: nil, kind: .games(Array(mostPlayed.prefix(12)))))
-                }
                 // A game you put plenty of time into and have not touched for a while.
                 var quietDays = 14.0
                 #if DEBUG
@@ -339,6 +336,12 @@ final class BigPictureModel: ObservableObject {
                 let cutoff = Date().addingTimeInterval(-quietDays * 24 * 3600)
                 if let again = mostPlayed.first(where: { ($0.lastPlayed ?? .distantFuture) < cutoff }) {
                     built.append(BigPictureLane(id: "rediscover", title: nil, subtitle: nil, kind: .games([again])))
+                }
+                let recentStates = allGames
+                    .flatMap { $0.defaultROM?.normalSaveStates ?? [] }
+                    .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+                if !recentStates.isEmpty {
+                    built.append(BigPictureLane(id: "recent-saves", title: "Recent Saves", subtitle: nil, kind: .saveStates(Array(recentStates.prefix(8))), showsGame: true))
                 }
                 lanes = built
             case .recent:
