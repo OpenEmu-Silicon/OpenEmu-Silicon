@@ -261,6 +261,7 @@ private enum BPMetrics {
 }
 
 private struct BPPage: View {
+    @Environment(\.bpCanvasHeight) private var canvasHeight
 
     @ObservedObject var model: BigPictureModel
     @ObservedObject var art: OEBigPictureArt
@@ -300,7 +301,7 @@ private struct BPPage: View {
             // The hero art scrolls with the page but is not faded under the tab bar: it should run to the top edge.
             if showsHero, let game = model.heroGame {
                 BPBackdrop(game: game, art: art, heroHeight: heroHeight)
-                    .frame(width: BP.canvas.width, height: BP.canvas.height, alignment: .topLeading)
+                    .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
                     .offset(y: pageOffset)
                     .animation(.easeOut(duration: 0.22), value: pageOffset)
             }
@@ -331,23 +332,23 @@ private struct BPPage: View {
                     BPEmpty(model: model).offset(y: BPMetrics.top + (model.tab == .search ? 230 : (model.lanes.isEmpty ? 0 : 56)))
                 }
             }
-            .frame(width: BP.canvas.width, height: BP.canvas.height, alignment: .topLeading)
+            .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
             .offset(y: pageOffset)
             .animation(.easeOut(duration: 0.22), value: pageOffset)
-            .bpFadeUnderTabBar()
+            .bpFadeUnderTabBar(canvasHeight: canvasHeight)
         }
-        .frame(width: BP.canvas.width, height: BP.canvas.height, alignment: .topLeading)
+        .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
         .clipped()
     }
 }
 
 /// Content fades out under the tab bar instead of running through it.
 private extension View {
-    func bpFadeUnderTabBar() -> some View {
+    func bpFadeUnderTabBar(canvasHeight: CGFloat) -> some View {
         mask(LinearGradient(stops: [
             .init(color: .clear, location: 0),
-            .init(color: .clear, location: 64 / BP.canvas.height),
-            .init(color: .black, location: 100 / BP.canvas.height),
+            .init(color: .clear, location: 64 / canvasHeight),
+            .init(color: .black, location: 100 / canvasHeight),
             .init(color: .black, location: 1),
         ], startPoint: .top, endPoint: .bottom))
     }
@@ -1226,6 +1227,7 @@ private struct BPDetailSections: View {
 // MARK: - Sidebar
 
 private struct BPSidebar: View {
+    @Environment(\.bpCanvasHeight) private var canvasHeight
 
     @ObservedObject var model: BigPictureModel
 
@@ -1275,7 +1277,7 @@ private struct BPSidebar: View {
             .padding(.horizontal, 14).padding(.vertical, 16)
             .offset(y: -CGFloat(max(0, model.sidebarIndex - 9)) * 44)
             .animation(.easeOut(duration: 0.15), value: model.sidebarIndex)
-            .frame(width: BP.sidebarWidth, height: BP.canvas.height - 16, alignment: .topLeading)
+            .frame(width: BP.sidebarWidth, height: canvasHeight - 16, alignment: .topLeading)
             .clipped()
             .background(BP.material)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -1283,7 +1285,7 @@ private struct BPSidebar: View {
             .shadow(color: .black.opacity(0.5), radius: 48, y: 12)
             .offset(x: 12, y: 8)
         }
-        .frame(width: BP.canvas.width, height: BP.canvas.height)
+        .frame(width: BP.canvas.width, height: canvasHeight)
     }
 
     private func row(index: Int, entry: BigPictureModel.SidebarEntry) -> some View {
@@ -1337,6 +1339,7 @@ struct BigPicturePauseRoot: View {
 /// A two-choice dialog: Resume Game / Quit Game while a game runs, or Stay / Exit Big Picture. The first choice is the
 /// safe one and is where the highlight starts; Back and Home choose it too.
 private struct BPPauseMenu: View {
+    @Environment(\.bpCanvasHeight) private var canvasHeight
 
     @ObservedObject var model: BigPictureModel
     let kind: BigPictureModel.PauseKind
@@ -1374,7 +1377,7 @@ private struct BPPauseMenu: View {
             .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
             .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
         }
-        .frame(width: BP.canvas.width, height: BP.canvas.height)
+        .frame(width: BP.canvas.width, height: canvasHeight)
     }
 
     @ViewBuilder private var header: some View {
@@ -1416,6 +1419,7 @@ private struct BPPauseMenu: View {
 
 /// The list a filter button opens, under that button. Up and down move, Select chooses, Back closes.
 private struct BPFilterMenu: View {
+    @Environment(\.bpCanvasHeight) private var canvasHeight
 
     @ObservedObject var model: BigPictureModel
     let menu: BigPictureModel.FilterMenu
@@ -1459,13 +1463,14 @@ private struct BPFilterMenu: View {
             .shadow(color: .black.opacity(0.5), radius: 24, y: 10)
             .offset(x: x, y: BPMetrics.top + 52)
         }
-        .frame(width: BP.canvas.width, height: BP.canvas.height)
+        .frame(width: BP.canvas.width, height: canvasHeight)
     }
 }
 
 // MARK: - Settings
 
 private struct BPSettingsPage: View {
+    @Environment(\.bpCanvasHeight) private var canvasHeight
 
     @ObservedObject var model: BigPictureModel
 
@@ -1491,7 +1496,7 @@ private struct BPSettingsPage: View {
                 .font(BP.caption).foregroundColor(BP.tertiary)
         }
         .padding(.horizontal, 320)
-        .frame(width: BP.canvas.width, height: BP.canvas.height, alignment: .topLeading)
+        .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
     }
 
     private func group(_ title: String, rows: [(String, String, String)]) -> some View {

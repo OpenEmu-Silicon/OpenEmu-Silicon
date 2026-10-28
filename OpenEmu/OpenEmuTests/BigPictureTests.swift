@@ -72,6 +72,17 @@ final class BigPictureTests: XCTestCase {
         XCTAssertEqual(BigPictureTab.cycled(from: .search, by: 1), .home)
     }
 
+    func testCanvasHeightFollowsTheScreenShape() {
+        XCTAssertEqual(BP.canvasHeight(for: CGSize(width: 1920, height: 1080)), 720, accuracy: 0.01)   // 16:9, TVs and most monitors
+        XCTAssertEqual(BP.canvasHeight(for: CGSize(width: 1728, height: 1080)), 800, accuracy: 0.01)   // 16:10, MacBooks
+        XCTAssertEqual(BP.canvasHeight(for: CGSize(width: 1280, height: 1024)), 960, accuracy: 0.01)   // 5:4 is clamped to 960
+        XCTAssertEqual(BP.canvasHeight(for: CGSize(width: 3440, height: 1440)), 600, accuracy: 0.01)   // ultrawide is clamped to 600
+    }
+
+    func testCanvasHeightIsSafeBeforeTheWindowHasASize() {
+        XCTAssertEqual(BP.canvasHeight(for: .zero), 720)
+    }
+
     func testControllerActionsKnowTheirDirections() {
         XCTAssertTrue(BigPictureAction.up.isDirection)
         XCTAssertTrue(BigPictureAction.right.isDirection)

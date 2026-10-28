@@ -173,6 +173,18 @@ final class PlaytestDriver {
                 }
                 let step = steps[index]
                 index += 1
+                if step == "reopen" {
+                    // Leave big picture and come back, as exiting and pressing Ctrl+Cmd+B does.
+                    BigPictureWindowController.shared.hide()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { MainActor.assumeIsolated {
+                        BigPictureWindowController.shared.show()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { MainActor.assumeIsolated {
+                            self.keysSent.append("reopen: " + BigPictureWindowController.shared.playtestGeometry())
+                            next(after: 0.3)
+                        } }
+                    } }
+                    return
+                }
                 if step.hasPrefix("shot:") {
                     let name = String(step.dropFirst(5))
                     if let image = BigPictureWindowController.shared.playtestSnapshot(),

@@ -1150,6 +1150,14 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         model.perform(action, source: "playtest")
     }
 
+    /// How the window sits on its screen, for the play-test driver: "fullscreen window=WxH screen=WxH visible=WxH".
+    func playtestGeometry() -> String {
+        guard let window = window else { return "no window" }
+        let screen = window.screen
+        func size(_ rect: NSRect?) -> String { rect.map { "\(Int($0.width))x\(Int($0.height))" } ?? "none" }
+        return "\(window.styleMask.contains(.fullScreen) ? "fullscreen" : "NOT-fullscreen") window=\(size(window.frame)) content=\(size(window.contentView?.frame)) screen=\(size(screen?.frame)) screens=\(NSScreen.screens.count)"
+    }
+
     /// The window the pause menu is drawn in, while it is open.
     var playtestPauseOverlay: NSWindow? { pauseOverlay }
 

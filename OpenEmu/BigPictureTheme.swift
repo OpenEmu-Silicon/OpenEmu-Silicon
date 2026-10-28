@@ -34,6 +34,14 @@ enum BP {
     // MARK: Canvas
 
     static let canvas = CGSize(width: 1280, height: 720)
+
+    /// The canvas keeps its 1280 width and takes its height from the screen's shape: 720 on a 16:9 screen, 800 on a
+    /// 16:10 laptop, so the layout fills the screen instead of leaving black strips. Very wide or very tall screens
+    /// are clamped so the layout never gets absurdly short or tall.
+    static func canvasHeight(for size: CGSize) -> CGFloat {
+        guard size.width > 1, size.height > 1 else { return canvas.height }
+        return min(max(canvas.width * size.height / size.width, 600), 960)
+    }
     /// Side margin. Keeps content inside the area a TV may crop.
     static let margin: CGFloat = 56
     /// Space between neighbouring cards in a shelf.
@@ -138,6 +146,18 @@ extension Color {
     }
 }
 
+private struct BPCanvasHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = BP.canvas.height
+}
+
+extension EnvironmentValues {
+    /// The height of the design canvas on this screen (see `BP.canvasHeight(for:)`).
+    var bpCanvasHeight: CGFloat {
+        get { self[BPCanvasHeightKey.self] }
+        set { self[BPCanvasHeightKey.self] = newValue }
+    }
+}
+
 /// Lays the design canvas (BP.canvas) out at whatever size the screen is.
 struct BigPictureCanvas<Content: View>: View {
 
@@ -152,14 +172,16 @@ struct BigPictureCanvas<Content: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let height = BP.canvasHeight(for: geometry.size)
             // The window starts at zero size; a zero scale makes AppKit's scroll views assert.
-            let scale = min(geometry.size.width / BP.canvas.width, geometry.size.height / BP.canvas.height)
+            let scale = min(geometry.size.width / BP.canvas.width, geometry.size.height / height)
             if scale > 0.05 {
                 content
-                    .frame(width: BP.canvas.width, height: BP.canvas.height)
+                    .environment(\.bpCanvasHeight, height)
+                    .frame(width: BP.canvas.width, height: height)
                     .clipped()
                     .scaleEffect(scale, anchor: .topLeading)
-                    .frame(width: BP.canvas.width * scale, height: BP.canvas.height * scale, alignment: .topLeading)
+                    .frame(width: BP.canvas.width * scale, height: height * scale, alignment: .topLeading)
                     .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
         }
