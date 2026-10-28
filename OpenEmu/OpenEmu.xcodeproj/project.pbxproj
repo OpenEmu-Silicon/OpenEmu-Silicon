@@ -233,6 +233,7 @@
 		0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */; };
 		0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B105 /* BigPictureTheme.swift */; };
 		B16A1C0E2D7F4A0100000012 /* OEBigPictureAchievements.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */; };
+		B16A1C0E2D7F4A0100000022 /* BigPictureSystemGestures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16A1C0E2D7F4A0100000021 /* BigPictureSystemGestures.swift */; };
 		0B1C9F0B000000000000A106 /* BigPictureScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B106 /* BigPictureScreens.swift */; };
 		0B1C9F0A00000000000000A1 /* BigPictureNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0A00000000000000B1 /* BigPictureNavigation.swift */; };
 		0B1C9F0A00000000000000A2 /* BigPictureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0A00000000000000B2 /* BigPictureView.swift */; };
@@ -1358,6 +1359,7 @@
 		0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PrefArtworkProvidersController.swift; sourceTree = "<group>"; };
 		0B1C9F0B000000000000B105 /* BigPictureTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureTheme.swift; sourceTree = "<group>"; };
 		B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEBigPictureAchievements.swift; sourceTree = "<group>"; };
+		B16A1C0E2D7F4A0100000021 /* BigPictureSystemGestures.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureSystemGestures.swift; sourceTree = "<group>"; };
 		0B1C9F0B000000000000B106 /* BigPictureScreens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureScreens.swift; sourceTree = "<group>"; };
 		0B1C9F0A00000000000000B1 /* BigPictureNavigation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureNavigation.swift; sourceTree = "<group>"; };
 		0B1C9F0A00000000000000B2 /* BigPictureView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureView.swift; sourceTree = "<group>"; };
@@ -2914,6 +2916,7 @@
 				0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */,
 				0B1C9F0B000000000000B105 /* BigPictureTheme.swift */,
 				B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */,
+				B16A1C0E2D7F4A0100000021 /* BigPictureSystemGestures.swift */,
 				0B1C9F0B000000000000B106 /* BigPictureScreens.swift */,
 				0B1C9F0A00000000000000B1 /* BigPictureNavigation.swift */,
 				0B1C9F0A00000000000000B2 /* BigPictureView.swift */,
@@ -6514,6 +6517,7 @@
 				0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */,
 				0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */,
 				B16A1C0E2D7F4A0100000012 /* OEBigPictureAchievements.swift in Sources */,
+				B16A1C0E2D7F4A0100000022 /* BigPictureSystemGestures.swift in Sources */,
 				0B1C9F0B000000000000A106 /* BigPictureScreens.swift in Sources */,
 				0B1C9F0A00000000000000A1 /* BigPictureNavigation.swift in Sources */,
 				0B1C9F0A00000000000000A2 /* BigPictureView.swift in Sources */,

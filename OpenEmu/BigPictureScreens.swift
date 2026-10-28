@@ -50,6 +50,11 @@ struct BigPictureView: View {
                         .transition(.opacity)
                 }
 
+                if let game = model.pauseGame {
+                    BPPauseMenu(model: model, game: game, art: art)
+                        .transition(.opacity)
+                }
+
                 if let menu = model.openMenu {
                     BPFilterMenu(model: model, menu: menu)
                         .transition(.opacity)
@@ -276,6 +281,8 @@ private struct BPPage: View {
         }
         guard model.lane >= 0, model.lanes.indices.contains(model.lane) else { return 0 }
         if case .heroActions = model.lanes[model.lane].kind { return 0 }
+        // Moving around the search keyboard must not move the page: the whole keyboard stays in view.
+        if model.tab == .search, model.screen == .browse, case .keys = model.lanes[model.lane].kind { return 0 }
         return -max(0, laneTops[model.lane] - BPMetrics.focusTarget)
     }
 
@@ -1294,6 +1301,62 @@ private struct BPSidebar: View {
         .frame(height: 40)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(focused ? BP.focusFill : Color.clear))
         .onTapGesture { model.clickSidebar(index) }
+    }
+}
+
+// MARK: - Pause menu
+
+/// Shown when the Home button or Start + Select is used during a game: Resume Game or Quit Game, chosen with the controller.
+private struct BPPauseMenu: View {
+
+    @ObservedObject var model: BigPictureModel
+    let game: OEDBGame
+    @ObservedObject var art: OEBigPictureArt
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.7).onTapGesture { model.choosePause(0) }
+
+            VStack(spacing: 22) {
+                HStack(spacing: 14) {
+                    if let tile = art.tile(for: game) {
+                        Image(nsImage: tile).resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: 56, height: 56).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(game.bpTitle).font(BP.headline).foregroundColor(BP.primary).lineLimit(1)
+                        Text("Game paused").font(BP.callout).foregroundColor(BP.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(width: 340)
+
+                VStack(spacing: 10) {
+                    choice("Resume Game", symbol: "play.fill", index: 0)
+                    choice("Quit Game", symbol: "xmark.circle", index: 1)
+                }
+                Text("Your progress is saved when you quit.").font(BP.caption).foregroundColor(BP.tertiary)
+            }
+            .padding(30)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(BP.material))
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(BP.border, lineWidth: 1))
+            .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
+        }
+        .frame(width: BP.canvas.width, height: BP.canvas.height)
+    }
+
+    private func choice(_ title: String, symbol: String, index: Int) -> some View {
+        let focused = model.pauseIndex == index
+        return HStack(spacing: 10) {
+            Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
+            Text(title).font(.system(size: 15, weight: .semibold))
+        }
+        .foregroundColor(focused ? BP.focusText : BP.primary)
+        .frame(width: 340, height: 44)
+        .background(Capsule().fill(focused ? BP.focusFill : BP.surface))
+        .overlay(Capsule().strokeBorder(BP.border, lineWidth: focused ? 0 : 1))
+        .onTapGesture { model.choosePause(index) }
     }
 }
 

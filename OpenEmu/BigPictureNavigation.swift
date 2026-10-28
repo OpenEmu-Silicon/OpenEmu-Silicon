@@ -32,7 +32,7 @@ enum BigPictureAction: String {
     case up, down, left, right
     case select, back, menu
     case tabPrevious, tabNext
-    /// The Guide / Home button. Used to pull the menu back over a running game.
+    /// The Guide / Home button, or Start + Select held together. Opens the pause menu over a running game.
     case home
 
     var isDirection: Bool {
@@ -61,6 +61,14 @@ final class BigPictureInput {
 
     /// Called whenever the set of connected controllers may have changed.
     var onControllersChanged: (() -> Void)?
+
+    // Pause chord: Start and Select held together for a moment, or Start held on its own a little longer, in case a
+    // controller names its Select button something this does not recognise. Either one acts like the Home button.
+    private var startDown = false
+    private var selectDown = false
+    private var chordTimer: Timer?
+    private let chordHold: TimeInterval = 1.0
+    private let startOnlyHold: TimeInterval = 2.0
 
     private var monitor: Any?
     private var deviceObservers = [NSObjectProtocol]()
@@ -95,6 +103,10 @@ final class BigPictureInput {
     }
 
     func stop() {
+        chordTimer?.invalidate()
+        chordTimer = nil
+        startDown = false
+        selectDown = false
         if let monitor = monitor {
             OEDeviceManager.shared.removeMonitor(monitor)
             self.monitor = nil
@@ -119,6 +131,7 @@ final class BigPictureInput {
     /// Returns true when the event should keep flowing to the rest of the app.
     private func handle(handler: OEDeviceHandler, event: OEHIDEvent) -> Bool {
         let controller = handler.controllerDescription?.name ?? "Controller"
+        trackPauseChord(handler: handler, event: event, controller: controller)
 
         // The Guide button must work while a game has focus; everything else
         // only counts while the menu is the active window.
@@ -156,6 +169,31 @@ final class BigPictureInput {
         var press: BigPictureAction? {
             if case .press(let a) = self { return a }
             return nil
+        }
+    }
+
+    /// Watches Start and Select (whatever the game is doing with them) and fires `.home` when they are held long enough.
+    private func trackPauseChord(handler: OEDeviceHandler, event: OEHIDEvent, controller: String) {
+        guard event.type == .button else { return }
+        let name = controlName(handler: handler, event: event) ?? ""
+        let isStart = ["Start", "Menu", "+", "Options"].contains(name)
+        let isSelect = ["Select", "Back", "View", "Share", "Create", "-", "Minus"].contains(name)
+        guard isStart || isSelect else { return }
+
+        let down = event.state == .on
+        if isStart { startDown = down } else { selectDown = down }
+
+        chordTimer?.invalidate()
+        chordTimer = nil
+        guard startDown else { return }
+        let delay = selectDown ? chordHold : startOnlyHold
+        chordTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self = self else { return }
+                self.startDown = false
+                self.selectDown = false
+                self.onAction?(.home, controller)
+            }
         }
     }
 

@@ -44,6 +44,16 @@ enum BigPictureTab: Int, CaseIterable {
     }
 }
 
+extension BigPictureTab {
+
+    /// The tab `delta` steps away, wrapping around at either end. Used by the shoulder buttons.
+    static func cycled(from tab: BigPictureTab, by delta: Int) -> BigPictureTab {
+        let all = BigPictureTab.allCases
+        let index = ((tab.rawValue + delta) % all.count + all.count) % all.count
+        return all[index]
+    }
+}
+
 /// One row of focusable content: the hero's buttons, or a shelf of posters or save states.
 struct BigPictureLane: Identifiable {
 
@@ -163,6 +173,11 @@ final class BigPictureModel: ObservableObject {
     @Published private(set) var genreFilters = Set<String>()
     @Published private(set) var searchQuery = ""
     @Published private(set) var heroIndex = 0
+    /// The game shown in the pause menu while a game runs behind big picture, and the highlighted choice.
+    @Published private(set) var pauseGame: OEDBGame?
+    @Published private(set) var pauseIndex = 0
+    var onResumeGame: (() -> Void)?
+    var onQuitGame: (() -> Void)?
     @Published private(set) var sortOrder = SortOrder.recentlyPlayed
 
     enum SortOrder: String, CaseIterable {
@@ -243,6 +258,7 @@ final class BigPictureModel: ObservableObject {
         gameRunning = running
         // Back from a game: the one just played is now the most recent, so start the hero on it.
         if !running {
+            pauseGame = nil
             heroIndex = 0
             if tab == .home, screen == .browse { rebuildLanes() }
         }
@@ -403,6 +419,7 @@ final class BigPictureModel: ObservableObject {
         lastInput = "\(action.rawValue)  ·  \(source)"
         mouseAnchor = NSEvent.mouseLocation
 
+        if pauseGame != nil { performPause(action); return }
         if openMenu != nil { performMenu(action); return }
         if sidebarOpen { performSidebar(action); return }
 
@@ -411,8 +428,8 @@ final class BigPictureModel: ObservableObject {
         case .down: moveLane(1)
         case .left: moveColumn(-1)
         case .right: moveColumn(1)
-        case .tabPrevious: moveColumn(-5)
-        case .tabNext: moveColumn(5)
+        case .tabPrevious: switchTab(by: -1)
+        case .tabNext: switchTab(by: 1)
         case .select: activate()
         case .back: goBack()
         case .menu: openSidebar()
@@ -427,6 +444,8 @@ final class BigPictureModel: ObservableObject {
         case .down: sidebarIndex = min(sidebarIndex + 1, entries.count - 1)
         case .select: chooseSidebar(entries[sidebarIndex])
         case .back, .menu, .right: sidebarOpen = false
+        case .tabPrevious: sidebarOpen = false; switchTab(by: -1)
+        case .tabNext: sidebarOpen = false; switchTab(by: 1)
         default: break
         }
     }
@@ -562,6 +581,8 @@ final class BigPictureModel: ObservableObject {
         case .down: menuIndex = min(menuIndex + 1, options.count - 1)
         case .select: clickMenu(menuIndex)
         case .back, .menu, .left, .right: openMenu = nil
+        case .tabPrevious: openMenu = nil; switchTab(by: -1)
+        case .tabNext: openMenu = nil; switchTab(by: 1)
         default: break
         }
     }
@@ -627,6 +648,50 @@ final class BigPictureModel: ObservableObject {
     func openSidebar() {
         sidebarIndex = sidebarEntries.firstIndex(of: screen == .settings ? .settings : .tab(tab)) ?? 0
         sidebarOpen = true
+    }
+
+    /// Shoulder buttons: move to the next or previous tab from wherever you are (a game page, a menu, the keyboard).
+    /// The filters you set stay as they were, and the highlight stays on the tab bar if that is where it was.
+    func switchTab(by delta: Int) {
+        let wasOnTabBar = lane < 0
+        let kept = (systemFilters, genreFilters)
+        show(tab: BigPictureTab.cycled(from: tab, by: delta), system: nil)
+        systemFilters = kept.0
+        genreFilters = kept.1
+        rebuildLanes()
+        if wasOnTabBar {
+            lane = -1
+        } else {
+            lane = lanes.firstIndex { if case .filters = $0.kind { return false } else { return true } } ?? (lanes.isEmpty ? -1 : 0)
+        }
+        column = 0
+    }
+
+    // MARK: Pause menu
+
+    /// Opens the pause menu over the page (a game is running behind big picture).
+    func showPauseMenu(for game: OEDBGame?) {
+        sidebarOpen = false
+        openMenu = nil
+        pauseIndex = 0
+        pauseGame = game ?? heroGame
+    }
+
+    func closePauseMenu() { pauseGame = nil }
+
+    private func performPause(_ action: BigPictureAction) {
+        switch action {
+        case .up: pauseIndex = max(pauseIndex - 1, 0)
+        case .down: pauseIndex = min(pauseIndex + 1, 1)
+        case .select: choosePause(pauseIndex)
+        case .back, .menu, .home: choosePause(0)
+        default: break
+        }
+    }
+
+    func choosePause(_ index: Int) {
+        pauseGame = nil
+        if index == 0 { onResumeGame?() } else { onQuitGame?() }
     }
 
     private func moveLane(_ delta: Int) {
@@ -789,6 +854,8 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
 
     private let model = BigPictureModel()
     private let input = BigPictureInput()
+    private let gestures = BigPictureSystemGestures()
+    private weak var pausedDocument: OEGameDocument?
     private var keyMonitor: Any?
     private var closeObserver: NSObjectProtocol?
     private var launchedFromBigPicture = false
@@ -820,6 +887,8 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
             self?.launch { handler in GameDocumentController.shared.openGameDocument(with: state, display: true, fullScreen: true, completionHandler: handler) }
         }
         model.onExit = { [weak self] in self?.hide() }
+        model.onResumeGame = { [weak self] in self?.resumeGame() }
+        model.onQuitGame = { [weak self] in self?.quitGame() }
 
         input.isActive = { [weak window] in window?.isKeyWindow ?? false }
         input.onControllersChanged = { [weak self] in self?.refreshControllers() }
@@ -848,6 +917,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         if !window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
 
         input.start()
+        gestures.claim()
         installKeyMonitor()
         startWatchingForGameEnd()
     }
@@ -855,6 +925,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     func hide() {
         input.releaseAll()
         input.stop()
+        gestures.release()
         removeKeyMonitor()
         stopWatchingForGameEnd()
         launchedFromBigPicture = false
@@ -868,7 +939,8 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     private func handle(_ action: BigPictureAction, source: String) {
         if Date() < ignoreInputUntil, action != .home { return }
         if action == .home {
-            returnFromGame(source: source)
+            // A second press while the pause menu is up closes it.
+            if model.pauseGame != nil { model.perform(.back, source: source) } else { returnFromGame(source: source) }
             return
         }
         model.perform(action, source: source)
@@ -897,12 +969,32 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Guide / Home while a game runs: switch back to the menu's Space without quitting the game.
+    /// Home or the Start + Select hold while a game runs: pause it and show the pause menu (Resume or Quit Game) over
+    /// big picture, so a controller alone can get out of a game.
     private func returnFromGame(source: String) {
-        guard launchedFromBigPicture, let window = window, !window.isKeyWindow else { return }
-        model.perform(.home, source: source)
+        guard launchedFromBigPicture, let window = window, !window.isKeyWindow,
+              let document = GameDocumentController.shared.gameDocuments.first else { return }
+        pausedDocument = document
+        document.requestEmulationPauseRespectingRetroAchievementsHardcore(showBlockedToast: false)
+        model.showPauseMenu(for: document.rom.game)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func resumeGame() {
+        guard let document = pausedDocument ?? GameDocumentController.shared.gameDocuments.first else { return }
+        pausedDocument = nil
+        document.isEmulationPaused = false
+        NSApp.activate(ignoringOtherApps: true)
+        document.windowControllers.first?.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Closes the game without the "Are you sure?" alert, which a controller cannot answer. Choosing Quit Game in the
+    /// pause menu is the confirmation, and the auto save is still written.
+    private func quitGame() {
+        guard let document = pausedDocument ?? GameDocumentController.shared.gameDocuments.first else { return }
+        pausedDocument = nil
+        document.stopEmulationWithoutConfirmation()
     }
 
     /// When the last game window closes, return to the menu.
@@ -985,6 +1077,9 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         guard let action = BigPictureAction(rawValue: name) else { return }
         model.perform(action, source: "playtest")
     }
+
+    /// The Home button, as the window controller handles it while a game runs.
+    func playtestHome() { handle(.home, source: "playtest") }
 
     /// A picture of the big-picture window as it is on screen.
     func playtestSnapshot() -> NSImage? {

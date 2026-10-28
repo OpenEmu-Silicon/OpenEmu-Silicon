@@ -4,6 +4,7 @@
 # Usage:
 #   ./Scripts/bigpicture-look.sh                       # a standard tour: home, shelves, sidebar, library, filters
 #   ./Scripts/bigpicture-look.sh --steps "shot:home,play:10,shot:returned"   # launch the featured game and come back
+#   ./Scripts/bigpicture-look.sh --steps "pauseplay:6:quit"     # launch, press Home, quit from the pause menu (or :resume)
 #   ./Scripts/bigpicture-look.sh --steps "shot:a,down,shot:b,select,shot:c"
 #   ./Scripts/bigpicture-look.sh --no-build
 #   ./Scripts/bigpicture-look.sh --app-arg -OEBigPictureRediscoverDays 0   # pass a launch argument for this run only

@@ -188,7 +188,11 @@ final class PlaytestDriver {
                     next(after: Double(step.dropFirst(5)) ?? 1)
                 } else if step.hasPrefix("play:") {
                     // Choose what is highlighted (Resume on the hero), let the real game run, then close it.
-                    self.bigPicturePlay(seconds: Double(step.dropFirst(5)) ?? 8) { next(after: 0.5) }
+                    self.bigPicturePlay(seconds: Double(step.dropFirst(5)) ?? 8, via: nil) { next(after: 0.5) }
+                } else if step.hasPrefix("pauseplay:") {
+                    // "pauseplay:<seconds>:quit" or ":resume": run the game, press Home, and leave through the pause menu.
+                    let parts = step.dropFirst(10).split(separator: ":").map(String.init)
+                    self.bigPicturePlay(seconds: Double(parts.first ?? "") ?? 6, via: parts.count > 1 ? parts[1] : "quit") { next(after: 0.5) }
                 } else {
                     BigPictureWindowController.shared.playtestPerform(step)
                     self.keysSent.append(step)
@@ -202,7 +206,7 @@ final class PlaytestDriver {
 
     /// Launches the highlighted game from big picture, plays it for `seconds`, saves what the core drew, closes it the
     /// normal way (the auto save is skipped by -OESkipAutosaveOnStop) and checks that big picture comes back.
-    @MainActor private func bigPicturePlay(seconds: Double, then resume: @escaping () -> Void) {
+    @MainActor private func bigPicturePlay(seconds: Double, via: String?, then resume: @escaping () -> Void) {
         BigPictureWindowController.shared.playtestPerform("select")
         func waitForGame(deadline: Date) {
             if failIfAlertIsShowing(during: "waiting for the game to start") { return }
@@ -212,8 +216,32 @@ final class PlaytestDriver {
                     self.takeShot(document)
                     DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { MainActor.assumeIsolated {
                         self.takeShot(document)
-                        document.stopEmulation(nil)
-                        waitForReturn(deadline: Date().addingTimeInterval(30))
+                        guard let via = via else {
+                            document.stopEmulation(nil)
+                            waitForReturn(deadline: Date().addingTimeInterval(30))
+                            return
+                        }
+                        // The Home button: the pause menu should open over big picture and the game should be paused.
+                        BigPictureWindowController.shared.playtestHome()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated {
+                            self.keysSent.append(document.isEmulationPaused ? "home:game-paused" : "home:GAME-NOT-PAUSED")
+                            self.saveBigPictureShot("pause-menu")
+                            if via == "quit" {
+                                // Down to Quit Game, then Select: no "Are you sure?" alert may appear.
+                                BigPictureWindowController.shared.playtestPerform("down")
+                                BigPictureWindowController.shared.playtestPerform("select")
+                                waitForReturn(deadline: Date().addingTimeInterval(30))
+                            } else {
+                                // Select on Resume Game: the game must run again.
+                                BigPictureWindowController.shared.playtestPerform("select")
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { MainActor.assumeIsolated {
+                                    self.keysSent.append(document.isEmulationPaused ? "resume:STILL-PAUSED" : "resume:game-running")
+                                    self.takeShot(document)
+                                    document.stopEmulation(nil)
+                                    waitForReturn(deadline: Date().addingTimeInterval(30))
+                                } }
+                            }
+                        } }
                     } }
                 } }
                 return
@@ -318,6 +346,15 @@ final class PlaytestDriver {
             self.takeShot(document)
             self.closeGame(document)
         }
+    }
+
+    /// A picture of the big-picture window, saved next to the other pictures.
+    @MainActor private func saveBigPictureShot(_ name: String) {
+        guard let plan, let image = BigPictureWindowController.shared.playtestSnapshot(),
+              let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return }
+        shotCounter += 1
+        try? png.write(to: URL(fileURLWithPath: plan.outputDirectory).appendingPathComponent(String(format: "bp-%02d-%@.png", shotCounter, name)))
     }
 
     private func takeShot(_ document: OEGameDocument) {

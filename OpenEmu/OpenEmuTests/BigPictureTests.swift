@@ -65,6 +65,13 @@ final class BigPictureTests: XCTestCase {
         XCTAssertEqual(OEBigPictureArt.GameKey.searchName("(USA)"), "(USA)")
     }
 
+    func testShoulderButtonsCycleTabsAndWrap() {
+        XCTAssertEqual(BigPictureTab.cycled(from: .home, by: 1), .recent)
+        XCTAssertEqual(BigPictureTab.cycled(from: .recent, by: -1), .home)
+        XCTAssertEqual(BigPictureTab.cycled(from: .home, by: -1), .search)
+        XCTAssertEqual(BigPictureTab.cycled(from: .search, by: 1), .home)
+    }
+
     func testControllerActionsKnowTheirDirections() {
         XCTAssertTrue(BigPictureAction.up.isDirection)
         XCTAssertTrue(BigPictureAction.right.isDirection)

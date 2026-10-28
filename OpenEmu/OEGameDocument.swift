@@ -1410,8 +1410,18 @@ final class OEGameDocument: NSDocument {
         gameCoreHelper?.setAdaptiveSyncEnabled(enabled)
     }
     
+    /// Set when the player has already chosen Quit Game somewhere that cannot show the usual "Are you sure?" alert
+    /// (big picture's pause menu, driven by a controller). The auto save is still written on the way out.
+    private var skipsStopConfirmation = false
+
+    /// Closes the game like Controls > Quit Game, without asking again.
+    func stopEmulationWithoutConfirmation() {
+        skipsStopConfirmation = true
+        stopEmulation(self)
+    }
+
     private var shouldTerminateEmulation: Bool {
-        if coreDidTerminateSuddenly {
+        if coreDidTerminateSuddenly || skipsStopConfirmation {
             return true
         }
         
