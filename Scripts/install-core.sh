@@ -56,7 +56,7 @@ fi
 DEST="$HOME/Library/Application Support/OpenEmu/Cores/${CORE}.oecoreplugin"
 
 # Look in two places, in this order, and pick the most recently built:
-#   1. ~/Builds/openemu/<branch>/  — worktree mode build path, used by verify.sh
+#   1. ~/Builds/openemu/<branch>/  — worktree mode build path, used by core.sh
 #                                    when run inside a git worktree
 #   2. <Core>/build/XcodeDerived/  — core-local build path used by heavyweight
 #                                    standalone build scripts such as MAME

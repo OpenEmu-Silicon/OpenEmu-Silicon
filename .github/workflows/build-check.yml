@@ -33,6 +33,7 @@ jobs:
     # Fast guard (no Xcode): catches a flattened core submodule that was
     # committed without its vendored upstream source — the regression that
     # silently broke the Dolphin build for months because CI never compiled it.
+    # Covers every core's .gitmodules, not a hardcoded list.
     # Runs on every PR; it takes seconds and needs no build toolchain.
     name: Core sources present
     runs-on: ubuntu-latest
@@ -43,8 +44,16 @@ jobs:
       - name: Check vendored core externals are populated
         run: ./Scripts/check-core-sources.sh
 
+      - name: Test vendored core externals check
+        run: python3 Scripts/test-check-core-sources.py
+
       - name: Test core change detection
         run: python3 Scripts/test-detect-core-changes.py
+
+      # No upstream update URLs in core plists, every SUFeedURL has an Appcasts/ file,
+      # every core plist has a SUFeedURL. Seconds; no toolchain needed.
+      - name: Check core update feed URLs
+        run: ./Scripts/check-core-feed-urls.sh
 
   detect-core-changes:
     # The `OpenEmu` scheme only builds the main app plus its own dependencies
@@ -116,11 +125,12 @@ jobs:
             # scheme, or build phase references it, so a script change cannot
             # change what a core compiles. (If a build phase ever starts
             # calling a script, add that script's path here.)
-            # OpenEmuKit/ is included because about 19 cores compile .m files
-            # or import headers directly out of OpenEmuKit/Source/ into their
-            # own plugin targets (Scripts/detect-core-changes.py --print-map
-            # lists them).
-            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|OpenEmuKit/)'; then
+            # OpenEmuKit/ is not on this list: about 19 cores compile .m files or
+            # import headers directly out of OpenEmuKit/Source/, but no core
+            # compiles its Swift, imports its Swift header, or links the
+            # framework. Scripts/detect-core-changes.py picks the affected cores
+            # from the cores' Xcode projects (see below).
+            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/)'; then
               echo "Shared code changed — building all core schemes"
               cores="$all_cores"
             else
@@ -134,19 +144,28 @@ jobs:
           ")
             fi
 
-            # REPORT ONLY: Scripts/detect-core-changes.py narrows OpenEmuKit/
-            # changes using the cores' Xcode projects. Log what it would pick
-            # next to what this job actually builds, so we can compare over a
-            # few PRs before it is allowed to skip anything. Never fails the job.
-            echo "--- detect-core-changes.py (report only, not used) ---"
-            proposed=$(echo "$changed" | python3 Scripts/detect-core-changes.py --files - || echo "(script failed; ignored)")
-            echo "$proposed"
-            echo "--- actually building: $cores ---"
-            echo "::notice title=detect-core-changes (report only)::$proposed"
+            # A change under OpenEmuKit/ adds the cores Scripts/detect-core-changes.py
+            # picks (a Swift or doc file picks none; a C-family file a core's
+            # project uses picks that core; anything unrecognised picks every
+            # core). If the script fails, build every core.
+            if echo "$changed" | grep -q '^OpenEmuKit/'; then
+              if kit_cores=$(echo "$changed" | python3 Scripts/detect-core-changes.py --files - | python3 -c "import json, sys; print(json.dumps(json.load(sys.stdin)['cores']))"); then
+                cores=$(KIT_CORES="$kit_cores" CORES="$cores" python3 -c "
+          import json, os
+          print(json.dumps(sorted(set(json.loads(os.environ['CORES'])) | set(json.loads(os.environ['KIT_CORES'])))))
+          ")
+              else
+                echo "detect-core-changes.py failed - building all core schemes"
+                cores="$all_cores"
+              fi
+            fi
+            echo "--- building: $cores ---"
 
             # FBNeo depends on FBNeo/ plus the frameworks it links (OpenEmu-SDK /
             # OpenEmuBase) and compiles from (OpenEmuKit/Source: the RA bridge).
-            if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/|OpenEmuKit/)'; then
+            # Only a non-Swift, non-doc OpenEmuKit file can reach it.
+            if echo "$changed" | grep -qE '^(FBNeo/|Scripts/(prepare|build)-fbneo-core\.sh|OpenEmu-SDK/)' \
+               || echo "$changed" | grep -E '^OpenEmuKit/' | grep -qvE '\.(swift|md|txt)$'; then
               fbneo=true
             fi
           fi
@@ -296,3 +315,76 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
+
+  # The two jobs below are new and kept apart from `build` on purpose: they are not required checks until the
+  # maintainer adds them to branch protection, so a flaky runner cannot block pull requests while they prove themselves.
+
+  app-unit-tests:
+    name: App unit tests (OpenEmuTests)
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Generate credentials stubs
+        run: |
+          cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
+
+      - name: Download the game database
+        # GameInfoHelperTests and ImportFailureTests read openvgdb.sqlite, which the app downloads into the user's
+        # Application Support folder on first run. A fresh runner does not have it, so those tests would skip.
+        # A fixed release, so the tests see the same data every run.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$HOME/Library/Application Support/OpenEmu"
+          gh release download v29.0 --repo OpenVGDB/OpenVGDB --pattern openvgdb.zip --dir "$RUNNER_TEMP"
+          unzip -o "$RUNNER_TEMP/openvgdb.zip" -d "$HOME/Library/Application Support/OpenEmu"
+          ls -l "$HOME/Library/Application Support/OpenEmu/openvgdb.sqlite"
+
+      - name: Run OpenEmuTests
+        # The app is the test host and starts with no library; tests that need one make a throwaway
+        # library themselves (ensureTestLibrary in ROMImporterTests). A test that hangs fails after 2 minutes.
+        run: |
+          xcodebuild test \
+            -workspace OpenEmu-metal.xcworkspace \
+            -scheme OpenEmu \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+  headless-gameboy:
+    # Runs the Gambatte core with no window against a small test ROM written for this repo:
+    # loads, draws, takes button presses, and round-trips save states. See Scripts/headless/.
+    name: Headless core checks (Game Boy)
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Run headless Game Boy checks
+        run: ./Scripts/headless/gb-checks.sh

@@ -1,0 +1,7 @@
+# Error-level log lines that are known and tracked elsewhere. check.sh leaves entries containing any of these
+# substrings out of its error count, and says how many it left out. One substring per line; # starts a comment.
+# Remove a line once its cause is fixed.
+#
+# The core appcasts on main are empty files, so the Cores pane cannot read them.
+Appcasts/fbneo
+Appcasts/pcsx2

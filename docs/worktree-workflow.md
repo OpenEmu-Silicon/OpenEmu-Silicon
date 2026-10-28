@@ -51,7 +51,7 @@ Practical implications:
 - Switching between worktrees that touch the same core requires a re-install each time you want to test.
 - The "installed cores" state isn't checkpointed by git — there's no equivalent of `git stash` for the cores directory.
 
-The only way to keep cores straight: every time you switch which worktree you're testing, run `Scripts/install-core.sh <CoreName>` from that worktree before launching. `verify.sh --core <Name>` does this automatically.
+The only way to keep cores straight: every time you switch which worktree you're testing, run `Scripts/install-core.sh <CoreName>` from that worktree before launching. `core.sh <Name>` does this automatically.
 
 ## `main`'s state isn't in worktrees
 
@@ -69,15 +69,15 @@ git rebase origin/main         # rewrites history; only do this on branches no o
 
 If you've already pushed the branch and the merge commit is fine, the merge approach is simpler. The rebase approach gives a cleaner history but requires force-pushing afterward.
 
-## `verify.sh` from a worktree
+## `core.sh` from a worktree
 
-`verify.sh --worktree` uses the stable `~/Builds/openemu/<branch>/` path instead of DerivedData. Always pass `--worktree` when inside a linked worktree:
+`core.sh` notices when it runs inside a linked worktree and uses the stable `~/Builds/openemu/<branch>/` path instead of DerivedData:
 
 ```bash
-./Scripts/verify.sh --worktree --core <CoreName>
+./Scripts/core.sh <CoreName>
 ```
 
-This builds to the stable path, installs the core, and runs the MD5 preflight (`verify-core-installed.sh`) to confirm the installed plugin matches the build. Without `--worktree`, verify.sh looks in DerivedData and may find a stale artifact from a previous session.
+This builds to the stable path, installs the core, and runs the MD5 preflight (`verify-core-installed.sh`) to confirm the installed plugin matches the build. A plain `xcodebuild` puts the build in DerivedData instead, where a later install can pick up a stale artifact from a previous session.
 
 ## Verification protocol for core changes
 
@@ -117,7 +117,7 @@ The fix (PR #321) makes `install-core.sh` search both paths and prefer the most 
 Run through this at the start of any session that touches cores in a worktree:
 
 - [ ] Confirm you're in a worktree: `git worktree list` — `.git` will be a file, not a directory
-- [ ] Build with: `./Scripts/verify.sh --worktree --core <Name>` (or `./Scripts/build-for-worktree.sh` for app-only)
+- [ ] Build with: `./Scripts/core.sh <Name>` (or `./Scripts/build-for-worktree.sh` for app-only)
 - [ ] Install with: `./Scripts/install-core.sh <Name>` (searches both paths, prefers most recent)
 - [ ] Verify with three-way hash — only declare done when installed hash matches worktree build hash
 - [ ] If the hashes don't match: quit OpenEmu, re-run `install-core.sh`, re-check

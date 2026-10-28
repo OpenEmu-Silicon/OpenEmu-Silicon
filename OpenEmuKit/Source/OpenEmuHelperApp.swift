@@ -772,6 +772,17 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     public func setHandleKeyboardEvents(_ handleKeyboardEvents: Bool) {
         _handleKeyboardEvents = handleKeyboardEvents
     }
+
+    public func injectKeyboardKey(usage: UInt, pressed: Bool) {
+        #if DEBUG
+        DispatchQueue.main.async {
+            // A script-started app is not the active app, and the app turns game input off then, so turn it on here.
+            self._handleEvents = true
+            self._handleKeyboardEvents = true
+            OEDeviceManager.shared.sendKeyboardKey(withUsage: usage, pressed: pressed)
+        }
+        #endif
+    }
     
     public func systemBindingsDidSetEvent(_ event: OEHIDEvent, forBinding bindingDescription: OEBindingDescription, playerNumber: UInt) {
         DispatchQueue.main.async {
@@ -787,7 +798,20 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     
     // MARK: - OEGameCoreOwner image capture
     
+    private func logRenderingForCapture() {
+        let name: String
+        switch gameCore.gameCoreRendering {
+        case .bitmap: name = "bitmap"
+        case .openGL2: name = "openGL2"
+        case .openGL3: name = "openGL3"
+        case .metal2: name = "metal2"
+        @unknown default: name = "other"
+        }
+        os_log(.info, log: .captureRendering, "capture: this core renders with %{public}@", name)
+    }
+    
     public func captureOutputImage(completionHandler block: @escaping (NSBitmapImageRep) -> Void) {
+        logRenderingForCapture()
         let gr      = _gameRenderer!
         let ss      = _screenshot!
         let chain   = _filterChain!
@@ -800,6 +824,7 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     }
     
     public func captureSourceImage(completionHandler block: @escaping (NSBitmapImageRep) -> Void) {
+        logRenderingForCapture()
         let gr      = _gameRenderer!
         let ss      = _screenshot!
         let flipped = flipVertically

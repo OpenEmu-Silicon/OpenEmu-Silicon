@@ -28,6 +28,7 @@ import OpenEmuBase
 import OpenEmuSystem
 import OpenEmuKit
 import UserNotifications
+import os.log
 
 let OEGameVolumeKey = "volume"
 let OEGameCoreDisplayModeKeyFormat = "displayMode.%@"
@@ -48,6 +49,10 @@ let OEGameCoreManagerModePreferenceKey = "OEGameCoreManagerModePreference"
 /// Default `true` per RA's recommendation. Disables save state loading, rewind,
 /// frame advance, and cheats while enabled.
 let RAHardcoreEnabledKey = "RAHardcoreEnabled"
+
+/// User preference: show the challenge/leaderboard/progress trackers in the
+/// top-right corner while playing in softcore. Hardcore always shows them.
+let RAShowTrackersSoftcoreKey = "RAShowTrackersSoftcore"
 
 /// Posted by `PrefRetroAchievementsController` when the user toggles hardcore mode.
 /// `userInfo[OEHardcoreEnabledKey]` carries the new `Bool`.
@@ -144,6 +149,7 @@ final class OEGameDocument: NSDocument {
             OEScreenshotFileFormatKey : NSBitmapImageRep.FileType.png.rawValue,
             OEScreenshotPropertiesKey : [NSBitmapImageRep.PropertyKey : Any](),
             RAHardcoreEnabledKey      : true,
+            RAShowTrackersSoftcoreKey : true,
         ])
     }()
     
@@ -202,6 +208,8 @@ final class OEGameDocument: NSDocument {
     private var displaySleepAssertionID: IOPMAssertionID = 0
     
     private var emulationStatus: EmulationStatus = .notSetup
+    /// True while the game is running. Read by the debug play test driver.
+    var isPlaying: Bool { emulationStatus == .playing }
     private var saveStateForGameStart: OEDBSaveState?
     private var lastPlayStartDate: Date?
     private var lastSelectedDisplayModeOption: String?
@@ -1184,8 +1192,11 @@ final class OEGameDocument: NSDocument {
         }
 
         SentryService.addBreadcrumb(message: "Emulation started", category: "emulation")
+        os_log(.info, log: .core, "Starting emulation of '%{public}@' with core '%{public}@'",
+               rom.url?.lastPathComponent ?? "unknown", corePlugin.bundleIdentifier ?? "unknown")
         emulationStatus = .starting
         gameCoreManager?.startEmulation() {
+            os_log(.info, log: .core, "Emulation is playing")
             self.emulationStatus = .playing
             // Cheats are disabled in hardcore mode (RA spec).
             if HardcoreModePolicy.allows(.cheats, hardcoreEnabled: self.isHardcoreModeEnabled) {
@@ -1511,6 +1522,15 @@ final class OEGameDocument: NSDocument {
         let screenshot = NSImage(size: rep.size)
         screenshot.addRepresentation(rep)
         return screenshot
+    }
+    
+    /// The core's picture before the shader chain (not aspect corrected). Used by the debug play test driver to tell
+    /// which stage of the capture went blank.
+    func sourceScreenshot() -> NSImage? {
+        guard let rep = gameCoreManager?.captureSourceImage() else { return nil }
+        let image = NSImage(size: rep.size)
+        image.addRepresentation(rep)
+        return image
     }
     
     @objc func takeScreenshot(_ sender: Any?) {
@@ -2899,6 +2919,13 @@ final class OEGameDocument: NSDocument {
     }
     
     private func saveState(name stateName: String, completionHandler handler: (() -> Void)? = nil) {
+        #if DEBUG
+        // Automated runs against a real library (-OESkipAutosaveOnStop 1) must not replace the player's auto save.
+        if stateName == OEDBSaveState.autosaveName, UserDefaults.standard.bool(forKey: "OESkipAutosaveOnStop") {
+            handler?()
+            return
+        }
+        #endif
         guard
             supportsSaveStates,
             emulationStatus.rawValue > EmulationStatus.starting.rawValue,

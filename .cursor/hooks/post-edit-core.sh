@@ -116,11 +116,11 @@ You just edited a file in the **${core}** core plugin directory (${rel_path}).
 Before you (or the user) report any in-game test result for ${core}:
 
   1. Build:   xcodebuild -workspace OpenEmu-metal.xcworkspace -scheme "OpenEmu + ${core}" -configuration <Debug|Release> -destination 'platform=macOS,arch=arm64' build
-              or:    ./Scripts/verify.sh --core ${core}            (Debug)
-                     ./Scripts/verify.sh --core ${core} --release  (Release)
+              or:    ./Scripts/core.sh ${core}            (Debug)
+                     ./Scripts/core.sh ${core} --release  (Release)
 
   2. Install: ./Scripts/install-core.sh ${core} [--debug|--release]
-              (verify.sh --core does this automatically)
+              (core.sh does this automatically)
 
   3. Preflight: ./Scripts/verify-core-installed.sh ${core} [--debug|--release]
                 Confirm it prints "OK" before claiming any test result.
