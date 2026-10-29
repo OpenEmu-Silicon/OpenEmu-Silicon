@@ -731,6 +731,7 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
                     "address": region.address,
                     "addressBytes": region.addressBytes,
                     "minDataBytes": region.minDataBytes,
+                    "addressShift": region.addressShift,
                     "data": region.data,
                 ]
             }
