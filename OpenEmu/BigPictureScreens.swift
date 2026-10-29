@@ -284,22 +284,29 @@ private struct BPPage: View {
         }
     }
 
-    private var pageOffset: CGFloat {
-        if model.detailScrolled, let lastTop = laneTops.last, let last = model.lanes.last {
-            return -max(0, lastTop + BPMetrics.height(of: last) - BPMetrics.focusTarget)
-        }
-        guard model.lane >= 0, model.lanes.indices.contains(model.lane) else { return 0 }
-        if case .heroActions = model.lanes[model.lane].kind { return 0 }
-        // Moving around the search keyboard must not move the page: the whole keyboard stays in view.
-        if model.tab == .search, model.screen == .browse, case .keys = model.lanes[model.lane].kind { return 0 }
-        let wanted = max(0, laneTops[model.lane] - BPMetrics.focusTarget)
+    /// How far down the highlight alone scrolls the page, and the furthest the page can go.
+    private var scrollRange: (base: CGFloat, limit: CGFloat) {
+        guard let lastTop = laneTops.last, let last = model.lanes.last else { return (0, 0) }
+        let bottom = lastTop + BPMetrics.height(of: last)
         // On a game page the closing sections scroll separately (see detailScrolled), so only the browsing screens stop
         // at the end: once the bottom of the content reaches the bottom of the screen, the last shelves stay where they
         // are instead of scrolling up and leaving the lower half of the screen empty.
-        if case .detail = model.screen { return -wanted }
-        guard let lastTop = laneTops.last, let last = model.lanes.last else { return -wanted }
-        let contentBottom = lastTop + BPMetrics.height(of: last) - BPMetrics.laneGap + 32
-        return -min(wanted, max(0, contentBottom - canvasHeight))
+        let isDetail: Bool = { if case .detail = model.screen { return true } else { return false } }()
+        let limit = isDetail ? max(0, bottom - BPMetrics.focusTarget) : max(0, bottom - BPMetrics.laneGap + 32 - canvasHeight)
+        if model.detailScrolled { return (limit, limit) }
+        // The page follows the highlight, or the place it was when the pointer took over (see `pointerDriven`).
+        let lane = model.viewLane
+        guard lane >= 0, model.lanes.indices.contains(lane) else { return (0, limit) }
+        if case .heroActions = model.lanes[lane].kind { return (0, limit) }
+        // Moving around the search keyboard must not move the page: the whole keyboard stays in view.
+        if model.tab == .search, model.screen == .browse, case .keys = model.lanes[lane].kind { return (0, limit) }
+        let wanted = max(0, laneTops[lane] - BPMetrics.focusTarget)
+        return (isDetail ? wanted : min(wanted, limit), limit)
+    }
+
+    private var pageOffset: CGFloat {
+        let range = scrollRange
+        return -min(max(range.base + model.pageNudge, 0), range.limit)
     }
 
     var body: some View {
@@ -310,7 +317,7 @@ private struct BPPage: View {
                 BPBackdrop(game: game, art: art, heroHeight: heroHeight)
                     .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
                     .offset(y: pageOffset)
-                    .animation(.easeOut(duration: 0.22), value: pageOffset)
+                    .animation(model.pointerDriven ? nil : .easeOut(duration: 0.22), value: pageOffset)
             }
 
             ZStack(alignment: .topLeading) {
@@ -341,11 +348,17 @@ private struct BPPage: View {
             }
             .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
             .offset(y: pageOffset)
-            .animation(.easeOut(duration: 0.22), value: pageOffset)
+            .animation(model.pointerDriven ? nil : .easeOut(duration: 0.22), value: pageOffset)
             .bpFadeUnderTabBar(canvasHeight: canvasHeight)
         }
         .frame(width: BP.canvas.width, height: canvasHeight, alignment: .topLeading)
         .clipped()
+        // The wheel can push past the ends; pull what it has stored back so scrolling the other way responds at once.
+        .onChange(of: model.pageNudge) { nudge in
+            let range = scrollRange
+            let clamped = min(max(nudge, -range.base), range.limit - range.base)
+            if clamped != nudge { model.setPageNudge(clamped) }
+        }
     }
 }
 
@@ -533,7 +546,7 @@ private struct BPHero: View {
 
 // MARK: - Shelves
 
-private extension BigPictureLane {
+extension BigPictureLane {
     enum Style { case icons, grid, featured, wide, genre, filters, banner, keys, recent, badges }
 
     /// How a shelf draws its items: icon tiles for what you just played, large cards for favorites, else posters.
@@ -643,10 +656,7 @@ private struct BPLane: View {
             }
 
             let step = lane.itemWidth + lane.itemGap
-            let shift: CGFloat = {
-                guard model.lane == index else { return 0 }
-                return -CGFloat(max(0, model.column - (lane.visibleColumns - 1))) * step
-            }()
+            let shift = model.laneShift(index)
             HStack(alignment: .top, spacing: lane.itemGap) {
                 switch lane.kind {
                 case .games(let games):
@@ -686,7 +696,7 @@ private struct BPLane: View {
             .padding(.leading, lane.leadingInset)
             .padding(.top, BP.space12)
             .offset(x: shift)
-            .animation(.easeOut(duration: 0.2), value: shift)
+            .animation(model.pointerDriven ? nil : .easeOut(duration: 0.2), value: shift)
         }
     }
 

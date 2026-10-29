@@ -198,6 +198,10 @@ final class PlaytestDriver {
                     next(after: 0.3)
                 } else if step.hasPrefix("wait:") {
                     next(after: Double(step.dropFirst(5)) ?? 1)
+                } else if step.hasPrefix("scroll:") || step.hasPrefix("hscroll:") || step.hasPrefix("hover:") {
+                    BigPictureWindowController.shared.playtestPointer(step)
+                    self.keysSent.append(step)
+                    next(after: 0.5)
                 } else if step.hasPrefix("play:") {
                     // Choose what is highlighted (Resume on the hero), let the real game run, then close it.
                     self.bigPicturePlay(seconds: Double(step.dropFirst(5)) ?? 8, via: nil) { next(after: 0.5) }

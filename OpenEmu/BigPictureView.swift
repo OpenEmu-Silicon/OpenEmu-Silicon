@@ -215,6 +215,16 @@ final class BigPictureModel: ObservableObject {
     var onLaunchState: ((OEDBSaveState) -> Void)?
     var onExit: (() -> Void)?
 
+    /// True while the mouse or trackpad is driving the view. Hovering then only moves the highlight: the page and the
+    /// shelves stay where they are, and the wheel scrolls them. Any key or controller press hands the view back to the
+    /// highlight, which scrolls it into place the way it always did.
+    @Published private(set) var pointerDriven = false
+    /// How far the wheel has moved the page beyond where the highlight put it. The page clamps it to its ends.
+    @Published private(set) var pageNudge: CGFloat = 0
+    @Published private(set) var laneNudges = [Int: CGFloat]()
+    private var frozenLane = 0
+    private var frozenColumn = 0
+
     private var allGames = [OEDBGame]()
     private var mouseAnchor = NSEvent.mouseLocation
     private var coverObserver: NSObjectProtocol?
@@ -284,6 +294,7 @@ final class BigPictureModel: ObservableObject {
     }
 
     private func rebuildLanes() {
+        endPointerDriving()
         switch screen {
         case .settings:
             lanes = []
@@ -424,6 +435,7 @@ final class BigPictureModel: ObservableObject {
     func perform(_ action: BigPictureAction, source: String) {
         lastInput = "\(action.rawValue)  ·  \(source)"
         mouseAnchor = NSEvent.mouseLocation
+        if source != "mouse" { endPointerDriving() }
 
         if pauseKind != nil { performPause(action); return }
         if openMenu != nil { performMenu(action); return }
@@ -820,23 +832,90 @@ final class BigPictureModel: ObservableObject {
         column = 0
     }
 
-    /// Mouse hover moves the highlight, but only when the pointer really moved.
-    /// Without the check, items scrolling under a resting pointer would steal
-    /// the highlight from the controller.
+    /// The lane and column the page and shelves are positioned from: the highlight, unless the pointer is driving.
+    var viewLane: Int { pointerDriven ? frozenLane : lane }
+    var viewColumn: Int { pointerDriven ? frozenColumn : column }
+
+    private func beginPointerDriving() {
+        guard !pointerDriven else { return }
+        frozenLane = lane
+        frozenColumn = column
+        pointerDriven = true
+    }
+
+    private func endPointerDriving() {
+        pointerDriven = false
+        pageNudge = 0
+        if !laneNudges.isEmpty { laneNudges = [:] }
+    }
+
+    /// Mouse hover moves the highlight, but only when the pointer really moved, and never scrolls anything.
+    /// Without the check, items scrolling under a resting pointer would steal the highlight from the controller.
     func hover(lane newLane: Int, column newColumn: Int) {
         let location = NSEvent.mouseLocation
         guard hypot(location.x - mouseAnchor.x, location.y - mouseAnchor.y) > 4 else { return }
         mouseAnchor = location
+        beginPointerDriving()
         lane = newLane
         column = newColumn
         lastInput = "hover  ·  mouse"
     }
 
+    #if DEBUG
+    /// Hover without the "pointer really moved" check, for the play-test driver.
+    func playtestHover(lane newLane: Int, column newColumn: Int) {
+        beginPointerDriving()
+        lane = newLane
+        column = newColumn
+        lastInput = "hover  ·  playtest"
+    }
+    #endif
+
     func click(lane newLane: Int, column newColumn: Int) {
+        beginPointerDriving()
         lane = newLane
         column = newColumn
         lastInput = "click  ·  mouse"
         activate()
+    }
+
+    /// Whether the wheel can move the page right now (not under a menu, the sidebar, the pause menu or a running game).
+    var acceptsScrolling: Bool {
+        !gameRunning && openMenu == nil && !sidebarOpen && pauseKind == nil && screen != .settings && !lanes.isEmpty
+    }
+
+    /// Wheel or trackpad, vertical: positive moves the page down, in design-canvas points.
+    func scrollPage(by delta: CGFloat) {
+        guard acceptsScrolling else { return }
+        beginPointerDriving()
+        pageNudge += delta
+    }
+
+    /// Called by the page when it clamped the nudge to the ends of its content.
+    func setPageNudge(_ value: CGFloat) { pageNudge = value }
+
+    /// Where the highlight alone puts a shelf, and the furthest it can slide.
+    private func shiftRange(_ index: Int) -> (base: CGFloat, limit: CGFloat) {
+        let shelf = lanes[index]
+        let step = shelf.itemWidth + shelf.itemGap
+        let base = index == viewLane ? -CGFloat(max(0, viewColumn - (shelf.visibleColumns - 1))) * step : 0
+        return (base, CGFloat(max(0, shelf.count - shelf.visibleColumns)) * step)
+    }
+
+    /// How far a shelf is slid to the left: the highlight's position, or the highlight's plus the wheel's.
+    func laneShift(_ index: Int) -> CGFloat {
+        guard lanes.indices.contains(index) else { return 0 }
+        let range = shiftRange(index)
+        return min(0, max(-range.limit, range.base + (laneNudges[index] ?? 0)))
+    }
+
+    /// Trackpad or wheel, horizontal, over the shelf the pointer is on: positive moves the items to the right.
+    func scrollLane(by delta: CGFloat) {
+        guard acceptsScrolling else { return }
+        beginPointerDriving()
+        guard lanes.indices.contains(lane) else { return }
+        let range = shiftRange(lane)
+        laneNudges[lane] = min(0, max(-range.limit, laneShift(lane) + delta)) - range.base
     }
 
     func clickTab(_ index: Int) {
@@ -886,6 +965,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
     /// The pause menu, drawn in its own window on top of the running game.
     private var pauseOverlay: NSWindow?
     private var keyMonitor: Any?
+    private var scrollMonitor: Any?
     private var closeObserver: NSObjectProtocol?
     private var launchedFromBigPicture = false
     /// Keys typed into the quit confirmation or the closing game must not land on the menu and leave the mode.
@@ -953,6 +1033,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         input.start()
         gestures.claim()
         installKeyMonitor()
+        installScrollMonitor()
         startWatchingForGameEnd()
     }
 
@@ -961,6 +1042,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         input.stop()
         gestures.release()
         removeKeyMonitor()
+        removeScrollMonitor()
         stopWatchingForGameEnd()
         dismissPauseOverlay()
         launchedFromBigPicture = false
@@ -1139,6 +1221,35 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Mouse wheel and trackpad scroll the page and the shelf under the pointer, like any other scrolling view.
+    private func installScrollMonitor() {
+        guard scrollMonitor == nil else { return }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self = self, self.window?.isKeyWindow == true, event.window === self.window,
+                      let width = self.window?.contentView?.bounds.width, width > 0, self.model.acceptsScrolling else { return event }
+                // Trackpads report points on screen; a wheel reports lines, which are worth about ten points each.
+                let unit: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
+                // The design is drawn on a fixed-width canvas that is scaled to the window.
+                let scale = width / BP.canvas.width
+                let dx = event.scrollingDeltaX * unit / scale
+                let dy = event.scrollingDeltaY * unit / scale
+                if abs(dx) > abs(dy) {
+                    self.model.scrollLane(by: dx)
+                } else {
+                    // A positive delta means the content moves down, which is the page moving up.
+                    self.model.scrollPage(by: -dy)
+                }
+                return nil
+            }
+        }
+    }
+
+    private func removeScrollMonitor() {
+        if let scrollMonitor = scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
+    }
+
     private func removeKeyMonitor() {
         if let keyMonitor = keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
@@ -1146,6 +1257,18 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
 
     #if DEBUG
     // MARK: Play-test hooks (PlaytestDriver)
+
+    /// "scroll:<points>" and "hscroll:<points>" move the page or the shelf under the pointer as the wheel would;
+    /// "hover:<lane>:<column>" moves the pointer onto a card.
+    func playtestPointer(_ step: String) {
+        let parts = step.split(separator: ":").map(String.init)
+        switch parts.first {
+        case "scroll": model.scrollPage(by: CGFloat(Double(parts.dropFirst().first ?? "") ?? 0))
+        case "hscroll": model.scrollLane(by: CGFloat(Double(parts.dropFirst().first ?? "") ?? 0))
+        case "hover": model.playtestHover(lane: Int(parts.dropFirst().first ?? "") ?? 0, column: Int(parts.dropFirst(2).first ?? "") ?? 0)
+        default: break
+        }
+    }
 
     /// Sends one action ("up", "select", "back", ...) as if it came from a controller.
     func playtestPerform(_ name: String) {
@@ -1187,6 +1310,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         input.releaseAll()
         input.stop()
         removeKeyMonitor()
+        removeScrollMonitor()
         stopWatchingForGameEnd()
         launchedFromBigPicture = false
         model.setGameRunning(false)

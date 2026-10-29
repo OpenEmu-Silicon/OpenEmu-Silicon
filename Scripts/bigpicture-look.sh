@@ -11,7 +11,8 @@
 #   ./Scripts/bigpicture-look.sh --no-steamgriddb      # see the fallbacks a user without a SteamGridDB key gets
 #
 # Steps are controller actions (up down left right select back menu) plus "shot:<name>" to save a picture of the
-# screen, "wait:<seconds>", and "play:<seconds>" to choose what is highlighted (Resume on the hero), let that real game
+# screen, "scroll:<points>" / "hscroll:<points>" (the wheel: page, or the shelf last hovered), "hover:<lane>:<column>"
+# (the pointer on a card), "wait:<seconds>", and "play:<seconds>" to choose what is highlighted (Resume on the hero), let that real game
 # run, save what it drew, close it and check big picture comes back. Closing skips the auto save, so nothing is written
 # to your library saves (play count and last-played time do change). Nothing is imported. OpenEmu must be closed. The debug app has a built-in driver (OpenEmu/PlaytestDriver.swift) and no
 # UI-test runner is involved, so there are no permission prompts. Pictures are in the folder it prints.
