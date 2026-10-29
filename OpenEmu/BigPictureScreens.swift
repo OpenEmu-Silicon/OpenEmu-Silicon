@@ -232,12 +232,17 @@ private struct BPTile: View {
     let size: CGFloat
     /// True for a provider's own square icon, which is made to fill the tile.
     var fills = false
+    /// True when the icon is SteamGridDB's own tile art: it fills the tile even where its corners are see-through.
+    var providerSquare = false
 
     var body: some View {
         ZStack {
             // A provider's square icon fills the tile. Anything else (a cartridge, a disc, a box, a library cover that
             // happens to be square) sits whole on the system's colors, so every tile has the same margin and backdrop.
-            if fills && image.isNearlySquare && !image.hasTransparentCorners {
+            if fills && image.isNearlySquare && (providerSquare || !image.hasTransparentCorners) {
+                if providerSquare {
+                    LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
+                }
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
                 LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
@@ -779,7 +784,7 @@ private struct BPLane: View {
             if let title = lane.title {
                 HStack(spacing: 12) {
                     if let game = lane.game, let tile = art.tile(for: game) {
-                        BPTile(image: tile, game: game, size: 40, fills: art.tileFills(for: game))
+                        BPTile(image: tile, game: game, size: 40, fills: art.tileFills(for: game), providerSquare: art.tileIsProviderSquare(for: game))
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     VStack(alignment: .leading, spacing: 2) {
@@ -901,7 +906,7 @@ private struct BPLane: View {
             HStack(spacing: -16) {
                 ForEach(Array(genre.games.prefix(3).enumerated()), id: \.offset) { offset, game in
                     if let image = art.tile(for: game) {
-                        BPTile(image: image, game: game, size: 50, fills: art.tileFills(for: game))
+                        BPTile(image: image, game: game, size: 50, fills: art.tileFills(for: game), providerSquare: art.tileIsProviderSquare(for: game))
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                             .rotationEffect(.degrees(Double(offset - 1) * 7))
@@ -1060,7 +1065,7 @@ private struct BPLane: View {
             }
             HStack(spacing: 12) {
                 if let tile = art.tile(for: game) {
-                    BPTile(image: tile, game: game, size: 48, fills: art.tileFills(for: game))
+                    BPTile(image: tile, game: game, size: 48, fills: art.tileFills(for: game), providerSquare: art.tileIsProviderSquare(for: game))
                         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }
                 VStack(alignment: .leading, spacing: 2) {
@@ -1143,7 +1148,7 @@ private struct BPLane: View {
                 if art.isLoading(key) {
                     BPSkeleton()
                 } else if let image = image {
-                    BPTile(image: image, game: game, size: BP.iconSize, fills: art.tileFills(for: game))
+                    BPTile(image: image, game: game, size: BP.iconSize, fills: art.tileFills(for: game), providerSquare: art.tileIsProviderSquare(for: game))
                 } else {
                     // No art at all: the system's color with the game's initials.
                     LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
@@ -1554,7 +1559,7 @@ private struct BPPauseMenu: View {
         switch kind {
         case .game(let game):
             if let game = game, let tile = art.tile(for: game) {
-                BPTile(image: tile, game: game, size: 56, fills: art.tileFills(for: game))
+                BPTile(image: tile, game: game, size: 56, fills: art.tileFills(for: game), providerSquare: art.tileIsProviderSquare(for: game))
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
             }
             VStack(alignment: .leading, spacing: 2) {

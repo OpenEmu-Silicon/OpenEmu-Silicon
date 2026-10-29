@@ -78,6 +78,7 @@ final class OEBigPictureArt: ObservableObject {
         var icon: NSImage?
         var logo: NSImage?
         var standardPoster = false
+        var squareIcon = false
 
         var cost: Int {
             [backdrop, poster, icon, logo].compactMap { $0 }.reduce(0) { $0 + Int($1.size.width * $1.size.height) * 4 }
@@ -149,6 +150,10 @@ final class OEBigPictureArt: ObservableObject {
     /// True when the tile's picture is a provider's own square icon, which is made to fill the tile.
     func tileFills(for game: OEDBGame) -> Bool { icon(for: GameKey(game)) != nil }
 
+    /// True when the tile's icon is a provider's own square tile art, which fills the tile even if its corners are
+    /// rounded and see-through. A cartridge or disc cutout from another provider sits inset on the system's colors.
+    func tileIsProviderSquare(for game: OEDBGame) -> Bool { entry(GameKey(game))?.squareIcon ?? false }
+
     func hasStandardPoster(for key: GameKey) -> Bool { entry(key).map { $0.standardPoster && $0.poster != nil } ?? false }
 
     /// True when a poster should be built from the game's backdrop and logo: its box art comes in whatever shape the
@@ -172,6 +177,7 @@ final class OEBigPictureArt: ObservableObject {
         entry.icon = stored.icon ?? entry.icon
         entry.logo = stored.logo ?? entry.logo
         entry.standardPoster = stored.standardPoster || entry.standardPoster
+        entry.squareIcon = stored.squareIcon || entry.squareIcon
         memory.setObject(entry, forKey: md5 as NSString, cost: entry.cost)
         bump()
     }
@@ -217,6 +223,7 @@ final class OEBigPictureArt: ObservableObject {
             // 2. Only a provider that has not answered for this game yet is asked, and only while something is missing.
             var gathered = OEBigPictureArtSet()
             var standard = snapshot.stored.standardPoster
+            var square = snapshot.stored.squareIcon
             func hasEverything() -> Bool {
                 (snapshot.stored.backdrop != nil || gathered.hero != nil) && (snapshot.stored.poster != nil || gathered.grid != nil)
                     && (snapshot.stored.icon != nil || gathered.icon != nil) && (snapshot.stored.logo != nil || gathered.logo != nil)
@@ -227,12 +234,13 @@ final class OEBigPictureArt: ObservableObject {
                     await Task.detached(priority: .utility) { store.recordAnswer(md5: key.md5, providerID: provider.id, found: found.hasAny) }.value
                 }
                 if gathered.grid == nil, snapshot.stored.poster == nil, found.grid != nil, provider.providesStandardPosters { standard = true }
+                if gathered.icon == nil, snapshot.stored.icon == nil, found.icon != nil, provider.providesStandardPosters { square = true }
                 gathered.fillGaps(from: found)
             }
             guard gathered.hasAny else { return }
-            let isStandard = standard
+            let isStandard = standard, isSquare = square
             let result = await Task.detached(priority: .userInitiated) { () -> OEBigPictureArtStore.Stored in
-                store.write(gathered, md5: key.md5, standardPoster: isStandard)
+                store.write(gathered, md5: key.md5, standardPoster: isStandard, squareIcon: isSquare)
                 return store.read(md5: key.md5, providerIDs: []).stored
             }.value
             self.apply(result, md5: key.md5)
@@ -602,6 +610,8 @@ final class OEBigPictureArtStore: @unchecked Sendable {
         var icon: NSImage?
         var logo: NSImage?
         var standardPoster = false
+        /// The icon came from a provider that makes square tile art (SteamGridDB), so it fills the tile.
+        var squareIcon = false
     }
 
     private let directory: URL
@@ -610,7 +620,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
 
     init(signature: String) {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = caches.appendingPathComponent("OpenEmu/BigPictureArt/v2/\(signature)", isDirectory: true)
+        directory = caches.appendingPathComponent("OpenEmu/BigPictureArt/v3/\(signature)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
@@ -640,6 +650,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
         stored.icon = existing(md5, .icon).flatMap(Self.decode)
         stored.logo = existing(md5, .logo).flatMap(Self.decode)
         stored.standardPoster = FileManager.default.fileExists(atPath: marker(md5, "standard").path)
+        stored.squareIcon = FileManager.default.fileExists(atPath: marker(md5, "squareicon").path)
 
         var answered = Set<String>()
         for id in providerIDs {
@@ -662,11 +673,12 @@ final class OEBigPictureArtStore: @unchecked Sendable {
     }
 
     /// Saves the pictures a provider found, each scaled to its slot. A picture already saved is kept.
-    func write(_ art: OEBigPictureArtSet, md5: String, standardPoster: Bool) {
+    func write(_ art: OEBigPictureArtSet, md5: String, standardPoster: Bool, squareIcon: Bool = false) {
         if let hero = art.hero { save(hero, md5, .hero) }
         if let grid = art.grid { save(grid, md5, .poster) }
         if let icon = art.icon { save(icon, md5, .icon) }
         if let logo = art.logo { save(logo, md5, .logo) }
+        if squareIcon, art.icon != nil { try? Data().write(to: marker(md5, "squareicon")) }
         if standardPoster, art.grid != nil { try? Data().write(to: marker(md5, "standard")) }
     }
 

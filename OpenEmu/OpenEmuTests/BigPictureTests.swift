@@ -244,6 +244,15 @@ final class BigPictureTests: XCTestCase {
         XCTAssertFalse(read.standardPoster)
     }
 
+    func testASquareTileIconIsRememberedSoItFillsTheTile() throws {
+        let store = OEBigPictureArtStore(signature: "test-\(UUID().uuidString)")
+        let md5 = UUID().uuidString, other = UUID().uuidString
+        store.write(OEBigPictureArtSet(icon: solid(512, 512, cutout: true)), md5: md5, standardPoster: false, squareIcon: true)
+        store.write(OEBigPictureArtSet(icon: solid(512, 512, cutout: true)), md5: other, standardPoster: false)
+        XCTAssertTrue(store.read(md5: md5, providerIDs: []).stored.squareIcon)     // rounded corners, but it is the provider's tile
+        XCTAssertFalse(store.read(md5: other, providerIDs: []).stored.squareIcon)  // a cutout from elsewhere stays inset
+    }
+
     func testAProviderIsAskedAgainOnlyIfItFoundNothingLongAgo() {
         let store = OEBigPictureArtStore(signature: "test-\(UUID().uuidString)")
         let md5 = UUID().uuidString
