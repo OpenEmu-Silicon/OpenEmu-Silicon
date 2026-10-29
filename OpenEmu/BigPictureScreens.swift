@@ -156,6 +156,12 @@ private struct BPCoverPanel: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
                     .padding(.vertical, 14).padding(.horizontal, 20)
+            } else if let system = game?.system {
+                // No art anywhere: say which system it is, in color, instead of an empty box.
+                VStack(spacing: 8) {
+                    if let icon = system.icon { Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(height: 44) }
+                    Text(system.name).font(.system(size: 13, weight: .semibold)).foregroundColor(BP.primary.opacity(0.85))
+                }
             }
         }
     }
@@ -1136,7 +1142,6 @@ private struct BPLane: View {
         let shot = NSImage(contentsOf: state.screenshotURL)
         let image = Self.isBlank(shot) ? nil : shot
         let game = state.rom?.game
-        let fallback = game.flatMap { art.poster(for: $0) }
         // Save names carry a long timestamp ("Save-Game-2 2026-10-26 11:42:15 -0700"); show the name and a short date.
         let label = state.displayName.split(separator: " ").first.map { $0.replacingOccurrences(of: "-", with: " ") } ?? state.displayName
         let title = lane.showsGame ? (game?.bpTitle ?? label) : label
@@ -1148,8 +1153,13 @@ private struct BPLane: View {
                 if let image = image {
                     Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                 } else {
-                    // Some cores save an all-black preview; show the game's art instead.
-                    BPCoverPanel(game: game, cover: fallback, dim: 0.7)
+                    // Some cores save an all-black preview. A game's cover is not a picture of the save, so say there is none.
+                    LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom).opacity(0.7)
+                    VStack(spacing: 6) {
+                        Image(systemName: "photo").font(.system(size: 26, weight: .regular))
+                        Text("No preview").font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(BP.primary.opacity(0.75))
                 }
             }
             .frame(width: BP.wideCard.width, height: BP.wideCard.height).clipped()

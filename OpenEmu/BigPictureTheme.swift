@@ -131,11 +131,11 @@ enum BP {
         case "openemu.system.snes": return pair(0x5B3A99, 0x43297A)
         case "openemu.system.n64": return pair(0x1F6F3A, 0x155228)
         case "openemu.system.gba", "openemu.system.gb", "openemu.system.nds": return pair(0x3B2A8A, 0x2A1E6A)
-        case "openemu.system.scd", "openemu.system.32x", "openemu.system.saturn", "openemu.system.dc":
-            return pair(0x242426, 0x181818)
-        case "openemu.system.psx", "openemu.system.ps2", "openemu.system.psp": return pair(0x151720, 0x0E1018)
-        case "openemu.system.arcade": return pair(0x111111, 0x0A0A0A)
-        default: return pair(0x2A2A30, 0x1A1A1F)
+        case "openemu.system.scd", "openemu.system.32x", "openemu.system.saturn", "openemu.system.dc", "openemu.system.genesis", "openemu.system.sms", "openemu.system.gg":
+            return pair(0x2E5E9E, 0x1F4272)
+        case "openemu.system.psx", "openemu.system.ps2", "openemu.system.psp": return pair(0x2B4C9B, 0x1B3170)
+        case "openemu.system.arcade": return pair(0x9A5A14, 0x6A3C0C)
+        default: return pair(0x3E4A66, 0x2A3350)
         }
     }
 }

@@ -89,4 +89,29 @@ final class BigPictureTests: XCTestCase {
         XCTAssertFalse(BigPictureAction.select.isDirection)
         XCTAssertFalse(BigPictureAction.home.isDirection)
     }
+
+    /// A game with no art is drawn on its system's colors. Near-black ones read as an empty box.
+    func testNoArtPlaceholdersAreNeverNearBlack() {
+        let systems = ["openemu.system.nes", "openemu.system.snes", "openemu.system.n64", "openemu.system.gba",
+                       "openemu.system.psx", "openemu.system.ps2", "openemu.system.psp", "openemu.system.arcade",
+                       "openemu.system.saturn", "openemu.system.dc", "openemu.system.genesis", "openemu.system.unknown", nil]
+        for system in systems {
+            for color in BP.systemColors(system) {
+                let c = NSColor(color).usingColorSpace(.sRGB)!
+                let brightest = max(c.redComponent, c.greenComponent, c.blueComponent)
+                XCTAssertGreaterThan(brightest, 0.25, "\(system ?? "nil") placeholder is nearly black")
+            }
+        }
+    }
+
+    /// Hover only highlights; the page stays put. Wheel and keys hand the view back and forth.
+    @MainActor func testPointerScrollingLeavesTheHighlightAlone() {
+        let model = BigPictureModel()
+        // With no library there are no shelves, so scrolling is refused and nothing moves.
+        model.scrollPage(by: 100)
+        XCTAssertEqual(model.pageNudge, 0)
+        XCTAssertFalse(model.pointerDriven)
+        model.perform(.down, source: "keyboard")
+        XCTAssertFalse(model.pointerDriven)
+    }
 }
