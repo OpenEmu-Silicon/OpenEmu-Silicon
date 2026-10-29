@@ -40,7 +40,7 @@ final class OEBigPictureArt: ObservableObject {
     static let shared = OEBigPictureArt()
 
     /// Facts about a game that the library itself does not store.
-    struct Details {
+    struct Details: Codable {
         var genres = [String]()
         var developer: String?
         var publisher: String?
@@ -56,17 +56,52 @@ final class OEBigPictureArt: ObservableObject {
         }
     }
 
-    /// Bumped whenever something new arrives so views redraw.
+    /// Bumped, at most about fifteen times a second, when something new arrives so views redraw. One redraw per
+    /// game would repaint every card on screen once for each of them.
     @Published private(set) var tick = 0
+    private var tickScheduled = false
 
-    private var heroes = [String: NSImage]()
-    private var grids = [String: NSImage]()
-    private var icons = [String: NSImage]()
-    private var logos = [String: NSImage]()
+    private func bump() {
+        guard !tickScheduled else { return }
+        tickScheduled = true
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 60_000_000)
+            self?.tickScheduled = false
+            self?.tick += 1
+        }
+    }
+
+    /// A game's decoded pictures, at the size the screens draw them (see `OEBigPictureArtStore`).
+    private final class Entry {
+        var backdrop: NSImage?
+        var poster: NSImage?
+        var icon: NSImage?
+        var logo: NSImage?
+        var standardPoster = false
+
+        var cost: Int {
+            [backdrop, poster, icon, logo].compactMap { $0 }.reduce(0) { $0 + Int($1.size.width * $1.size.height) * 4 }
+        }
+    }
+
+    /// Decoded pictures stay in memory only up to a limit, least recently used first, so a library of thousands of
+    /// games cannot fill it. A game that falls out is read back from disk when its card shows again.
+    private let memory: NSCache<NSString, Entry> = {
+        let cache = NSCache<NSString, Entry>()
+        cache.totalCostLimit = 256 * 1024 * 1024
+        return cache
+    }()
+    /// The big backdrop of the featured game, which is much larger than a card's.
+    private let fullHeroes: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 6
+        return cache
+    }()
+    private var loadingFullHeroes = Set<String>()
     private var details = [String: Details]()
+    private var detailsRequested = Set<String>()
     private var requested = Set<String>()
-    /// Games whose poster came from a provider that makes proper portrait posters (SteamGridDB).
-    private var standardPosters = Set<String>()
+    private var rereading = Set<String>()
     /// When each game's lookup started, until its providers have answered. Views show a skeleton for a moment.
     private var pending = [String: Date]()
     private var skeletonExpiryScheduled = false
@@ -74,15 +109,32 @@ final class OEBigPictureArt: ObservableObject {
     /// card empty: after this, the library cover or placeholder shows and the art replaces it when it arrives.
     private static let skeletonSeconds: TimeInterval = 2.5
     private var known = [String: GameKey]()
+    private var storeInUse: (signature: String, store: OEBigPictureArtStore)?
 
-    func hero(for key: GameKey) -> NSImage? { heroes[key.md5] }
-    func grid(for key: GameKey) -> NSImage? { grids[key.md5] }
-    func icon(for key: GameKey) -> NSImage? { icons[key.md5] }
-    func logo(for key: GameKey) -> NSImage? { logos[key.md5] }
+    private func entry(_ key: GameKey) -> Entry? { memory.object(forKey: key.md5 as NSString) }
+
+    /// The game's backdrop at card size.
+    func hero(for key: GameKey) -> NSImage? { entry(key)?.backdrop }
+    func grid(for key: GameKey) -> NSImage? { entry(key)?.poster }
+    func icon(for key: GameKey) -> NSImage? { entry(key)?.icon }
+    func logo(for key: GameKey) -> NSImage? { entry(key)?.logo }
     func details(for key: GameKey) -> Details? { details[key.md5] }
 
-    /// True when a poster should be built from the game's backdrop and logo: its box art comes in whatever shape the
-    /// box was, so it is no use for a fixed portrait card. SteamGridDB's posters are already that shape.
+    /// The backdrop for the featured game's full-width hero: the large version once it is read, the card-size one before.
+    func fullHero(for key: GameKey) -> NSImage? { fullHeroes.object(forKey: key.md5 as NSString) ?? hero(for: key) }
+
+    /// Reads the large backdrop for a game that is about to fill the hero. Safe to call every time it shows.
+    func prepareFullHero(_ key: GameKey) {
+        guard !key.md5.isEmpty, fullHeroes.object(forKey: key.md5 as NSString) == nil,
+              loadingFullHeroes.insert(key.md5).inserted, let store = currentStore() else { return }
+        Task { [weak self] in
+            let found = await Task.detached(priority: .userInitiated) { OEBigPictureArtSet(hero: store.readHero(md5: key.md5)) }.value
+            guard let self = self else { return }
+            self.loadingFullHeroes.remove(key.md5)
+            if let image = found.hero { self.fullHeroes.setObject(image, forKey: key.md5 as NSString); self.bump() }
+        }
+    }
+
     /// True while a game's art is being looked for, for a short time after it is first asked for. Views draw a
     /// skeleton in place of art, so an empty card never looks like an error.
     func isLoading(_ key: GameKey) -> Bool {
@@ -97,23 +149,53 @@ final class OEBigPictureArt: ObservableObject {
     /// True when the tile's picture is a provider's own square icon, which is made to fill the tile.
     func tileFills(for game: OEDBGame) -> Bool { icon(for: GameKey(game)) != nil }
 
-    func hasStandardPoster(for key: GameKey) -> Bool { standardPosters.contains(key.md5) && grids[key.md5] != nil }
+    func hasStandardPoster(for key: GameKey) -> Bool { entry(key).map { $0.standardPoster && $0.poster != nil } ?? false }
 
-    func usesBuiltPoster(for key: GameKey) -> Bool { !standardPosters.contains(key.md5) && heroes[key.md5] != nil }
+    /// True when a poster should be built from the game's backdrop and logo: its box art comes in whatever shape the
+    /// box was, so it is no use for a fixed portrait card. SteamGridDB's posters are already that shape.
+    func usesBuiltPoster(for key: GameKey) -> Bool { entry(key).map { !$0.standardPoster && $0.backdrop != nil } ?? false }
 
-    /// Starts the lookups for a game once. Safe to call every time a game is shown.
+    private func currentStore() -> OEBigPictureArtStore? {
+        let chain = OEBigPictureArtSource.providers()
+        guard !chain.isEmpty else { return nil }
+        let signature = chain.map { $0.id }.joined(separator: "+")
+        if let inUse = storeInUse, inUse.signature == signature { return inUse.store }
+        let store = OEBigPictureArtStore(signature: signature)
+        storeInUse = (signature, store)
+        return store
+    }
+
+    private func apply(_ stored: OEBigPictureArtStore.Stored, md5: String) {
+        let entry = memory.object(forKey: md5 as NSString) ?? Entry()
+        entry.backdrop = stored.backdrop ?? entry.backdrop
+        entry.poster = stored.poster ?? entry.poster
+        entry.icon = stored.icon ?? entry.icon
+        entry.logo = stored.logo ?? entry.logo
+        entry.standardPoster = stored.standardPoster || entry.standardPoster
+        memory.setObject(entry, forKey: md5 as NSString, cost: entry.cost)
+        bump()
+    }
+
+    /// Starts the lookups for a game once. Safe to call every time a game is shown, and never waits: the saved copies
+    /// are read and decoded in the background, and the providers are asked only for what is not saved yet.
     func load(_ key: GameKey) {
         guard !key.md5.isEmpty else { return }
         known[key.md5] = key
-        guard requested.insert(key.md5).inserted else { return }
+        loadDetails(key)
+        guard let store = currentStore() else { return }
 
-        if let found = Self.lookupDetails(md5: key.md5, name: key.name) {
-            details[key.md5] = found
-            tick += 1
+        guard requested.insert(key.md5).inserted else {
+            // Asked before: if the memory limit dropped its pictures, read the small saved copies back.
+            if memory.object(forKey: key.md5 as NSString) == nil, rereading.insert(key.md5).inserted {
+                Task { [weak self] in
+                    let stored = await Task.detached(priority: .userInitiated) { store.read(md5: key.md5, providerIDs: []).stored }.value
+                    self?.rereading.remove(key.md5)
+                    self?.apply(stored, md5: key.md5)
+                }
+            }
+            return
         }
 
-        let chain = OEBigPictureArtSource.providers()
-        guard !chain.isEmpty else { return }
         pending[key.md5] = Date()
         if !skeletonExpiryScheduled {
             skeletonExpiryScheduled = true
@@ -123,16 +205,49 @@ final class OEBigPictureArt: ObservableObject {
                 self?.tick += 1
             }
         }
+
+        let chain = OEBigPictureArtSource.providers()
         Task { [weak self] in
-            defer { Task { @MainActor in self?.pending[key.md5] = nil; self?.tick += 1 } }
-            // Each provider is asked only for what the ones before it did not have, and what arrives is shown at once.
-            var merged = OEBigPictureArtSet()
-            for provider in chain where !merged.isComplete {
-                let found = await provider.art(for: key)
-                if merged.grid == nil, found.grid != nil, provider.providesStandardPosters { self?.standardPosters.insert(key.md5) }
-                merged.fillGaps(from: found)
-                self?.store(merged, for: key.md5)
+            // 1. What is already saved, which is nearly always everything: small files, decoded off the main thread.
+            let snapshot = await Task.detached(priority: .userInitiated) { store.read(md5: key.md5, providerIDs: chain.map { $0.id }) }.value
+            guard let self = self else { return }
+            self.apply(snapshot.stored, md5: key.md5)
+            self.pending[key.md5] = nil
+
+            // 2. Only a provider that has not answered for this game yet is asked, and only while something is missing.
+            var gathered = OEBigPictureArtSet()
+            var standard = snapshot.stored.standardPoster
+            func hasEverything() -> Bool {
+                (snapshot.stored.backdrop != nil || gathered.hero != nil) && (snapshot.stored.poster != nil || gathered.grid != nil)
+                    && (snapshot.stored.icon != nil || gathered.icon != nil) && (snapshot.stored.logo != nil || gathered.logo != nil)
             }
+            for provider in chain where !snapshot.answered.contains(provider.id) && !hasEverything() {
+                let found = await provider.art(for: key)
+                if found.isDefinitive {
+                    await Task.detached(priority: .utility) { store.recordAnswer(md5: key.md5, providerID: provider.id, found: found.hasAny) }.value
+                }
+                if gathered.grid == nil, snapshot.stored.poster == nil, found.grid != nil, provider.providesStandardPosters { standard = true }
+                gathered.fillGaps(from: found)
+            }
+            guard gathered.hasAny else { return }
+            let isStandard = standard
+            let result = await Task.detached(priority: .userInitiated) { () -> OEBigPictureArtStore.Stored in
+                store.write(gathered, md5: key.md5, standardPoster: isStandard)
+                return store.read(md5: key.md5, providerIDs: []).stored
+            }.value
+            self.apply(result, md5: key.md5)
+        }
+    }
+
+    /// Reads a game's facts (genre, developer, year) on a background queue and keeps them on disk, so the main
+    /// thread never searches the OpenVGDB database.
+    private func loadDetails(_ key: GameKey) {
+        guard detailsRequested.insert(key.md5).inserted else { return }
+        Task { [weak self] in
+            let found = await OEBigPictureDetailsLookup.details(md5: key.md5, name: key.name)
+            guard let self = self, let found = found else { return }
+            self.details[key.md5] = found
+            self.bump()
         }
     }
 
@@ -143,22 +258,17 @@ final class OEBigPictureArt: ObservableObject {
     /// Forget what was asked, so a key just entered in Preferences takes effect.
     func reset() {
         requested.removeAll()
-        heroes.removeAll(); grids.removeAll(); icons.removeAll(); logos.removeAll(); standardPosters.removeAll(); pending.removeAll()
+        memory.removeAllObjects()
+        fullHeroes.removeAllObjects()
+        pending.removeAll()
+        rereading.removeAll()
         known.values.forEach { load($0) }
         tick += 1
     }
 
     // MARK: -
 
-    private func store(_ art: OEBigPictureArtSet, for md5: String) {
-        if let hero = art.hero { heroes[md5] = hero }
-        if let grid = art.grid { grids[md5] = grid }
-        if let icon = art.icon { icons[md5] = icon }
-        if let logo = art.logo { logos[md5] = logo }
-        tick += 1
-    }
-
-    private static func lookupDetails(md5: String, name: String) -> Details? {
+    nonisolated fileprivate static func lookupDetails(md5: String, name: String) -> Details? {
         guard OpenVGDB.shared.isAvailable else { return nil }
         let columns = "releaseDeveloper, releasePublisher, releaseGenre, releaseDate, releaseDescription"
 
@@ -231,8 +341,12 @@ struct OEBigPictureArtSet: @unchecked Sendable {
     var grid: NSImage?
     var icon: NSImage?
     var logo: NSImage?
+    /// True when the provider really answered (it found art, or it is sure it has none), as opposed to failing to
+    /// reach its server. Only a real answer is remembered, so a game is not asked about again.
+    var isDefinitive = false
 
     var isComplete: Bool { hero != nil && grid != nil && icon != nil && logo != nil }
+    var hasAny: Bool { hero != nil || grid != nil || icon != nil || logo != nil }
 
     /// Keeps what is already here and takes the rest from `other`.
     mutating func fillGaps(from other: OEBigPictureArtSet) {
@@ -337,15 +451,15 @@ struct SteamGridDBArtProvider: OEBigPictureArtProvider {
         async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name)
         async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name)
         async let logo = OEHeroArtFetcher.shared.logoArt(md5: key.md5, displayName: key.name)
-        return await OEBigPictureArtSet(hero: hero, grid: grid, icon: icon, logo: logo)
+        return await OEBigPictureArtSet(hero: hero, grid: grid, icon: icon, logo: logo, isDefinitive: true)
     }
 }
 
 /// ScreenScraper: one lookup per game (by hash, file name and size) returns every picture's address, so a game costs
 /// one request. Its box art comes in every shape (N64 boxes are landscape, most others portrait), so each slot takes the
-/// picture made for it: box art for posters, the fixed-size square "mix" image for tiles, fan art for backdrops. Requests go out one at a time, at least `interval` apart, and stop for a while when ScreenScraper
-/// says the quota is used up. Every game is looked up once: what it had, or the fact that it had nothing, is kept on
-/// disk (`~/Library/Application Support/OpenEmu/BigPictureArt/ScreenScraper`).
+/// picture made for it: box art for posters, the cartridge or disc for tiles, fan art for backdrops. Requests go out one
+/// at a time, at least `interval` apart, and stop for a while when ScreenScraper says the quota is used up. What it found
+/// is saved by `OEBigPictureArtStore`; this type keeps nothing on disk.
 actor ScreenScraperArtProvider: OEBigPictureArtProvider {
 
     static let shared = ScreenScraperArtProvider()
@@ -361,18 +475,6 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
     private var pausedUntil = Date.distantPast
     private var inFlight = [String: Task<OEBigPictureArtSet, Never>]()
 
-    private let directory: URL = {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = support.appendingPathComponent("OpenEmu/BigPictureArt/ScreenScraper", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }()
-
-    private func file(_ md5: String, _ kind: String) -> URL { directory.appendingPathComponent("\(md5)-\(kind).png") }
-    /// Bump when a lookup starts keeping something new, so games looked up before are asked about again.
-    private static let lookupVersion = 7
-    private func marker(_ md5: String) -> URL { directory.appendingPathComponent("\(md5).looked-up-\(Self.lookupVersion)") }
-
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
         guard !key.md5.isEmpty else { return OEBigPictureArtSet() }
         if let running = inFlight[key.md5] { return await running.value }
@@ -383,15 +485,8 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         return result
     }
 
-    private func cached(_ md5: String) -> OEBigPictureArtSet {
-        func image(_ kind: String) -> NSImage? { NSImage(contentsOf: file(md5, kind)) }
-        return OEBigPictureArtSet(hero: image("hero"), grid: image("grid"), icon: image("icon"), logo: image("logo"))
-    }
-
     private func load(_ key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
-        let known = cached(key.md5)
-        if FileManager.default.fileExists(atPath: marker(key.md5).path) { return known }
-        guard let systemIdentifier = key.systemIdentifier else { return known }
+        guard let systemIdentifier = key.systemIdentifier else { return OEBigPictureArtSet(isDefinitive: true) }
 
         await waitForSlot()
         let outcome = await Task.detached {
@@ -402,25 +497,22 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         switch outcome {
         case .failure(.rateLimited):
             pausedUntil = Date().addingTimeInterval(pause)
-            return known
+            return OEBigPictureArtSet()   // not an answer: ask again later
         case .failure:
-            return known   // offline or a bad login: try again next time, do not remember it
+            return OEBigPictureArtSet()   // offline or a bad login: not an answer either
         case .success(let found):
-            var art = known
-            if let found = found {
-                art.grid = await download(found.boxImageURL, to: file(key.md5, "grid")) ?? art.grid
-                art.hero = await download(found.heroImageURL, to: file(key.md5, "hero")) ?? art.hero
-                art.logo = await download(found.logoImageURL, to: file(key.md5, "logo")) ?? art.logo
-                // A cutout with no background (cartridge, disc, 3D box) is what the tiles want. Failing that, a square.
-                art.icon = nil   // a fresh lookup starts the choice over; an older pick may be a worse one
-                for url in found.iconImageURLs {
-                    if let image = await download(url, to: file(key.md5, "icon"), accept: { $0.hasTransparentCorners || $0.isNearlySquare }) {
-                        art.icon = image
-                        break
-                    }
+            var art = OEBigPictureArtSet(isDefinitive: true)
+            guard let found = found else { return art }
+            art.grid = await download(found.boxImageURL)
+            art.hero = await download(found.heroImageURL)
+            art.logo = await download(found.logoImageURL)
+            // A cutout with no background (cartridge, disc, 3D box) is what the tiles want. Failing that, a square.
+            for url in found.iconImageURLs {
+                if let image = await download(url, accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
+                    art.icon = image
+                    break
                 }
             }
-            try? Data().write(to: marker(key.md5))
             return art
         }
     }
@@ -434,12 +526,9 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
     }
 
-    private func download(_ url: URL?, to path: URL, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
+    private func download(_ url: URL?, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
         guard let url = url, let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data),
-              accept(image),
-              let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-              let png = rep.representation(using: .png, properties: [:]) else { return nil }
-        try? png.write(to: path)
+              accept(image) else { return nil }
         return image
     }
 }
@@ -457,15 +546,8 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
 
     private var inFlight = [String: Task<OEBigPictureArtSet, Never>]()
 
-    private let directory: URL = {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = support.appendingPathComponent("OpenEmu/BigPictureArt/Libretro", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
-    }()
-
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
-        guard !key.md5.isEmpty, key.systemIdentifier != nil else { return OEBigPictureArtSet() }
+        guard !key.md5.isEmpty, key.systemIdentifier != nil else { return OEBigPictureArtSet(isDefinitive: true) }
         if let running = inFlight[key.md5] { return await running.value }
         let task = Task { await self.load(key) }
         inFlight[key.md5] = task
@@ -475,11 +557,7 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
     }
 
     private func load(_ key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
-        let posterFile = directory.appendingPathComponent("\(key.md5)-grid.png")
-        let marker = directory.appendingPathComponent("\(key.md5).looked-up")
-        if let image = NSImage(contentsOf: posterFile) { return OEBigPictureArtSet(grid: image) }
-        if FileManager.default.fileExists(atPath: marker.path) { return OEBigPictureArtSet() }
-        guard let systemIdentifier = key.systemIdentifier else { return OEBigPictureArtSet() }
+        guard let systemIdentifier = key.systemIdentifier else { return OEBigPictureArtSet(isDefinitive: true) }
 
         // The library's title usually carries its region tag already; otherwise try the common ones.
         let tagged = key.fullName != key.name
@@ -489,28 +567,200 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
                 LibretroThumbnailsClient.shared.fetchBoxArtURL(gameName: candidate, systemIdentifier: systemIdentifier)
             }.value
             guard let address = address, let url = URL(string: address),
-                  let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data),
-                  let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-                  let png = rep.representation(using: .png, properties: [:]) else { continue }
-            try? png.write(to: posterFile)
-            return OEBigPictureArtSet(grid: image)
+                  let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { continue }
+            return OEBigPictureArtSet(grid: image, isDefinitive: true)
         }
-        try? Data().write(to: marker)
-        return OEBigPictureArtSet()
+        return OEBigPictureArtSet(isDefinitive: true)
+    }
+}
+
+// MARK: - Saved copies
+
+/// Every game's pictures, saved at the size the screens draw them, in `~/Library/Caches/OpenEmu/BigPictureArt`.
+///
+/// The originals are 1 to 2 MB each (a backdrop is 1920 by 1080), which is slow to read and decode and adds up to
+/// gigabytes for a big library. A card needs a few hundred pixels, so each picture is saved once, scaled down, in the
+/// smallest form that keeps it sharp: JPEG for backdrops and opaque posters, PNG for cutouts (tiles, logos). A game is
+/// about 400 KB, and its files decode in a millisecond or two. It lives in Caches because it can always be fetched again.
+///
+/// There is one folder per set of providers in use, so changing the source in Preferences starts fresh instead of
+/// mixing art from different sources.
+final class OEBigPictureArtStore: @unchecked Sendable {
+
+    enum Slot: String, CaseIterable {
+        case hero, backdrop, poster, icon, logo
+
+        /// The longest side, in pixels. Cards are drawn at up to about 330 pixels on a Retina screen.
+        var longestSide: CGFloat {
+            switch self {
+            case .hero: return 1600
+            case .backdrop: return 640
+            case .poster: return 560
+            case .icon: return 320
+            case .logo: return 520
+            }
+        }
+    }
+
+    /// What is saved for one game, decoded and ready to draw.
+    struct Stored: @unchecked Sendable {
+        var backdrop: NSImage?
+        var poster: NSImage?
+        var icon: NSImage?
+        var logo: NSImage?
+        var standardPoster = false
+    }
+
+    private let directory: URL
+    /// A provider that found nothing is asked again after this long (it may have been offline).
+    private static let retryAfterNothing: TimeInterval = 7 * 24 * 3600
+
+    init(signature: String) {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        directory = caches.appendingPathComponent("OpenEmu/BigPictureArt/v1/\(signature)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    private func existing(_ md5: String, _ slot: Slot) -> URL? {
+        for ext in ["jpg", "png"] {
+            let url = directory.appendingPathComponent("\(md5)-\(slot.rawValue).\(ext)")
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+        }
+        return nil
+    }
+
+    private func marker(_ md5: String, _ name: String) -> URL { directory.appendingPathComponent("\(md5).\(name)") }
+
+    // MARK: Reading (call off the main thread)
+
+    private static func decode(_ url: URL) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+    }
+
+    /// Everything saved for a game, decoded, and which of `providerIDs` have already answered for it.
+    func read(md5: String, providerIDs: [String]) -> (stored: Stored, answered: Set<String>) {
+        var stored = Stored()
+        stored.backdrop = existing(md5, .backdrop).flatMap(Self.decode)
+        stored.poster = existing(md5, .poster).flatMap(Self.decode)
+        stored.icon = existing(md5, .icon).flatMap(Self.decode)
+        stored.logo = existing(md5, .logo).flatMap(Self.decode)
+        stored.standardPoster = FileManager.default.fileExists(atPath: marker(md5, "standard").path)
+
+        var answered = Set<String>()
+        for id in providerIDs {
+            let url = marker(md5, "answered-\(id)")
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { continue }
+            let foundSomething = (try? String(contentsOf: url)) == "found"
+            let age = Date().timeIntervalSince((attributes[.modificationDate] as? Date) ?? .distantPast)
+            if foundSomething || age < Self.retryAfterNothing { answered.insert(id) }
+        }
+        return (stored, answered)
+    }
+
+    /// The large backdrop for the featured game's hero.
+    func readHero(md5: String) -> NSImage? { existing(md5, .hero).flatMap(Self.decode) }
+
+    // MARK: Writing (call off the main thread)
+
+    func recordAnswer(md5: String, providerID: String, found: Bool) {
+        try? (found ? "found" : "empty").write(to: marker(md5, "answered-\(providerID)"), atomically: true, encoding: .utf8)
+    }
+
+    /// Saves the pictures a provider found, each scaled to its slot. A picture already saved is kept.
+    func write(_ art: OEBigPictureArtSet, md5: String, standardPoster: Bool) {
+        if let hero = art.hero { save(hero, md5, .hero); save(hero, md5, .backdrop) }
+        if let grid = art.grid { save(grid, md5, .poster) }
+        if let icon = art.icon { save(icon, md5, .icon) }
+        if let logo = art.logo { save(logo, md5, .logo) }
+        if standardPoster, art.grid != nil { try? Data().write(to: marker(md5, "standard")) }
+    }
+
+    private func save(_ image: NSImage, _ md5: String, _ slot: Slot) {
+        guard existing(md5, slot) == nil, let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        let cutout = Self.hasTransparentCorners(source)
+        let jpeg = slot == .hero || slot == .backdrop || (slot == .poster && !cutout)
+        guard let scaled = Self.scaled(source, longestSide: slot.longestSide, opaque: jpeg) else { return }
+
+        let url = directory.appendingPathComponent("\(md5)-\(slot.rawValue).\(jpeg ? "jpg" : "png")")
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, (jpeg ? "public.jpeg" : "public.png") as CFString, 1, nil) else { return }
+        let options: [CFString: Any] = jpeg ? [kCGImageDestinationLossyCompressionQuality: 0.82] : [:]
+        CGImageDestinationAddImage(destination, scaled, options as CFDictionary)
+        CGImageDestinationFinalize(destination)
+    }
+
+    private static func scaled(_ image: CGImage, longestSide: CGFloat, opaque: Bool) -> CGImage? {
+        let scale = min(1, longestSide / CGFloat(max(image.width, image.height)))
+        let width = max(1, Int((CGFloat(image.width) * scale).rounded())), height = max(1, Int((CGFloat(image.height) * scale).rounded()))
+        let info = opaque ? CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: info) else { return nil }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
+    }
+
+    /// True for a cutout (a cartridge, a disc) whose four corners are see-through, as opposed to a picture with its own
+    /// background. Safe to call from any thread.
+    static func hasTransparentCorners(_ image: CGImage) -> Bool {
+        guard image.alphaInfo != .none, image.alphaInfo != .noneSkipFirst, image.alphaInfo != .noneSkipLast else { return false }
+        let size = 16
+        guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: size * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data?.assumingMemoryBound(to: UInt8.self) else { return false }
+        context.clear(CGRect(x: 0, y: 0, width: size, height: size))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+        func alpha(_ x: Int, _ y: Int) -> UInt8 { data[(y * size + x) * 4 + 3] }
+        return [alpha(0, 0), alpha(size - 1, 0), alpha(0, size - 1), alpha(size - 1, size - 1)].allSatisfy { $0 < 26 }
+    }
+
+    static func hasTransparentCorners(_ image: NSImage) -> Bool {
+        image.cgImage(forProposedRect: nil, context: nil, hints: nil).map(hasTransparentCorners) ?? false
+    }
+}
+
+/// The OpenVGDB lookup for a game's genre, developer and year. The database has no index on the hash, so a lookup
+/// takes tens of milliseconds: far too long for the main thread, which is where it used to run for every game in the
+/// library when big picture opened. It now runs one at a time on its own queue, and the answers are kept on disk.
+enum OEBigPictureDetailsLookup {
+
+    private static let queue = DispatchQueue(label: "org.openemu.bigpicture.details", qos: .utility)
+
+    static func details(md5: String, name: String) async -> OEBigPictureArt.Details? {
+        await withCheckedContinuation { continuation in
+            queue.async { continuation.resume(returning: lookup(md5: md5, name: name)) }
+        }
+    }
+
+    /// Answers are saved per version of the database, so a database update is picked up.
+    private static var directory: URL {
+        let version = UserDefaults.standard.string(forKey: OpenVGDB.versionKey) ?? "none"
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let dir = caches.appendingPathComponent("OpenEmu/BigPictureArt/details-\(version)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private static func lookup(md5: String, name: String) -> OEBigPictureArt.Details? {
+        let file = directory.appendingPathComponent("\(md5).json")
+        if let data = try? Data(contentsOf: file), let saved = try? JSONDecoder().decode(OEBigPictureArt.Details?.self, from: data) {
+            return saved
+        }
+        guard OpenVGDB.shared.isAvailable else { return nil }
+        let found = OEBigPictureArt.lookupDetails(md5: md5, name: name)
+        if let data = try? JSONEncoder().encode(found) { try? data.write(to: file) }   // a "nothing found" answer is kept too
+        return found
     }
 }
 
 extension NSImage {
 
     /// True for a cutout (a cartridge, a disc) whose corners are see-through, as opposed to a picture with its own
-    /// background. Checked once per image.
+    /// background. Checked once per image, on the main thread.
     var hasTransparentCorners: Bool {
         if let known = NSImage.cornerCache.object(forKey: self) { return known.boolValue }
-        var transparent = false
-        if let tiff = tiffRepresentation, let rep = NSBitmapImageRep(data: tiff), rep.hasAlpha, rep.pixelsWide > 1, rep.pixelsHigh > 1 {
-            let corners = [(0, 0), (rep.pixelsWide - 1, 0), (0, rep.pixelsHigh - 1), (rep.pixelsWide - 1, rep.pixelsHigh - 1)]
-            transparent = corners.allSatisfy { (rep.colorAt(x: $0.0, y: $0.1)?.alphaComponent ?? 1) < 0.1 }
-        }
+        let transparent = OEBigPictureArtStore.hasTransparentCorners(self)
         NSImage.cornerCache.setObject(NSNumber(value: transparent), forKey: self)
         return transparent
     }

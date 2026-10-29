@@ -543,7 +543,7 @@ private struct BPBackdrop: View {
 
     var body: some View {
         ZStack {
-            if art.hero(for: OEBigPictureArt.GameKey(game)) == nil {
+            if art.fullHero(for: OEBigPictureArt.GameKey(game)) == nil {
                 // No backdrop from any provider: the system's colors, fading into the page, instead of empty black.
                 LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier).map { $0.opacity(0.55) },
                                startPoint: .top, endPoint: .bottom)
@@ -552,7 +552,7 @@ private struct BPBackdrop: View {
                 LinearGradient(colors: [.clear, BP.background], startPoint: .top, endPoint: .bottom)
                     .frame(height: 170).frame(maxHeight: .infinity, alignment: .bottom)
             }
-            if let hero = art.hero(for: OEBigPictureArt.GameKey(game)) {
+            if let hero = art.fullHero(for: OEBigPictureArt.GameKey(game)) {
                 Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).opacity(0.6)
                 // Dim under the tab bar, a soft pool behind the text, and a fade into the page below.
                 LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
@@ -566,6 +566,9 @@ private struct BPBackdrop: View {
         .clipped()
         .allowsHitTesting(false)
         .animation(.easeOut(duration: 0.3), value: art.tick)
+        // The card-size backdrop shows at once; the large one replaces it a moment later.
+        .onAppear { art.prepareFullHero(OEBigPictureArt.GameKey(game)) }
+        .onChange(of: game.objectID) { _ in art.prepareFullHero(OEBigPictureArt.GameKey(game)) }
     }
 }
 

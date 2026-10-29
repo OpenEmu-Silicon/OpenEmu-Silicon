@@ -252,10 +252,9 @@ final class BigPictureModel: ObservableObject {
         allGames = all.flatMap { Array($0.games) }
 
         // Ask for every game's artwork now, so posters do not wait for a card to scroll into view.
-        // A rate-limited provider gets only the games most likely to show first; the rest load as their cards appear.
-        let eager = OEBigPictureArt.shared.providerIsThrottled
-            ? Array((sortedByRecent(allGames) + allGames.sorted { ($0.importDate ?? .distantPast) > ($1.importDate ?? .distantPast) }).prefix(24))
-            : allGames
+        // The games most likely to show first are loaded now; the rest load as their cards appear. Loading is cheap (small
+        // saved files, read in the background), so this is about not starting hundreds of first-time lookups at once.
+        let eager = Array((sortedByRecent(allGames) + allGames.sorted { ($0.importDate ?? .distantPast) > ($1.importDate ?? .distantPast) }).prefix(40))
         eager.forEach { OEBigPictureArt.shared.load(OEBigPictureArt.GameKey($0)) }
 
         screen = .browse

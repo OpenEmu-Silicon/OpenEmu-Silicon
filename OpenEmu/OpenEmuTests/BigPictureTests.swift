@@ -217,4 +217,49 @@ final class BigPictureTests: XCTestCase {
             XCTAssertFalse(source.title.isEmpty)
         }
     }
+
+    private func solid(_ width: Int, _ height: Int, cutout: Bool) -> NSImage {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSColor.clear.setFill(); NSRect(x: 0, y: 0, width: width, height: height).fill(using: .copy)
+        NSColor.red.setFill()
+        (cutout ? NSRect(x: width / 4, y: height / 4, width: width / 2, height: height / 2) : NSRect(x: 0, y: 0, width: width, height: height)).fill()
+        NSGraphicsContext.restoreGraphicsState()
+        let image = NSImage(size: NSSize(width: width, height: height)); image.addRepresentation(rep); return image
+    }
+
+    func testSavedCopiesAreSmallAndComeBackTheSame() throws {
+        let store = OEBigPictureArtStore(signature: "test-\(UUID().uuidString)")
+        let md5 = UUID().uuidString
+        let backdrop = solid(1920, 1080, cutout: false), cartridge = solid(600, 386, cutout: true)
+        store.write(OEBigPictureArtSet(hero: backdrop, grid: solid(498, 680, cutout: false), icon: cartridge, logo: cartridge), md5: md5, standardPoster: false)
+        let read = store.read(md5: md5, providerIDs: []).stored
+        XCTAssertLessThanOrEqual(try XCTUnwrap(read.backdrop).size.width, 640)           // a card never needs 1920 pixels
+        XCTAssertEqual(try XCTUnwrap(read.backdrop).size.width / read.backdrop!.size.height, 1920.0 / 1080.0, accuracy: 0.01)
+        XCTAssertEqual(try XCTUnwrap(read.icon).size.width / read.icon!.size.height, 600.0 / 386.0, accuracy: 0.02)
+        XCTAssertTrue(OEBigPictureArtStore.hasTransparentCorners(try XCTUnwrap(read.icon)))   // a cutout stays a cutout
+        XCTAssertNotNil(store.readHero(md5: md5))
+        XCTAssertFalse(read.standardPoster)
+    }
+
+    func testAProviderIsAskedAgainOnlyIfItFoundNothingLongAgo() {
+        let store = OEBigPictureArtStore(signature: "test-\(UUID().uuidString)")
+        let md5 = UUID().uuidString
+        XCTAssertTrue(store.read(md5: md5, providerIDs: ["libretro"]).answered.isEmpty)
+        store.recordAnswer(md5: md5, providerID: "libretro", found: false)
+        store.recordAnswer(md5: md5, providerID: "screenscraper", found: true)
+        XCTAssertEqual(store.read(md5: md5, providerIDs: ["libretro", "screenscraper"]).answered, ["libretro", "screenscraper"])
+        XCTAssertTrue(store.read(md5: md5, providerIDs: ["steamgriddb"]).answered.isEmpty)   // a different provider has not answered
+    }
+
+    func testSourcesDoNotShareSavedCopies() throws {
+        let one = OEBigPictureArtStore(signature: "test-a-\(UUID().uuidString)"), two = OEBigPictureArtStore(signature: "test-b-\(UUID().uuidString)")
+        let md5 = UUID().uuidString
+        one.write(OEBigPictureArtSet(grid: solid(100, 140, cutout: false)), md5: md5, standardPoster: true)
+        XCTAssertNotNil(one.read(md5: md5, providerIDs: []).stored.poster)
+        XCTAssertTrue(one.read(md5: md5, providerIDs: []).stored.standardPoster)
+        XCTAssertNil(two.read(md5: md5, providerIDs: []).stored.poster)
+    }
 }
