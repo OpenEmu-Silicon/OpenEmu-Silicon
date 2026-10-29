@@ -140,6 +140,27 @@ private struct BPPoster: View {
     }
 }
 
+/// What fills a wide card that has no wide art: the game's own cover, whole and sharp, on its system's colors.
+/// Stretching a portrait cover across a wide card and blurring it leaves nothing recognizable.
+private struct BPCoverPanel: View {
+
+    let game: OEDBGame?
+    let cover: NSImage?
+    var dim: Double = 0.85
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom).opacity(dim)
+            if let cover = cover {
+                Image(nsImage: cover).resizable().aspectRatio(contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
+                    .padding(.vertical, 14).padding(.horizontal, 20)
+            }
+        }
+    }
+}
+
 /// A small outlined tag, like the rating and format chips on Apple TV.
 private struct BPChip: View {
 
@@ -895,8 +916,8 @@ private struct BPLane: View {
                 BP.material
                 if let hero = art.hero(for: key) {
                     Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill)
-                } else if let cover = art.poster(for: game) {
-                    Image(nsImage: cover).resizable().aspectRatio(contentMode: .fill).blur(radius: 22).opacity(0.7)
+                } else {
+                    BPCoverPanel(game: game, cover: art.poster(for: game))
                 }
             }
             .frame(width: size.width, height: size.height - BP.recentBarHeight).clipped()
@@ -1126,11 +1147,9 @@ private struct BPLane: View {
                 Color.white.opacity(0.06)
                 if let image = image {
                     Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
-                } else if let fallback = fallback {
-                    // Some cores save an all-black preview; show the game's art instead.
-                    Image(nsImage: fallback).resizable().aspectRatio(contentMode: .fill).blur(radius: 18).opacity(0.5)
                 } else {
-                    LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom).opacity(0.7)
+                    // Some cores save an all-black preview; show the game's art instead.
+                    BPCoverPanel(game: game, cover: fallback, dim: 0.7)
                 }
             }
             .frame(width: BP.wideCard.width, height: BP.wideCard.height).clipped()
