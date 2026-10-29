@@ -590,16 +590,9 @@ final class OEBigPictureArtStore: @unchecked Sendable {
     enum Slot: String, CaseIterable {
         case hero, backdrop, poster, icon, logo
 
-        /// The longest side, in pixels. Cards are drawn at up to about 330 pixels on a Retina screen.
-        var longestSide: CGFloat {
-            switch self {
-            case .hero: return 1600
-            case .backdrop: return 640
-            case .poster: return 560
-            case .icon: return 320
-            case .logo: return 520
-            }
-        }
+        /// Big picture can be shown on a very large display, so nothing is scaled down: each slot keeps the picture's
+        /// full resolution. Speed comes from reading it off the main thread and keeping it in memory, not from shrinking it.
+        var longestSide: CGFloat { .greatestFiniteMagnitude }
     }
 
     /// What is saved for one game, decoded and ready to draw.
@@ -617,7 +610,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
 
     init(signature: String) {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        directory = caches.appendingPathComponent("OpenEmu/BigPictureArt/v1/\(signature)", isDirectory: true)
+        directory = caches.appendingPathComponent("OpenEmu/BigPictureArt/v2/\(signature)", isDirectory: true)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
@@ -642,7 +635,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
     /// Everything saved for a game, decoded, and which of `providerIDs` have already answered for it.
     func read(md5: String, providerIDs: [String]) -> (stored: Stored, answered: Set<String>) {
         var stored = Stored()
-        stored.backdrop = existing(md5, .backdrop).flatMap(Self.decode)
+        stored.backdrop = (existing(md5, .backdrop) ?? existing(md5, .hero)).flatMap(Self.decode)
         stored.poster = existing(md5, .poster).flatMap(Self.decode)
         stored.icon = existing(md5, .icon).flatMap(Self.decode)
         stored.logo = existing(md5, .logo).flatMap(Self.decode)
@@ -670,7 +663,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
 
     /// Saves the pictures a provider found, each scaled to its slot. A picture already saved is kept.
     func write(_ art: OEBigPictureArtSet, md5: String, standardPoster: Bool) {
-        if let hero = art.hero { save(hero, md5, .hero); save(hero, md5, .backdrop) }
+        if let hero = art.hero { save(hero, md5, .hero) }
         if let grid = art.grid { save(grid, md5, .poster) }
         if let icon = art.icon { save(icon, md5, .icon) }
         if let logo = art.logo { save(logo, md5, .logo) }
@@ -685,7 +678,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
 
         let url = directory.appendingPathComponent("\(md5)-\(slot.rawValue).\(jpeg ? "jpg" : "png")")
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, (jpeg ? "public.jpeg" : "public.png") as CFString, 1, nil) else { return }
-        let options: [CFString: Any] = jpeg ? [kCGImageDestinationLossyCompressionQuality: 0.82] : [:]
+        let options: [CFString: Any] = jpeg ? [kCGImageDestinationLossyCompressionQuality: 0.97] : [:]
         CGImageDestinationAddImage(destination, scaled, options as CFDictionary)
         CGImageDestinationFinalize(destination)
     }

@@ -230,13 +230,13 @@ final class BigPictureTests: XCTestCase {
         let image = NSImage(size: NSSize(width: width, height: height)); image.addRepresentation(rep); return image
     }
 
-    func testSavedCopiesAreSmallAndComeBackTheSame() throws {
+    func testSavedCopiesKeepFullResolutionAndComeBackTheSame() throws {
         let store = OEBigPictureArtStore(signature: "test-\(UUID().uuidString)")
         let md5 = UUID().uuidString
         let backdrop = solid(1920, 1080, cutout: false), cartridge = solid(600, 386, cutout: true)
         store.write(OEBigPictureArtSet(hero: backdrop, grid: solid(498, 680, cutout: false), icon: cartridge, logo: cartridge), md5: md5, standardPoster: false)
         let read = store.read(md5: md5, providerIDs: []).stored
-        XCTAssertLessThanOrEqual(try XCTUnwrap(read.backdrop).size.width, 640)           // a card never needs 1920 pixels
+        XCTAssertEqual(try XCTUnwrap(read.backdrop).size.width, 1920)                      // nothing is scaled down
         XCTAssertEqual(try XCTUnwrap(read.backdrop).size.width / read.backdrop!.size.height, 1920.0 / 1080.0, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(read.icon).size.width / read.icon!.size.height, 600.0 / 386.0, accuracy: 0.02)
         XCTAssertTrue(OEBigPictureArtStore.hasTransparentCorners(try XCTUnwrap(read.icon)))   // a cutout stays a cutout
