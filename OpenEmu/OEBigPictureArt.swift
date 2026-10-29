@@ -67,6 +67,12 @@ final class OEBigPictureArt: ObservableObject {
     private var requested = Set<String>()
     /// Games whose poster came from a provider that makes proper portrait posters (SteamGridDB).
     private var standardPosters = Set<String>()
+    /// When each game's lookup started, until its providers have answered. Views show a skeleton for a moment.
+    private var pending = [String: Date]()
+    private var skeletonExpiryScheduled = false
+    /// How long a skeleton is shown at most. A slow provider (ScreenScraper queues a game for minutes) must not leave a
+    /// card empty: after this, the library cover or placeholder shows and the art replaces it when it arrives.
+    private static let skeletonSeconds: TimeInterval = 2.5
     private var known = [String: GameKey]()
 
     func hero(for key: GameKey) -> NSImage? { heroes[key.md5] }
@@ -77,6 +83,22 @@ final class OEBigPictureArt: ObservableObject {
 
     /// True when a poster should be built from the game's backdrop and logo: its box art comes in whatever shape the
     /// box was, so it is no use for a fixed portrait card. SteamGridDB's posters are already that shape.
+    /// True while a game's art is being looked for, for a short time after it is first asked for. Views draw a
+    /// skeleton in place of art, so an empty card never looks like an error.
+    func isLoading(_ key: GameKey) -> Bool {
+        #if DEBUG
+        // `-OEBigPictureAlwaysLoading 1` holds the skeleton on screen so its look can be checked.
+        if UserDefaults.standard.bool(forKey: "OEBigPictureAlwaysLoading") { return true }
+        #endif
+        guard let since = pending[key.md5] else { return false }
+        return Date().timeIntervalSince(since) < Self.skeletonSeconds
+    }
+
+    /// True when the tile's picture is a provider's own square icon, which is made to fill the tile.
+    func tileFills(for game: OEDBGame) -> Bool { icon(for: GameKey(game)) != nil }
+
+    func hasStandardPoster(for key: GameKey) -> Bool { standardPosters.contains(key.md5) && grids[key.md5] != nil }
+
     func usesBuiltPoster(for key: GameKey) -> Bool { !standardPosters.contains(key.md5) && heroes[key.md5] != nil }
 
     /// Starts the lookups for a game once. Safe to call every time a game is shown.
@@ -92,7 +114,17 @@ final class OEBigPictureArt: ObservableObject {
 
         let chain = OEBigPictureArtSource.providers()
         guard !chain.isEmpty else { return }
+        pending[key.md5] = Date()
+        if !skeletonExpiryScheduled {
+            skeletonExpiryScheduled = true
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(Self.skeletonSeconds * 1_000_000_000) + 100_000_000)
+                self?.skeletonExpiryScheduled = false
+                self?.tick += 1
+            }
+        }
         Task { [weak self] in
+            defer { Task { @MainActor in self?.pending[key.md5] = nil; self?.tick += 1 } }
             // Each provider is asked only for what the ones before it did not have, and what arrives is shown at once.
             var merged = OEBigPictureArtSet()
             for provider in chain where !merged.isComplete {
@@ -111,7 +143,7 @@ final class OEBigPictureArt: ObservableObject {
     /// Forget what was asked, so a key just entered in Preferences takes effect.
     func reset() {
         requested.removeAll()
-        heroes.removeAll(); grids.removeAll(); icons.removeAll(); logos.removeAll(); standardPosters.removeAll()
+        heroes.removeAll(); grids.removeAll(); icons.removeAll(); logos.removeAll(); standardPosters.removeAll(); pending.removeAll()
         known.values.forEach { load($0) }
         tick += 1
     }

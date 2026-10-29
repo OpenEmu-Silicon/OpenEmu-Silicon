@@ -92,6 +92,12 @@ private extension OEDBGame {
 
     var systemName: String { system?.name ?? "" }
 
+    /// "Dragon Quest VIII - Journey of the Cursed King" becomes "DQV".
+    var bpInitials: String {
+        let words = bpTitle.split { !$0.isLetter && !$0.isNumber }.filter { !["of", "the", "a", "an", "and"].contains($0.lowercased()) }
+        return String(words.prefix(3).compactMap { $0.first }).uppercased()
+    }
+
     /// The title as shown on screen, without region and revision tags: "Dragon Quest VIII (USA)" is "Dragon Quest VIII".
     var bpTitle: String { OEBigPictureArt.GameKey.searchName(cleanDisplayName) }
 
@@ -123,35 +129,38 @@ private struct BPPoster: View {
         let key = OEBigPictureArt.GameKey(game)
         let image = art.poster(for: game)
         ZStack {
-            if allowsBuiltPoster, art.usesBuiltPoster(for: key), let backdrop = art.hero(for: key) {
+            if art.isLoading(key) {
+                BPSkeleton()
+            } else if allowsBuiltPoster, art.usesBuiltPoster(for: key), let backdrop = art.hero(for: key) {
                 BPBuiltPoster(game: game, backdrop: backdrop, logo: art.logo(for: key), size: size)
             } else if let image = image {
-                // Box art comes in every shape. One close to the slot's shape fills it; any other (an N64 box is
-                // landscape) is shown whole on the system's colors, never cropped.
-                let shape = image.size.width / max(image.size.height, 1)
-                let slot = size.width / max(size.height, 1)
-                if abs(shape / slot - 1) < 0.15 {
+                if art.hasStandardPoster(for: key) {
+                    // A real portrait poster (SteamGridDB) is made for this shape.
                     Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                         .frame(width: size.width, height: size.height).clipped()
                 } else {
+                    // Box art comes in every shape, so every box gets the same treatment: whole, with the same margin and
+                    // shadow, on its system's colors. Nothing is cropped and a landscape box sits like a portrait one.
                     LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
-                    // The game's own backdrop, when the provider has one, behind the whole box: a poster-shaped card.
-                    if let backdrop = art.hero(for: key) {
-                        Image(nsImage: backdrop).resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: size.width, height: size.height).clipped().opacity(0.55)
-                        LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
-                    }
                     Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
-                        .frame(width: size.width - 14, height: size.height)
+                        .frame(width: size.width - 22, height: size.height - 22)
                         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
                 }
             } else {
+                // No art from anywhere: the system's colors, the game's initials large, then its name and system.
                 LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
-                Text(game.bpTitle)
-                    .font(BP.calloutBold)
-                    .foregroundColor(BP.primary)
-                    .multilineTextAlignment(.center)
-                    .padding(10)
+                VStack(spacing: size.height * 0.03) {
+                    Text(game.bpInitials)
+                        .font(.system(size: size.width * 0.3, weight: .heavy)).minimumScaleFactor(0.5).lineLimit(1)
+                        .foregroundColor(BP.primary.opacity(0.9))
+                    Text(game.bpTitle)
+                        .font(.system(size: max(size.width * 0.085, 12), weight: .semibold))
+                        .foregroundColor(BP.primary).multilineTextAlignment(.center).lineLimit(3)
+                    Text(game.systemName)
+                        .font(.system(size: max(size.width * 0.07, 10), weight: .medium))
+                        .foregroundColor(BP.primary.opacity(0.6)).lineLimit(1)
+                }
+                .padding(size.width * 0.08)
             }
         }
         .frame(width: size.width, height: size.height)
@@ -193,6 +202,27 @@ private struct BPBuiltPoster: View {
     }
 }
 
+/// A wireframe stand-in while a card's art is being looked up: a soft card with a light sweep across it, the way
+/// Apple TV shows an unloaded shelf. Without it an empty card looks like an error.
+private struct BPSkeleton: View {
+
+    @State private var sweep: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.white.opacity(0.07)
+                LinearGradient(colors: [.clear, Color.white.opacity(0.12), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geometry.size.width * 0.7)
+                    .offset(x: geometry.size.width * sweep)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+        }
+        .onAppear { withAnimation(.linear(duration: 1.3).repeatForever(autoreverses: false)) { sweep = 1.3 } }
+    }
+}
+
 /// A game's small square tile. A square picture fills it; anything else (a cartridge, a disc, a box, an arcade cabinet)
 /// is shown whole on the system's colors with some air around it, so a tile is never cropped.
 private struct BPTile: View {
@@ -200,12 +230,14 @@ private struct BPTile: View {
     let image: NSImage
     let game: OEDBGame?
     let size: CGFloat
+    /// True for a provider's own square icon, which is made to fill the tile.
+    var fills = false
 
     var body: some View {
         ZStack {
-            // A picture with its own square background fills the tile. A cutout with no background (cartridge, disc,
-            // box) of any shape sits whole on the system's colors, whether or not it happens to be nearly square.
-            if image.isNearlySquare && !image.hasTransparentCorners {
+            // A provider's square icon fills the tile. Anything else (a cartridge, a disc, a box, a library cover that
+            // happens to be square) sits whole on the system's colors, so every tile has the same margin and backdrop.
+            if fills && image.isNearlySquare && !image.hasTransparentCorners {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
                 LinearGradient(colors: BP.systemColors(game?.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
@@ -511,7 +543,15 @@ private struct BPBackdrop: View {
 
     var body: some View {
         ZStack {
-            // No hero art (no SteamGridDB, or none for this game): just the page's black, nothing in its place.
+            if art.hero(for: OEBigPictureArt.GameKey(game)) == nil {
+                // No backdrop from any provider: the system's colors, fading into the page, instead of empty black.
+                LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier).map { $0.opacity(0.55) },
+                               startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [.black.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 90).frame(maxHeight: .infinity, alignment: .top)
+                LinearGradient(colors: [.clear, BP.background], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 170).frame(maxHeight: .infinity, alignment: .bottom)
+            }
             if let hero = art.hero(for: OEBigPictureArt.GameKey(game)) {
                 Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill).opacity(0.6)
                 // Dim under the tab bar, a soft pool behind the text, and a fade into the page below.
@@ -736,7 +776,7 @@ private struct BPLane: View {
             if let title = lane.title {
                 HStack(spacing: 12) {
                     if let game = lane.game, let tile = art.tile(for: game) {
-                        BPTile(image: tile, game: game, size: 40)
+                        BPTile(image: tile, game: game, size: 40, fills: art.tileFills(for: game))
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     VStack(alignment: .leading, spacing: 2) {
@@ -858,7 +898,7 @@ private struct BPLane: View {
             HStack(spacing: -16) {
                 ForEach(Array(genre.games.prefix(3).enumerated()), id: \.offset) { offset, game in
                     if let image = art.tile(for: game) {
-                        BPTile(image: image, game: game, size: 50)
+                        BPTile(image: image, game: game, size: 50, fills: art.tileFills(for: game))
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                             .rotationEffect(.degrees(Double(offset - 1) * 7))
@@ -996,7 +1036,9 @@ private struct BPLane: View {
         return VStack(spacing: 0) {
             ZStack {
                 BP.material
-                if let hero = art.hero(for: key) {
+                if art.isLoading(key) {
+                    BPSkeleton()
+                } else if let hero = art.hero(for: key) {
                     Image(nsImage: hero).resizable().aspectRatio(contentMode: .fill)
                 } else {
                     BPCoverPanel(game: game, cover: art.poster(for: game))
@@ -1015,7 +1057,7 @@ private struct BPLane: View {
             }
             HStack(spacing: 12) {
                 if let tile = art.tile(for: game) {
-                    BPTile(image: tile, game: game, size: 48)
+                    BPTile(image: tile, game: game, size: 48, fills: art.tileFills(for: game))
                         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                 }
                 VStack(alignment: .leading, spacing: 2) {
@@ -1095,8 +1137,10 @@ private struct BPLane: View {
         let image = art.tile(for: game)
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
-                if let image = image {
-                    BPTile(image: image, game: game, size: BP.iconSize)
+                if art.isLoading(key) {
+                    BPSkeleton()
+                } else if let image = image {
+                    BPTile(image: image, game: game, size: BP.iconSize, fills: art.tileFills(for: game))
                 } else {
                     // No art at all: the system's color with the game's initials.
                     LinearGradient(colors: BP.systemColors(game.system?.systemIdentifier), startPoint: .top, endPoint: .bottom)
@@ -1507,7 +1551,7 @@ private struct BPPauseMenu: View {
         switch kind {
         case .game(let game):
             if let game = game, let tile = art.tile(for: game) {
-                BPTile(image: tile, game: game, size: 56)
+                BPTile(image: tile, game: game, size: 56, fills: art.tileFills(for: game))
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
             }
             VStack(alignment: .leading, spacing: 2) {
