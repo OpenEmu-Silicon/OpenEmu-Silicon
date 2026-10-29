@@ -65,6 +65,17 @@ clone splits). When a game fails to load under FBNeo:
 - Games are identified by **short name** = the zip's filename without extension
   (e.g. `mslug.zip` → `mslug`, `sf2.zip` → `sf2`). Keep the canonical short name.
 
+## Support folders
+
+The core keeps FBNeo's runtime files under
+`~/Library/Application Support/OpenEmu/FBNeo/`, the same way the MAME core does:
+
+| Folder | Holds |
+|--------|-------|
+| `nvram/` | EEPROM saves (`.nv`), battery-backed RAM (`.fs`, e.g. Mortal Kombat's settings), per-game DIP switch/input config (`.ini`), hiscore saves (`.hi`), hard-disk diffs. Created automatically. |
+| `samples/` | Optional sample packs (e.g. `invaders.zip` with WAV files) for games whose sounds FBNeo plays from recordings. Not shipped; without a pack those games are silent. |
+| `hiscore/`, `blend/`, `hdd/` | FBNeo's optional `hiscore.dat`, blend files and hard-disk images. |
+
 ## RetroAchievements — filename requirement
 
 Arcade RA hashing is based on the **ROM filename** (the zip's base name, no

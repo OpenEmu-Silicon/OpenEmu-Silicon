@@ -27,6 +27,10 @@
 //                                           the way the cheat search window addresses it)
 //   done frames=<n>
 // Any failure prints "error: <reason>" and exits non-zero.
+//
+// The support and BIOS folders live in a throwaway directory that is deleted at the end. Set
+// OE_HEADLESS_SANDBOX=<dir> to use that directory instead and keep it, so a second run sees the
+// files the first one saved (for example EEPROM or battery saves).
 
 #import <Foundation/Foundation.h>
 #import <OpenEmuBase/OpenEmuBase.h>
@@ -157,10 +161,11 @@ int main(int argc, char **argv)
                 NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
                 if (parts.count < 3) return Fail(@"--input wants FRAME:SELECTOR:INT");
                 NSNumber *frame = @(parts.firstObject.integerValue);
-                // The selector may itself contain colons, e.g. didPushArcadeButton:forPlayer:
-                NSString *selectorName = [[parts subarrayWithRange:NSMakeRange(1, parts.count - 2)] componentsJoinedByString:@":"];
                 if (!inputs[frame]) inputs[frame] = [NSMutableArray array];
-                [inputs[frame] addObject:@[selectorName, @(parts.lastObject.integerValue)]];
+                // Everything between the frame and the value is the selector, so
+                // multi-part ones work too (600:didPushArcadeButton:forPlayer:12).
+                NSString *selector = [[parts subarrayWithRange:NSMakeRange(1, parts.count - 2)] componentsJoinedByString:@":"];
+                [inputs[frame] addObject:@[selector, @(parts.lastObject.integerValue)]];
                 i++;
             } else {
                 return Fail([NSString stringWithFormat:@"unknown or incomplete argument %@", arg]);
@@ -174,8 +179,11 @@ int main(int argc, char **argv)
         if (![bundle loadAndReturnError:&loadError]) return Fail([NSString stringWithFormat:@"core would not load: %@", loadError]);
         NSString *className = bundle.infoDictionary[@"OEGameCoreClass"];
         HeadlessController *controller = [[HeadlessController alloc] initWithBundle:bundle];
-        controller.sandbox = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:
-                                                     [NSString stringWithFormat:@"oe-headless-%d", getpid()]]];
+        NSString *keptSandbox = NSProcessInfo.processInfo.environment[@"OE_HEADLESS_SANDBOX"];
+        controller.sandbox = keptSandbox.length > 0
+            ? [NSURL fileURLWithPath:keptSandbox]
+            : [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:
+                                      [NSString stringWithFormat:@"oe-headless-%d", getpid()]]];
         for (NSString *sub in @[@"Support", @"BIOS"]) {
             [[NSFileManager defaultManager] createDirectoryAtURL:[controller.sandbox URLByAppendingPathComponent:sub]
                                      withIntermediateDirectories:YES attributes:nil error:nil];
@@ -264,7 +272,7 @@ int main(int argc, char **argv)
                 videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
             }
             if (!videoBuffer && !hostVideo) {
-                // Some cores (MAME) only draw into a buffer the host provides.
+                // Some cores (FBNeo, MAME) only draw into a buffer the host provides.
                 hostVideo = [NSMutableData dataWithLength:core.bytesPerRow * core.bufferSize.height];
                 videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
             }
@@ -286,7 +294,7 @@ int main(int argc, char **argv)
             }
         }
         [core stopEmulationWithCompletionHandler:^{}];
-        [[NSFileManager defaultManager] removeItemAtURL:controller.sandbox error:nil];
+        if (keptSandbox.length == 0) [[NSFileManager defaultManager] removeItemAtURL:controller.sandbox error:nil];
         printf("done frames=%ld\n", (long)frames);
     }
     return 0;
