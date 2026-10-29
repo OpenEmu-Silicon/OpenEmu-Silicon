@@ -114,4 +114,107 @@ final class BigPictureTests: XCTestCase {
         model.perform(.down, source: "keyboard")
         XCTAssertFalse(model.pointerDriven)
     }
+
+    private func media(_ type: String, _ name: String, region: String = "wor") -> [String: Any] {
+        ["type": type, "region": region, "url": "https://example.test/\(name).png"]
+    }
+
+    func testScreenScraperGivesPosterBackdropAndLogoFromOneLookup() {
+        let jeu: [String: Any] = ["medias": [
+            media("box-2D", "box"), media("ss", "shot"), media("fanart", "fan"), media("wheel", "wheel"), media("wheel-hd", "wheelhd"), media("mixrbv1", "mix1"), media("mixrbv2", "mix2"), media("support-2D", "cart"),
+        ]]
+        let result = ScreenScraperClient.shared.parseGameInfo(jeu: jeu)
+        XCTAssertEqual(result?.boxImageURL?.lastPathComponent, "box.png")
+        XCTAssertEqual(result?.heroImageURL?.lastPathComponent, "fan.png")      // fan art beats a screenshot
+        XCTAssertEqual(result?.logoImageURL?.lastPathComponent, "wheelhd.png")  // the HD logo beats the plain one
+        XCTAssertEqual(result?.iconImageURL?.lastPathComponent, "cart.png")     // the cartridge or disc, for tiles
+        XCTAssertEqual(result?.iconImageURLs.map { $0.lastPathComponent }, ["cart.png", "mix2.png", "mix1.png"])
+    }
+
+    func testFanArtBeatsAScreenshotEvenWhenOnlyTheScreenshotHasTheRightRegion() {
+        // Fan art carries no region tag; the screenshot is tagged for the player's region.
+        let fan: [String: Any] = ["type": "fanart", "url": "https://example.test/fan.png"]
+        let jeu: [String: Any] = ["medias": [media("box-2D", "box"), media("ss", "shot", region: "us"), fan]]
+        XCTAssertEqual(ScreenScraperClient.shared.parseGameInfo(jeu: jeu)?.heroImageURL?.lastPathComponent, "fan.png")
+    }
+
+    func testScreenScraperBackdropFallsBackToAScreenshot() {
+        let result = ScreenScraperClient.shared.parseGameInfo(jeu: ["medias": [media("box-2D", "box"), media("ss", "shot")]])
+        XCTAssertEqual(result?.heroImageURL?.lastPathComponent, "shot.png")
+        XCTAssertNil(result?.logoImageURL)
+    }
+
+    func testScreenScraperTileTriesTheCutoutsBeforeTheSquareMix() {
+        let jeu: [String: Any] = ["medias": [media("box-2D", "box"), media("mixrbv2", "mix2"), media("box-3D", "box3d")]]
+        let result = ScreenScraperClient.shared.parseGameInfo(jeu: jeu)
+        XCTAssertEqual(result?.iconImageURLs.map { $0.lastPathComponent }, ["box3d.png", "mix2.png"])  // no support-2D: the 3D box
+    }
+
+    func testCutoutsAreToldApartFromPicturesWithABackground() {
+        func image(opaque: Bool) -> NSImage {
+            let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8, samplesPerPixel: 4,
+                                       hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            NSColor.clear.setFill(); NSRect(x: 0, y: 0, width: 8, height: 8).fill(using: .copy)
+            if opaque { NSColor.red.setFill(); NSRect(x: 0, y: 0, width: 8, height: 8).fill() }
+            NSColor.blue.setFill(); NSRect(x: 2, y: 2, width: 4, height: 4).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            let result = NSImage(size: NSSize(width: 8, height: 8)); result.addRepresentation(rep); return result
+        }
+        XCTAssertTrue(image(opaque: false).hasTransparentCorners)
+        XCTAssertFalse(image(opaque: true).hasTransparentCorners)
+        XCTAssertTrue(image(opaque: true).isNearlySquare)
+    }
+
+    func testALogoInThePlayersRegionBeatsAnHDLogoInAnother() {
+        // Super Mario Bros.: the plain logo has US and EU versions; the only HD logo is the Japanese one.
+        let jeu: [String: Any] = ["medias": [
+            media("box-2D", "box"), media("wheel", "wheel-eu", region: "eu"), media("wheel", "wheel-us", region: "us"),
+            media("wheel-hd", "hd-jp", region: "jp"),
+        ]]
+        let result = ScreenScraperClient.shared.parseGameInfo(jeu: jeu)
+        XCTAssertTrue(["wheel-us.png", "wheel-eu.png"].contains(result?.logoImageURL?.lastPathComponent ?? ""))
+    }
+
+    func testAJapaneseLogoIsTheLastResort() {
+        let jeu: [String: Any] = ["medias": [media("box-2D", "box"), media("wheel-hd", "hd-jp", region: "jp"), media("wheel", "wheel-fr", region: "fr")]]
+        XCTAssertEqual(ScreenScraperClient.shared.parseGameInfo(jeu: jeu)?.logoImageURL?.lastPathComponent, "wheel-fr.png")
+        let only: [String: Any] = ["medias": [media("box-2D", "box"), media("wheel-hd", "hd-jp", region: "jp")]]
+        XCTAssertEqual(ScreenScraperClient.shared.parseGameInfo(jeu: only)?.logoImageURL?.lastPathComponent, "hd-jp.png")
+    }
+
+    func testLibraryOnlyUsesNoProvider() {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey)
+        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey) }
+        defaults.set("libraryOnly", forKey: OEBigPictureArtSource.defaultsKey)
+        XCTAssertTrue(OEBigPictureArtSource.providers().isEmpty)
+        XCTAssertEqual(OEBigPictureArtSource.inUseTitle, "Library covers only")
+    }
+
+    func testAutomaticAlwaysEndsWithTheKeylessProvider() {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey)
+        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey) }
+        defaults.set("automatic", forKey: OEBigPictureArtSource.defaultsKey)
+        XCTAssertEqual(OEBigPictureArtSource.providers().last?.id, "libretro")
+    }
+
+    func testAGameTakesEachPictureFromTheFirstProviderThatHasIt() {
+        let first = NSImage(size: NSSize(width: 1, height: 1)), second = NSImage(size: NSSize(width: 2, height: 2))
+        var art = OEBigPictureArtSet(hero: first)
+        XCTAssertFalse(art.isComplete)
+        art.fillGaps(from: OEBigPictureArtSet(hero: second, grid: second, icon: second, logo: second))
+        XCTAssertTrue(art.hero === first)   // kept
+        XCTAssertTrue(art.grid === second)  // filled
+        XCTAssertTrue(art.isComplete)
+    }
+
+    func testEverySourceCanBeSavedAndRead() {
+        for source in OEBigPictureArtSource.allCases {
+            XCTAssertEqual(OEBigPictureArtSource(rawValue: source.rawValue), source)
+            XCTAssertFalse(source.title.isEmpty)
+        }
+    }
 }

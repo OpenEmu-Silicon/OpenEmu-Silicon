@@ -31,9 +31,10 @@ final class PrefArtworkProvidersController: NSViewController {
 
     private let steamGridKey = NSSecureTextField()
     private let statusLabel  = NSTextField(labelWithString: "")
+    private let sourcePopUp  = NSPopUpButton(frame: .zero, pullsDown: false)
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 468, height: 380))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 468, height: 440))
         buildUI()
     }
 
@@ -46,11 +47,15 @@ final class PrefArtworkProvidersController: NSViewController {
         let header = NSTextField(labelWithString: "Big Picture Artwork")
         header.font = .boldSystemFont(ofSize: 15)
 
-        let description = NSTextField(wrappingLabelWithString: "Big-picture mode uses your library's cover art as a fallback. Add a SteamGridDB key below to also fetch posters and backdrops. It is optional.")
+        let description = NSTextField(wrappingLabelWithString: "Big-picture mode shows your library's cover art. It can also fetch posters, backdrops and logos from one online source: SteamGridDB (needs a key, below) or ScreenScraper (sign in on the ScreenScraper tab). Both are optional.")
         description.font = .systemFont(ofSize: 12)
         description.textColor = .secondaryLabelColor
 
         steamGridKey.placeholderString = "SteamGridDB API key"
+
+        OEBigPictureArtSource.allCases.forEach { sourcePopUp.addItem(withTitle: $0.title) }
+        sourcePopUp.target = self
+        sourcePopUp.action = #selector(sourceChanged)
 
         let save = NSButton(title: "Save", target: self, action: #selector(save))
         save.bezelStyle = .rounded
@@ -69,6 +74,7 @@ final class PrefArtworkProvidersController: NSViewController {
 
         let stack = NSStackView(views: [
             header, description,
+            label("Artwork source"), sourcePopUp,
             label("SteamGridDB — posters and backdrops"), steamGridKey,
             buttons, statusLabel, links,
         ])
@@ -76,6 +82,7 @@ final class PrefArtworkProvidersController: NSViewController {
         stack.alignment = .leading
         stack.spacing = 8
         stack.setCustomSpacing(18, after: description)
+        stack.setCustomSpacing(16, after: sourcePopUp)
         stack.setCustomSpacing(16, after: steamGridKey)
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
@@ -98,9 +105,18 @@ final class PrefArtworkProvidersController: NSViewController {
     private func refresh() {
         steamGridKey.placeholderString = OECredentialStore.shared.has(.steamGridDBAPIKey) ? "••••••••  (saved)" : "SteamGridDB API key"
 
-        var active = [String]()
-        if SteamGridDBClient.isConfigured { active.append("SteamGridDB") }
-        statusLabel.stringValue = active.isEmpty ? "No online providers — using library cover art only." : "Active: " + active.joined(separator: ", ")
+        if let index = OEBigPictureArtSource.allCases.firstIndex(of: OEBigPictureArtSource.chosen) { sourcePopUp.selectItem(at: index) }
+        let inUse = !OEBigPictureArtSource.providers().isEmpty
+        statusLabel.stringValue = inUse ? "Order: \(OEBigPictureArtSource.inUseTitle)."
+            : "No online source ready (SteamGridDB needs a key, ScreenScraper needs a sign-in) — using library cover art only."
+    }
+
+    @objc private func sourceChanged() {
+        let index = sourcePopUp.indexOfSelectedItem
+        guard OEBigPictureArtSource.allCases.indices.contains(index) else { return }
+        UserDefaults.standard.set(OEBigPictureArtSource.allCases[index].rawValue, forKey: OEBigPictureArtSource.defaultsKey)
+        Task { @MainActor in OEBigPictureArt.shared.reset() }
+        refresh()
     }
 
     @objc private func save() {
@@ -120,6 +136,7 @@ final class PrefArtworkProvidersController: NSViewController {
     @objc private func clear() {
         OECredentialStore.shared.remove(.steamGridDBAPIKey)
         steamGridKey.stringValue = ""
+        Task { @MainActor in OEBigPictureArt.shared.reset() }
         refresh()
     }
 }
@@ -132,5 +149,5 @@ extension PrefArtworkProvidersController: PreferencePane {
 
     var panelTitle: String { "Artwork" }
 
-    var viewSize: NSSize { NSSize(width: 468, height: 380) }
+    var viewSize: NSSize { NSSize(width: 468, height: 440) }
 }
