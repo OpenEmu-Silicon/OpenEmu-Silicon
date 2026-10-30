@@ -54,7 +54,7 @@ a Release build because it looks for a Debug build.
 ## ROM sets — important
 
 **FBNeo uses its own versioned ROM sets, which are NOT interchangeable with
-MAME's.** This fork's MAME core expects MAME 0.250 sets; FBNeo expects sets
+MAME's.** This fork's MAME core expects MAME 0.289 sets; FBNeo expects sets
 matching the pinned FBNeo revision. A given game's `.zip` is often valid for one
 core but not the other (different CRCs, different member files, different parent/
 clone splits). When a game fails to load under FBNeo:
@@ -64,6 +64,17 @@ clone splits). When a game fails to load under FBNeo:
   "not a recognized FinalBurn Neo set".
 - Games are identified by **short name** = the zip's filename without extension
   (e.g. `mslug.zip` → `mslug`, `sf2.zip` → `sf2`). Keep the canonical short name.
+
+## Support folders
+
+The core keeps FBNeo's runtime files under
+`~/Library/Application Support/OpenEmu/FBNeo/`, the same way the MAME core does:
+
+| Folder | Holds |
+|--------|-------|
+| `nvram/` | EEPROM saves (`.nv`), battery-backed RAM (`.fs`, e.g. Mortal Kombat's settings), per-game DIP switch/input config (`.ini`), hiscore saves (`.hi`), hard-disk diffs. Created automatically. |
+| `samples/` | Optional sample packs (e.g. `invaders.zip` with WAV files) for games whose sounds FBNeo plays from recordings. Not shipped; without a pack those games are silent. |
+| `hiscore/`, `blend/`, `hdd/` | FBNeo's optional `hiscore.dat`, blend files and hard-disk images. |
 
 ## RetroAchievements — filename requirement
 

@@ -4,6 +4,12 @@
 // Usage:
 //   oe-headless --core <X.oecoreplugin> --rom <file> --frames N [--input FRAME:SELECTOR:INT ...]
 //               [--hash-at FRAME ...] [--save-state-at FRAME] [--load-state-at FRAME] [--audio]
+//               [--search-byte FRAME:HEXVALUE ...] [--cheat-at FRAME:CODE ...] [--reset-at FRAME ...]
+//               [--buffer-once] [--save-file-at FRAME:PATH ...] [--load-file-at FRAME:PATH ...]
+//
+// --buffer-once asks the core for its video buffer only before the first frame, the way Release builds
+// of the app do (Debug builds ask again every frame from an assert), so a core that loses the buffer
+// shows up as a picture that stops changing.
 //
 // Output is one line per event, easy to grep:
 //   core-loaded <class>
@@ -11,8 +17,20 @@
 //   frame <n> video=<hash> audio=<hash>    (for every --hash-at frame, and the last frame)
 //   state-saved <bytes>
 //   state-loaded
+//   cheat-set <code>
+//   reset
+//   file-saved ok|failed exists=yes|no [<error>]   (for --save-file-at: what the core reported, and
+//                                                   whether the file is really there afterwards)
+//   file-loaded ok|failed [<error>]                 (for --load-file-at)
+//   region <name> address=<hex> bytes=<n>  (for --search-byte, once per readable memory region)
+//   hit <hex address>                      (for --search-byte, every byte equal to the value, addressed
+//                                           the way the cheat search window addresses it)
 //   done frames=<n>
 // Any failure prints "error: <reason>" and exits non-zero.
+//
+// The support and BIOS folders live in a throwaway directory that is deleted at the end. Set
+// OE_HEADLESS_SANDBOX=<dir> to use that directory instead and keep it, so a second run sees the
+// files the first one saved (for example EEPROM or battery saves).
 
 #import <Foundation/Foundation.h>
 #import <OpenEmuBase/OpenEmuBase.h>
@@ -96,6 +114,12 @@ int main(int argc, char **argv)
         BOOL wantAudio = NO;
         NSInteger saveAt = -1, loadAt = -1;
         NSMutableSet<NSNumber *> *hashAt = [NSMutableSet set];
+        NSMutableDictionary<NSNumber *, NSNumber *> *searchAt = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSNumber *, NSMutableArray<NSString *> *> *cheatsAt = [NSMutableDictionary dictionary];
+        NSMutableSet<NSNumber *> *resetAt = [NSMutableSet set];
+        NSMutableDictionary<NSNumber *, NSString *> *saveFileAt = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSNumber *, NSString *> *loadFileAt = [NSMutableDictionary dictionary];
+        BOOL bufferOnce = NO;
         NSMutableDictionary<NSNumber *, NSMutableArray<NSArray *> *> *inputs = [NSMutableDictionary dictionary];
 
         for (int i = 1; i < argc; i++) {
@@ -108,12 +132,40 @@ int main(int argc, char **argv)
             else if ([arg isEqual:@"--save-state-at"] && next) { saveAt = next.integerValue; i++; }
             else if ([arg isEqual:@"--load-state-at"] && next) { loadAt = next.integerValue; i++; }
             else if ([arg isEqual:@"--audio"]) { wantAudio = YES; }
+            else if ([arg isEqual:@"--buffer-once"]) { bufferOnce = YES; }
+            else if ([arg isEqual:@"--reset-at"] && next) { [resetAt addObject:@(next.integerValue)]; i++; }
+            else if (([arg isEqual:@"--save-file-at"] || [arg isEqual:@"--load-file-at"]) && next) {
+                NSRange colon = [next rangeOfString:@":"];
+                if (colon.location == NSNotFound) return Fail([arg stringByAppendingString:@" wants FRAME:PATH"]);
+                NSMutableDictionary *target = [arg isEqual:@"--save-file-at"] ? saveFileAt : loadFileAt;
+                target[@([next substringToIndex:colon.location].integerValue)] = [next substringFromIndex:colon.location + 1];
+                i++;
+            }
+            else if ([arg isEqual:@"--cheat-at"] && next) {
+                NSRange colon = [next rangeOfString:@":"];
+                if (colon.location == NSNotFound) return Fail(@"--cheat-at wants FRAME:CODE");
+                NSNumber *frame = @([next substringToIndex:colon.location].integerValue);
+                if (!cheatsAt[frame]) cheatsAt[frame] = [NSMutableArray array];
+                [cheatsAt[frame] addObject:[next substringFromIndex:colon.location + 1]];
+                i++;
+            }
+            else if ([arg isEqual:@"--search-byte"] && next) {
+                NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
+                if (parts.count != 2) return Fail(@"--search-byte wants FRAME:HEXVALUE");
+                unsigned value = 0;
+                [[NSScanner scannerWithString:parts[1]] scanHexInt:&value];
+                searchAt[@(parts[0].integerValue)] = @(value & 0xFF);
+                i++;
+            }
             else if ([arg isEqual:@"--input"] && next) {
                 NSArray<NSString *> *parts = [next componentsSeparatedByString:@":"];
                 if (parts.count < 3) return Fail(@"--input wants FRAME:SELECTOR:INT");
-                NSNumber *frame = @(parts[0].integerValue);
+                NSNumber *frame = @(parts.firstObject.integerValue);
                 if (!inputs[frame]) inputs[frame] = [NSMutableArray array];
-                [inputs[frame] addObject:@[parts[1], @(parts[2].integerValue)]];
+                // Everything between the frame and the value is the selector, so
+                // multi-part ones work too (600:didPushArcadeButton:forPlayer:12).
+                NSString *selector = [[parts subarrayWithRange:NSMakeRange(1, parts.count - 2)] componentsJoinedByString:@":"];
+                [inputs[frame] addObject:@[selector, @(parts.lastObject.integerValue)]];
                 i++;
             } else {
                 return Fail([NSString stringWithFormat:@"unknown or incomplete argument %@", arg]);
@@ -127,8 +179,11 @@ int main(int argc, char **argv)
         if (![bundle loadAndReturnError:&loadError]) return Fail([NSString stringWithFormat:@"core would not load: %@", loadError]);
         NSString *className = bundle.infoDictionary[@"OEGameCoreClass"];
         HeadlessController *controller = [[HeadlessController alloc] initWithBundle:bundle];
-        controller.sandbox = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:
-                                                     [NSString stringWithFormat:@"oe-headless-%d", getpid()]]];
+        NSString *keptSandbox = NSProcessInfo.processInfo.environment[@"OE_HEADLESS_SANDBOX"];
+        controller.sandbox = keptSandbox.length > 0
+            ? [NSURL fileURLWithPath:keptSandbox]
+            : [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:
+                                      [NSString stringWithFormat:@"oe-headless-%d", getpid()]]];
         for (NSString *sub in @[@"Support", @"BIOS"]) {
             [[NSFileManager defaultManager] createDirectoryAtURL:[controller.sandbox URLByAppendingPathComponent:sub]
                                      withIntermediateDirectories:YES attributes:nil error:nil];
@@ -156,6 +211,7 @@ int main(int argc, char **argv)
         CC_SHA256_Init(&audioDigest);
         NSUInteger audioBytes = 0;
         const void *videoBuffer = NULL;
+        NSMutableData *hostVideo = nil;
         for (NSInteger frame = 1; frame <= frames; frame++) {
             for (NSArray *input in inputs[@(frame)]) {
                 NSString *name = [input[0] hasSuffix:@":"] ? input[0] : [input[0] stringByAppendingString:@":"];
@@ -182,17 +238,63 @@ int main(int argc, char **argv)
                 if (!savedState || ![core deserializeState:savedState withError:&e]) return Fail([NSString stringWithFormat:@"load state failed: %@", e]);
                 printf("state-loaded\n");
             }
-            void *noHint = NULL;
-            videoBuffer = [core getVideoBufferWithHint:noHint];
+            for (NSString *code in cheatsAt[@(frame)]) {
+                [core setCheat:code setType:@"Unknown" setEnabled:YES];
+                printf("cheat-set %s\n", code.UTF8String);
+            }
+            if ([resetAt containsObject:@(frame)]) {
+                [core resetEmulation];
+                printf("reset\n");
+            }
+            if (saveFileAt[@(frame)] || loadFileAt[@(frame)]) {
+                BOOL saving = saveFileAt[@(frame)] != nil;
+                NSString *path = saving ? saveFileAt[@(frame)] : loadFileAt[@(frame)];
+                __block BOOL ok = NO;
+                __block NSError *fileError = nil;
+                dispatch_semaphore_t done = dispatch_semaphore_create(0);
+                void (^handler)(BOOL, NSError *) = ^(BOOL success, NSError *e) {
+                    ok = success; fileError = e; dispatch_semaphore_signal(done);
+                };
+                if (saving) [core saveStateToFileAtPath:path completionHandler:handler];
+                else [core loadStateFromFileAtPath:path completionHandler:handler];
+                while (dispatch_semaphore_wait(done, DISPATCH_TIME_NOW) != 0) {
+                    [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+                }
+                NSString *detail = fileError ? [NSString stringWithFormat:@" %@ %@", fileError.localizedDescription, fileError.localizedRecoverySuggestion ?: @""] : @"";
+                if (saving) {
+                    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+                    printf("file-saved %s exists=%s%s\n", ok ? "ok" : "failed", exists ? "yes" : "no", detail.UTF8String);
+                } else {
+                    printf("file-loaded %s%s\n", ok ? "ok" : "failed", detail.UTF8String);
+                }
+            }
+            if (!bufferOnce || frame == 1) {
+                videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
+            }
+            if (!videoBuffer && !hostVideo) {
+                // Some cores (FBNeo, MAME) only draw into a buffer the host provides.
+                hostVideo = [NSMutableData dataWithLength:core.bytesPerRow * core.bufferSize.height];
+                videoBuffer = [core getVideoBufferWithHint:hostVideo.mutableBytes];
+            }
             [core executeFrame];
             DrainAudio(core, &audioDigest, &audioBytes);
+            if (searchAt[@(frame)]) {
+                uint8_t wanted = searchAt[@(frame)].unsignedCharValue;
+                for (OEMemoryRegionDescriptor *region in [core readableMemoryRegions]) {
+                    printf("region %s address=%08X bytes=%lu\n", region.name.UTF8String, region.address, (unsigned long)region.data.length);
+                    const uint8_t *bytes = region.data.bytes;
+                    for (NSUInteger offset = 0; offset < region.data.length; offset++) {
+                        if (bytes[offset] == wanted) printf("hit %08X\n", [region addressForOffset:offset]);
+                    }
+                }
+            }
             if ([hashAt containsObject:@(frame)] || frame == frames) {
                 printf("frame %ld video=%s audio=%s\n", (long)frame, VideoHash(core, videoBuffer).UTF8String,
                        wantAudio ? DigestString(audioDigest, audioBytes).UTF8String : "-");
             }
         }
         [core stopEmulationWithCompletionHandler:^{}];
-        [[NSFileManager defaultManager] removeItemAtURL:controller.sandbox error:nil];
+        if (keptSandbox.length == 0) [[NSFileManager defaultManager] removeItemAtURL:controller.sandbox error:nil];
         printf("done frames=%ld\n", (long)frames);
     }
     return 0;
