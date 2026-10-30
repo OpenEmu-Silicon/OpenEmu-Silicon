@@ -434,8 +434,40 @@ final class BigPictureModel: ObservableObject {
 
     // MARK: Navigation
 
-    /// Handles an action from any input device.
+    /// Set when something in this action already played its own sound, so the default one stays quiet.
+    private var cuePlayed = false
+
+    private func cue(_ cue: BigPictureSounds.Cue) {
+        cuePlayed = true
+        BigPictureSounds.play(cue)
+    }
+
+    /// Where the highlight is, as numbers, to tell whether an action moved it.
+    private var highlightPosition: [Int] {
+        [lane, column, tabBarIndex, sidebarIndex, menuIndex, pauseIndex, detailScrolled ? 1 : 0]
+    }
+
+    /// Handles an action from any input device, and plays the sound that goes with what it did.
     func perform(_ action: BigPictureAction, source: String) {
+        let before = highlightPosition
+        let sidebarWasOpen = sidebarOpen
+        cuePlayed = false
+        route(action, source: source)
+        guard !cuePlayed else { return }
+
+        switch action {
+        case .up, .down, .left, .right:
+            if highlightPosition != before { BigPictureSounds.play(.move) }
+        case .select: BigPictureSounds.play(.select)
+        case .back: BigPictureSounds.play(.back)
+        case .tabPrevious, .tabNext: BigPictureSounds.play(.tab)
+        case .menu: BigPictureSounds.play(sidebarWasOpen ? .back : .select)
+        case .delete: if isSearching { BigPictureSounds.play(.move) }
+        case .home: break
+        }
+    }
+
+    private func route(_ action: BigPictureAction, source: String) {
         lastInput = "\(action.rawValue)  ·  \(source)"
         mouseAnchor = NSEvent.mouseLocation
         if source != "mouse" { endPointerDriving() }
@@ -477,7 +509,7 @@ final class BigPictureModel: ObservableObject {
         switch entry {
         case .tab(let tab): show(tab: tab, system: nil)
         case .system(let id): show(tab: .library, system: id)
-        case .exit: onExit?()
+        case .exit: cue(.quit); onExit?()
         case .settings:
             screen = .settings
             lanes = []
@@ -591,6 +623,7 @@ final class BigPictureModel: ObservableObject {
     /// Choosing in a stacking drop-down keeps it open so several can be ticked; sort closes it.
     func clickMenu(_ index: Int) {
         guard let menu = openMenu, menuOptions(menu).indices.contains(index) else { return }
+        cue(.select)
         apply(menuOptions(menu)[index].action)
         if menu == .sort { openMenu = nil }
         else { menuIndex = min(index, max(menuOptions(menu).count - 1, 0)) }
@@ -698,6 +731,7 @@ final class BigPictureModel: ObservableObject {
         openMenu = nil
         pauseIndex = 0
         pauseKind = .game(game ?? heroGame)
+        cue(.pause)
     }
 
     /// Opens "Exit Big Picture?", the same dialog design for leaving the mode.
@@ -706,6 +740,7 @@ final class BigPictureModel: ObservableObject {
         openMenu = nil
         pauseIndex = 0
         pauseKind = .exit
+        cue(.pause)
     }
 
     func closePauseMenu() { pauseKind = nil }
@@ -725,8 +760,10 @@ final class BigPictureModel: ObservableObject {
         let kind = pauseKind
         pauseKind = nil
         switch kind {
-        case .game?: if index == 0 { onResumeGame?() } else { onQuitGame?() }
-        case .exit?: if index == 1 { onExit?() }
+        case .game?:
+            if index == 0 { cue(.resume); onResumeGame?() } else { cue(.quit); onQuitGame?() }
+        case .exit?:
+            if index == 1 { cue(.quit); onExit?() } else { cue(.resume) }
         case nil: break
         }
     }
@@ -782,6 +819,7 @@ final class BigPictureModel: ObservableObject {
             } else if lane >= 0 {
                 lane = -1
             } else {
+                cue(.quit)
                 onExit?()
             }
         }
@@ -798,17 +836,18 @@ final class BigPictureModel: ObservableObject {
         case .heroActions:
             if column >= 2 { heroIndex = column - 2; return }
             guard let game = heroGame else { return }
-            if column == 0 { onLaunch?(game) }
+            if column == 0 { launch(game) }
             else if case .detail = screen, lanes.indices.contains(1) { lane = 1; column = 0 }   // jump to this game's saves
             else { open(game) }
         case .games(let games):
             guard games.indices.contains(column) else { return }
             // The Rediscover banner says "Play Now": it launches the game; every other shelf opens its page.
-            if lanes[lane].id == "rediscover" { onLaunch?(games[column]) } else { open(games[column]) }
+            if lanes[lane].id == "rediscover" { launch(games[column]) } else { open(games[column]) }
         case .achievements:
             return
         case .saveStates(let states):
             guard states.indices.contains(column) else { return }
+            cue(.launch)
             onLaunchState?(states[column])
         case .genres(let genres):
             guard genres.indices.contains(column) else { return }
@@ -825,6 +864,11 @@ final class BigPictureModel: ObservableObject {
             case .clear: clearSearch()
             }
         }
+    }
+
+    private func launch(_ game: OEDBGame) {
+        cue(.launch)
+        onLaunch?(game)
     }
 
     private func open(_ game: OEDBGame) {
@@ -879,7 +923,9 @@ final class BigPictureModel: ObservableObject {
         lane = newLane
         column = newColumn
         lastInput = "click  ·  mouse"
+        cuePlayed = false
         activate()
+        if !cuePlayed { BigPictureSounds.play(.select) }
     }
 
     /// Whether the wheel can move the page right now (not under a menu, the sidebar, the pause menu or a running game).
@@ -922,6 +968,7 @@ final class BigPictureModel: ObservableObject {
     }
 
     func clickTab(_ index: Int) {
+        BigPictureSounds.play(index == 0 ? .select : .tab)
         tabBarIndex = index
         lane = -1
         if index == 0 { openSidebar() }
@@ -932,7 +979,9 @@ final class BigPictureModel: ObservableObject {
         let entries = sidebarEntries
         guard entries.indices.contains(index) else { return }
         sidebarIndex = index
+        cuePlayed = false
         chooseSidebar(entries[index])
+        if !cuePlayed { BigPictureSounds.play(.select) }
     }
 }
 
