@@ -350,16 +350,13 @@ final class CheatSearchViewController: NSViewController {
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             for region in regions {
-                let regionStart = UInt32(region.address)
-                let regionEnd = regionStart + UInt32(region.data.count)
                 let byteCount = region.data.count
 
                 region.data.withUnsafeBytes { buffer in
                     for i in 0..<results.count {
-                        let address = results[i].address
-                        guard address >= regionStart && address < regionEnd else { continue }
+                        let offset = region.offset(forAddress: results[i].address)
+                        guard offset != NSNotFound else { continue }
 
-                        let offset = Int(address - regionStart)
                         let readSize = bigEndian ? min(dataSize, byteCount - offset) : min(4, byteCount - offset)
                         guard readSize > 0 else { continue }
 
@@ -691,7 +688,6 @@ final class CheatSearchViewController: NSViewController {
 
                 for region in regions {
                     let data = region.data
-                    let baseAddress = UInt32(region.address)
                     let byteCount = data.count
                     let stride = Int(region.minDataBytes)
 
@@ -715,7 +711,7 @@ final class CheatSearchViewController: NSViewController {
 
                             if self?.compare(fullValue, to: referenceValue, operation: comparison, dataType: dataType, dataSize: dataSize) == true {
                                 results.append(SearchResult(
-                                    address: baseAddress + UInt32(offset),
+                                    address: region.address(forOffset: offset),
                                     currentValue: fullValue,
                                     previousValue: nil,
                                     storedValue: nil
@@ -897,10 +893,7 @@ final class CheatSearchViewController: NSViewController {
         // Derive addressBytes/minDataBytes from the region that contains this address
         let hitAddress = UInt32(address, radix: 16)
         let region = hitAddress.flatMap { hit in
-            memoryRegions.first { region in
-                let start = UInt32(region.address)
-                return hit >= start && hit - start < UInt32(region.data.count)
-            }
+            memoryRegions.first { $0.offset(forAddress: hit) != NSNotFound }
         } ?? memoryRegions.first
 
         let addressBytes = region.map { $0.addressBytes } ?? 2
