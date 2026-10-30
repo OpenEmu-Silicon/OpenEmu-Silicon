@@ -9,10 +9,10 @@ these sounds in a commercial project needs the author's permission first
 
 Files, and the original sample each one came from:
   move.wav    NAV_3
-  select.wav  A CONFIRM_0
+  select.wav  A CONFIRM_9
   back.wav    BACK_4
   tab.wav     Z BONUS NAV
-  launch.wav  A CONFIRM_4
-  pause.wav   Z BONUS CONFIRM
+  launch.wav  A CONFIRM_7
+  pause.wav   A CONFIRM_3
   resume.wav  Z BONUS BACK
-  quit.wav    BACK_3
+  quit.wav    BACK_7
