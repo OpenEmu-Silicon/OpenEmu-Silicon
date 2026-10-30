@@ -49,7 +49,7 @@ Everything that connects the core to this repo goes through the fork, the way PS
 | Engine build | `Scripts/build-armsx2-core.sh`: CMake to static libraries, then compile Metal shaders, then generate Xcode inputs | `Scripts/build-azahar-core.sh`: the same stages. Azahar appears to build its shaders at run time (it bundles glslang, SPIR-V tools and sirit), so there may be no separate shader step. Check this in item 2. |
 | Xcode glue | `Scripts/gen-armsx2-xcconfig.py` reads the engine's `compile_commands.json` and link line and writes `engine.xcconfig` and `engine-link.rsp`, so the project never drifts from CMake | Reuse the idea: copy the script and point it at an Azahar target |
 | Plugin | `PCSX2/PCSX2.xcodeproj`, `PCSX2GameCore.{h,mm}` (about 600 lines), `OEHost.{h,cpp}` (about 670 lines), `Info.plist` | `Azahar/Azahar.xcodeproj`, `AzaharGameCore.{h,mm}`, a host file, `Info.plist` |
-| Tracker and branch | Issue #769, branch `feat/ps2-core`, ADR-0006, port doc | The tracker for this plan, branch `feat/3ds-core`, ADR-0007, this doc |
+| Tracker and branch | Issue #769, branch `feat/ps2-core`, ADR-0006, port doc | Issue #814, branch `feat/3ds-core`, ADR-0007, this doc |
 
 One thing **not** to copy: PS2 builds its engine with `ENABLE_LIBRETRO=ON`, because in ARMSX2 that switch means "the host owns pads, audio and video". In Azahar the same switch means something different and unwanted: it defines `HAVE_LIBRETRO` in every library and makes the Vulkan renderer take a device and images from a libretro frontend (`LibRetroVKInstance`, `libretro_vk.cpp`). Build Azahar with it **off**, and use its normal macOS Vulkan path with a `CAMetalLayer`.
 
@@ -192,7 +192,7 @@ Official Azahar macOS builds are a good baseline for speed on your machine befor
 
 ## Work breakdown
 
-All items live as checkboxes in one tracker issue. To take one, comment with the item number. Items 1 to 3 come first. Items 4 to 9 can run in parallel once item 3 boots a game.
+All items live as checkboxes in one tracker issue, [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814). To take one, comment with the item number. Items 1 to 3 come first. Items 4 to 9 can run in parallel once item 3 boots a game.
 
 1. **3DS system plugin.** Add the files above. Done when: the 3DS system appears in the app with controls configurable and no core installed.
 2. **Pin the fork and build the engine.** In `OpenEmu-Silicon/azahar`, pin `219d743a`. Write `prepare-azahar-core.sh` (fetch the commit and submodules, retry on network errors, apply patches) and `build-azahar-core.sh`. Build the engine libraries with the switches above, with MoltenVK and other downloads pinned and checked. Generate the Xcode inputs from CMake. Settle the submodule mirror question. Done when: the engine builds from a clean clone with one script and the pinned commit is recorded.
