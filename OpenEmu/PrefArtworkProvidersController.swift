@@ -47,7 +47,7 @@ final class PrefArtworkProvidersController: NSViewController {
         let header = NSTextField(labelWithString: "Big Picture Artwork")
         header.font = .boldSystemFont(ofSize: 15)
 
-        let description = NSTextField(wrappingLabelWithString: "Big-picture mode shows your library's cover art. It can also fetch posters, backdrops and logos from one online source: SteamGridDB (needs a key, below) or ScreenScraper (sign in on the ScreenScraper tab). Both are optional.")
+        let description = NSTextField(wrappingLabelWithString: "Big-picture mode shows your library's cover art. It can also fetch posters, backdrops and logos from online sources: SteamGridDB (needs a key, below), ScreenScraper (sign in on the ScreenScraper tab) and libretro-thumbnails (no key or login, posters only). Automatic uses every one that is ready, in that order. All are optional.")
         description.font = .systemFont(ofSize: 12)
         description.textColor = .secondaryLabelColor
 

@@ -384,6 +384,8 @@ enum OEBigPictureArtSource: String, CaseIterable {
     case automatic
     case steamGridDB
     case screenScraper
+    /// libretro-thumbnails alone: no key and no login, posters only.
+    case libretro
     case libraryOnly
 
     static let defaultsKey = "OEBigPictureArtSource"
@@ -397,6 +399,7 @@ enum OEBigPictureArtSource: String, CaseIterable {
         case .automatic: return "Automatic"
         case .steamGridDB: return "SteamGridDB"
         case .screenScraper: return "ScreenScraper"
+        case .libretro: return "libretro-thumbnails"
         case .libraryOnly: return "Library covers only"
         }
     }
@@ -429,6 +432,7 @@ enum OEBigPictureArtSource: String, CaseIterable {
         case .libraryOnly: return []
         case .steamGridDB: return steamGridDBAvailable ? [SteamGridDBArtProvider()] : []
         case .screenScraper: return screenScraperAvailable ? [ScreenScraperArtProvider.shared] : []
+        case .libretro: return [LibretroThumbnailsArtProvider.shared]
         case .automatic:
             var chain = [OEBigPictureArtProvider]()
             if steamGridDBAvailable { chain.append(SteamGridDBArtProvider()) }

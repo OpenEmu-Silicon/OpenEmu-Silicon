@@ -201,6 +201,15 @@ final class BigPictureTests: XCTestCase {
         XCTAssertEqual(OEBigPictureArtSource.providers().last?.id, "libretro")
     }
 
+    func testLibretroCanBeChosenOnItsOwn() {
+        let defaults = UserDefaults.standard
+        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey)
+        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey) }
+        defaults.set("libretro", forKey: OEBigPictureArtSource.defaultsKey)
+        XCTAssertEqual(OEBigPictureArtSource.providers().map { $0.id }, ["libretro"])
+        XCTAssertEqual(OEBigPictureArtSource.libretro.title, "libretro-thumbnails")
+    }
+
     func testAGameTakesEachPictureFromTheFirstProviderThatHasIt() {
         let first = NSImage(size: NSSize(width: 1, height: 1)), second = NSImage(size: NSSize(width: 2, height: 2))
         var art = OEBigPictureArtSet(hero: first)
