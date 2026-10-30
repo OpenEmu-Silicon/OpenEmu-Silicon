@@ -227,6 +227,18 @@
 		5A2CE89A206EA61B00790F89 /* NSArray+OEAdditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A2CE899206EA61B00790F89 /* NSArray+OEAdditions.swift */; };
 		5A3BB0391D964A4500E10F27 /* CenteredTextFieldCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3BB0381D964A4500E10F27 /* CenteredTextFieldCell.swift */; };
 		5A3DB1691D8C93C3009445EC /* PreferencesControlsBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3DB1681D8C93C3009445EC /* PreferencesControlsBox.swift */; };
+		0B1C9F0B000000000000A100 /* SteamGridDBClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B100 /* SteamGridDBClient.swift */; };
+		0B1C9F0B000000000000A102 /* OEHeroArtFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B102 /* OEHeroArtFetcher.swift */; };
+		0B1C9F0B000000000000A103 /* OEBigPictureArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */; };
+		0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */; };
+		0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B105 /* BigPictureTheme.swift */; };
+		B16A1C0E2D7F4A0100000012 /* OEBigPictureAchievements.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */; };
+		B16A1C0E2D7F4A0100000022 /* BigPictureSystemGestures.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16A1C0E2D7F4A0100000021 /* BigPictureSystemGestures.swift */; };
+		0B1C9F0B000000000000A106 /* BigPictureScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B106 /* BigPictureScreens.swift */; };
+		0B1C9F0A00000000000000C1 /* BigPictureSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0A00000000000000C2 /* BigPictureSounds.swift */; };
+		0B1C9F0A00000000000000D1 /* BigPictureSounds in Resources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0A00000000000000D2 /* BigPictureSounds */; };
+		0B1C9F0A00000000000000A1 /* BigPictureNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0A00000000000000B1 /* BigPictureNavigation.swift */; };
+		0B1C9F0A00000000000000A2 /* BigPictureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0A00000000000000B2 /* BigPictureView.swift */; };
 		5A3DB1B11D8E6806009445EC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3DB1B01D8E6806009445EC /* AppDelegate.swift */; };
 		5A438A1B1D89AEB60061A47C /* OpenEmuApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A438A1A1D89AEB60061A47C /* OpenEmuApplication.swift */; };
 		5A46AC411DC66D8300771B3B /* GameViewController+TouchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A46AC401DC66D8300771B3B /* GameViewController+TouchBar.swift */; };
@@ -411,6 +423,7 @@
 		8F8DB27B26D2A69E003CF106 /* PreferencePane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53439B6813B932C5005C0CC8 /* PreferencePane.swift */; };
 		8F93FDDA27374F2000B59F3E /* GameInfoHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93FDD927374F2000B59F3E /* GameInfoHelperTests.swift */; };
 		8F93FDE02737506900B59F3E /* ROMImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */; };
+		B16A1C0E2D7F4A0100000002 /* BigPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B16A1C0E2D7F4A0100000001 /* BigPictureTests.swift */; };
 		C0DEA27500000000000A0001 /* CoverArtSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEA27500000000000A0002 /* CoverArtSyncTests.swift */; };
 		8F9410C0273A0167004C47CC /* CoreUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8375E14E1477FC0D0018DA1F /* CoreUpdater.swift */; };
 		8F94B44D25566FE00058AA94 /* NSShadow+OEAdditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F94B44C25566FE00058AA94 /* NSShadow+OEAdditions.swift */; };
@@ -1342,6 +1355,18 @@
 		5A2CE899206EA61B00790F89 /* NSArray+OEAdditions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSArray+OEAdditions.swift"; sourceTree = "<group>"; };
 		5A3BB0381D964A4500E10F27 /* CenteredTextFieldCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CenteredTextFieldCell.swift; sourceTree = "<group>"; };
 		5A3DB1681D8C93C3009445EC /* PreferencesControlsBox.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PreferencesControlsBox.swift; sourceTree = "<group>"; };
+		0B1C9F0B000000000000B100 /* SteamGridDBClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SteamGridDBClient.swift; sourceTree = "<group>"; };
+		0B1C9F0B000000000000B102 /* OEHeroArtFetcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEHeroArtFetcher.swift; sourceTree = "<group>"; };
+		0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEBigPictureArt.swift; sourceTree = "<group>"; };
+		0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PrefArtworkProvidersController.swift; sourceTree = "<group>"; };
+		0B1C9F0B000000000000B105 /* BigPictureTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureTheme.swift; sourceTree = "<group>"; };
+		B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEBigPictureAchievements.swift; sourceTree = "<group>"; };
+		B16A1C0E2D7F4A0100000021 /* BigPictureSystemGestures.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureSystemGestures.swift; sourceTree = "<group>"; };
+		0B1C9F0B000000000000B106 /* BigPictureScreens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureScreens.swift; sourceTree = "<group>"; };
+		0B1C9F0A00000000000000C2 /* BigPictureSounds.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureSounds.swift; sourceTree = "<group>"; };
+		0B1C9F0A00000000000000D2 /* BigPictureSounds */ = {isa = PBXFileReference; lastKnownFileType = folder; path = BigPictureSounds; sourceTree = "<group>"; };
+		0B1C9F0A00000000000000B1 /* BigPictureNavigation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureNavigation.swift; sourceTree = "<group>"; };
+		0B1C9F0A00000000000000B2 /* BigPictureView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureView.swift; sourceTree = "<group>"; };
 		5A3DB1B01D8E6806009445EC /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5A438A1A1D89AEB60061A47C /* OpenEmuApplication.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OpenEmuApplication.swift; sourceTree = "<group>"; };
 		5A46AC401DC66D8300771B3B /* GameViewController+TouchBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "GameViewController+TouchBar.swift"; sourceTree = "<group>"; };
@@ -1593,6 +1618,7 @@
 		8F93FDD827374F1F00B59F3E /* OpenEmuTests-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "OpenEmuTests-Bridging-Header.h"; sourceTree = "<group>"; };
 		8F93FDD927374F2000B59F3E /* GameInfoHelperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameInfoHelperTests.swift; sourceTree = "<group>"; };
 		8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ROMImporterTests.swift; sourceTree = "<group>"; };
+		B16A1C0E2D7F4A0100000001 /* BigPictureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BigPictureTests.swift; sourceTree = "<group>"; };
 		C0DEA27500000000000A0002 /* CoverArtSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverArtSyncTests.swift; sourceTree = "<group>"; };
 		8F94B44C25566FE00058AA94 /* NSShadow+OEAdditions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSShadow+OEAdditions.swift"; sourceTree = "<group>"; };
 		8F94DEBA250EC701003A1F33 /* OpenEmuQLThumbnail.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OpenEmuQLThumbnail.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2602,6 +2628,7 @@
 				CE47B0C12A00000000000005 /* DrawableProviderTests.swift */,
 				A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */,
 				8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */,
+				B16A1C0E2D7F4A0100000001 /* BigPictureTests.swift */,
 				C0DEA27500000000000A0002 /* CoverArtSyncTests.swift */,
 				8F93FDD827374F1F00B59F3E /* OpenEmuTests-Bridging-Header.h */,
 			);
@@ -2887,6 +2914,18 @@
 			children = (
 				5A438A1A1D89AEB60061A47C /* OpenEmuApplication.swift */,
 				5A3DB1B01D8E6806009445EC /* AppDelegate.swift */,
+				0B1C9F0B000000000000B100 /* SteamGridDBClient.swift */,
+				0B1C9F0B000000000000B102 /* OEHeroArtFetcher.swift */,
+				0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */,
+				0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */,
+				0B1C9F0B000000000000B105 /* BigPictureTheme.swift */,
+				B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */,
+				B16A1C0E2D7F4A0100000021 /* BigPictureSystemGestures.swift */,
+				0B1C9F0B000000000000B106 /* BigPictureScreens.swift */,
+				0B1C9F0A00000000000000B1 /* BigPictureNavigation.swift */,
+				0B1C9F0A00000000000000C2 /* BigPictureSounds.swift */,
+				0B1C9F0A00000000000000D2 /* BigPictureSounds */,
+				0B1C9F0A00000000000000B2 /* BigPictureView.swift */,
 				53439A8913B92BF6005C0CC8 /* Library Database */,
 				836BC9541853811800B6AF26 /* GameInfo */,
 				53439A8813B92BF4005C0CC8 /* Main Window */,
@@ -5761,6 +5800,7 @@
 				83FE966419685F8F00DD8DB9 /* SetupAssistant.xib in Resources */,
 				83C748CC196DF34D0090BC91 /* HomebrewViewController.xib in Resources */,
 				556CEBF01BCE173B00F00EAA /* Graphics.xcassets in Resources */,
+				0B1C9F0A00000000000000D1 /* BigPictureSounds in Resources */,
 				051DDCB923E5E50100325147 /* AvailableLibrariesCollectionViewItem.xib in Resources */,
 				8FD78305243A8AD300861B7A /* Debug.strings in Resources */,
 				832D29431451ACF200BDF950 /* MainWindow.xib in Resources */,
@@ -6262,6 +6302,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8F93FDE02737506900B59F3E /* ROMImporterTests.swift in Sources */,
+				B16A1C0E2D7F4A0100000002 /* BigPictureTests.swift in Sources */,
 				C0DEA27500000000000A0001 /* CoverArtSyncTests.swift in Sources */,
 				8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */,
 				CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */,
@@ -6477,6 +6518,17 @@
 				8FDCCADA27063FDE00CBF2E3 /* GameCollectionViewItemIndicationLayer.swift in Sources */,
 				839310BC147802380020058E /* CoreDownload.swift in Sources */,
 				5A3DB1B11D8E6806009445EC /* AppDelegate.swift in Sources */,
+				0B1C9F0B000000000000A100 /* SteamGridDBClient.swift in Sources */,
+				0B1C9F0B000000000000A102 /* OEHeroArtFetcher.swift in Sources */,
+				0B1C9F0B000000000000A103 /* OEBigPictureArt.swift in Sources */,
+				0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */,
+				0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */,
+				B16A1C0E2D7F4A0100000012 /* OEBigPictureAchievements.swift in Sources */,
+				B16A1C0E2D7F4A0100000022 /* BigPictureSystemGestures.swift in Sources */,
+				0B1C9F0B000000000000A106 /* BigPictureScreens.swift in Sources */,
+				0B1C9F0A00000000000000A1 /* BigPictureNavigation.swift in Sources */,
+				0B1C9F0A00000000000000C1 /* BigPictureSounds.swift in Sources */,
+				0B1C9F0A00000000000000A2 /* BigPictureView.swift in Sources */,
 				83CA87B41961CDD400D86D55 /* 1.2 to 1.3.xcmappingmodel in Sources */,
 				8F812C4426D5454B00E89C42 /* OEDBScreenshot.swift in Sources */,
 				83F7DBAF18C0E2470029199C /* OEFileManager.m in Sources */,

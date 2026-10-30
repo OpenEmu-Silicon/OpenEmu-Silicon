@@ -39,6 +39,8 @@ enum OECredentialKey: String, CaseIterable {
     /// RetroAchievements login token — not the password; the password is used
     /// only once to obtain this token from the RA server.
     case retroAchievementsToken  = "retroachievements.token"
+    /// SteamGridDB API key (hero and cover art for big-picture mode).
+    case steamGridDBAPIKey       = "steamgriddb.apiKey"
     /// Left over from the removed Google Drive sign-in. Only read so it can be deleted.
     case googleDriveRefreshToken = "googledrive.refreshToken"
 }

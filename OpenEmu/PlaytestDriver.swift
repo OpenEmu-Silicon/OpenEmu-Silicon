@@ -55,6 +55,9 @@ final class PlaytestDriver {
         var steps: [Step]
         /// Also restore from the backup and compare. This rewrites the local saves, so it is off unless asked for.
         var auditRestore: Bool?
+        /// Look at big picture instead of playing a game: actions ("up", "select", "back") and "shot:<name>" /
+        /// "wait:<seconds>" steps. Nothing is launched and nothing is saved.
+        var bigPicture: [String]?
     }
 
     private struct Step: Decodable {
@@ -144,7 +147,144 @@ final class PlaytestDriver {
         }
         RunLoop.main.add(stall, forMode: .common)
         self.stallTimer = stall
-        DispatchQueue.main.async { self.openGame() }
+        if let steps = plan?.bigPicture {
+            DispatchQueue.main.async { MainActor.assumeIsolated { self.runBigPicture(steps) } }
+        } else {
+            DispatchQueue.main.async { self.openGame() }
+        }
+    }
+
+    // MARK: - Big picture
+
+    /// Opens big picture on the real library and walks through `steps`, saving a screenshot at each "shot:<name>".
+    @MainActor private func runBigPicture(_ steps: [String]) {
+        guard let plan else { return }
+        gameName = "big picture"
+        runStart = Date()
+        BigPictureWindowController.shared.show()
+        var index = 0
+        func next(after delay: TimeInterval) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in MainActor.assumeIsolated {
+                guard let self else { return }
+                guard index < steps.count else {
+                    BigPictureWindowController.shared.hide()
+                    self.finish(status: "ok", message: "big picture walked through \(steps.count) steps")
+                    return
+                }
+                let step = steps[index]
+                index += 1
+                if step == "reopen" {
+                    // Leave big picture and come back, as exiting and pressing Ctrl+Cmd+B does.
+                    BigPictureWindowController.shared.hide()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { MainActor.assumeIsolated {
+                        BigPictureWindowController.shared.show()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { MainActor.assumeIsolated {
+                            self.keysSent.append("reopen: " + BigPictureWindowController.shared.playtestGeometry())
+                            next(after: 0.3)
+                        } }
+                    } }
+                    return
+                }
+                if step.hasPrefix("shot:") {
+                    let name = String(step.dropFirst(5))
+                    if let image = BigPictureWindowController.shared.playtestSnapshot(),
+                       let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+                       let png = rep.representation(using: .png, properties: [:]) {
+                        self.shotCounter += 1
+                        let file = String(format: "bp-%02d-%@.png", self.shotCounter, name)
+                        try? png.write(to: URL(fileURLWithPath: plan.outputDirectory).appendingPathComponent(file))
+                        self.keysSent.append(step)
+                    }
+                    next(after: 0.3)
+                } else if step.hasPrefix("wait:") {
+                    next(after: Double(step.dropFirst(5)) ?? 1)
+                } else if step.hasPrefix("scroll:") || step.hasPrefix("hscroll:") || step.hasPrefix("hover:") {
+                    BigPictureWindowController.shared.playtestPointer(step)
+                    self.keysSent.append(step)
+                    next(after: 0.5)
+                } else if step.hasPrefix("play:") {
+                    // Choose what is highlighted (Resume on the hero), let the real game run, then close it.
+                    self.bigPicturePlay(seconds: Double(step.dropFirst(5)) ?? 8, via: nil) { next(after: 0.5) }
+                } else if step.hasPrefix("pauseplay:") {
+                    // "pauseplay:<seconds>:quit" or ":resume": run the game, press Home, and leave through the pause menu.
+                    let parts = step.dropFirst(10).split(separator: ":").map(String.init)
+                    self.bigPicturePlay(seconds: Double(parts.first ?? "") ?? 6, via: parts.count > 1 ? parts[1] : "quit") { next(after: 0.5) }
+                } else {
+                    // "home" is the Home button as the window controller sees it; the rest are model actions.
+                    if step == "home" { BigPictureWindowController.shared.playtestHome() } else { BigPictureWindowController.shared.playtestPerform(step) }
+                    self.keysSent.append(step)
+                    next(after: 0.9)
+                }
+            } }
+        }
+        // The window goes fullscreen first, which takes a moment.
+        next(after: 3.5)
+    }
+
+    /// Launches the highlighted game from big picture, plays it for `seconds`, saves what the core drew, closes it the
+    /// normal way (the auto save is skipped by -OESkipAutosaveOnStop) and checks that big picture comes back.
+    @MainActor private func bigPicturePlay(seconds: Double, via: String?, then resume: @escaping () -> Void) {
+        BigPictureWindowController.shared.playtestPerform("select")
+        func waitForGame(deadline: Date) {
+            if failIfAlertIsShowing(during: "waiting for the game to start") { return }
+            if let document = currentDocument(), document.isPlaying {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated {
+                    self.lastKey = "play"
+                    self.takeShot(document)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { MainActor.assumeIsolated {
+                        self.takeShot(document)
+                        guard let via = via else {
+                            document.stopEmulation(nil)
+                            waitForReturn(deadline: Date().addingTimeInterval(30))
+                            return
+                        }
+                        // The Home button: the pause menu should open over big picture and the game should be paused.
+                        BigPictureWindowController.shared.playtestHome()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated {
+                            self.keysSent.append(document.isEmulationPaused ? "home:game-paused" : "home:GAME-NOT-PAUSED")
+                            self.keysSent.append(self.spaceReport(document, label: "after-home"))
+                            self.saveBigPictureShot("pause-menu")
+                            if via == "quit" {
+                                // Down to Quit Game, then Select: no "Are you sure?" alert may appear.
+                                BigPictureWindowController.shared.playtestPerform("down")
+                                BigPictureWindowController.shared.playtestPerform("select")
+                                waitForReturn(deadline: Date().addingTimeInterval(30))
+                            } else {
+                                // Select on Resume Game: the game must run again.
+                                BigPictureWindowController.shared.playtestPerform("select")
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { MainActor.assumeIsolated {
+                                    self.keysSent.append(document.isEmulationPaused ? "resume:STILL-PAUSED" : "resume:game-running")
+                                    self.keysSent.append(self.spaceReport(document, label: "after-resume"))
+                                    self.takeShot(document)
+                                    document.stopEmulation(nil)
+                                    waitForReturn(deadline: Date().addingTimeInterval(30))
+                                } }
+                            }
+                        } }
+                    } }
+                } }
+                return
+            }
+            if Date() > deadline { finish(status: "error", message: "The game did not start from big picture within 120 seconds"); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { MainActor.assumeIsolated { waitForGame(deadline: deadline) } }
+        }
+        func waitForReturn(deadline: Date) {
+            if failIfAlertIsShowing(during: "closing the game") { return }
+            if currentDocument() == nil {
+                // Give the fullscreen Space time to close, then big picture should be back in front.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { MainActor.assumeIsolated {
+                    let window = BigPictureWindowController.shared.window
+                    let back = window?.isVisible == true && window?.isKeyWindow == true
+                    self.keysSent.append(back ? "returned-to-big-picture" : "DID-NOT-RETURN")
+                    if !back { self.finish(status: "error", message: "Big picture did not come back after the game closed"); return }
+                    resume()
+                } }
+                return
+            }
+            if Date() > deadline { finish(status: "error", message: "The game did not close within 30 seconds"); return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { MainActor.assumeIsolated { waitForReturn(deadline: deadline) } }
+        }
+        waitForGame(deadline: Date().addingTimeInterval(120))
     }
 
     // MARK: - Steps
@@ -225,6 +365,27 @@ final class PlaytestDriver {
             self.takeShot(document)
             self.closeGame(document)
         }
+    }
+
+    /// Which of the game window and the big-picture window is on the Space the player is looking at, and which is key.
+    @MainActor private func spaceReport(_ document: OEGameDocument, label: String) -> String {
+        let game = document.windowControllers.first?.window
+        let bp = BigPictureWindowController.shared.window
+        let overlay = BigPictureWindowController.shared.playtestPauseOverlay
+        func flags(_ window: NSWindow?) -> String {
+            guard let window = window else { return "none" }
+            return "\(window.isOnActiveSpace ? "ON-SCREEN" : "off-screen")/\(window.isKeyWindow ? "key" : "notkey")"
+        }
+        return "\(label): game=\(flags(game)) pause-menu=\(flags(overlay)) bigpicture=\(flags(bp))"
+    }
+
+    /// A picture of the big-picture window, saved next to the other pictures.
+    @MainActor private func saveBigPictureShot(_ name: String) {
+        guard let plan, let image = BigPictureWindowController.shared.playtestSnapshot(),
+              let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return }
+        shotCounter += 1
+        try? png.write(to: URL(fileURLWithPath: plan.outputDirectory).appendingPathComponent(String(format: "bp-%02d-%@.png", shotCounter, name)))
     }
 
     private func takeShot(_ document: OEGameDocument) {

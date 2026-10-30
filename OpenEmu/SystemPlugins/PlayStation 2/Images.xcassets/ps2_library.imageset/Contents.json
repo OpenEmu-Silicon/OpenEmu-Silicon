@@ -1,12 +1,12 @@
 {
   "images" : [
     {
-      "filename" : "psx_library.png",
+      "filename" : "ps2_library.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "psx_library@2x.png",
+      "filename" : "ps2_library@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },

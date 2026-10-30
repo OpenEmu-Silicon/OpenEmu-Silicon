@@ -45,6 +45,7 @@ CI (`build-check.yml`) builds every PR, including every core the PR touches, and
 ./Scripts/check.sh --rom <file>     # also load a game from a file: draws, moves, quick save, quit (uses a throwaway library)
 ./Scripts/check.sh --game "<name>"  # same checks on a game already in your real library, found by name; writes no saves
 ./Scripts/playtest.sh --game "<name>"   # play a game from your real library, then report frame rate, audio, errors
+./Scripts/bigpicture-look.sh              # walk through big-picture mode on your real library (no game launched, nothing saved) and save screenshots
 ./Scripts/doctor.sh                 # a few seconds: signing certificate, credential stubs, running app, test runner signature
 ./Scripts/prove.sh                  # the checks the diff touches, ends with PROVEN or NOT PROVEN (--all runs every step)
 ./Scripts/core.sh <Name>            # build, install, and check one core (add --release for Release-only bugs)
