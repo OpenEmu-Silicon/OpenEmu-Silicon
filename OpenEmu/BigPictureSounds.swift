@@ -31,8 +31,12 @@ import Cocoa
 enum BigPictureSounds {
 
     enum Cue: String, CaseIterable {
+        /// Big picture itself opened.
+        case enter
         /// The highlight moved one step. Very short, because holding a direction repeats it about ten times a second.
         case move
+        /// A letter or digit was typed into search, from the keyboard or the on-screen keys.
+        case key
         /// A button, card or menu entry was chosen.
         case select
         /// Went back a screen, or closed a menu.
@@ -61,12 +65,22 @@ enum BigPictureSounds {
         sound.play()
     }
 
+    /// 0...1, relative to the file. The move tick fires constantly, so it sits lowest.
+    private static func volume(for cue: Cue) -> Float {
+        switch cue {
+        case .move: return 0.25
+        case .key: return 0.35
+        default: return 0.65
+        }
+    }
+
     private static func sound(for cue: Cue) -> NSSound? {
         if let sound = sounds[cue] { return sound }
         guard let url = Bundle.main.url(forResource: cue.rawValue, withExtension: "wav", subdirectory: "BigPictureSounds"),
               let sound = NSSound(contentsOf: url, byReference: false) else {
             return nil
         }
+        sound.volume = volume(for: cue)
         sounds[cue] = sound
         return sound
     }

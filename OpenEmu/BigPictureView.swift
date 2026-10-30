@@ -647,9 +647,9 @@ final class BigPictureModel: ObservableObject {
 
     var isSearching: Bool { tab == .search && screen == .browse && !sidebarOpen && openMenu == nil }
 
-    func typeSearch(_ character: Character) { searchQuery.append(character); refreshSearch() }
-    func deleteSearch() { if !searchQuery.isEmpty { searchQuery.removeLast(); refreshSearch() } }
-    func clearSearch() { searchQuery = ""; refreshSearch() }
+    func typeSearch(_ character: Character) { cue(.key); searchQuery.append(character); refreshSearch() }
+    func deleteSearch() { if !searchQuery.isEmpty { cue(.back); searchQuery.removeLast(); refreshSearch() } }
+    func clearSearch() { cue(.back); searchQuery = ""; refreshSearch() }
 
     private func refreshSearch() {
         rebuildLanes()
@@ -811,16 +811,24 @@ final class BigPictureModel: ObservableObject {
             detailScrolled = false
             screen = .browse
             rebuildLanes()
-            lane = lanes.isEmpty ? -1 : 0
-            column = 0
+            // Back to the shelf and card you opened the page from, on the same tab, filters and search.
+            let spot = detailReturn
+            detailReturn = nil
+            if let spot = spot, lanes.indices.contains(spot.lane) {
+                lane = spot.lane
+                column = min(spot.column, max(lanes[spot.lane].count - 1, 0))
+            } else {
+                lane = lanes.isEmpty ? -1 : 0
+                column = 0
+            }
         case .browse:
             if lane >= 0 && tab != .home {
                 show(tab: .home, system: nil)
             } else if lane >= 0 {
                 lane = -1
             } else {
-                cue(.quit)
-                onExit?()
+                // Never leave big picture on a single back press: ask first, like the Home button does.
+                showExitDialog()
             }
         }
     }
@@ -871,7 +879,11 @@ final class BigPictureModel: ObservableObject {
         onLaunch?(game)
     }
 
+    /// Where the highlight was on the browse screen when a game page was opened.
+    private var detailReturn: (lane: Int, column: Int)?
+
     private func open(_ game: OEDBGame) {
+        if case .detail = screen {} else { detailReturn = (lane, column) }
         detailScrolled = false
         screen = .detail(game)
         rebuildLanes()
@@ -1082,6 +1094,7 @@ final class BigPictureWindowController: NSWindowController, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         if !window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
 
+        BigPictureSounds.play(.enter)
         input.start()
         gestures.claim()
         installKeyMonitor()
