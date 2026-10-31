@@ -221,6 +221,7 @@ enum OEArtworkOriginals {
         if head.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "png" }
         if head.starts(with: [0xFF, 0xD8, 0xFF]) { return "jpg" }
         if head.starts(with: [0x47, 0x49, 0x46, 0x38]) { return "gif" }
+        if head.starts(with: [0x00, 0x00, 0x01, 0x00]) { return "ico" }   // SteamGridDB icons
         if head.count >= 12, head.starts(with: [0x52, 0x49, 0x46, 0x46]), Array(head[8..<12]) == [0x57, 0x45, 0x42, 0x50] { return "webp" }
         return "img"
     }

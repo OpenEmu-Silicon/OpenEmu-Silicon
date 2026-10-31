@@ -36,9 +36,22 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
 ### Phase 0: measure the real downloads
 
 - Done: the raw bytes of every provider download are saved to `Application Support/OpenEmu/Artwork Originals/<provider>/` and never replaced (commit 2a801eb3a, with tests).
-- To do: refetch art for a set of games and measure the originals by slot and provider.
-- Decision: whether a "save space" option is worth building later.
-- Check: the numbers are recorded in this file.
+- Done: refetched 17 library games through Big Picture with the art caches set aside (and restored afterward), and measured the SteamGridDB originals. ScreenScraper and libretro did not download in that run (SteamGridDB filled every slot), so their originals are not measured yet.
+- Results, SteamGridDB, 17 games:
+
+  | Slot | Formats | Median | Average | Largest | Lossless repack saves | Lossy WebP 80 saves |
+  |---|---|---|---|---|---|---|
+  | Hero | 14 PNG, 3 JPEG | 703 KB | 916 KB | 2.1 MB | 25% | 91% |
+  | Poster | 17 PNG | 487 KB | 625 KB | 1.3 MB | 21% | 87% |
+  | Logo | 17 PNG | 394 KB | 526 KB | 2.8 MB | 31% | 80% |
+  | Icon | 11 ICO, 5 PNG | 173 KB | 262 KB | 0.9 MB | 2% | 74% |
+
+- What this means:
+  - SteamGridDB mostly sends PNG, so the originals are bigger than the app's current cache (which re-saves heroes and posters as JPEG). About 2.3 MB per game, or about 2.3 GB per 1,000 games, with all four slots stored as received.
+  - Lossless repacking saves 20 to 30%, but it needs a WebP writer that Apple's image library does not have, so the real gain would be smaller.
+  - Icons come as Windows `.ico` files that hold several sizes. They need a reader before they can be drawn from the store.
+- Decision: keep the rule to store originals. Move the opt-in "save space" mode (lossy, originals kept in `History`) up to Phase 2, since it is the only thing that changes the size. Back up pinned art only by default.
+- Still to measure: ScreenScraper and libretro originals (needs a run set to those sources).
 
 ### Phase 1: the durable store
 

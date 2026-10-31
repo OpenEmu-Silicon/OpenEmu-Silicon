@@ -303,6 +303,7 @@ final class ArtworkOriginalsTests: XCTestCase {
         XCTAssertEqual(url.lastPathComponent, "abc123-logo.png")
         XCTAssertEqual(try Data(contentsOf: url), png)
         XCTAssertEqual(OEArtworkOriginals.fileExtension(for: jpeg), "jpg")
+        XCTAssertEqual(OEArtworkOriginals.fileExtension(for: Data([0, 0, 1, 0, 1, 0, 0x80, 0x80])), "ico")
         XCTAssertEqual(OEArtworkOriginals.fileExtension(for: Data([1, 2, 3])), "img")
     }
 
