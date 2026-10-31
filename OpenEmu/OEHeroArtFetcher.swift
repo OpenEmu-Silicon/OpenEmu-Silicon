@@ -94,6 +94,7 @@ actor OEHeroArtFetcher {
                let artURL = await SteamGridDBClient.shared.heroURL(for: id),
                let (data, _) = try? await URLSession.shared.data(from: artURL),
                let img = NSImage(data: data) {
+                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "hero")
                 cacheToDisk(img, path: cachedPath)
                 return ImageBox(img)
             }
@@ -118,6 +119,7 @@ actor OEHeroArtFetcher {
                let artURL = await SteamGridDBClient.shared.iconURL(for: id),
                let (data, _) = try? await URLSession.shared.data(from: artURL),
                let img = NSImage(data: data) {
+                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "icon")
                 cacheToDisk(img, path: cachedPath)
                 return ImageBox(img)
             }
@@ -141,6 +143,7 @@ actor OEHeroArtFetcher {
                let artURL = await SteamGridDBClient.shared.logoURL(for: id),
                let (data, _) = try? await URLSession.shared.data(from: artURL),
                let img = NSImage(data: data) {
+                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "logo")
                 cacheToDisk(img, path: cachedPath)
                 return ImageBox(img)
             }
@@ -168,6 +171,7 @@ actor OEHeroArtFetcher {
             guard let (data, _) = try? await URLSession.shared.data(from: artURL), let img = NSImage(data: data) else {
                 return ImageBox(nil)
             }
+            OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "poster")
             cacheToDisk(img, path: cachedPath)
             return ImageBox(img)
         }
@@ -179,6 +183,7 @@ actor OEHeroArtFetcher {
         guard let (data, _) = try? await URLSession.shared.data(from: url),
               let img = NSImage(data: data) else { return nil }
         let cachedPath = cacheDir.appendingPathComponent("\(md5).png")
+        OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "hero")
         cacheToDisk(img, path: cachedPath)
         return img
     }
@@ -190,5 +195,56 @@ actor OEHeroArtFetcher {
               let rep = NSBitmapImageRep(data: tiff),
               let png = rep.representation(using: .png, properties: [:]) else { return }
         try? png.write(to: path)
+    }
+}
+
+/// Keeps the exact bytes a provider sent, before anything decodes or re-saves them.
+///
+/// `~/Library/Application Support/OpenEmu/Artwork Originals/<provider>/<md5>-<slot>.<ext>`
+///
+/// Nothing here is ever replaced or deleted: a file that already exists is left alone, so a later fetch from the same
+/// provider cannot change what was kept. The picture caches (`OEBigPictureArtStore` and the folders `OEHeroArtFetcher`
+/// fills) are rebuilt from re-encoded copies; this is the only place the downloads are kept as they arrived.
+enum OEArtworkOriginals {
+
+    static let folderName = "Artwork Originals"
+
+    static var directory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("OpenEmu", isDirectory: true)
+            .appendingPathComponent(folderName, isDirectory: true)
+    }
+
+    /// The file extension for what the bytes actually are, whatever the address said.
+    static func fileExtension(for data: Data) -> String {
+        let head = [UInt8](data.prefix(12))
+        if head.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "png" }
+        if head.starts(with: [0xFF, 0xD8, 0xFF]) { return "jpg" }
+        if head.starts(with: [0x47, 0x49, 0x46, 0x38]) { return "gif" }
+        if head.count >= 12, head.starts(with: [0x52, 0x49, 0x46, 0x46]), Array(head[8..<12]) == [0x57, 0x45, 0x42, 0x50] { return "webp" }
+        return "img"
+    }
+
+    /// Writes `data` unless this provider already has a file for this game and slot. Returns the file that now holds it,
+    /// or nil when nothing could be written. Safe to call from any thread.
+    @discardableResult
+    static func save(_ data: Data, provider: String, md5: String, slot: String, in root: URL = directory) -> URL? {
+        let safe = { (text: String) in text.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" } }
+        let provider = safe(provider), md5 = safe(md5), slot = safe(slot)
+        guard !data.isEmpty, !provider.isEmpty, !md5.isEmpty, !slot.isEmpty else { return nil }
+
+        let fm = FileManager.default
+        let folder = root.appendingPathComponent(provider, isDirectory: true)
+        do { try fm.createDirectory(at: folder, withIntermediateDirectories: true) } catch { return nil }
+
+        let prefix = "\(md5)-\(slot)."
+        if let names = try? fm.contentsOfDirectory(atPath: folder.path),
+           let kept = names.first(where: { $0.hasPrefix(prefix) }) {
+            return folder.appendingPathComponent(kept)
+        }
+
+        let url = folder.appendingPathComponent(prefix + fileExtension(for: data))
+        do { try data.write(to: url, options: .withoutOverwriting) } catch { return nil }
+        return url
     }
 }

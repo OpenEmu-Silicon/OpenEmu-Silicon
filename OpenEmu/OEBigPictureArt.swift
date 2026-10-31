@@ -515,12 +515,12 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         case .success(let found):
             var art = OEBigPictureArtSet(isDefinitive: true)
             guard let found = found else { return art }
-            art.grid = await download(found.boxImageURL)
-            art.hero = await download(found.heroImageURL)
-            art.logo = await download(found.logoImageURL)
+            art.grid = await download(found.boxImageURL, md5: key.md5, slot: "poster")
+            art.hero = await download(found.heroImageURL, md5: key.md5, slot: "hero")
+            art.logo = await download(found.logoImageURL, md5: key.md5, slot: "logo")
             // A cutout with no background (cartridge, disc, 3D box) is what the tiles want. Failing that, a square.
             for url in found.iconImageURLs {
-                if let image = await download(url, accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
+                if let image = await download(url, md5: key.md5, slot: "icon", accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
                     art.icon = image
                     break
                 }
@@ -538,9 +538,10 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
     }
 
-    private func download(_ url: URL?, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
+    private func download(_ url: URL?, md5: String, slot: String, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
         guard let url = url, let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data),
               accept(image) else { return nil }
+        OEArtworkOriginals.save(data, provider: id, md5: md5, slot: slot)
         return image
     }
 }
@@ -580,6 +581,7 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
             }.value
             guard let address = address, let url = URL(string: address),
                   let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { continue }
+            OEArtworkOriginals.save(data, provider: id, md5: key.md5, slot: "poster")
             return OEBigPictureArtSet(grid: image, isDefinitive: true)
         }
         return OEBigPictureArtSet(isDefinitive: true)

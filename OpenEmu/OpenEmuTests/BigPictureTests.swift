@@ -281,3 +281,52 @@ final class BigPictureTests: XCTestCase {
         XCTAssertNil(two.read(md5: md5, providerIDs: []).stored.poster)
     }
 }
+
+/// `OEArtworkOriginals` keeps downloads exactly as they arrived and never replaces a file. These use a throwaway folder.
+final class ArtworkOriginalsTests: XCTestCase {
+
+    private var root: URL!
+
+    override func setUpWithError() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("ArtworkOriginalsTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3])
+    private let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 9, 8, 7])
+
+    func testKeepsTheExactBytesAndNamesTheFileByWhatItIs() throws {
+        let url = try XCTUnwrap(OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "abc123", slot: "logo", in: root))
+        XCTAssertEqual(url.lastPathComponent, "abc123-logo.png")
+        XCTAssertEqual(try Data(contentsOf: url), png)
+        XCTAssertEqual(OEArtworkOriginals.fileExtension(for: jpeg), "jpg")
+        XCTAssertEqual(OEArtworkOriginals.fileExtension(for: Data([1, 2, 3])), "img")
+    }
+
+    func testNeverReplacesAnExistingFile() throws {
+        let first = try XCTUnwrap(OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "abc123", slot: "hero", in: root))
+        // A later download of the same game and slot, even in another format, leaves the first one alone.
+        let second = OEArtworkOriginals.save(jpeg, provider: "steamgriddb", md5: "abc123", slot: "hero", in: root)
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(try Data(contentsOf: first), png)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: first.deletingLastPathComponent().path).count, 1)
+    }
+
+    func testProvidersAndSlotsKeepSeparateFiles() throws {
+        OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "abc123", slot: "poster", in: root)
+        OEArtworkOriginals.save(jpeg, provider: "screenscraper", md5: "abc123", slot: "poster", in: root)
+        OEArtworkOriginals.save(jpeg, provider: "screenscraper", md5: "abc123", slot: "hero", in: root)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("screenscraper").path).count, 2)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("steamgriddb").path).count, 1)
+    }
+
+    func testPathPiecesCannotEscapeTheFolder() throws {
+        let url = try XCTUnwrap(OEArtworkOriginals.save(png, provider: "../evil", md5: "../../abc", slot: "a/b", in: root))
+        XCTAssertTrue(url.standardized.path.hasPrefix(root.standardized.path))
+        XCTAssertNil(OEArtworkOriginals.save(Data(), provider: "steamgriddb", md5: "abc", slot: "hero", in: root))
+        XCTAssertNil(OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "", slot: "hero", in: root))
+    }
+}
