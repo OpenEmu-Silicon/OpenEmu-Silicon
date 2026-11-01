@@ -322,7 +322,7 @@ final class OEArtworkStore: @unchecked Sendable {
         let stem = Self.fileStem(game.title)
         for candidate in [stem + " [\(game.md5.prefix(8))]", stem] {
             if let url = Self.activeFile(in: folder, stem: candidate) {
-                if candidate == stem, claimedByOtherGame(url, game) { continue }
+                if claimedByOtherGame(url, game) { continue }
                 let entry = Entry(file: relativePath(url), origin: Origin.unknown.raw, pinned: true, added: Date())
                 record(game, slot, entry)
                 scheduleSave()
@@ -332,10 +332,12 @@ final class OEArtworkStore: @unchecked Sendable {
         return nil
     }
 
+    /// Whether another game's index entry is this file. Compared ignoring case, because the usual Mac disk treats
+    /// `Zelda.png` and `ZELDA.png` as one file.
     private func claimedByOtherGame(_ url: URL, _ game: Game) -> Bool {
         let path = relativePath(url)
         for (md5, slots) in index ?? [:] where md5 != game.md5 {
-            if slots.values.contains(where: { $0.file == path }) { return true }
+            if slots.values.contains(where: { $0.file.compare(path, options: .caseInsensitive) == .orderedSame }) { return true }
         }
         return false
     }

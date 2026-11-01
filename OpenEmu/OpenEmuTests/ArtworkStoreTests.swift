@@ -249,4 +249,48 @@ final class ArtworkStoreTests: XCTestCase {
         XCTAssertNil(OEArtworkStore.largestImage(at: file))
         XCTAssertNil(OEArtworkStore.largestImage(at: root.appendingPathComponent("missing.ico")))
     }
+
+    // MARK: Hard cases
+
+    func testManyThreadsFillingAtOnceLoseNothing() throws {
+        let games = (0..<60).map { OEArtworkStore.Game(md5: String(format: "%032x", $0), system: "openemu.system.nes", title: "Game \($0 % 20)") }
+        DispatchQueue.concurrentPerform(iterations: games.count * 3) { n in
+            let g = games[n % games.count]
+            store.fill(data(UInt8(n % 200)), for: g, slot: .cover, origin: .provider("p"))
+            if n % 7 == 0 { store.choose(data(UInt8(n % 200 + 1)), for: g, slot: .poster) }
+        }
+        store.flush()
+        for g in games {
+            let url = try XCTUnwrap(store.active(g, .cover), g.title)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        }
+        let reopened = OEArtworkStore(root: root)
+        for g in games { XCTAssertNotNil(reopened.active(g, .cover)) }
+        let leftovers = snapshot().keys.filter { $0.contains(".incoming-") }
+        XCTAssertEqual(leftovers, [], "no staged file is left behind")
+    }
+
+    func testStrangeTitlesStayInsideTheFolderAndKeepTheirPicture() throws {
+        let titles = ["", ".", "..", "...", " ", "a/b", "../../etc/passwd", "CON", "aux.png", String(repeating: "x", count: 600),
+                      String(repeating: "é", count: 300), "title\u{0}with null", "emoji 🎮", "trailing dot.", "  spaced  "]
+        for (n, title) in titles.enumerated() {
+            let g = OEArtworkStore.Game(md5: String(format: "%032x", n), system: "openemu.system.snes", title: title)
+            guard case .stored(let url) = store.fill(data(UInt8(n)), for: g, slot: .cover, origin: .library) else { return XCTFail("title \(title.debugDescription) was not stored") }
+            XCTAssertTrue(url.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path + "/"), title)
+            XCTAssertEqual(try Data(contentsOf: url), data(UInt8(n)), title)
+            XCTAssertEqual(store.active(g, .cover), url, title)
+        }
+    }
+
+    func testTitlesThatDifferOnlyInCaseOrAccentsDoNotShareAFile() throws {
+        let a = OEArtworkStore.Game(md5: String(format: "%032x", 1), system: "openemu.system.snes", title: "Zelda")
+        let b = OEArtworkStore.Game(md5: String(format: "%032x", 2), system: "openemu.system.snes", title: "ZELDA")
+        let c = OEArtworkStore.Game(md5: String(format: "%032x", 3), system: "openemu.system.snes", title: "Caf\u{E9}")
+        let d = OEArtworkStore.Game(md5: String(format: "%032x", 4), system: "openemu.system.snes", title: "Cafe\u{301}")
+        for (n, g) in [a, b, c, d].enumerated() { store.fill(data(UInt8(n)), for: g, slot: .cover, origin: .library) }
+        for (n, g) in [a, b, c, d].enumerated() {
+            let url = try XCTUnwrap(store.active(g, .cover), g.title)
+            XCTAssertEqual(try Data(contentsOf: url), data(UInt8(n)), "\(g.title) must still have its own picture")
+        }
+    }
 }
