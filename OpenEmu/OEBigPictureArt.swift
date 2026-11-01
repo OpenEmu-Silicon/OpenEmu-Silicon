@@ -215,7 +215,11 @@ final class OEBigPictureArt: ObservableObject {
         let chain = OEBigPictureArtSource.providers()
         Task { [weak self] in
             // 1. What is already saved, which is nearly always everything: small files, decoded off the main thread.
-            let snapshot = await Task.detached(priority: .userInitiated) { store.read(md5: key.md5, providerIDs: chain.map { $0.id }) }.value
+            let pickedGame = key.artworkGame
+            let snapshot = await Task.detached(priority: .userInitiated) { () -> (stored: OEBigPictureArtStore.Stored, answered: Set<String>) in
+                store.syncPinned(pickedGame, md5: key.md5)
+                return store.read(md5: key.md5, providerIDs: chain.map { $0.id })
+            }.value
             guard let self = self else { return }
             self.apply(snapshot.stored, md5: key.md5)
             self.pending[key.md5] = nil
@@ -711,6 +715,30 @@ final class OEBigPictureArtStore: @unchecked Sendable {
 
     func recordAnswer(md5: String, providerID: String, found: Bool) {
         try? (found ? "found" : "empty").write(to: marker(md5, "answered-\(providerID)"), atomically: true, encoding: .utf8)
+    }
+
+    /// Makes the display copies match what a person pinned in the artwork folder, so a chosen picture shows here too
+    /// and wins over what a provider found. A small marker per slot records which pick the copy was made from, so
+    /// this costs one tiny read per slot once nothing has changed. These copies are a cache; the pick itself is kept
+    /// in the artwork folder.
+    func syncPinned(_ game: OEArtworkStore.Game, md5: String) {
+        let pairs: [(OEArtworkStore.Slot, Slot)] = [(.hero, .hero), (.poster, .poster), (.icon, .icon), (.logo, .logo)]
+        for (storeSlot, slot) in pairs {
+            guard let entry = OEArtworkStore.shared.entry(game, storeSlot), entry.pinned else { continue }
+            let token = "\(entry.file)|\(entry.added.timeIntervalSince1970)"
+            let tokenFile = marker(md5, "pinned-\(slot.rawValue)")
+            if (try? String(contentsOf: tokenFile)) == token { continue }
+            guard let url = OEArtworkStore.shared.active(game, storeSlot), let image = Self.decode(url) else { continue }
+            for slotToClear in slot == .hero ? [Slot.hero, .backdrop] : [slot] {
+                for ext in ["jpg", "png"] {
+                    try? FileManager.default.removeItem(at: directory.appendingPathComponent("\(md5)-\(slotToClear.rawValue).\(ext)"))
+                }
+            }
+            save(image, md5, slot)
+            if slot == .poster { try? Data().write(to: marker(md5, "standard")) }
+            if slot == .icon { try? Data().write(to: marker(md5, "squareicon")) }
+            try? token.write(to: tokenFile, atomically: true, encoding: .utf8)
+        }
     }
 
     /// Saves the pictures a provider found, each scaled to its slot. A picture already saved is kept.

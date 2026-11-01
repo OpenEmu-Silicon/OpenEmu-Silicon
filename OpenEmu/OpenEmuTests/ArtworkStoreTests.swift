@@ -333,4 +333,72 @@ final class ArtworkStoreTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: index.path)
         XCTAssertEqual(try Data(contentsOf: index), before, "the unreadable index was left alone")
     }
+
+    func testAPickIsPinnedAndAutomaticFetchingNeverReplacesIt() throws {
+        store.fill(data(1), for: game, slot: .poster, origin: .provider("libretro"))
+        OEArtworkChoice.choose(data(2), for: game, slot: .poster, provider: "steamgriddb", store: store)
+
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(store.active(game, .poster))), data(2))
+        XCTAssertEqual(store.entry(game, .poster)?.pinned, true)
+        XCTAssertEqual(store.entry(game, .poster)?.origin, "provider:steamgriddb")
+        XCTAssertEqual(store.history(game, .poster).count, 1, "the picture it replaced is kept")
+
+        // Switching provider and coming back leaves the pick where it is.
+        if case .keptPinned = store.replaceAutomatic(data(3), for: game, slot: .poster, origin: .provider("screenscraper")) {} else { XCTFail("a pinned pick was replaced") }
+        if case .keptPinned = store.replaceAutomatic(data(4), for: game, slot: .poster, origin: .provider("steamgriddb")) {} else { XCTFail("a pinned pick was replaced") }
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(store.active(game, .poster))), data(2))
+    }
+
+    func testResetToAutomaticKeepsThePictureAndLetsProvidersReplaceIt() throws {
+        OEArtworkChoice.choose(data(2), for: game, slot: .hero, provider: nil, store: store)
+        XCTAssertEqual(store.entry(game, .hero)?.origin, "user")
+        OEArtworkChoice.resetToAutomatic(game, slot: .hero, store: store)
+
+        XCTAssertEqual(store.entry(game, .hero)?.pinned, false)
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(store.active(game, .hero))), data(2), "resetting deletes nothing")
+        store.replaceAutomatic(data(5), for: game, slot: .hero, origin: .provider("steamgriddb"))
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(store.active(game, .hero))), data(5))
+        XCTAssertEqual(store.history(game, .hero).count, 1, "the earlier pick moved to History, not away")
+    }
+
+    func testAPickSurvivesReopeningTheStore() throws {
+        OEArtworkChoice.choose(data(2), for: game, slot: .logo, provider: "steamgriddb", store: store)
+        let reopened = OEArtworkStore(root: root)
+        XCTAssertEqual(reopened.entry(game, .logo)?.pinned, true)
+    }
+
+    private func png(width: Int, height: Int) throws -> Data {
+        let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4,
+                                                 hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        return try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+    }
+
+    func testAPinnedPickReachesTheBigPictureCopiesAndChangesWithTheNextPick() throws {
+        let previous = OEArtworkStore.shared
+        OEArtworkStore.useRoot(root)
+        defer { OEArtworkStore.install(previous) }
+        let signature = "test-\(UUID().uuidString)"
+        let display = OEBigPictureArtStore(signature: signature)
+        defer {
+            let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            try? FileManager.default.removeItem(at: caches.appendingPathComponent("OpenEmu/BigPictureArt/v3/\(signature)"))
+        }
+
+        display.syncPinned(game, md5: game.md5)
+        XCTAssertNil(display.read(md5: game.md5, providerIDs: []).stored.poster, "nothing pinned, nothing copied")
+
+        OEArtworkStore.shared.fill(try png(width: 10, height: 15), for: game, slot: .poster, origin: .provider("libretro"))
+        display.syncPinned(game, md5: game.md5)
+        XCTAssertNil(display.read(md5: game.md5, providerIDs: []).stored.poster, "an automatic picture is not forced on the display copies")
+
+        OEArtworkChoice.choose(try png(width: 20, height: 30), for: game, slot: .poster, provider: nil, store: OEArtworkStore.shared)
+        display.syncPinned(game, md5: game.md5)
+        let first = try XCTUnwrap(display.read(md5: game.md5, providerIDs: []).stored)
+        XCTAssertEqual(first.poster.map { Int($0.size.width) }, 20)
+        XCTAssertTrue(first.standardPoster)
+
+        OEArtworkChoice.choose(try png(width: 40, height: 60), for: game, slot: .poster, provider: nil, store: OEArtworkStore.shared)
+        display.syncPinned(game, md5: game.md5)
+        XCTAssertEqual(display.read(md5: game.md5, providerIDs: []).stored.poster.map { Int($0.size.width) }, 40, "the newer pick wins")
+    }
 }

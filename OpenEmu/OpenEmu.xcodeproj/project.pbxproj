@@ -231,6 +231,7 @@
 		0B1C9F0B000000000000A102 /* OEHeroArtFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B102 /* OEHeroArtFetcher.swift */; };
 		0B1C9F0C000000000000A101 /* OEArtworkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0C000000000000B101 /* OEArtworkStore.swift */; };
 		0B1C9F0D000000000000A101 /* OEArtworkLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0D000000000000B101 /* OEArtworkLocation.swift */; };
+		0B1C9F0E000000000000A101 /* OEArtworkPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B101 /* OEArtworkPicker.swift */; };
 		0B1C9F0B000000000000A103 /* OEBigPictureArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */; };
 		0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */; };
 		0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0B000000000000B105 /* BigPictureTheme.swift */; };
@@ -1363,6 +1364,7 @@
 		0B1C9F0B000000000000B102 /* OEHeroArtFetcher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEHeroArtFetcher.swift; sourceTree = "<group>"; };
 		0B1C9F0C000000000000B101 /* OEArtworkStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEArtworkStore.swift; sourceTree = "<group>"; };
 		0B1C9F0D000000000000B101 /* OEArtworkLocation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEArtworkLocation.swift; sourceTree = "<group>"; };
+		0B1C9F0E000000000000B101 /* OEArtworkPicker.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEArtworkPicker.swift; sourceTree = "<group>"; };
 		0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OEBigPictureArt.swift; sourceTree = "<group>"; };
 		0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PrefArtworkProvidersController.swift; sourceTree = "<group>"; };
 		0B1C9F0B000000000000B105 /* BigPictureTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BigPictureTheme.swift; sourceTree = "<group>"; };
@@ -2929,6 +2931,7 @@
 				0B1C9F0B000000000000B102 /* OEHeroArtFetcher.swift */,
 				0B1C9F0C000000000000B101 /* OEArtworkStore.swift */,
 				0B1C9F0D000000000000B101 /* OEArtworkLocation.swift */,
+				0B1C9F0E000000000000B101 /* OEArtworkPicker.swift */,
 				0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */,
 				0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */,
 				0B1C9F0B000000000000B105 /* BigPictureTheme.swift */,
@@ -6537,6 +6540,7 @@
 				0B1C9F0B000000000000A102 /* OEHeroArtFetcher.swift in Sources */,
 				0B1C9F0C000000000000A101 /* OEArtworkStore.swift in Sources */,
 				0B1C9F0D000000000000A101 /* OEArtworkLocation.swift in Sources */,
+				0B1C9F0E000000000000A101 /* OEArtworkPicker.swift in Sources */,
 				0B1C9F0B000000000000A103 /* OEBigPictureArt.swift in Sources */,
 				0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */,
 				0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */,

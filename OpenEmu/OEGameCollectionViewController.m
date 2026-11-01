@@ -540,6 +540,13 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
     }];
 }
 
+- (void)chooseArtwork:(id)sender
+{
+    NSArray<OEDBGame *> *games = [self selectedGames];
+    if(games.count == 1)
+        [OEArtworkPickerController showFor:games.firstObject];
+}
+
 - (void)importArtworkFromFolder:(id)sender
 {
     NSOpenPanel *openPanel = [NSOpenPanel openPanel];
@@ -808,6 +815,7 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
             [menu addItemWithTitle:NSLocalizedString(@"Cancel Cover Art Download", @"") action:@selector(cancelCoverArtDownload:) keyEquivalent:@""];
 
         [menu addItemWithTitle:NSLocalizedString(@"Add Cover Art from File…", @"") action:@selector(addCoverArtFromFile:) keyEquivalent:@""];
+        [menu addItemWithTitle:NSLocalizedString(@"Choose Artwork…", @"") action:@selector(chooseArtwork:) keyEquivalent:@""];
         [menu addItemWithTitle:NSLocalizedString(@"Import Artwork from Folder…", @"") action:@selector(importArtworkFromFolder:) keyEquivalent:@""];
         if(hasLocalFiles)
             [menu addItemWithTitle:NSLocalizedString(@"Consolidate Files…", @"") action:@selector(consolidateFiles:) keyEquivalent:@""];

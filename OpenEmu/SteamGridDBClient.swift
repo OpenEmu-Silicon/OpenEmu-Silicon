@@ -41,12 +41,13 @@ extension SteamGridDBItem: Identifiable {
 }
 
 enum SteamGridDBItemType: String, Codable {
-    case hero, grid, icon
+    case hero, grid, icon, logo
     var displayLabel: String {
         switch self {
         case .hero: return "HERO ART"
         case .grid: return "COVER ART"
         case .icon: return "ICON"
+        case .logo: return "LOGO"
         }
     }
 }
@@ -163,6 +164,18 @@ actor SteamGridDBClient {
         }
     }
 
+    /// Every still picture SteamGridDB has for a game and slot, best score first, for the artwork picker. Needs a key.
+    func candidates(gameID: Int, slot: OEArtworkStore.Slot, limit: Int = 30) async -> [SteamGridDBItem] {
+        let type: SteamGridDBItemType
+        switch slot {
+        case .cover, .poster: type = .grid
+        case .hero: type = .hero
+        case .icon: type = .icon
+        case .logo: type = .logo
+        }
+        return await fetchArtItems(type: type, gameID: gameID, limit: limit, dimensions: nil)
+    }
+
     func fetchArtMedia(gameID: Int) async -> [SteamGridDBItem] {
         async let heroes = fetchArtItems(type: .hero, gameID: gameID)
         async let grids  = fetchArtItems(type: .grid, gameID: gameID)
@@ -170,14 +183,15 @@ actor SteamGridDBClient {
         return await heroes + grids + icons
     }
 
-    private func fetchArtItems(type: SteamGridDBItemType, gameID: Int) async -> [SteamGridDBItem] {
+    private func fetchArtItems(type: SteamGridDBItemType, gameID: Int, limit: Int = 6, dimensions: String? = "600x900") async -> [SteamGridDBItem] {
         guard SteamGridDBClient.isConfigured else { return [] }
         let segment: String
         var queryItems: [URLQueryItem] = []
         switch type {
         case .hero: segment = "heroes"
-        case .grid: segment = "grids"; queryItems.append(URLQueryItem(name: "dimensions", value: "600x900"))
+        case .grid: segment = "grids"; if let dimensions = dimensions { queryItems.append(URLQueryItem(name: "dimensions", value: dimensions)) }
         case .icon: segment = "icons"
+        case .logo: segment = "logos"
         }
         var components = URLComponents(string: "\(base)/\(segment)/game/\(gameID)")!
         if !queryItems.isEmpty { components.queryItems = queryItems }
@@ -193,7 +207,7 @@ actor SteamGridDBClient {
         return dataArray
             .filter { $0["animated"] as? Bool != true }
             .sorted { ($0["score"] as? Int ?? 0) > ($1["score"] as? Int ?? 0) }
-            .prefix(6)
+            .prefix(limit)
             .compactMap { item -> SteamGridDBItem? in
                 guard let id       = item["id"] as? Int,
                       let urlStr   = item["url"] as? String,

@@ -81,6 +81,8 @@ Progress: done: Preferences → Artwork has an "Artwork folder" section (choose,
 - Choosing pins the slot. "Reset to automatic" unpins and keeps the file.
 - Check: pick, switch provider, switch back; the pick is still there.
 
+Progress: "Choose Artwork…" is in the game's right-click menu (single game). A tab per slot (Cover, Poster, Hero, Icon, Logo) shows up to 30 SteamGridDB pictures with size, score and author, plus "From File…". "Use This Picture" stores the bytes as they arrived and pins the slot (the old picture moves to History); "Reset to Automatic" unpins and deletes nothing. Cover also sets the library's box art. A pinned pick is copied into Big Picture's display copies (a cache, one small marker per slot) and wins over provider art. Checked in the real app on Space Invaders (Poster: pick, pinned in the index, reset, file kept). Not done: the info panel entry, filters on the grid, the other providers' single results, and a Swift-side menu entry for the new grid view.
+
 ### Phase 4: use my own folder
 
 - Scan on demand first. Read the ES-DE layout and `Game.png`, `Game-poster.png`, `Game-hero.png`, `Game-icon.png`.

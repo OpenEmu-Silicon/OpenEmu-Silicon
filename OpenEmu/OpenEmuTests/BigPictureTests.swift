@@ -203,9 +203,10 @@ final class BigPictureTests: XCTestCase {
 
     func testLibretroCanBeChosenOnItsOwn() {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey)
-        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey) }
+        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey), fallback = defaults.object(forKey: OEBigPictureArtSource.fallbackKey)
+        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey); defaults.set(fallback, forKey: OEBigPictureArtSource.fallbackKey) }
         defaults.set("libretro", forKey: OEBigPictureArtSource.defaultsKey)
+        defaults.set(false, forKey: OEBigPictureArtSource.fallbackKey)
         XCTAssertEqual(OEBigPictureArtSource.providers().map { $0.id }, ["libretro"])
         XCTAssertEqual(OEBigPictureArtSource.libretro.title, "libretro-thumbnails")
     }
