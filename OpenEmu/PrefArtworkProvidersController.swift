@@ -24,12 +24,23 @@
 
 import Cocoa
 
+/// Top-left origin, so scrolled content starts at its top.
+private final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
+}
+
 /// Preferences pane for the online artwork providers used by big-picture mode.
 ///
 /// Keys are stored in `OECredentialStore`; a provider with no key is simply skipped.
 final class PrefArtworkProvidersController: NSViewController {
 
     private let steamGridKey = NSSecureTextField()
+    private let steamGridStatus = NSTextField(labelWithString: "")
+    private let scraperUser = NSTextField()
+    private let scraperPassword = NSSecureTextField()
+    private let scraperStatus = NSTextField(wrappingLabelWithString: "")
+    private let scraperSave = NSButton()
+    private let scraperClear = NSButton()
     private let statusLabel  = NSTextField(labelWithString: "")
     private let sourcePopUp  = NSPopUpButton(frame: .zero, pullsDown: false)
     private let fallbackCheck = NSButton(checkboxWithTitle: "Use the other sources when this one has nothing", target: nil, action: nil)
@@ -48,14 +59,20 @@ final class PrefArtworkProvidersController: NSViewController {
     }
 
     private func buildUI() {
-        let header = NSTextField(labelWithString: "Big Picture Artwork")
+        let header = NSTextField(labelWithString: "Artwork")
         header.font = .boldSystemFont(ofSize: 15)
 
-        let description = NSTextField(wrappingLabelWithString: "Big-picture mode shows your library's cover art. It can also fetch posters, backdrops and logos from online sources: SteamGridDB (needs a key, below), ScreenScraper (sign in on the ScreenScraper tab) and libretro-thumbnails (no key or login, posters only). Automatic uses every one that is ready, in that order. All are optional.")
+        let description = NSTextField(wrappingLabelWithString: "Covers for your library and the posters, backdrops and logos in big-picture mode come from the sources below. OpenEmu looks in its built-in OpenVGDB database first, then in each source you have set up. Every source is optional, and what you choose yourself is never replaced.")
         description.font = .systemFont(ofSize: 12)
         description.textColor = .secondaryLabelColor
 
         steamGridKey.placeholderString = "SteamGridDB API key"
+        scraperUser.placeholderString = "screenscraper.fr username"
+        scraperPassword.placeholderString = "screenscraper.fr password"
+        scraperStatus.font = .systemFont(ofSize: 11)
+        scraperStatus.textColor = .secondaryLabelColor
+        steamGridStatus.font = .systemFont(ofSize: 11)
+        steamGridStatus.textColor = .secondaryLabelColor
 
         OEBigPictureArtSource.allCases.forEach { sourcePopUp.addItem(withTitle: $0.title) }
         sourcePopUp.target = self
@@ -77,47 +94,80 @@ final class PrefArtworkProvidersController: NSViewController {
         let folderRow = NSStackView(views: folderButtons)
         folderRow.spacing = 8
 
-        let save = NSButton(title: "Save", target: self, action: #selector(save))
-        save.bezelStyle = .rounded
-        save.keyEquivalent = "\r"
-        let clear = NSButton(title: "Clear", target: self, action: #selector(clear))
-        clear.bezelStyle = .rounded
-        let buttons = NSStackView(views: [clear, save])
-        buttons.spacing = 8
+        let steamSave = NSButton(title: "Save", target: self, action: #selector(saveSteamGrid))
+        steamSave.bezelStyle = .rounded
+        let steamClear = NSButton(title: "Clear", target: self, action: #selector(clearSteamGrid))
+        steamClear.bezelStyle = .rounded
+        let steamButtons = NSStackView(views: [steamClear, steamSave])
+        steamButtons.spacing = 8
+
+        scraperSave.title = "Sign In"
+        scraperSave.bezelStyle = .rounded
+        scraperSave.target = self
+        scraperSave.action = #selector(saveScreenScraper)
+        scraperClear.title = "Sign Out"
+        scraperClear.bezelStyle = .rounded
+        scraperClear.target = self
+        scraperClear.action = #selector(clearScreenScraper)
+        let scraperButtons = NSStackView(views: [scraperClear, scraperSave])
+        scraperButtons.spacing = 8
 
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
 
-        let links = NSTextField(wrappingLabelWithString: "Get a key at steamgriddb.com/profile/preferences/api. Game details come from the built-in OpenVGDB database.")
+        let builtIn = NSTextField(wrappingLabelWithString: "libretro-thumbnails and OpenVGDB need no key or login. libretro-thumbnails supplies posters only.")
+        builtIn.font = .systemFont(ofSize: 11)
+        builtIn.textColor = .tertiaryLabelColor
+
+        let links = NSTextField(wrappingLabelWithString: "SteamGridDB keys are at steamgriddb.com/profile/preferences/api. ScreenScraper registration is free at screenscraper.fr.")
         links.font = .systemFont(ofSize: 11)
         links.textColor = .tertiaryLabelColor
 
         let stack = NSStackView(views: [
             header, description,
-            label("Artwork source"), sourcePopUp, fallbackCheck,
-            label("SteamGridDB — posters and backdrops"), steamGridKey,
-            buttons, statusLabel,
+            label("SteamGridDB — posters and backdrops"), steamGridKey, steamButtons, steamGridStatus,
+            label("ScreenScraper — covers, posters and logos"), scraperUser, scraperPassword, scraperButtons, scraperStatus,
+            builtIn, links,
+            label("Preferred source"), sourcePopUp, fallbackCheck, statusLabel,
             label("Artwork folder"), folderPath, folderRow, folderStatus,
-            links,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
-        stack.setCustomSpacing(18, after: description)
-        stack.setCustomSpacing(8, after: sourcePopUp)
-        stack.setCustomSpacing(16, after: fallbackCheck)
-        stack.setCustomSpacing(18, after: statusLabel)
-        stack.setCustomSpacing(18, after: folderStatus)
-        stack.setCustomSpacing(16, after: steamGridKey)
+        stack.setCustomSpacing(16, after: description)
+        stack.setCustomSpacing(16, after: steamGridStatus)
+        stack.setCustomSpacing(16, after: scraperStatus)
+        stack.setCustomSpacing(16, after: links)
+        stack.setCustomSpacing(16, after: statusLabel)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
 
-        let fields: [NSView] = [description, steamGridKey, links, folderPath, folderStatus]
+        // The pane is taller than a small screen, so it scrolls.
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        let content = FlippedView()
+        content.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(stack)
+        scroll.documentView = content
+        view.addSubview(scroll)
+
+        let fields: [NSView] = [description, steamGridKey, scraperUser, scraperPassword, scraperStatus, builtIn, links, folderPath, folderStatus]
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 32),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
-            buttons.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: view.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            content.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            content.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: scroll.contentView.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 28),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -28),
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 36),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -36),
+            steamButtons.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+            scraperButtons.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
         ] + fields.map { $0.widthAnchor.constraint(equalTo: stack.widthAnchor) })
     }
 
@@ -128,7 +178,10 @@ final class PrefArtworkProvidersController: NSViewController {
     }
 
     private func refresh() {
-        steamGridKey.placeholderString = OECredentialStore.shared.has(.steamGridDBAPIKey) ? "••••••••  (saved)" : "SteamGridDB API key"
+        let hasKey = OECredentialStore.shared.has(.steamGridDBAPIKey)
+        steamGridKey.placeholderString = hasKey ? "••••••••  (saved)" : "SteamGridDB API key"
+        steamGridStatus.stringValue = hasKey ? "✓  Key saved" : "No key saved — SteamGridDB is skipped."
+        refreshScreenScraper()
 
         if let index = OEBigPictureArtSource.allCases.firstIndex(of: OEBigPictureArtSource.chosen) { sourcePopUp.selectItem(at: index) }
         fallbackCheck.state = OEBigPictureArtSource.fallbackEnabled ? .on : .off
@@ -242,23 +295,106 @@ final class PrefArtworkProvidersController: NSViewController {
         }
     }
 
-    @objc private func save() {
-        let store = OECredentialStore.shared
-        let values: [(NSTextField, OECredentialKey)] = [
-            (steamGridKey, .steamGridDBAPIKey),
-        ]
-        for (field, key) in values {
-            let value = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !value.isEmpty { store.set(value, forKey: key) }
-            field.stringValue = ""
-        }
+    @objc private func saveSteamGrid() {
+        let value = steamGridKey.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !value.isEmpty { OECredentialStore.shared.set(value, forKey: .steamGridDBAPIKey) }
+        steamGridKey.stringValue = ""
         Task { @MainActor in OEBigPictureArt.shared.reset() }
         refresh()
     }
 
-    @objc private func clear() {
+    @objc private func clearSteamGrid() {
         OECredentialStore.shared.remove(.steamGridDBAPIKey)
         steamGridKey.stringValue = ""
+        Task { @MainActor in OEBigPictureArt.shared.reset() }
+        refresh()
+    }
+
+    // MARK: ScreenScraper
+
+    private static let scraperUserKey = "ScreenScraperUsername"
+    private static let red = NSColor(red: 0.87, green: 0.20, blue: 0.18, alpha: 1)
+    private static let green = NSColor(red: 0.2, green: 0.78, blue: 0.35, alpha: 1)
+
+    private func showScraper(_ text: String, _ color: NSColor = .secondaryLabelColor) {
+        scraperStatus.stringValue = text
+        scraperStatus.textColor = color
+    }
+
+    private func refreshScreenScraper() {
+        let username = UserDefaults.standard.string(forKey: Self.scraperUserKey) ?? ""
+        if scraperUser.stringValue.isEmpty { scraperUser.stringValue = username }
+        let hasPassword = OECredentialStore.shared.has(.screenScraperPassword)
+        scraperPassword.placeholderString = hasPassword ? "••••••••  (saved)" : "screenscraper.fr password"
+        guard !username.isEmpty, hasPassword else {
+            showScraper("Not signed in — ScreenScraper is skipped.")
+            return
+        }
+        if let description = ScreenScraperClient.shared.lastFetchError?.errorDescription {
+            showScraper(description, Self.red)
+        } else if ScreenScraperClient.shared.hasVerifiedCredentials {
+            showScraper("✓  Signed in as \(username)", Self.green)
+        } else {
+            showScraper("Verifying…")
+            silentlyVerify(username: username)
+        }
+    }
+
+    /// Checks saved credentials in the background so the pane shows the true state without a Save.
+    private func silentlyVerify(username: String) {
+        guard let password = OECredentialStore.shared.get(.screenScraperPassword) else { return }
+        Task { @MainActor in
+            do {
+                if try await ScreenScraperClient.shared.verifyCredentials(username: username, password: password) {
+                    ScreenScraperClient.shared.clearLastFetchError()
+                    self.showScraper("✓  Signed in as \(username)", Self.green)
+                } else {
+                    self.showScraper("ScreenScraper rejected these credentials. Re-enter your password and sign in.", Self.red)
+                }
+            } catch {
+                self.showScraper("Could not reach ScreenScraper — check your connection.")
+            }
+        }
+    }
+
+    @objc private func saveScreenScraper() {
+        let username = scraperUser.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let typed = scraperPassword.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return showScraper("Username cannot be empty.", Self.red) }
+        guard let password = typed.isEmpty ? OECredentialStore.shared.get(.screenScraperPassword) : typed else {
+            return showScraper("Password cannot be empty.", Self.red)
+        }
+        UserDefaults.standard.set(username, forKey: Self.scraperUserKey)
+        OECredentialStore.shared.set(password, forKey: .screenScraperPassword)
+        scraperPassword.stringValue = ""
+        scraperPassword.placeholderString = "••••••••  (saved)"
+        scraperSave.isEnabled = false
+        scraperClear.isEnabled = false
+        showScraper("Verifying credentials…")
+        Task { @MainActor in
+            do {
+                if try await ScreenScraperClient.shared.verifyCredentials(username: username, password: password) {
+                    ScreenScraperClient.shared.clearLastFetchError()
+                    self.showScraper("✓  Signed in as \(username)", Self.green)
+                } else {
+                    self.showScraper("ScreenScraper rejected these credentials. Check your username and password.", Self.red)
+                }
+            } catch {
+                self.showScraper("Could not reach ScreenScraper — check your connection.", Self.red)
+            }
+            self.scraperSave.isEnabled = true
+            self.scraperClear.isEnabled = true
+            OEBigPictureArt.shared.reset()
+            self.statusLabel.stringValue = OEBigPictureArtSource.providers().isEmpty
+                ? "No online source ready — using library cover art only." : "Order: \(OEBigPictureArtSource.inUseTitle)."
+        }
+    }
+
+    @objc private func clearScreenScraper() {
+        UserDefaults.standard.removeObject(forKey: Self.scraperUserKey)
+        OECredentialStore.shared.remove(.screenScraperPassword)
+        scraperUser.stringValue = ""
+        scraperPassword.stringValue = ""
         Task { @MainActor in OEBigPictureArt.shared.reset() }
         refresh()
     }

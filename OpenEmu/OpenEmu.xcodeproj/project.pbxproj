@@ -696,7 +696,6 @@
 		C6F696C01648F64B00B243DB /* Controller-Database.plist in Resources */ = {isa = PBXBuildFile; fileRef = C6F696BF1648F64B00B243DB /* Controller-Database.plist */; };
 		C6F697D6164E0EFD00B243DB /* Keyboard-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = C6F697D5164E0EFD00B243DB /* Keyboard-Mappings.plist */; };
 		CC0011223344556701900001 /* ScreenScraperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344556601900001 /* ScreenScraperClient.swift */; };
-		CC0011223344556901900001 /* PrefScreenScraperController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344556801900001 /* PrefScreenScraperController.swift */; };
 		CC0011223344556B01900001 /* LibretroThumbnailsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344556A01900001 /* LibretroThumbnailsClient.swift */; };
 		CC0011223344557101900001 /* ScreenScraperDevCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011223344557001900001 /* ScreenScraperDevCredentials.swift */; };
 		CC00CW00CONF000000000002 /* CheatWorksConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00CW00CONF000000000001 /* CheatWorksConfig.swift */; };
@@ -2001,7 +2000,6 @@
 		C6F696BF1648F64B00B243DB /* Controller-Database.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Database.plist"; sourceTree = "<group>"; };
 		C6F697D5164E0EFD00B243DB /* Keyboard-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Keyboard-Mappings.plist"; sourceTree = "<group>"; };
 		CC0011223344556601900001 /* ScreenScraperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenScraperClient.swift; sourceTree = "<group>"; };
-		CC0011223344556801900001 /* PrefScreenScraperController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefScreenScraperController.swift; sourceTree = "<group>"; };
 		CC0011223344556A01900001 /* LibretroThumbnailsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibretroThumbnailsClient.swift; sourceTree = "<group>"; };
 		CC0011223344557001900001 /* ScreenScraperDevCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenScraperDevCredentials.swift; sourceTree = "<group>"; };
 		CC0011223344557201900001 /* ScreenScraperDevCredentials.template.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScreenScraperDevCredentials.template.swift; sourceTree = "<group>"; };
@@ -3063,7 +3061,6 @@
 				8F76285D255C835A00A1246D /* PrefControlsController2.xib */,
 				01E2A2F223E60F7D00194150 /* PrefCoresController.swift */,
 				8F40EB7A1C1072B100683055 /* PrefCoresController.xib */,
-				CC0011223344556801900001 /* PrefScreenScraperController.swift */,
 				OE0RA0APPFILEREF00000001 /* PrefRetroAchievementsController.swift */,
 				OE0RALOGIN0FILEREF0001 /* OERetroAchievementsLoginClient.h */,
 				OE0RALOGIN0FILEREF0002 /* OERetroAchievementsLoginClient.m */,
@@ -6589,7 +6586,6 @@
 				01E2A2F323E60F7E00194150 /* PrefCoresController.swift in Sources */,
 				CC0011223344556701900001 /* ScreenScraperClient.swift in Sources */,
 				CC0011223344556B01900001 /* LibretroThumbnailsClient.swift in Sources */,
-				CC0011223344556901900001 /* PrefScreenScraperController.swift in Sources */,
 				OE0RA0APPBUILDFILE0000001 /* PrefRetroAchievementsController.swift in Sources */,
 				CC0011223344557101900001 /* ScreenScraperDevCredentials.swift in Sources */,
 				CC00CW00CONF000000000002 /* CheatWorksConfig.swift in Sources */,

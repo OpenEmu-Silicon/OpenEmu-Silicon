@@ -53,7 +53,7 @@ extension ScreenScraperFetchError: LocalizedError {
         case .networkUnavailable(let detail):
             return "Could not reach ScreenScraper — check your connection. (\(detail))"
         case .badCredentials:
-            return "ScreenScraper rejected your credentials. Check your username and password in Preferences → Cover Art."
+            return "ScreenScraper rejected your credentials. Check your username and password in Preferences → Artwork."
         case .rateLimited:
             return "ScreenScraper rate limit reached. Try again later."
         case .notFound:
