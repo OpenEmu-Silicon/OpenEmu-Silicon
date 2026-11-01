@@ -61,6 +61,7 @@ final class PrefDebugController: NSViewController {
         Checkbox(key: OEDBSaveStatesMedia.showsQuickSavesKey, label: "Show quicksave states in save state category"),
         Checkbox(key: Key.useNewSaveStatesViewController.rawValue, label: "Use new save states view"),
         Checkbox(key: Key.useNewScreenshotsViewController.rawValue, label: "Use new screenshots view"),
+        Checkbox(key: Key.useNewGamesViewController.rawValue, label: "Use new games view (restart OpenEmu)"),
         Button(label: "Reset main window size", action: #selector(resetMainWindow(_:))),
         Button(label: "Toggle game scanner view", action: #selector(toggleGameScannerView(_:))),
         

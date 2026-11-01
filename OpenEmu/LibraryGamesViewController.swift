@@ -28,6 +28,45 @@ extension NSNotification.Name {
     static let OELibrarySplitViewResetSidebar = NSNotification.Name("OELibrarySplitViewResetSidebar")
 }
 
+/// What `LibraryGamesViewController` needs from the view that shows the games. Both the old
+/// `OEGameCollectionViewController` and the new `GameCollectionViewController` provide it, so the
+/// new one can be switched on from the debug preferences while it is tested.
+protocol GamesCollectionControlling: NSViewController {
+    func use(database: OELibraryDatabase?)
+    var selectedGames: [OEDBGame] { get }
+    var isGridView: Bool { get }
+    var isBlankSlate: Bool { get }
+    
+    func updateBlankSlate()
+    func showGridView()
+    func showListView()
+    func performSearch(_ text: String)
+    func zoomGrid(to value: CGFloat)
+}
+
+extension OEGameCollectionViewController: GamesCollectionControlling {
+    var isGridView: Bool { selectedViewTag == .gridViewTag }
+    var isBlankSlate: Bool { shouldShowBlankSlate() }
+    func use(database: OELibraryDatabase?) { self.database = database }
+    func zoomGrid(to value: CGFloat) { zoomGridView(withValue: value) }
+}
+
+extension GameCollectionViewController: GamesCollectionControlling {
+    var isGridView: Bool { viewMode == .grid }
+    var isBlankSlate: Bool { shouldShowBlankSlate }
+    func use(database: OELibraryDatabase?) { self.database = database }
+    func zoomGrid(to value: CGFloat) { zoomGridView(zoomValue: value) }
+}
+
+extension Key {
+    static let useNewGamesViewController: Key = "useNewGamesViewController"
+}
+
+extension LibraryGamesViewController {
+    @UserDefault(.useNewGamesViewController, defaultValue: false)
+    static var useNewGamesViewController: Bool
+}
+
 final class LibraryGamesViewController: NSSplitViewController {
     
     private static let skipDiscGuideMessageKey = "OESkipDiscGuideMessageKey"
@@ -39,7 +78,7 @@ final class LibraryGamesViewController: NSSplitViewController {
     private let collectionViewMinWidth: CGFloat = 495
     
     private var sidebarController: SidebarController!
-    private var collectionController: OEGameCollectionViewController!
+    private var collectionController: GamesCollectionControlling!
     private var toolbar: LibraryToolbar? {
         view.window?.toolbar as? LibraryToolbar
     }
@@ -50,7 +89,7 @@ final class LibraryGamesViewController: NSSplitViewController {
         super.viewDidLoad()
         
         sidebarController = SidebarController()
-        collectionController = OEGameCollectionViewController()
+        collectionController = Self.useNewGamesViewController ? GameCollectionViewController() : OEGameCollectionViewController()
         
         setUpSplitView()
         assignDatabase()
@@ -89,7 +128,7 @@ final class LibraryGamesViewController: NSSplitViewController {
     
     private func assignDatabase() {
         sidebarController.database = database
-        collectionController.database = database
+        collectionController.use(database: database)
     }
     
     // MARK: - Split View
@@ -193,19 +232,19 @@ final class LibraryGamesViewController: NSSplitViewController {
     
     @IBAction func changeGridSize(_ sender: NSSlider?) {
         guard let slider = toolbar?.gridSizeSlider else { return }
-        collectionController.zoomGridView(withValue: CGFloat(slider.doubleValue))
+        collectionController.zoomGrid(to: CGFloat(slider.doubleValue))
     }
     
     @IBAction func decreaseGridSize(_ sender: AnyObject?) {
         guard let slider = toolbar?.gridSizeSlider else { return }
         slider.doubleValue -= sender?.tag == 199 ? 0.25 : 0.5
-        collectionController.zoomGridView(withValue: CGFloat(slider.doubleValue))
+        collectionController.zoomGrid(to: CGFloat(slider.doubleValue))
     }
     
     @IBAction func increaseGridSize(_ sender: AnyObject?) {
         guard let slider = toolbar?.gridSizeSlider else { return }
         slider.doubleValue += sender?.tag == 199 ? 0.25 : 0.5
-        collectionController.zoomGridView(withValue: CGFloat(slider.doubleValue))
+        collectionController.zoomGrid(to: CGFloat(slider.doubleValue))
     }
     
     @objc func updateCollectionContentsFromSidebar() {
@@ -262,8 +301,8 @@ extension LibraryGamesViewController: LibrarySubviewControllerGameSelection {
 extension LibraryGamesViewController: NSMenuItemValidation {
     
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        let isGridView = collectionController.selectedViewTag == .gridViewTag
-        let isBlankSlate = collectionController.shouldShowBlankSlate()
+        let isGridView = collectionController.isGridView
+        let isBlankSlate = collectionController.isBlankSlate
         
         switch menuItem.action {
         case #selector(switchToGridView):
