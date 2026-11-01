@@ -51,7 +51,9 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
   - Lossless repacking saves 20 to 30%, but it needs a WebP writer that Apple's image library does not have, so the real gain would be smaller.
   - Icons come as Windows `.ico` files that hold several sizes. They need a reader before they can be drawn from the store.
 - Decision: keep the rule to store originals. Move the opt-in "save space" mode (lossy, originals kept in `History`) up to Phase 2, since it is the only thing that changes the size. Back up pinned art only by default.
-- Still to measure: ScreenScraper and libretro originals (needs a run set to those sources).
+- libretro-thumbnails, 5 posters from a 60 second run: all PNG, 94 KB to 834 KB, average about 450 KB, at most 512 pixels on the long side. Posters only, so about 0.5 MB per game. Small enough that lossless storage is fine.
+- ScreenScraper: not measured. In this worktree the app is built with placeholder developer credentials (`harness_ensure_stubs`), so every lookup came back `badCredentials`. It needs a build with the real developer credentials. Fan art is a ScreenScraper media type and has the same requirement.
+- Decision unchanged: ScreenScraper is the only unknown, and it does not change the plan. The store keeps whatever arrives.
 
 ### Phase 1: the durable store
 
