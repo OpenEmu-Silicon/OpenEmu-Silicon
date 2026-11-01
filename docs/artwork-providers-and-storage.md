@@ -57,7 +57,7 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
 
 ### Phase 1: the durable store
 
-Progress: the store itself (`OEArtworkStore`, with tests) and the library cover hooks are done. A replaced or deleted library cover is copied into the store first. Still to do: copy the covers already in the library, make Big Picture read from the store, and read `.ico` icons.
+Progress: done: the store (`OEArtworkStore`, with tests); a replaced or deleted library cover is copied in first; the covers already in the library are copied in once at launch; provider downloads are saved in it under the game's name; Big Picture falls back to it when a provider has nothing. Still to do: `.ico` reading for SteamGridDB icons, and reading from the store first (that belongs with the provider-choice work in Phase 2, because it decides what a change of provider replaces).
 
 - Needs PR 795 (Big Picture) merged first, or this work branched from it.
 - Add the artwork store, index, history folder, and the never-overwrite rules.

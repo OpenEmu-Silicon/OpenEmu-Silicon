@@ -171,6 +171,7 @@ extension OELibraryDatabase {
             if image.sourceURL != nil,
                let fileURL = image.imageURL
             {
+                OEArtworkStore.keepCover(image)
                 try? FileManager.default.removeItem(at: fileURL)
                 image.relativePath = nil
                 count += 1
@@ -278,8 +279,15 @@ extension OELibraryDatabase {
             }
         }
         
+        // Moved aside, not deleted: a file the library does not know about may still be somebody's picture.
+        let removedDirectory = artworkDirectory.deletingLastPathComponent().appendingPathComponent("Artwork Removed", isDirectory: true)
+        try? FileManager.default.createDirectory(at: removedDirectory, withIntermediateDirectories: true)
         for untrackedFile in artwork {
-            try? FileManager.default.removeItem(at: untrackedFile)
+            var target = removedDirectory.appendingPathComponent(untrackedFile.lastPathComponent)
+            if FileManager.default.fileExists(atPath: target.path) {
+                target = removedDirectory.appendingPathComponent("\(UUID().uuidString)-\(untrackedFile.lastPathComponent)")
+            }
+            try? FileManager.default.moveItem(at: untrackedFile, to: target)
         }
         
         NSLog("Removed \(artwork.count) unknown files from artwork directory")

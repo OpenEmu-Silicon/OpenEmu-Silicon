@@ -295,11 +295,18 @@ final class OEArtworkStore: @unchecked Sendable {
         return url
     }
 
-    /// An active file in a slot folder named exactly `stem` plus any extension (History and hidden files do not count).
+    /// Extensions a picture can have. Looking for these by name keeps a lookup the same cost however many pictures
+    /// share the folder, where listing the folder would grow with the library.
+    private static let knownExtensions = ["png", "jpg", "jpeg", "webp", "gif", "ico", "img", "bmp", "tif", "tiff", "heic"]
+
+    /// An active file in a slot folder named exactly `stem` plus a picture extension (History and hidden files do not count).
     private static func activeFile(in folder: URL, stem: String) -> URL? {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-        guard let name = names.sorted().first(where: { !$0.hasPrefix(".") && ($0 as NSString).deletingPathExtension == stem }) else { return nil }
-        return folder.appendingPathComponent(name)
+        let fm = FileManager.default
+        for ext in knownExtensions {
+            let url = folder.appendingPathComponent("\(stem).\(ext)")
+            if fm.fileExists(atPath: url.path) { return url }
+        }
+        return nil
     }
 
     /// The game's active picture: the one the index says, otherwise one found by its name (a lost index, or a file a
@@ -433,5 +440,38 @@ extension OEArtworkStore {
               let url = source ?? image.imageURL,
               let data = try? Data(contentsOf: url), !data.isEmpty else { return }
         shared.replaceAutomatic(data, for: Game(game), slot: .cover, origin: .library)
+    }
+}
+
+extension OEArtworkStore {
+
+    private static let importedKey = "OEArtworkStoreCoversImported"
+
+    /// Copies every cover already in the library into the artwork folder, once. The library's own files are only
+    /// read. Safe to run again: a game that already has a cover in the folder is left alone.
+    static func importLibraryCovers(from database: OELibraryDatabase) {
+        guard !UserDefaults.standard.bool(forKey: importedKey) else { return }
+        let context = database.makeChildContext()
+        context.perform {
+            let request = OEDBGame.fetchRequest()
+            request.predicate = NSPredicate(format: "boxImage != nil")
+            request.fetchBatchSize = 200
+            let fetched = try? context.fetch(request)
+            guard let games = fetched as? [OEDBGame] else {
+                NSLog("Artwork folder: could not list library covers (\(String(describing: fetched?.count)))")
+                return
+            }
+
+            var copied = 0
+            for game in games {
+                autoreleasepool {
+                    guard let url = game.boxImage?.imageURL, let data = try? Data(contentsOf: url), !data.isEmpty else { return }
+                    if case .stored = shared.fill(data, for: Game(game), slot: .cover, origin: .library) { copied += 1 }
+                }
+            }
+            shared.flush()
+            if !games.isEmpty { UserDefaults.standard.set(true, forKey: importedKey) }   // an empty list may only mean the library is still loading
+            NSLog("Artwork folder: copied \(copied) of \(games.count) library covers")
+        }
     }
 }

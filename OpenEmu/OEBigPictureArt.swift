@@ -237,6 +237,18 @@ final class OEBigPictureArt: ObservableObject {
                 if gathered.icon == nil, snapshot.stored.icon == nil, found.icon != nil, provider.providesStandardPosters { square = true }
                 gathered.fillGaps(from: found)
             }
+            // 3. Whatever the providers could not supply (offline, out of quota, art removed) comes from the artwork folder.
+            let artworkGame = key.artworkGame
+            let wanted = (hero: snapshot.stored.backdrop == nil && gathered.hero == nil, grid: snapshot.stored.poster == nil && gathered.grid == nil,
+                          icon: snapshot.stored.icon == nil && gathered.icon == nil, logo: snapshot.stored.logo == nil && gathered.logo == nil)
+            if wanted.hero || wanted.grid || wanted.icon || wanted.logo {
+                let kept = await Task.detached(priority: .utility) { () -> OEBigPictureArtSet in
+                    func image(_ slot: OEArtworkStore.Slot) -> NSImage? { OEArtworkStore.shared.active(artworkGame, slot).flatMap { NSImage(contentsOf: $0) } }
+                    return OEBigPictureArtSet(hero: wanted.hero ? image(.hero) : nil, grid: wanted.grid ? image(.poster) : nil,
+                                              icon: wanted.icon ? image(.icon) : nil, logo: wanted.logo ? image(.logo) : nil)
+                }.value
+                gathered.fillGaps(from: kept)
+            }
             guard gathered.hasAny else { return }
             let isStandard = standard, isSquare = square
             let result = await Task.detached(priority: .userInitiated) { () -> OEBigPictureArtStore.Stored in
@@ -321,6 +333,11 @@ final class OEBigPictureArt: ObservableObject {
         let fileSize: Int
         /// The title with its region tag ("Super Mario Bros. (USA)"), the way libretro-thumbnails names its files.
         let fullName: String
+
+        /// How the artwork folder names this game.
+        var artworkGame: OEArtworkStore.Game {
+            OEArtworkStore.Game(md5: md5, system: systemIdentifier ?? "unknown", title: fullName)
+        }
 
         /// Region and revision tags such as "(USA)" or "[!]" make provider searches miss.
         static func searchName(_ name: String) -> String {
@@ -459,10 +476,10 @@ struct SteamGridDBArtProvider: OEBigPictureArtProvider {
     let providesStandardPosters = true
 
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
-        async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name)
-        async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name)
-        async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name)
-        async let logo = OEHeroArtFetcher.shared.logoArt(md5: key.md5, displayName: key.name)
+        async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
+        async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
+        async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
+        async let logo = OEHeroArtFetcher.shared.logoArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
         return await OEBigPictureArtSet(hero: hero, grid: grid, icon: icon, logo: logo, isDefinitive: true)
     }
 }
@@ -515,12 +532,12 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         case .success(let found):
             var art = OEBigPictureArtSet(isDefinitive: true)
             guard let found = found else { return art }
-            art.grid = await download(found.boxImageURL, md5: key.md5, slot: "poster")
-            art.hero = await download(found.heroImageURL, md5: key.md5, slot: "hero")
-            art.logo = await download(found.logoImageURL, md5: key.md5, slot: "logo")
+            art.grid = await download(found.boxImageURL, key: key, slot: "poster")
+            art.hero = await download(found.heroImageURL, key: key, slot: "hero")
+            art.logo = await download(found.logoImageURL, key: key, slot: "logo")
             // A cutout with no background (cartridge, disc, 3D box) is what the tiles want. Failing that, a square.
             for url in found.iconImageURLs {
-                if let image = await download(url, md5: key.md5, slot: "icon", accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
+                if let image = await download(url, key: key, slot: "icon", accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
                     art.icon = image
                     break
                 }
@@ -538,10 +555,10 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
     }
 
-    private func download(_ url: URL?, md5: String, slot: String, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
+    private func download(_ url: URL?, key: OEBigPictureArt.GameKey, slot: String, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
         guard let url = url, let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data),
               accept(image) else { return nil }
-        OEArtworkOriginals.save(data, provider: id, md5: md5, slot: slot)
+        OEArtworkOriginals.save(data, provider: id, md5: key.md5, slot: slot, game: key.artworkGame)
         return image
     }
 }
@@ -581,7 +598,7 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
             }.value
             guard let address = address, let url = URL(string: address),
                   let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { continue }
-            OEArtworkOriginals.save(data, provider: id, md5: key.md5, slot: "poster")
+            OEArtworkOriginals.save(data, provider: id, md5: key.md5, slot: "poster", game: key.artworkGame)
             return OEBigPictureArtSet(grid: image, isDefinitive: true)
         }
         return OEBigPictureArtSet(isDefinitive: true)

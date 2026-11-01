@@ -72,7 +72,7 @@ actor OEHeroArtFetcher {
     private var gridInFlight: [String: Task<ImageBox, Never>] = [:]
     private var logoInFlight: [String: Task<ImageBox, Never>] = [:]
 
-    func heroArt(md5: String, displayName: String) async -> NSImage? {
+    func heroArt(md5: String, displayName: String, game: OEArtworkStore.Game? = nil) async -> NSImage? {
         guard !md5.isEmpty else { return nil }
 
         let cachedPath = cacheDir.appendingPathComponent("\(md5).png")
@@ -94,7 +94,7 @@ actor OEHeroArtFetcher {
                let artURL = await SteamGridDBClient.shared.heroURL(for: id),
                let (data, _) = try? await URLSession.shared.data(from: artURL),
                let img = NSImage(data: data) {
-                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "hero")
+                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "hero", game: game)
                 cacheToDisk(img, path: cachedPath)
                 return ImageBox(img)
             }
@@ -106,7 +106,7 @@ actor OEHeroArtFetcher {
         return await task.value.image
     }
 
-    func iconArt(md5: String, displayName: String) async -> NSImage? {
+    func iconArt(md5: String, displayName: String, game: OEArtworkStore.Game? = nil) async -> NSImage? {
         guard !md5.isEmpty else { return nil }
         let cachedPath = iconCacheDir.appendingPathComponent("\(md5).png")
         if FileManager.default.fileExists(atPath: cachedPath.path),
@@ -119,7 +119,7 @@ actor OEHeroArtFetcher {
                let artURL = await SteamGridDBClient.shared.iconURL(for: id),
                let (data, _) = try? await URLSession.shared.data(from: artURL),
                let img = NSImage(data: data) {
-                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "icon")
+                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "icon", game: game)
                 cacheToDisk(img, path: cachedPath)
                 return ImageBox(img)
             }
@@ -130,7 +130,7 @@ actor OEHeroArtFetcher {
     }
 
     /// The game's title logo, cached on disk by ROM MD5.
-    func logoArt(md5: String, displayName: String) async -> NSImage? {
+    func logoArt(md5: String, displayName: String, game: OEArtworkStore.Game? = nil) async -> NSImage? {
         guard !md5.isEmpty else { return nil }
         let cachedPath = logoCacheDir.appendingPathComponent("\(md5).png")
         if FileManager.default.fileExists(atPath: cachedPath.path),
@@ -143,7 +143,7 @@ actor OEHeroArtFetcher {
                let artURL = await SteamGridDBClient.shared.logoURL(for: id),
                let (data, _) = try? await URLSession.shared.data(from: artURL),
                let img = NSImage(data: data) {
-                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "logo")
+                OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "logo", game: game)
                 cacheToDisk(img, path: cachedPath)
                 return ImageBox(img)
             }
@@ -153,7 +153,7 @@ actor OEHeroArtFetcher {
         return await task.value.image
     }
 
-    func gridArt(md5: String, displayName: String) async -> NSImage? {
+    func gridArt(md5: String, displayName: String, game: OEArtworkStore.Game? = nil) async -> NSImage? {
         guard !md5.isEmpty else { return nil }
         let cachedPath = gridCacheDir.appendingPathComponent("\(md5).png")
         if FileManager.default.fileExists(atPath: cachedPath.path),
@@ -171,7 +171,7 @@ actor OEHeroArtFetcher {
             guard let (data, _) = try? await URLSession.shared.data(from: artURL), let img = NSImage(data: data) else {
                 return ImageBox(nil)
             }
-            OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "poster")
+            OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "poster", game: game)
             cacheToDisk(img, path: cachedPath)
             return ImageBox(img)
         }
@@ -179,11 +179,11 @@ actor OEHeroArtFetcher {
         return await task.value.image
     }
 
-    func setHeroArt(url: URL, forMD5 md5: String) async -> NSImage? {
+    func setHeroArt(url: URL, forMD5 md5: String, game: OEArtworkStore.Game? = nil) async -> NSImage? {
         guard let (data, _) = try? await URLSession.shared.data(from: url),
               let img = NSImage(data: data) else { return nil }
         let cachedPath = cacheDir.appendingPathComponent("\(md5).png")
-        OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "hero")
+        OEArtworkOriginals.save(data, provider: "steamgriddb", md5: md5, slot: "hero", game: game)
         cacheToDisk(img, path: cachedPath)
         return img
     }
@@ -229,7 +229,11 @@ enum OEArtworkOriginals {
     /// Writes `data` unless this provider already has a file for this game and slot. Returns the file that now holds it,
     /// or nil when nothing could be written. Safe to call from any thread.
     @discardableResult
-    static func save(_ data: Data, provider: String, md5: String, slot: String, in root: URL = directory) -> URL? {
+    static func save(_ data: Data, provider: String, md5: String, slot: String, game: OEArtworkStore.Game? = nil, in root: URL = directory) -> URL? {
+        // The artwork folder keeps the same bytes under the game's name, where a person can find them.
+        if let game = game, let artSlot = OEArtworkStore.Slot(rawValue: slot) {
+            OEArtworkStore.shared.fill(data, for: game, slot: artSlot, origin: .provider(provider))
+        }
         let safe = { (text: String) in text.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" } }
         let provider = safe(provider), md5 = safe(md5), slot = safe(slot)
         guard !data.isEmpty, !provider.isEmpty, !md5.isEmpty, !slot.isEmpty else { return nil }

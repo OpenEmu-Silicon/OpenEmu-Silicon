@@ -189,6 +189,7 @@ final class OELibraryDatabase: NSObject {
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(2)) {
             defaultDB.startOpenVGDBSync()
             romImporter.start()
+            OEArtworkStore.importLibraryCovers(from: defaultDB)
         }
     }
     
