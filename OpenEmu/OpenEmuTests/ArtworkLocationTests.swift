@@ -167,7 +167,8 @@ final class ArtworkLocationTests: XCTestCase {
         XCTAssertEqual(snapshot(old).filter { $0.key != OEArtworkStore.indexName }, oldBefore.filter { $0.key != OEArtworkStore.indexName })
     }
 
-    func testAFailedMoveSwitchesNothing() throws {
+    /// Runs a body with the store pointed at `old`, and puts the app's real settings back afterwards.
+    private func withStore(at root: URL, _ body: () throws -> Void) rethrows {
         let key = OEArtworkLocation.defaultsKey
         let previousPath = UserDefaults.standard.string(forKey: key)
         let previousStore = OEArtworkStore.shared
@@ -175,15 +176,129 @@ final class ArtworkLocationTests: XCTestCase {
             if let previousPath { UserDefaults.standard.set(previousPath, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
             OEArtworkStore.useRoot(previousStore.root)
         }
-        OEArtworkStore.useRoot(old)
-        OEArtworkStore.shared.fill(data(1), for: game, slot: .cover, origin: .library)
-        let theirs = new.appendingPathComponent("nes/cover", isDirectory: true)
-        try FileManager.default.createDirectory(at: theirs, withIntermediateDirectories: true)
-        try Data("other".utf8).write(to: theirs.appendingPathComponent("Metroid.png"))
+        OEArtworkStore.useRoot(root)
+        try body()
+    }
 
-        guard case .failure(.conflict) = OEArtworkLocation.move(to: new) else { return XCTFail() }
-        XCTAssertEqual(OEArtworkStore.shared.root.standardizedFileURL, old.standardizedFileURL)
-        XCTAssertEqual(UserDefaults.standard.string(forKey: key), previousPath)
+    func testAFailedMoveSwitchesNothing() throws {
+        try withStore(at: old) {
+            OEArtworkStore.shared.fill(data(1), for: game, slot: .cover, origin: .library)
+            let before = UserDefaults.standard.string(forKey: OEArtworkLocation.defaultsKey)
+            guard case .failure(.nested) = OEArtworkLocation.move(to: old.appendingPathComponent("inside")) else { return XCTFail() }
+            XCTAssertEqual(OEArtworkStore.shared.root.standardizedFileURL, old.standardizedFileURL)
+            XCTAssertEqual(UserDefaults.standard.string(forKey: OEArtworkLocation.defaultsKey), before)
+        }
+    }
+
+    func testAMoveKeepsBothWhenTheNewFolderHasADifferentFileOfTheSameName() throws {
+        try withStore(at: old) {
+            OEArtworkStore.shared.fill(data(1), for: game, slot: .cover, origin: .library)
+            OEArtworkStore.shared.choose(data(2), for: game, slot: .cover)
+            let theirs = new.appendingPathComponent("nes/cover", isDirectory: true)
+            try FileManager.default.createDirectory(at: theirs, withIntermediateDirectories: true)
+            let clash = theirs.appendingPathComponent("Metroid.png")
+            try Data("their own picture".utf8).write(to: clash)
+
+            guard case .success = OEArtworkLocation.move(to: new) else { return XCTFail() }
+            XCTAssertEqual(try Data(contentsOf: clash), Data("their own picture".utf8), "their file is untouched")
+            let active = try XCTUnwrap(OEArtworkStore.shared.active(game, .cover))
+            XCTAssertEqual(try Data(contentsOf: active), data(2), "the chosen picture is still the active one")
+            XCTAssertNotEqual(active, clash)
+            XCTAssertEqual(OEArtworkStore.shared.entry(game, .cover)?.pinned, true)
+            XCTAssertEqual(OEArtworkStore.shared.history(game, .cover).count, 1)
+        }
+    }
+
+    func testMovingAwayChoosingAndMovingBackLosesNothing() throws {
+        try withStore(at: old) {
+            OEArtworkStore.shared.fill(data(1), for: game, slot: .cover, origin: .library)
+            guard case .success = OEArtworkLocation.move(to: new) else { return XCTFail("out") }
+            OEArtworkStore.shared.choose(data(2), for: game, slot: .cover)   // the same name now holds different bytes than in `old`
+            OEArtworkStore.shared.fill(data(5), for: game, slot: .hero, origin: .provider("p"))
+
+            guard case .success = OEArtworkLocation.move(to: old) else { return XCTFail("back") }
+            XCTAssertEqual(OEArtworkStore.shared.root.standardizedFileURL, old.standardizedFileURL)
+            XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(OEArtworkStore.shared.active(game, .cover))), data(2))
+            XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(OEArtworkStore.shared.active(game, .hero))), data(5))
+            XCTAssertEqual(OEArtworkStore.shared.entry(game, .cover)?.pinned, true)
+            let allBytes = Set(snapshot(old).values)
+            XCTAssertTrue(allBytes.contains(data(1)) && allBytes.contains(data(2)), "both versions of the cover are still on disk")
+        }
+    }
+
+    func testAPictureSavedThroughTheOldStoreDuringAMoveEndsUpInTheNewFolder() throws {
+        try withStore(at: old) {
+            let stale = OEArtworkStore.shared   // a fetch that fetched its reference earlier
+            stale.fill(data(1), for: game, slot: .cover, origin: .library)
+            let other = OEArtworkStore.Game(md5: String(format: "%032x", 9), system: "openemu.system.nes", title: "Kid Icarus")
+            let writer = DispatchQueue(label: "writer")
+            let done = expectation(description: "writes")
+            writer.async {
+                for n in 0..<150 { stale.fill(self.data(UInt8(n % 200)), for: OEArtworkStore.Game(md5: String(format: "%032x", 1000 + n), system: "openemu.system.nes", title: "Game \(n)"), slot: .cover, origin: .provider("p")) }
+                done.fulfill()
+            }
+            guard case .success = OEArtworkLocation.move(to: new) else { return XCTFail() }
+            wait(for: [done], timeout: 30)
+            stale.choose(data(77), for: other, slot: .cover)   // after the switch, through the old reference
+
+            stale.flush()   // what quitting does
+            let fresh = OEArtworkStore(root: new)
+            for n in 0..<150 {
+                let g = OEArtworkStore.Game(md5: String(format: "%032x", 1000 + n), system: "openemu.system.nes", title: "Game \(n)")
+                XCTAssertNotNil(fresh.active(g, .cover), "game \(n) is in the new folder")
+            }
+            XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(fresh.active(other, .cover))), data(77))
+            XCTAssertNil(OEArtworkStore(root: old).active(other, .cover), "nothing new was written to the old folder after the switch")
+        }
+    }
+
+    func testFoldersThatOverlapThroughCaseOrLinksAreRefused() throws {
+        _ = fillOld()
+        let before = snapshot(old)
+        let upper = base.appendingPathComponent("OLD/inner")
+        XCTAssertEqual(OEArtworkLocation.copyAndVerify(from: old, to: upper).failureValue, .nested)
+        XCTAssertEqual(OEArtworkLocation.copyAndVerify(from: old, to: base.appendingPathComponent("OLD")).failureValue, .sameFolder)
+
+        let link = base.appendingPathComponent("link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: old.appendingPathComponent("nes"))
+        XCTAssertEqual(OEArtworkLocation.copyAndVerify(from: old, to: link.appendingPathComponent("deeper")).failureValue, .nested)
+        let toRoot = base.appendingPathComponent("rootlink")
+        try FileManager.default.createSymbolicLink(at: toRoot, withDestinationURL: old)
+        XCTAssertEqual(OEArtworkLocation.copyAndVerify(from: old, to: toRoot).failureValue, .sameFolder)
+        XCTAssertEqual(snapshot(old), before, "the old folder was not touched")
+    }
+
+    func testLinkedPicturesAndFoldersAreCopiedAsTheirContents() throws {
+        _ = fillOld()
+        let elsewhere = base.appendingPathComponent("elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        try data(8).write(to: elsewhere.appendingPathComponent("Linked.png"))
+        let folderOnAnotherDisk = base.appendingPathComponent("nes-hero-folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folderOnAnotherDisk, withIntermediateDirectories: true)
+        try data(9).write(to: folderOnAnotherDisk.appendingPathComponent("Pic.png"))
+        try FileManager.default.createSymbolicLink(at: old.appendingPathComponent("nes/cover/Linked.png"), withDestinationURL: elsewhere.appendingPathComponent("Linked.png"))
+        try FileManager.default.createSymbolicLink(at: old.appendingPathComponent("nes/extra"), withDestinationURL: folderOnAnotherDisk)
+        try FileManager.default.createSymbolicLink(at: old.appendingPathComponent("loop"), withDestinationURL: old)   // a link back to itself
+
+        guard case .success = OEArtworkLocation.copyAndVerify(from: old, to: new) else { return XCTFail() }
+        XCTAssertEqual(try Data(contentsOf: new.appendingPathComponent("nes/cover/Linked.png")), data(8))
+        XCTAssertEqual(try Data(contentsOf: new.appendingPathComponent("nes/extra/Pic.png")), data(9))
+    }
+
+    func testABrokenLinkStopsTheMoveInsteadOfBeingSkipped() throws {
+        _ = fillOld()
+        try FileManager.default.createSymbolicLink(at: old.appendingPathComponent("nes/cover/Gone.png"), withDestinationURL: base.appendingPathComponent("nowhere.png"))
+        XCTAssertEqual(OEArtworkLocation.copyAndVerify(from: old, to: new).failureValue, .copyFailed("nes/cover/Gone.png"))
+    }
+
+    func testAnOddPathInTheSettingFallsBackToTheDefault() {
+        let key = OEArtworkLocation.defaultsKey
+        let previous = UserDefaults.standard.string(forKey: key)
+        defer { if let previous { UserDefaults.standard.set(previous, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
+        UserDefaults.standard.set("relative/Art", forKey: key)
+        XCTAssertEqual(OEArtworkLocation.chosenRoot, OEArtworkStore.defaultRoot)
+        UserDefaults.standard.set("~/Pictures/Art", forKey: key)
+        XCTAssertEqual(OEArtworkLocation.chosenRoot.path, NSHomeDirectory() + "/Pictures/Art")
     }
 }
 

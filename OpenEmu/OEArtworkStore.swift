@@ -117,13 +117,19 @@ final class OEArtworkStore: @unchecked Sendable {
     private static let sharedLock = NSLock()
     private static var current = OEArtworkStore(root: OEArtworkLocation.chosenRoot)
 
+    /// Makes `store` the folder in use. The one it replaces forwards to it from then on.
+    static func install(_ store: OEArtworkStore) {
+        sharedLock.lock(); defer { sharedLock.unlock() }
+        current = store
+    }
+
     /// The artwork folder in use. Preferences can move it while the app runs.
     static var shared: OEArtworkStore {
         sharedLock.lock(); defer { sharedLock.unlock() }
         return current
     }
 
-    /// Starts using another folder. The folder being left is saved first and is not touched again.
+    /// Starts using another folder without carrying anything over (for tests). Moving is `OEArtworkLocation.move`.
     static func useRoot(_ root: URL) {
         sharedLock.lock(); defer { sharedLock.unlock() }
         current.flush()
@@ -136,6 +142,23 @@ final class OEArtworkStore: @unchecked Sendable {
     private var saveScheduled = false
     private var indexUnsafeToWrite = false
 
+    /// Set once the app has moved to another folder. A caller still holding this store is passed on to the new one,
+    /// so a picture saved at that moment goes to the folder in use rather than the one that was left.
+    private let successorLock = NSLock()
+    private var successorStore: OEArtworkStore?
+    /// Takes the lock, unless the app has moved on. Then it returns the store now in use, with the lock not held.
+    /// Checking again after the lock closes the gap where a call waited while the move finished.
+    private func lockedOrForwarded() -> OEArtworkStore? {
+        lock.lock()
+        if let next = successor { lock.unlock(); return next }
+        return nil
+    }
+
+    private var successor: OEArtworkStore? {
+        successorLock.lock(); defer { successorLock.unlock() }
+        return successorStore
+    }
+
     init(root: URL) {
         self.root = root
     }
@@ -144,12 +167,14 @@ final class OEArtworkStore: @unchecked Sendable {
 
     /// The active picture for a game and slot, or nil. Safe to call from any thread.
     func active(_ game: Game, _ slot: Slot) -> URL? {
-        lock.lock(); defer { lock.unlock() }
+        if let next = lockedOrForwarded() { return next.active(game, slot) }
+        defer { lock.unlock() }
         return locatedActive(game, slot)?.url
     }
 
     /// Everything that was replaced for a game and slot, oldest first.
     func history(_ game: Game, _ slot: Slot) -> [URL] {
+        if let next = successor { return next.history(game, slot) }
         let folder = slotFolder(game, slot).appendingPathComponent(Self.historyName, isDirectory: true)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         let base = Self.fileStem(game.title)
@@ -159,7 +184,8 @@ final class OEArtworkStore: @unchecked Sendable {
     }
 
     func entry(_ game: Game, _ slot: Slot) -> Entry? {
-        lock.lock(); defer { lock.unlock() }
+        if let next = lockedOrForwarded() { return next.entry(game, slot) }
+        defer { lock.unlock() }
         return locatedActive(game, slot)?.entry
     }
 
@@ -168,7 +194,8 @@ final class OEArtworkStore: @unchecked Sendable {
     /// Puts a picture in an empty slot. A slot that already has one is left exactly as it is.
     @discardableResult
     func fill(_ data: Data, for game: Game, slot: Slot, origin: Origin) -> Outcome {
-        lock.lock(); defer { lock.unlock() }
+        if let next = lockedOrForwarded() { return next.fill(data, for: game, slot: slot, origin: origin) }
+        defer { lock.unlock() }
         if let found = locatedActive(game, slot) { return .keptExisting(found.url) }
         guard let url = write(data, game, slot) else { return .failed }
         record(game, slot, Entry(file: relativePath(url), origin: origin.raw, pinned: false, added: Date()))
@@ -194,7 +221,8 @@ final class OEArtworkStore: @unchecked Sendable {
     /// never changed and nothing is overwritten.
     @discardableResult
     func archive(_ data: Data, for game: Game, slot: Slot, origin: Origin) -> Outcome {
-        lock.lock(); defer { lock.unlock() }
+        if let next = lockedOrForwarded() { return next.archive(data, for: game, slot: slot, origin: origin) }
+        defer { lock.unlock() }
         guard let current = locatedActive(game, slot) else {
             guard let url = write(data, game, slot) else { return .failed }
             record(game, slot, Entry(file: relativePath(url), origin: origin.raw, pinned: false, added: Date()))
@@ -214,7 +242,8 @@ final class OEArtworkStore: @unchecked Sendable {
 
     /// Lets automatic fetching replace this slot again. The picture stays where it is.
     func unpin(_ game: Game, _ slot: Slot) {
-        lock.lock(); defer { lock.unlock() }
+        if let next = lockedOrForwarded() { return next.unpin(game, slot) }
+        defer { lock.unlock() }
         guard var found = locatedActive(game, slot) else { return }
         found.entry.pinned = false
         record(game, slot, found.entry)
@@ -223,14 +252,50 @@ final class OEArtworkStore: @unchecked Sendable {
 
     /// Writes the index to disk now. Called after a deliberate choice and when the app quits.
     func flush() {
+        if let next = lockedOrForwarded() { return next.flush() }
+        defer { lock.unlock() }
+        saveNow()
+    }
+
+    // MARK: - Moving to another folder
+
+    /// Holds this store still while `copyRemaining` copies what changed since the bulk copy and returns where clashing
+    /// files were kept (or nil if it failed), then carries the index over to `next` and passes every later call on to it.
+    /// An index already in `next`'s folder is kept beside it before the merged one is written.
+    /// Returns false, with nothing changed here, when the last copy failed.
+    @discardableResult
+    func handOver(to next: OEArtworkStore, copyRemaining: () -> [String: String]?) -> Bool {
         lock.lock(); defer { lock.unlock() }
+        saveNow()
+        guard let renamed = copyRemaining() else { return false }
+        loadIndexIfNeeded()
+        next.merge(index ?? [:], renamed: renamed)
+        successorLock.lock(); successorStore = next; successorLock.unlock()
+        return true
+    }
+
+    private func merge(_ incoming: [String: [String: Entry]], renamed: [String: String]) {
+        lock.lock(); defer { lock.unlock() }
+        loadIndexIfNeeded()
+        if FileManager.default.fileExists(atPath: indexURL.path), !(index ?? [:]).isEmpty {
+            let aside = root.appendingPathComponent("index.replaced-\(Self.stamp.string(from: Date())).json")
+            if !FileManager.default.fileExists(atPath: aside.path) { try? FileManager.default.copyItem(at: indexURL, to: aside) }
+        }
+        for (md5, slots) in incoming {
+            for (slot, entry) in slots {
+                var moved = entry
+                if let other = renamed[entry.file] { moved.file = other }
+                index?[md5, default: [:]][slot] = moved
+            }
+        }
         saveNow()
     }
 
     // MARK: - Replacing
 
     private func replace(_ data: Data, _ game: Game, _ slot: Slot, origin: Origin, pinned: Bool, onlyIfUnpinned: Bool) -> Outcome {
-        lock.lock(); defer { lock.unlock() }
+        if let next = lockedOrForwarded() { return next.replace(data, game, slot, origin: origin, pinned: pinned, onlyIfUnpinned: onlyIfUnpinned) }
+        defer { lock.unlock() }
         let fm = FileManager.default
 
         guard let current = locatedActive(game, slot) else {
@@ -434,7 +499,7 @@ final class OEArtworkStore: @unchecked Sendable {
 
     private func saveNow() {
         saveScheduled = false
-        guard let index = index, !indexUnsafeToWrite else { return }
+        guard let index = index, !indexUnsafeToWrite, successor == nil else { return }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]

@@ -179,24 +179,40 @@ final class PrefArtworkProvidersController: NSViewController {
     }
 
     private func moveFolder(to destination: URL) {
-        let warnings = OEArtworkLocation.warnings(for: destination)
-        if !warnings.isEmpty {
-            let alert = NSAlert()
-            alert.messageText = "Use this folder anyway?"
-            alert.informativeText = warnings.map { warning -> String in
-                switch warning {
-                case .network: return "It is on a network or external drive. Artwork would be missing whenever that drive is not connected."
-                case .iCloud: return "It is in a cloud-synced folder. Pictures that are not downloaded yet may be slow or missing."
-                }
-            }.joined(separator: "\n\n")
-            alert.addButton(withTitle: "Use Folder")
-            alert.addButton(withTitle: "Cancel")
-            guard alert.runModal() == .alertFirstButtonReturn else { return }
-        }
-
-        let old = OEArtworkStore.shared.root
         folderButtons.forEach { $0.isEnabled = false }
         folderStatus.textColor = .secondaryLabelColor
+        folderStatus.stringValue = "Checking the folder…"
+        // Looking at a network drive can stall, so the warnings are found off the main thread.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let warnings = OEArtworkLocation.warnings(for: destination)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if !warnings.isEmpty, !self.confirm(warnings) {
+                    self.folderButtons.forEach { $0.isEnabled = true }
+                    self.folderStatus.stringValue = ""
+                    return
+                }
+                self.runMove(to: destination)
+            }
+        }
+    }
+
+    private func confirm(_ warnings: [OEArtworkLocation.Warning]) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Use this folder anyway?"
+        alert.informativeText = warnings.map { warning -> String in
+            switch warning {
+            case .network: return "It is on a network or external drive. Artwork would be missing whenever that drive is not connected."
+            case .iCloud: return "It is in a cloud-synced folder. Pictures that are not downloaded yet may be slow or missing."
+            }
+        }.joined(separator: "\n\n")
+        alert.addButton(withTitle: "Use Folder")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func runMove(to destination: URL) {
+        let old = OEArtworkStore.shared.root
         folderStatus.stringValue = "Copying and checking…"
         DispatchQueue.global(qos: .userInitiated).async {
             let result = OEArtworkLocation.move(to: destination)
@@ -208,7 +224,7 @@ final class PrefArtworkProvidersController: NSViewController {
                     self.folderStatus.stringValue = "Done. Copied \(count) file\(count == 1 ? "" : "s") and checked each one. The old folder is still at \(old.path); delete it when you like."
                 case .failure(let problem):
                     self.folderStatus.textColor = .systemRed
-                    self.folderStatus.stringValue = Self.message(for: problem) + " Nothing was changed."
+                    self.folderStatus.stringValue = Self.message(for: problem) + " The artwork folder in use was not changed."
                 }
                 self.refresh()
             }
