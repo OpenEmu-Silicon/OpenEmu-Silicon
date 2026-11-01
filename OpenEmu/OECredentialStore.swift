@@ -60,7 +60,16 @@ enum OECredentialKey: String, CaseIterable {
 ///    same app, always the same key — so it never needs to be stored anywhere.
 /// 2. All credentials are kept as a `[String: String]` dictionary, serialised to JSON,
 ///    and encrypted with AES-GCM.
-/// 3. The sealed blob is written to `~/Library/Application Support/OpenEmu/.oe_credentials`.
+/// 3. The sealed blob is written to `~/Library/Application Support/OpenEmu/.oe_credentials.<bundle ID>`.
+///    Each bundle ID has its own file because each has its own key: release
+///    (`org.openemu.OpenEmu`) and debug (`org.openemu.OpenEmu.debug`) builds cannot read
+///    each other's store, and sharing one path let one build overwrite the other's.
+///
+/// ## Never overwrite what we could not read
+/// Older builds used a single shared `.oe_credentials` file. It is now only read, to
+/// migrate it, and never written. If this build's own file fails to decrypt, it is
+/// moved aside to `.oe_credentials.<bundle ID>.unreadable-<timestamp>` before anything
+/// new is written, so a build with a different key can never destroy saved credentials.
 ///
 /// Reads and writes are fast (local file I/O + in-process AES) and never trigger any
 /// OS permission dialogs.
@@ -72,28 +81,49 @@ final class OECredentialStore {
 
     // MARK: - Singleton
 
-    static let shared = OECredentialStore()
+    static let shared = OECredentialStore(
+        directory: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!.appendingPathComponent("OpenEmu", isDirectory: true),
+        bundleID: Bundle.main.bundleIdentifier ?? "org.openemu.OpenEmu",
+        hardwareUUID: OECredentialStore.hardwareUUID(),
+        migratesFromKeychain: true
+    )
 
     // MARK: - Storage path
 
-    private static var storeURL: URL {
-        let support = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first!
-        // Leading dot makes the file hidden in Finder, matching the convention for
-        // internal app data files that users should not edit directly.
-        return support.appendingPathComponent("OpenEmu/.oe_credentials", isDirectory: false)
-    }
+    // Leading dot makes the files hidden in Finder, matching the convention for
+    // internal app data files that users should not edit directly.
+    static let legacyFileName = ".oe_credentials"
+
+    /// This build's own store. Only this file is ever written.
+    let storeURL: URL
+    /// The single shared file older builds wrote. Read to migrate, never written.
+    let legacyStoreURL: URL
 
     // MARK: - In-memory cache
 
     private let queue = DispatchQueue(label: "org.openemu.credentialstore", qos: .userInitiated)
     private var cache: [String: String] = [:]
     private var isLoaded = false
+    /// True when `storeURL` exists but could not be decrypted. The next `persist()`
+    /// moves it aside first instead of writing over it.
+    private var storeIsUnreadable = false
+
+    private let bundleID: String
+    private let hardwareUUIDValue: String?
+    private let migratesFromKeychain: Bool
 
     // MARK: - Init
 
-    private init() {}
+    /// `directory` holds the store files. Tests pass a temporary directory and
+    /// `migratesFromKeychain: false` so they never touch the real store or keychain.
+    init(directory: URL, bundleID: String, hardwareUUID: String?, migratesFromKeychain: Bool) {
+        self.storeURL = directory.appendingPathComponent(Self.legacyFileName + "." + bundleID, isDirectory: false)
+        self.legacyStoreURL = directory.appendingPathComponent(Self.legacyFileName, isDirectory: false)
+        self.bundleID = bundleID
+        self.hardwareUUIDValue = hardwareUUID
+        self.migratesFromKeychain = migratesFromKeychain
+    }
 
     // MARK: - Public API
 
@@ -142,8 +172,7 @@ final class OECredentialStore {
     /// properly-distributed 256-bit symmetric key. Using HKDF instead of a raw hash
     /// provides stronger cryptographic guarantees about key quality.
     private func deriveKey() -> SymmetricKey {
-        let uuid     = hardwareUUID() ?? "unknown-machine"
-        let bundleID = Bundle.main.bundleIdentifier ?? "org.openemu.OpenEmu"
+        let uuid     = hardwareUUIDValue ?? "unknown-machine"
         let inputMaterial = SymmetricKey(data: Data((uuid + ":" + bundleID).utf8))
         return HKDF<SHA256>.deriveKey(
             inputKeyMaterial: inputMaterial,
@@ -155,7 +184,7 @@ final class OECredentialStore {
 
     /// Reads the hardware platform UUID from IOKit.
     /// Example value: "8A3F1C2D-4E5F-6789-ABCD-EF0123456789"
-    private func hardwareUUID() -> String? {
+    private static func hardwareUUID() -> String? {
         // kIOMainPortDefault was introduced in macOS 12; fall back to the deprecated
         // kIOMasterPortDefault on macOS 11 (still functional, just renamed).
         let port: mach_port_t
@@ -185,38 +214,89 @@ final class OECredentialStore {
         guard !isLoaded else { return }
         isLoaded = true
 
-        let url = OECredentialStore.storeURL
+        let fm = FileManager.default
 
-        // One-time migration: only touch legacy keychain items when the encrypted
-        // file store does not exist yet. If the store already exists, trying to
-        // read old keychain leftovers can trigger a macOS access prompt when a
-        // different Debug/Release build or app path launches.
-        if !FileManager.default.fileExists(atPath: url.path) {
-            migrateFromKeychain()
+        if fm.fileExists(atPath: storeURL.path) {
+            do {
+                cache = try decrypt(contentsOf: storeURL)
+                os_log(.info, log: log, "Credential store loaded (%d entries).", cache.count)
+            } catch {
+                // Leave the file where it is; persist() moves it aside before writing.
+                storeIsUnreadable = true
+                os_log(.fault, log: log,
+                       "Failed to decrypt credential store %{public}@ — it will be kept as a backup, not overwritten: %{public}@",
+                       storeURL.lastPathComponent, String(describing: error))
+            }
+            return
         }
 
-        guard FileManager.default.fileExists(atPath: url.path),
-              let ciphertext = try? Data(contentsOf: url)
-        else { return }
+        // First launch of this bundle ID with per-build files: copy what the shared
+        // legacy file holds, if this build's key can read it. The legacy file itself
+        // is left alone either way, since other builds may still use it.
+        if fm.fileExists(atPath: legacyStoreURL.path) {
+            do {
+                cache = try decrypt(contentsOf: legacyStoreURL)
+                os_log(.info, log: log,
+                       "Migrated %d credential(s) from the shared legacy store.", cache.count)
+                if !cache.isEmpty { persist() }
+            } catch {
+                os_log(.error, log: log,
+                       "Legacy credential store was written by a build with a different key; leaving it untouched: %{public}@",
+                       String(describing: error))
+            }
+            return
+        }
 
-        let key = deriveKey()
+        // One-time migration: only touch legacy keychain items when no file store
+        // exists yet. If one does, trying to read old keychain leftovers can trigger
+        // a macOS access prompt when a different Debug/Release build or app path launches.
+        if migratesFromKeychain {
+            migrateFromKeychain()
+        }
+    }
+
+    private func decrypt(contentsOf url: URL) throws -> [String: String] {
+        let ciphertext = try Data(contentsOf: url)
+        let box        = try AES.GCM.SealedBox(combined: ciphertext)
+        let plaintext  = try AES.GCM.open(box, using: deriveKey())
+        return try JSONDecoder().decode([String: String].self, from: plaintext)
+    }
+
+    /// Renames the unreadable store to a timestamped backup next to it.
+    /// Returns false if that failed, in which case nothing may be written.
+    private func moveUnreadableStoreAside() -> Bool {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let stamp = formatter.string(from: Date())
+        let dir = storeURL.deletingLastPathComponent()
+        var backup = dir.appendingPathComponent("\(storeURL.lastPathComponent).unreadable-\(stamp)")
+        var n = 1
+        while FileManager.default.fileExists(atPath: backup.path) {
+            n += 1
+            backup = dir.appendingPathComponent("\(storeURL.lastPathComponent).unreadable-\(stamp)-\(n)")
+        }
         do {
-            let box       = try AES.GCM.SealedBox(combined: ciphertext)
-            let plaintext = try AES.GCM.open(box, using: key)
-            cache         = try JSONDecoder().decode([String: String].self, from: plaintext)
-            os_log(.info, log: log, "Credential store loaded (%d entries).", cache.count)
+            try FileManager.default.moveItem(at: storeURL, to: backup)
+            os_log(.fault, log: log, "Moved unreadable credential store aside to %{public}@.", backup.lastPathComponent)
+            return true
         } catch {
-            os_log(.error, log: log,
-                   "Failed to decrypt credential store — store will be treated as empty: %{public}@",
-                   error.localizedDescription)
+            os_log(.fault, log: log,
+                   "Could not move unreadable credential store aside; refusing to overwrite it: %{public}@",
+                   String(describing: error))
+            return false
         }
     }
 
     /// Encrypts the current cache and writes it to disk atomically.
     /// Must only be called from within `queue`.
     private func persist() {
-        let url = OECredentialStore.storeURL
+        let url = storeURL
         let key = deriveKey()
+        if storeIsUnreadable {
+            guard moveUnreadableStoreAside() else { return }
+            storeIsUnreadable = false
+        }
         do {
             let dir = url.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -249,7 +329,7 @@ final class OECredentialStore {
 
     /// Reads any credentials left in the old keychain entries, copies them into the
     /// cache, then deletes the keychain items. This runs exactly once — after the store
-    /// file exists the keychain items are gone and this code is never reached again.
+    /// store file exists the keychain items are gone and this code is never reached again.
     ///
     /// Migration must never show a Keychain permission dialog. If macOS would require
     /// interaction because the item was created by a different binary/path/signature,
