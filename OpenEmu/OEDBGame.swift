@@ -365,6 +365,7 @@ final class OEDBGame: OEDBItem {
         let context = managedObjectContext
         context?.performAndWait {
             if let currentImage = boxImage {
+                OEArtworkStore.keepCover(currentImage, of: self)   // before the delete, while the game is still known
                 context?.delete(currentImage)
             }
             
@@ -382,6 +383,7 @@ final class OEDBGame: OEDBItem {
         let context = managedObjectContext
         context?.performAndWait {
             if let currentImage = boxImage {
+                OEArtworkStore.keepCover(currentImage, of: self)   // before the delete, while the game is still known
                 context?.delete(currentImage)
             }
             

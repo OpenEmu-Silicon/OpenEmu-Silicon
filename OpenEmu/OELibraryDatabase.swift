@@ -115,6 +115,7 @@ final class OELibraryDatabase: NSObject {
     }
     
     @objc func applicationWillTerminate(_ notification: Notification) {
+        OEArtworkStore.shared.flush()
         importer.saveQueue()
 
         writerContext.performAndWait {

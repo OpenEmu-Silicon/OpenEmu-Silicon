@@ -293,4 +293,44 @@ final class ArtworkStoreTests: XCTestCase {
             XCTAssertEqual(try Data(contentsOf: url), data(UInt8(n)), "\(g.title) must still have its own picture")
         }
     }
+
+    func testLongTitlesInAnyScriptAreStillKept() throws {
+        let titles = [String(repeating: "日", count: 200), String(repeating: "🎮", count: 200), String(repeating: "é", count: 400)]
+        for (n, title) in titles.enumerated() {
+            let g = OEArtworkStore.Game(md5: String(format: "%032x", n + 100), system: "openemu.system.snes", title: title)
+            XCTAssertLessThanOrEqual(OEArtworkStore.fileStem(title).utf8.count, 160)
+            guard case .stored = store.fill(data(1), for: g, slot: .cover, origin: .library) else { return XCTFail("not kept: \(title.prefix(3))") }
+            guard case .stored = store.choose(data(2), for: g, slot: .cover) else { return XCTFail("replace failed: \(title.prefix(3))") }
+            XCTAssertEqual(store.history(g, .cover).count, 1)
+        }
+    }
+
+    func testHistoryListsOnlyTheGamesOwnPictures() throws {
+        let mario = OEArtworkStore.Game(md5: String(format: "%032x", 1), system: "openemu.system.snes", title: "Mario")
+        let kart = OEArtworkStore.Game(md5: String(format: "%032x", 2), system: "openemu.system.snes", title: "Mario Kart")
+        for g in [mario, kart] {
+            store.fill(data(1), for: g, slot: .cover, origin: .library)
+            store.choose(data(2), for: g, slot: .cover)
+        }
+        XCTAssertEqual(store.history(mario, .cover).count, 1)
+        XCTAssertEqual(store.history(kart, .cover).count, 1)
+        XCTAssertTrue(store.history(mario, .cover)[0].lastPathComponent.hasPrefix("Mario 2"))
+    }
+
+    func testAnIndexThatCannotBeReadIsNeverWrittenOver() throws {
+        store.fill(data(1), for: game, slot: .cover, origin: .provider("p"))
+        store.flush()
+        let index = root.appendingPathComponent(OEArtworkStore.indexName)
+        let before = try Data(contentsOf: index)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: index.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: index.path) }
+
+        let reopened = OEArtworkStore(root: root)
+        XCTAssertNotNil(reopened.active(game, .cover), "the picture is still found by its name")
+        reopened.fill(data(9), for: OEArtworkStore.Game(md5: String(format: "%032x", 7), system: "openemu.system.snes", title: "Other"), slot: .cover, origin: .library)
+        reopened.flush()
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: index.path)
+        XCTAssertEqual(try Data(contentsOf: index), before, "the unreadable index was left alone")
+    }
 }

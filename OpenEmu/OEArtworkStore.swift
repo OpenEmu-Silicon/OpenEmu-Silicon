@@ -120,6 +120,7 @@ final class OEArtworkStore: @unchecked Sendable {
     private let lock = NSLock()
     private var index: [String: [String: Entry]]?   // md5 -> slot -> entry
     private var saveScheduled = false
+    private var indexUnsafeToWrite = false
 
     init(root: URL) {
         self.root = root
@@ -138,7 +139,9 @@ final class OEArtworkStore: @unchecked Sendable {
         let folder = slotFolder(game, slot).appendingPathComponent(Self.historyName, isDirectory: true)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         let base = Self.fileStem(game.title)
-        return names.filter { $0.hasPrefix(base) }.sorted().map { folder.appendingPathComponent($0) }
+        let suffix = " \\[\(game.md5.prefix(8))\\]"
+        let pattern = "^" + NSRegularExpression.escapedPattern(for: base.precomposedStringWithCanonicalMapping) + "(\(suffix))? \\d{8}-\\d{6}( \\d+)?(\\.[^.]*)?$"
+        return names.filter { $0.precomposedStringWithCanonicalMapping.range(of: pattern, options: .regularExpression) != nil }.sorted().map { folder.appendingPathComponent($0) }
     }
 
     func entry(_ game: Game, _ slot: Slot) -> Entry? {
@@ -239,13 +242,18 @@ final class OEArtworkStore: @unchecked Sendable {
             try data.write(to: staged, options: .withoutOverwriting)
         } catch { return .failed }
 
-        guard moveToHistory(current.url, game, slot) != nil else {
+        guard let movedToHistory = moveToHistory(current.url, game, slot) else {
             try? fm.removeItem(at: staged)   // our own staging file, never the person's
             return .failed
         }
 
         let final = uniqueURL(in: folder, stem: Self.fileStem(game.title), ext: OEArtworkOriginals.fileExtension(for: data))
-        do { try fm.moveItem(at: staged, to: final) } catch { return .failed }
+        do { try fm.moveItem(at: staged, to: final) } catch {
+            // Put the old picture back, so a failure here never leaves the slot empty (and open to an automatic fill).
+            try? fm.moveItem(at: movedToHistory, to: current.url)
+            try? fm.removeItem(at: staged)
+            return .failed
+        }
         record(game, slot, Entry(file: relativePath(final), origin: origin.raw, pinned: pinned, added: Date()))
         saveNow()
         return .stored(final)
@@ -351,7 +359,9 @@ final class OEArtworkStore: @unchecked Sendable {
     static func fileStem(_ title: String) -> String {
         var text = title.map { "/\\:*?\"<>|\0".contains($0) ? "-" : $0 }.reduce(into: "") { $0.append($1) }
         text = text.trimmingCharacters(in: CharacterSet(charactersIn: ". ").union(.whitespacesAndNewlines))
-        if text.count > 120 { text = String(text.prefix(120)).trimmingCharacters(in: .whitespaces) }
+        // File names are limited to 255 bytes, and a suffix or time stamp is added to them, so cap by bytes.
+        while text.utf8.count > 160 { text.removeLast() }
+        text = text.trimmingCharacters(in: .whitespaces)
         return text.isEmpty ? "Untitled" : text
     }
 
@@ -380,6 +390,12 @@ final class OEArtworkStore: @unchecked Sendable {
 
     private func loadIndexIfNeeded() {
         guard index == nil else { return }
+        if FileManager.default.fileExists(atPath: indexURL.path), (try? Data(contentsOf: indexURL)) == nil {
+            // Present but unreadable (permissions, a disk error): work from file names and never write over it.
+            indexUnsafeToWrite = true
+            index = [:]
+            return
+        }
         if let data = try? Data(contentsOf: indexURL) {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
@@ -404,7 +420,7 @@ final class OEArtworkStore: @unchecked Sendable {
 
     private func saveNow() {
         saveScheduled = false
-        guard let index = index else { return }
+        guard let index = index, !indexUnsafeToWrite else { return }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
@@ -431,8 +447,8 @@ extension OEArtworkStore {
 
     /// Copies a library cover into the artwork folder before the library lets go of it. The library's own file is only
     /// read. Call before a cover is replaced or deleted.
-    static func keepCover(_ image: OEDBImage) {
-        guard let game = image.Box, let url = image.imageURL, let data = try? Data(contentsOf: url), !data.isEmpty else { return }
+    static func keepCover(_ image: OEDBImage, of owner: OEDBGame? = nil) {
+        guard let game = owner ?? image.Box, let url = image.imageURL, let data = try? Data(contentsOf: url), !data.isEmpty else { return }
         shared.archive(data, for: Game(game), slot: .cover, origin: .library)
     }
 
