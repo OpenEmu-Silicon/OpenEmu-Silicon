@@ -25,6 +25,7 @@
 import Cocoa
 import os.log
 import OpenEmuKit
+import UniformTypeIdentifiers
 
 let OEForcePopoutGameWindowKey = "forcePopout"
 let OEFullScreenGameWindowKey = "fullScreen"
@@ -276,7 +277,6 @@ extension MainWindowController: LibraryControllerDelegate {
         return autosave
     }
     
-    @available(macOS, deprecated: 10.15, message: "Remove 'or \"User Reports\"' from alert (~line 392) and localizations, the term is not used in Catalina and above.")
     private func openGameDocument(with game: OEDBGame?, core: OECorePlugin? = nil, saveState state: OEDBSaveState?, secondAttempt retry: Bool = false, lockOnROM: OEDBRom? = nil, disableAutoReload noAutoReload: Bool = false) {
         
         guard let window = window else { return assertionFailure("MainWindow is nil") }
@@ -327,7 +327,8 @@ extension MainWindowController: LibraryControllerDelegate {
                         panel.canChooseFiles = true
                         panel.directoryURL = originalURL?.deletingLastPathComponent()
                         panel.allowsOtherFileTypes = false
-                        panel.allowedFileTypes = fileType != nil ? [fileType!] : nil
+                        // An empty list allows any type, as nil did before.
+                        panel.allowedContentTypes = [fileType.flatMap { UTType(filenameExtension: $0) }].compactMap { $0 }
                         
                         if panel.runModal() == .OK {
                             missingRom?.url = panel.url
