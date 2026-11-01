@@ -24,19 +24,24 @@
 
 import Cocoa
 
+/// What the box art of a game shows on top of itself.
+enum GameIndication {
+    case none, fileMissing, processing
+}
+
 /// A game in the library grid: box art, title and rating.
 final class GameCollectionViewItem: ImageCollectionViewItem {
     
     @IBOutlet weak var ratingIndicator: NSLevelIndicator?
     
-    private let indicationLayer = GameCollectionViewItemIndicationLayer()
+    private let indicationView = IndicationView()
     
     /// True while a placeholder stands in for missing box art.
     var isShowingMissingArtwork = false
     
-    var indication: OEGridViewCellIndicationType {
-        get { indicationLayer.type }
-        set { indicationLayer.type = newValue }
+    var indication: GameIndication {
+        get { indicationView.indication }
+        set { indicationView.indication = newValue }
     }
     
     var rating: Int {
@@ -46,8 +51,7 @@ final class GameCollectionViewItem: ImageCollectionViewItem {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        indicationLayer.actions = ["position": NSNull(), "bounds": NSNull(), "frame": NSNull(), "contents": NSNull()]
-        view.layer?.addSublayer(indicationLayer)
+        view.addSubview(indicationView, positioned: .above, relativeTo: imageView)
     }
     
     override func prepareForReuse() {
@@ -61,17 +65,76 @@ final class GameCollectionViewItem: ImageCollectionViewItem {
         super.viewDidLayout()
         
         guard let imageView else { return }
-        CATransaction.begin()
-        defer { CATransaction.commit() }
-        CATransaction.setDisableActions(true)
-        
-        indicationLayer.frame = view.convert(imageView.croppedBounds, from: imageView)
-        indicationLayer.zPosition = 1
+        indicationView.frame = view.convert(imageView.croppedBounds, from: imageView)
     }
     
     @IBAction func ratingDidChange(_ sender: NSLevelIndicator) {
         guard let game = representedObject as? OEDBGame else { return }
         game.rating = sender.integerValue as NSNumber
         try? game.managedObjectContext?.save()
+    }
+}
+
+/// Covers the box art of a game whose file is missing (red, with a warning picture) or that is busy (dark, with a spinner).
+/// Clicks go through to the item below.
+private final class IndicationView: NSView {
+    
+    var indication: GameIndication = .none {
+        didSet {
+            guard indication != oldValue else { return }
+            isHidden = indication == .none
+            if indication == .processing {
+                spinner.startAnimation(nil)
+            } else {
+                spinner.stopAnimation(nil)
+            }
+            spinner.isHidden = indication != .processing
+            needsDisplay = true
+        }
+    }
+    
+    private let spinner: NSProgressIndicator = {
+        let spinner = NSProgressIndicator()
+        spinner.style = .spinning
+        spinner.controlSize = .regular
+        spinner.isDisplayedWhenStopped = false
+        return spinner
+    }()
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        isHidden = true
+        addSubview(spinner)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    
+    override func layout() {
+        super.layout()
+        spinner.sizeToFit()
+        spinner.frame.origin = NSPoint(x: (bounds.width - spinner.frame.width) / 2, y: (bounds.height - spinner.frame.height) / 2)
+    }
+    
+    override func draw(_ dirtyRect: NSRect) {
+        switch indication {
+        case .none:
+            return
+        case .fileMissing:
+            NSColor(red: 0.992, green: 0, blue: 0, alpha: 0.4).setFill()
+            bounds.fill()
+            
+            if let image = NSImage(named: "missing_rom") {
+                let width = bounds.width * 0.45
+                let height = width * 0.9
+                image.draw(in: NSRect(x: (bounds.width - width) / 2, y: (bounds.height - height) / 2, width: width, height: height).integral)
+            }
+        case .processing:
+            NSColor(white: 0, alpha: 0.7).setFill()
+            bounds.fill()
+        }
     }
 }
