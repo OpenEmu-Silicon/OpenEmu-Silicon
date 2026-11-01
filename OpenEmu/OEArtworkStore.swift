@@ -23,6 +23,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Foundation
+import ImageIO
 
 /// The artwork folder: every game's pictures, kept exactly as they arrived, where the person can see them.
 ///
@@ -446,6 +447,19 @@ extension OEArtworkStore {
 extension OEArtworkStore {
 
     private static let importedKey = "OEArtworkStoreCoversImported"
+
+    /// Decodes the biggest picture in a file. A Windows `.ico` holds several sizes and the first is not always the largest.
+    static func largestImage(at url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        var best: (index: Int, pixels: Int)?
+        for index in 0..<CGImageSourceGetCount(source) {
+            guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any],
+                  let width = properties[kCGImagePropertyPixelWidth] as? Int,
+                  let height = properties[kCGImagePropertyPixelHeight] as? Int else { continue }
+            if width * height > (best?.pixels ?? 0) { best = (index, width * height) }
+        }
+        return CGImageSourceCreateImageAtIndex(source, best?.index ?? 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
+    }
 
     /// Copies every cover already in the library into the artwork folder, once. The library's own files are only
     /// read. Safe to run again: a game that already has a cover in the folder is left alone.

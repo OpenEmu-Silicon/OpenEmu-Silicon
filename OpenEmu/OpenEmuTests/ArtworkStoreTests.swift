@@ -22,6 +22,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import AppKit
 import XCTest
 @testable import OpenEmu
 
@@ -209,5 +210,43 @@ final class ArtworkStoreTests: XCTestCase {
         XCTAssertEqual(reopened.entry(game, .poster)?.origin, "provider:steamgriddb")
         XCTAssertEqual(reopened.entry(game, .poster)?.pinned, false)
         XCTAssertEqual(reopened.entry(game, .hero)?.pinned, true)
+    }
+
+    // MARK: Icons
+
+    /// A Windows icon holding PNG pictures at the given sizes, in the given order.
+    private func icoData(sizes: [Int]) throws -> Data {
+        let pngs: [Data] = try sizes.map { size in
+            let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8, samplesPerPixel: 4,
+                                                     hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            return try XCTUnwrap(rep.representation(using: .png, properties: [:]))
+        }
+        func le(_ value: Int, _ bytes: Int) -> [UInt8] { (0..<bytes).map { UInt8((value >> (8 * $0)) & 0xFF) } }
+        var out = Data(le(0, 2) + le(1, 2) + le(sizes.count, 2))
+        var offset = 6 + 16 * sizes.count
+        for (size, png) in zip(sizes, pngs) {
+            out.append(contentsOf: [UInt8(size % 256), UInt8(size % 256), 0, 0] + le(1, 2) + le(32, 2) + le(png.count, 4) + le(offset, 4))
+            offset += png.count
+        }
+        pngs.forEach { out.append($0) }
+        return out
+    }
+
+    func testAnIconFileIsReadAtItsLargestSizeWhateverTheOrder() throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for sizes in [[16, 32, 64], [64, 32, 16], [32, 64, 16]] {
+            let file = root.appendingPathComponent("icon-\(sizes.map(String.init).joined(separator: "-")).ico")
+            try icoData(sizes: sizes).write(to: file)
+            let image = try XCTUnwrap(OEArtworkStore.largestImage(at: file), "\(sizes)")
+            XCTAssertEqual(image.width, 64, "\(sizes)")
+        }
+    }
+
+    func testAnUnreadableFileGivesNoPictureInsteadOfCrashing() throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let file = root.appendingPathComponent("junk.ico")
+        try Data([1, 2, 3, 4]).write(to: file)
+        XCTAssertNil(OEArtworkStore.largestImage(at: file))
+        XCTAssertNil(OEArtworkStore.largestImage(at: root.appendingPathComponent("missing.ico")))
     }
 }

@@ -660,8 +660,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
     // MARK: Reading (call off the main thread)
 
     private static func decode(_ url: URL) -> NSImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
+        guard let image = OEArtworkStore.largestImage(at: url) else { return nil }
         return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
     }
 
