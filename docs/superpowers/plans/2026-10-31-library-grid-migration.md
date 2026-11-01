@@ -2,7 +2,7 @@
 
 Decision: [ADR-0008](../../adr/0008-library-grid-on-nscollectionview.md). Replace the deprecated `IKImageBrowserView` grid with `NSCollectionView`, reach parity, delete the old code, then refresh the look.
 
-Each phase is its own PR. Phases 1 and 2 can run in parallel with each other. Phase 3 needs phase 2's test scaffolding.
+Each phase is its own PR. Phases 1 and 2 can run in parallel with each other. Phase 3 (save states and screenshots) did not need it and shipped first, as #821.
 
 ## Phase 1: Small warning fixes
 
@@ -23,11 +23,13 @@ The two warnings in `OEGameCollectionViewController.m` (`setAllowedFileTypes`, `
 
 Nothing tests the grid today, so build the safety net before changing it.
 
-- Add UI tests for the games grid and list against the current grid: select, multi-select, open the context menu, switch grid/list, rename, and blank slate on an empty collection. Use accessibility identifiers that the new controller will keep.
+Changed 2026-11-01: UI tests that go through `check.sh` stall on a macOS UI-automation password prompt, so the grid is checked by driving the real debug app with the computer-use tools (`docs/computer-use-testing.md`). New XCUITests are optional and only worth adding where they can run without that prompt.
+
+- Write down a manual check list for the current grid and list, and run it with computer use before changing anything: select, multi-select, open the context menu, switch grid/list, rename, rate, blank slate on an empty collection. Keep screenshots of each as the "before" set.
 - Add a script that creates a synthetic library (5,000–10,000 games, generated covers) in a temporary folder and launches with `-databasePath <folder>` and `-OEBigPictureDisableSteamGridDB 1`. It must never touch the real library or its saves. Note that art caches under `~/Library/Application Support/OpenEmu/` are shared, so the script must not write there.
 - Record a baseline on the old grid with Instruments: scroll smoothness, memory, time to first paint.
 
-**Done when:** the new UI tests pass on the current grid, and the baseline numbers are written down in the PR.
+**Done when:** the "before" screenshots and baseline numbers are written down in the PR.
 
 ## Phase 3: Save states and screenshots on NSCollectionView
 
