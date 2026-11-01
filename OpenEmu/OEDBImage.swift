@@ -227,6 +227,8 @@ final class OEDBImage: OEDBItem {
     override func prepareForDeletion() {
         if managedObjectContext?.parent == nil,
            let url = imageURL {
+            // The artwork folder keeps a copy first, so replacing or removing a cover never loses the picture.
+            OEArtworkStore.keepCover(self)
             try? FileManager.default.removeItem(at: url)
         }
     }

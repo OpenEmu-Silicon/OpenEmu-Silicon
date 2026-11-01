@@ -369,6 +369,7 @@ final class OEDBGame: OEDBItem {
             }
             
             boxImage = OEDBImage.createImage(with: dictionary)
+            OEArtworkStore.recordNewCover(of: self)
         }
     }
     
@@ -385,6 +386,7 @@ final class OEDBGame: OEDBItem {
             }
             
             boxImage = OEDBImage.createImage(with: dictionary)
+            OEArtworkStore.recordNewCover(of: self, source: url)
         }
     }
     

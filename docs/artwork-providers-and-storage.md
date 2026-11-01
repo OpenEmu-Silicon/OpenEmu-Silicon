@@ -57,6 +57,8 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
 
 ### Phase 1: the durable store
 
+Progress: the store itself (`OEArtworkStore`, with tests) and the library cover hooks are done. A replaced or deleted library cover is copied into the store first. Still to do: copy the covers already in the library, make Big Picture read from the store, and read `.ico` icons.
+
 - Needs PR 795 (Big Picture) merged first, or this work branched from it.
 - Add the artwork store, index, history folder, and the never-overwrite rules.
 - First copy every cover already in the library into the store. Check what `OEDBImage.prepareForDeletion` does and make sure a replaced cover is kept first.
