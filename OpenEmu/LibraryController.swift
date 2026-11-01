@@ -478,9 +478,9 @@ extension Key {
 }
 
 extension LibraryController {
-    @UserDefault(.useNewSaveStatesViewController, defaultValue: false)
+    @UserDefault(.useNewSaveStatesViewController, defaultValue: true)
     static var useNewSaveStatesViewController: Bool
-    @UserDefault(.useNewScreenshotsViewController, defaultValue: false)
+    @UserDefault(.useNewScreenshotsViewController, defaultValue: true)
     static var useNewScreenshotsViewController: Bool
 }
 
