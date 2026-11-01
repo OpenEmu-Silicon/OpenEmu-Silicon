@@ -430,7 +430,6 @@
 		8FC3CC692708BD4200747DC2 /* OEGameDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FC3CC682708BD4200747DC2 /* OEGameDocument.swift */; };
 		8FD78305243A8AD300861B7A /* Debug.strings in Resources */ = {isa = PBXBuildFile; fileRef = 8FD78307243A8AD300861B7A /* Debug.strings */; };
 		8FD905771AA2927100FA7662 /* PrefControlsController.xib in Resources */ = {isa = PBXBuildFile; fileRef = 8F40EB791C1072B100683055 /* PrefControlsController.xib */; };
-		8FDCCADA27063FDE00CBF2E3 /* GameCollectionViewItemIndicationLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDCCAD927063FDE00CBF2E3 /* GameCollectionViewItemIndicationLayer.swift */; };
 		8FDCE3972520022700277BFA /* GlossCheckboxCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FDCE3962520022700277BFA /* GlossCheckboxCell.swift */; };
 		8FE1BF1E2586C64200A2818A /* OELibraryDatabase+Moving.m in Sources */ = {isa = PBXBuildFile; fileRef = 8FE1BF1D2586C64200A2818A /* OELibraryDatabase+Moving.m */; };
 		8FE5DC08270DC0AB00878DFF /* OEDBCollectionFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FE5DC07270DC0AB00878DFF /* OEDBCollectionFolder.swift */; };
@@ -1618,7 +1617,6 @@
 		8FCCCE6124E7089300223181 /* zh-Hant */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Debug.strings"; sourceTree = "<group>"; };
 		8FD78306243A8AD300861B7A /* en */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Debug.strings; sourceTree = "<group>"; };
 		8FD78308243A8ADC00861B7A /* de */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Debug.strings; sourceTree = "<group>"; };
-		8FDCCAD927063FDE00CBF2E3 /* GameCollectionViewItemIndicationLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameCollectionViewItemIndicationLayer.swift; sourceTree = "<group>"; };
 		8FDCE3962520022700277BFA /* GlossCheckboxCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlossCheckboxCell.swift; sourceTree = "<group>"; };
 		8FE1BF1D2586C64200A2818A /* OELibraryDatabase+Moving.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "OELibraryDatabase+Moving.m"; sourceTree = "<group>"; };
 		8FE5DC07270DC0AB00878DFF /* OEDBCollectionFolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OEDBCollectionFolder.swift; sourceTree = "<group>"; };
@@ -3089,7 +3087,6 @@
 		53439AAE13B92CFE005C0CC8 /* Grid View */ = {
 			isa = PBXGroup;
 			children = (
-				8FDCCAD927063FDE00CBF2E3 /* GameCollectionViewItemIndicationLayer.swift */,
 			);
 			name = "Grid View";
 			sourceTree = "<group>";
@@ -6435,7 +6432,6 @@
 				8F3062DB251A897F00BDFF1F /* OESearchField.swift in Sources */,
 				8FEA6770270373460034CFCE /* GameControlsBar.swift in Sources */,
 				8FC080272825914E00F18E15 /* OELibraryDatabase.swift in Sources */,
-				8FDCCADA27063FDE00CBF2E3 /* GameCollectionViewItemIndicationLayer.swift in Sources */,
 				839310BC147802380020058E /* CoreDownload.swift in Sources */,
 				5A3DB1B11D8E6806009445EC /* AppDelegate.swift in Sources */,
 				83CA87B41961CDD400D86D55 /* 1.2 to 1.3.xcmappingmodel in Sources */,
