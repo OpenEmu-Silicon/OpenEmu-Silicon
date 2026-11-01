@@ -24,6 +24,7 @@
 
 import Cocoa
 import UniformTypeIdentifiers
+import QuickLookUI
 
 @objc
 final class OEDBScreenshot: OEDBItem {

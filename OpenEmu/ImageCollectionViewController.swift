@@ -40,7 +40,7 @@ class ImageCollectionViewController: NSViewController {
     /// Identifier of the nib that makes the items of this collection.
     var itemIdentifier: NSUserInterfaceItemIdentifier { .imageCollectionViewItem }
     var sectionHeaderHeight: CGFloat { 46 }
-    /// Scales the slider value to the item size. The default replicates the zoom level of `IKImageBrowserView`.
+    /// Scales the slider value to the item size. The default matches the zoom level of the old grid.
     var gridZoomMultiplier: CGFloat { 1.07 }
     /// Key in user defaults that remembers the selection.
     var selectionDefaultsKey: String { "\(dataSourceDelegate.entityName)_OESelectedMediaKey" }

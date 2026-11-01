@@ -27,7 +27,7 @@ import OpenEmuKit
 
 /// The library's games, as a grid of box art or a list.
 ///
-/// This replaces `OEGameCollectionViewController`, which used the deprecated `IKImageBrowserView`.
+/// It replaced the old games grid.
 /// The grid is an `NSCollectionView` (see `ImageCollectionViewController`) and the list is an
 /// `NSTableView` (`GameTableView`). Both show the same sorted array of games from `GamesDataSource`,
 /// so a row and a grid item have the same index.
