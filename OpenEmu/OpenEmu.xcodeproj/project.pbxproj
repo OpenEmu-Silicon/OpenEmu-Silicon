@@ -401,6 +401,7 @@
 		CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */; };
 		CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000005 /* DrawableProviderTests.swift */; };
 		A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */; };
+		C5E7D9A1B3F24D6E8A0C1E02 /* CredentialStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E7D9A1B3F24D6E8A0C1E01 /* CredentialStoreTests.swift */; };
 		8F4A69732547F84500DFE092 /* GameControlsBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4A69722547F84500DFE092 /* GameControlsBarView.swift */; };
 		8F4AEAC1273594E6005C6246 /* OpenVGDB.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4AEAC0273594E6005C6246 /* OpenVGDB.swift */; };
 		8F4BDF7B1CE4AB25007DCB86 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F4BDF7A1CE4AB25007DCB86 /* libz.tbd */; };
@@ -1602,6 +1603,7 @@
 		CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRenderBlockTests.swift; sourceTree = "<group>"; };
 		CE47B0C12A00000000000005 /* DrawableProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawableProviderTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderBackupTests.swift; sourceTree = "<group>"; };
+		C5E7D9A1B3F24D6E8A0C1E01 /* CredentialStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStoreTests.swift; sourceTree = "<group>"; };
 		8F4A69722547F84500DFE092 /* GameControlsBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlsBarView.swift; sourceTree = "<group>"; };
 		8F4AEAC0273594E6005C6246 /* OpenVGDB.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenVGDB.swift; sourceTree = "<group>"; };
 		8F4BDF7A1CE4AB25007DCB86 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
@@ -2635,6 +2637,7 @@
 				CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */,
 				CE47B0C12A00000000000005 /* DrawableProviderTests.swift */,
 				A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */,
+				C5E7D9A1B3F24D6E8A0C1E01 /* CredentialStoreTests.swift */,
 				8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */,
 				B16A1C0E2D7F4A0100000001 /* BigPictureTests.swift */,
 				B16A1C0F2D7F4A0100000001 /* ArtworkStoreTests.swift */,
@@ -6322,6 +6325,7 @@
 				CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */,
 				CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */,
+				C5E7D9A1B3F24D6E8A0C1E02 /* CredentialStoreTests.swift in Sources */,
 				8F93FDDA27374F2000B59F3E /* GameInfoHelperTests.swift in Sources */,
 				A7B4C9102EEB000000000002 /* GameLaunchTests.swift in Sources */,
 				8F0C1C252A09E01A00343B6C /* BundleResourcesTests.swift in Sources */,

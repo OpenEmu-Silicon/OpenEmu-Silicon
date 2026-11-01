@@ -16,6 +16,11 @@ Arguments: $PR_NUMBER [$ROM_PATH]
 4. Read the PR description and list the specific behaviors to verify. Before
    calling any of them "needs manual verification," actually try to automate
    them with what the project already has, in this order:
+   - Drive the real debug app with the computer-use tools first
+     (`docs/computer-use-testing.md`): open the windows, menus, and panes the
+     PR touches and look at them. It has no password prompt and does not
+     stall. Use the `check.sh` entries below only when you have no
+     computer-use tools, or for a repeatable regression run.
    - `Scripts/check.sh` runs the real app through `OpenEmuUITests` (library
      window, preference panes, Cores pane) with no ROM needed — always run
      this; quit OpenEmu first if it's running (`pgrep -x OpenEmu`).
@@ -38,7 +43,9 @@ Arguments: $PR_NUMBER [$ROM_PATH]
      check.sh test would need to grow to cover it, instead of leaving a gap
      silently.
    - Known failure mode, not a PR bug: `check.sh` can fail with
-     "Timed out while enabling automation mode." This means the test
+     "Timed out while enabling automation mode." Usually this is macOS asking
+     for a password to enable UI automation, which no one answers; use the
+     computer-use route instead of retrying. Otherwise it means the test
      runner hasn't been granted Accessibility/automation permission for UI
      testing yet. Don't keep retrying it, and don't try to self-grant it
      (modifying security settings isn't something to do without asking) —
