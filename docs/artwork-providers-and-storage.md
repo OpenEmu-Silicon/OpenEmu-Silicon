@@ -57,7 +57,7 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
 
 ### Phase 1: the durable store
 
-Progress: done: the store (`OEArtworkStore`, with tests); a replaced or deleted library cover is copied in first; the covers already in the library are copied in once at launch; provider downloads are saved in it under the game's name; Big Picture falls back to it when a provider has nothing. Still to do: `.ico` reading for SteamGridDB icons, and reading from the store first (that belongs with the provider-choice work in Phase 2, because it decides what a change of provider replaces).
+Progress: done: the store (`OEArtworkStore`, with tests); a replaced or deleted library cover is copied in first; the covers already in the library are copied in once at launch; provider downloads are saved in it under the game's name; Big Picture falls back to it when a provider has nothing. Icons: macOS reads `.ico` files itself, and the store picks the largest size in the file. Hardening after an adversarial review: a failed replace puts the old picture back, the index is saved on quit, names are capped by bytes, titles that differ only in case no longer share a picture, and an unreadable index is never written over. Still to do: reading from the store first (that belongs with the provider-choice work in Phase 2, because it decides what a change of provider replaces). The `Artwork Originals` files from the Phase 0 run are not imported; that folder is new in this branch, so only the test run made them.
 
 - Needs PR 795 (Big Picture) merged first, or this work branched from it.
 - Add the artwork store, index, history folder, and the never-overwrite rules.
