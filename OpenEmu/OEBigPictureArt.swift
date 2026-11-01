@@ -445,19 +445,38 @@ enum OEBigPictureArtSource: String, CaseIterable {
         // `-OEBigPictureOnlyLibretro 1` runs the keyless provider alone, to see what a build with no keys gets.
         if UserDefaults.standard.bool(forKey: "OEBigPictureOnlyLibretro") { return [LibretroThumbnailsArtProvider.shared] }
         #endif
+        let available = automaticChain()
         switch chosen {
         case .libraryOnly: return []
-        case .steamGridDB: return steamGridDBAvailable ? [SteamGridDBArtProvider()] : []
-        case .screenScraper: return screenScraperAvailable ? [ScreenScraperArtProvider.shared] : []
-        case .libretro: return [LibretroThumbnailsArtProvider.shared]
-        case .automatic:
-            var chain = [OEBigPictureArtProvider]()
-            if steamGridDBAvailable { chain.append(SteamGridDBArtProvider()) }
-            if screenScraperAvailable { chain.append(ScreenScraperArtProvider.shared) }
-            chain.append(LibretroThumbnailsArtProvider.shared)
-            return chain
+        case .automatic: return available
+        case .steamGridDB, .screenScraper, .libretro:
+            guard let first = preferred(chosen) else { return fallbackEnabled ? available : [] }
+            // The preferred source is asked first. With the fallback on, the others follow in the automatic order.
+            return fallbackEnabled ? [first] + available.filter { $0.id != first.id } : [first]
         }
     }
+
+    /// The providers that are ready, in the automatic order.
+    private static func automaticChain() -> [OEBigPictureArtProvider] {
+        var chain = [OEBigPictureArtProvider]()
+        if steamGridDBAvailable { chain.append(SteamGridDBArtProvider()) }
+        if screenScraperAvailable { chain.append(ScreenScraperArtProvider.shared) }
+        chain.append(LibretroThumbnailsArtProvider.shared)
+        return chain
+    }
+
+    private static func preferred(_ source: OEBigPictureArtSource) -> OEBigPictureArtProvider? {
+        switch source {
+        case .steamGridDB: return steamGridDBAvailable ? SteamGridDBArtProvider() : nil
+        case .screenScraper: return screenScraperAvailable ? ScreenScraperArtProvider.shared : nil
+        case .libretro: return LibretroThumbnailsArtProvider.shared
+        case .automatic, .libraryOnly: return nil
+        }
+    }
+
+    /// Whether a source chosen on its own is followed by the others when it has nothing.
+    static let fallbackKey = "OEBigPictureArtFallback"
+    static var fallbackEnabled: Bool { UserDefaults.standard.bool(forKey: fallbackKey) }
 
     /// The providers' names for Preferences and the Settings screen.
     static var inUseTitle: String {

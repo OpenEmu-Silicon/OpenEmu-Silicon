@@ -210,6 +210,28 @@ final class BigPictureTests: XCTestCase {
         XCTAssertEqual(OEBigPictureArtSource.libretro.title, "libretro-thumbnails")
     }
 
+    func testAChosenSourceIsFollowedByTheOthersWhenFallbackIsOn() {
+        let defaults = UserDefaults.standard
+        let source = defaults.object(forKey: OEBigPictureArtSource.defaultsKey), fallback = defaults.object(forKey: OEBigPictureArtSource.fallbackKey)
+        defer { defaults.set(source, forKey: OEBigPictureArtSource.defaultsKey); defaults.set(fallback, forKey: OEBigPictureArtSource.fallbackKey) }
+
+        defaults.set("automatic", forKey: OEBigPictureArtSource.defaultsKey)
+        let everything = OEBigPictureArtSource.providers().map { $0.id }
+
+        defaults.set("libretro", forKey: OEBigPictureArtSource.defaultsKey)
+        defaults.set(false, forKey: OEBigPictureArtSource.fallbackKey)
+        XCTAssertEqual(OEBigPictureArtSource.providers().map { $0.id }, ["libretro"], "off: the chosen source alone")
+
+        defaults.set(true, forKey: OEBigPictureArtSource.fallbackKey)
+        let ids = OEBigPictureArtSource.providers().map { $0.id }
+        XCTAssertEqual(ids.first, "libretro", "on: the chosen source is asked first")
+        XCTAssertEqual(Set(ids), Set(everything), "on: every ready source follows")
+        XCTAssertEqual(ids.count, Set(ids).count, "no source twice")
+
+        defaults.set("libraryOnly", forKey: OEBigPictureArtSource.defaultsKey)
+        XCTAssertTrue(OEBigPictureArtSource.providers().isEmpty, "library covers only never reaches out")
+    }
+
     func testAGameTakesEachPictureFromTheFirstProviderThatHasIt() {
         let first = NSImage(size: NSSize(width: 1, height: 1)), second = NSImage(size: NSSize(width: 2, height: 2))
         var art = OEBigPictureArtSet(hero: first)

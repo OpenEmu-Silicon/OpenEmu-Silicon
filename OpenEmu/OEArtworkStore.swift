@@ -109,12 +109,26 @@ final class OEArtworkStore: @unchecked Sendable {
     static let historyName = "History"
     static let indexName = "index.json"
 
-    /// `~/Library/Application Support/OpenEmu/Artwork`. Preferences will let a person move it.
+    /// `~/Library/Application Support/OpenEmu/Artwork`. Preferences can move it (`OEArtworkLocation`).
     static let defaultRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("OpenEmu", isDirectory: true)
         .appendingPathComponent(folderName, isDirectory: true)
 
-    static let shared = OEArtworkStore(root: defaultRoot)
+    private static let sharedLock = NSLock()
+    private static var current = OEArtworkStore(root: OEArtworkLocation.chosenRoot)
+
+    /// The artwork folder in use. Preferences can move it while the app runs.
+    static var shared: OEArtworkStore {
+        sharedLock.lock(); defer { sharedLock.unlock() }
+        return current
+    }
+
+    /// Starts using another folder. The folder being left is saved first and is not touched again.
+    static func useRoot(_ root: URL) {
+        sharedLock.lock(); defer { sharedLock.unlock() }
+        current.flush()
+        current = OEArtworkStore(root: root)
+    }
 
     let root: URL
     private let lock = NSLock()
