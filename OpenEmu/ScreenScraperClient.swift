@@ -30,6 +30,13 @@ struct ScreenScraperResult {
     var gameTitle: String?
     var boxImageURL: URL?
     var gameDescription: String?
+    /// Big-picture art from the same lookup: a wide backdrop (fan art, else a screenshot) and the title logo.
+    var heroImageURL: URL?
+    var logoImageURL: URL?
+    /// For the small tiles, best first: the cartridge or disc, the 3D box, then a square screenshot-and-box mix.
+    /// The first two are cutouts with no background; the mix is the last resort.
+    var iconImageURLs = [URL]()
+    var iconImageURL: URL? { iconImageURLs.first }
 }
 
 enum ScreenScraperFetchError: Error, Equatable {
@@ -189,16 +196,18 @@ final class ScreenScraperClient {
 
     // Preferred region tags in priority order, per OELocalizationHelper region
     private func preferredRegions() -> [String] {
-        let region = OELocalizationHelper.shared.regionName
-        switch region {
+        switch OELocalizationHelper.shared.regionName {
         case "North America":
-            return ["us", "wor", "eu", "jp"]
+            return ["us", "wor", "eu", "uk"]
         case "Europe":
-            return ["eu", "wor", "us", "jp"]
+            // ScreenScraper has a version for each language of Europe; take the player's before the general one.
+            let own: [String: String] = ["fr": "fr", "de": "de", "es": "sp", "it": "it"]
+            let language = Locale.current.languageCode ?? ""
+            return (own[language].map { [$0] } ?? []) + ["eu", "uk", "wor", "us"]
         case "Japan":
-            return ["jp", "wor", "us", "eu"]
+            return ["jp", "wor", "us", "eu", "uk"]
         default:
-            return ["wor", "us", "eu", "jp"]
+            return ["wor", "us", "eu", "uk"]
         }
     }
 
@@ -375,7 +384,38 @@ final class ScreenScraperClient {
 
     // MARK: - JSON Parsing
 
-    private func parseGameInfo(jeu: [String: Any]) -> ScreenScraperResult? {
+    /// The best media for this player. With `regionFirst` false, `types` are tried in order and the player's region only
+    /// picks among the same type: fan art always beats a screenshot, whatever the screenshot's region. With it true the
+    /// region comes first across all the types: a Japanese HD logo is no use to a player in the US when the plain logo
+    /// has a US version. Regions with their own script (Japan, China, Korea) are used only when nothing else exists.
+    private func pickMedia(_ medias: [[String: Any]], types: [String], regionFirst: Bool = false) -> URL? {
+        func region(_ media: [String: Any]) -> String { (media["region"] as? String) ?? "" }
+        func type(_ media: [String: Any]) -> String { (media["type"] as? String) ?? "" }
+        func address(_ media: [String: Any]) -> URL? { (media["url"] as? String).flatMap { URL(string: $0) } }
+        let ownScript: Set<String> = ["jp", "cn", "asi", "kr", "tw"]
+
+        func best(among tier: [String]) -> URL? {
+            let wanted = medias.filter { tier.contains(type($0)) }
+            for preferred in preferredRegions() {
+                for wantedType in tier {
+                    if let match = wanted.first(where: { type($0) == wantedType && region($0) == preferred }), let url = address(match) { return url }
+                }
+            }
+            for includeOwnScript in [false, true] {
+                for wantedType in tier {
+                    if let match = wanted.first(where: { type($0) == wantedType && (includeOwnScript || !ownScript.contains(region($0))) }),
+                       let url = address(match) { return url }
+                }
+            }
+            return nil
+        }
+
+        let tiers = regionFirst ? [types] : types.map { [$0] }
+        for tier in tiers { if let url = best(among: tier) { return url } }
+        return nil
+    }
+
+    func parseGameInfo(jeu: [String: Any]) -> ScreenScraperResult? {
         var result = ScreenScraperResult()
 
         // Game title — prefer regional name
@@ -412,25 +452,11 @@ final class ScreenScraperClient {
             result.gameDescription = picked
         }
 
-        // Box art URL — medias array, type "box-2D", prefer regional
         if let medias = jeu["medias"] as? [[String: Any]] {
-            let boxMedias = medias.filter { ($0["type"] as? String) == "box-2D" }
-            let preferred = preferredRegions()
-            var pickedURL: URL?
-            for region in preferred {
-                if let match = boxMedias.first(where: { ($0["region"] as? String) == region }),
-                   let urlStr = match["url"] as? String,
-                   let url = URL(string: urlStr) {
-                    pickedURL = url
-                    break
-                }
-            }
-            if pickedURL == nil {
-                if let urlStr = boxMedias.first?["url"] as? String {
-                    pickedURL = URL(string: urlStr)
-                }
-            }
-            result.boxImageURL = pickedURL
+            result.boxImageURL = pickMedia(medias, types: ["box-2D"])
+            result.heroImageURL = pickMedia(medias, types: ["fanart", "ss"])
+            result.logoImageURL = pickMedia(medias, types: ["wheel-hd", "wheel"], regionFirst: true)
+            result.iconImageURLs = ["support-2D", "box-3D", "mixrbv2", "mixrbv1"].compactMap { pickMedia(medias, types: [$0]) }
         }
 
         guard result.gameTitle != nil || result.boxImageURL != nil else { return nil }
