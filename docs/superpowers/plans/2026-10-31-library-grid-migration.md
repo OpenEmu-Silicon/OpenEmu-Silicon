@@ -4,6 +4,18 @@ Decision: [ADR-0008](../../adr/0008-library-grid-on-nscollectionview.md). Replac
 
 Each phase is its own PR. Phases 1 and 2 can run in parallel with each other. Phase 3 (save states and screenshots) did not need it and shipped first, as #821.
 
+## Where each phase is tracked
+
+| Phase | Issues and PRs |
+|---|---|
+| 1. Warning fixes | #819 |
+| 2. Test scaffolding and baseline | not done: synthetic library script shipped in #822; the Instruments baseline did not |
+| 3. Save states and screenshots | #821 |
+| 4. Games grid | #689–#695, PR #822 |
+| 5. Cutover and deletion | #696, #697, PR #823 |
+| 6. Shared artwork service | #824 |
+| 7. Visual refresh | #825 |
+
 ## Phase 1: Small warning fixes
 
 Independent of the grid work.
