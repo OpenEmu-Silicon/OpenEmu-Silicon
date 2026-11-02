@@ -31,6 +31,8 @@ protocol CollectionViewExtendedDelegate {
     func collectionView(_ collectionView: CollectionView, menuForItemsAt indexPaths: Set<IndexPath>, point: CGPoint) -> NSMenu?
     func collectionView(_ collectionView: CollectionView, setTitle title: String, forItemAt indexPath: IndexPath)
     func collectionView(_ collectionView: CollectionView, doubleClickForItemAt indexPath: IndexPath)
+    /// Returns the item that matches what the user has typed so far, or nil if there is none.
+    func collectionView(_ collectionView: CollectionView, indexPathForTypeSelect string: String, startingAt indexPath: IndexPath?) -> IndexPath?
 }
 
 extension CollectionViewExtendedDelegate {
@@ -39,6 +41,7 @@ extension CollectionViewExtendedDelegate {
     func collectionView(_ collectionView: CollectionView, menuForItemsAt indexPaths: Set<IndexPath>, point: CGPoint) -> NSMenu? { nil }
     func collectionView(_ collectionView: CollectionView, setTitle title: String, forItemAt indexPath: IndexPath) {}
     func collectionView(_ collectionView: CollectionView, doubleClickForItemAt indexPath: IndexPath) {}
+    func collectionView(_ collectionView: CollectionView, indexPathForTypeSelect string: String, startingAt indexPath: IndexPath?) -> IndexPath? { nil }
 }
 
 class CollectionView: NSCollectionView {
@@ -133,12 +136,49 @@ class CollectionView: NSCollectionView {
     override func keyDown(with event: NSEvent) {
         switch Int(event.keyCode) {
         case kVK_Space:
-            toggleQuickLook()
+            if !toggleQuickLook() {
+                typeSelect(with: event)
+            }
             
         case kVK_Return:
             beginEditingWithSelectedItem(self)
         default:
+            typeSelect(with: event)
+        }
+    }
+    
+    // MARK: - Type Select
+    
+    private var typeSelectString = ""
+    private var typeSelectDate = Date.distantPast
+    
+    /// Selects the item whose title starts with the characters the user types, like a table view does.
+    /// Keys that are not printable characters go to the normal key handling (arrow keys and so on).
+    private func typeSelect(with event: NSEvent) {
+        guard
+            let ed = extendedDelegate,
+            event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+            let chars = event.characters, !chars.isEmpty,
+            chars.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.union(.punctuationCharacters).union(.symbols).union(.whitespaces).contains($0) })
+        else {
             super.keyDown(with: event)
+            return
+        }
+        
+        if event.timestamp - typeSelectDate.timeIntervalSinceReferenceDate > 1 || typeSelectString.isEmpty {
+            typeSelectString = ""
+        }
+        typeSelectString += chars
+        typeSelectDate = Date(timeIntervalSinceReferenceDate: event.timestamp)
+        
+        let start = selectionIndexPaths.sorted().first
+        if let match = ed.collectionView(self, indexPathForTypeSelect: typeSelectString, startingAt: start) {
+            selectionIndexPaths = [match]
+            scrollToItems(at: [match], scrollPosition: .centeredVertically)
+            delegate?.collectionView?(self, didSelectItemsAt: [match])
+        } else if chars.count == 1 {
+            // nothing starts with the typed text; restart with just this character
+            typeSelectString = ""
         }
     }
     
@@ -158,10 +198,12 @@ class CollectionView: NSCollectionView {
 // MARK: - Quick Look support
 
 extension CollectionView: QLPreviewPanelDataSource, QLPreviewPanelDelegate {
-    func toggleQuickLook() {
+    /// Returns false if this view does not support Quick Look.
+    @discardableResult
+    func toggleQuickLook() -> Bool {
         let panel = QLPreviewPanel.shared()!
         if !acceptsPreviewPanelControl(panel) {
-            return
+            return false
         }
         
         if panel.isVisible {
@@ -169,6 +211,7 @@ extension CollectionView: QLPreviewPanelDataSource, QLPreviewPanelDelegate {
         } else {
             panel.makeKeyAndOrderFront(nil)
         }
+        return true
     }
     
     func refreshPreviewPanelIfNeeded() {
