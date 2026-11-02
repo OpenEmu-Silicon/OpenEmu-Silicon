@@ -497,4 +497,51 @@ final class ArtworkStoreTests: XCTestCase {
         UserDefaults.standard.set(OEBigPictureArtSource.libretro.rawValue, forKey: key)
         XCTAssertEqual(OEArtworkCoverSource.providersForCovers()?.first?.id, "libretro")
     }
+
+    // MARK: Picker filters and other providers
+
+    func testTheSteamGridDBFilterBuildsTheQueryAndNeverAllowsAdultContent() {
+        func query(_ filter: SteamGridDBFilter, _ type: SteamGridDBItemType) -> [String: String] {
+            Dictionary(uniqueKeysWithValues: filter.queryItems(for: type).map { ($0.name, $0.value ?? "") })
+        }
+        let none = query(SteamGridDBFilter(), .grid)
+        XCTAssertEqual(none["nsfw"], "false")
+        XCTAssertEqual(none["types"], "static")
+        XCTAssertNil(none["styles"]); XCTAssertNil(none["dimensions"])
+        XCTAssertEqual(none["mimes"], "image/png,image/jpeg,image/webp")
+
+        let all = query(SteamGridDBFilter(style: "blurred", dimensions: "600x900", mime: "image/png"), .grid)
+        XCTAssertEqual(all["styles"], "blurred")
+        XCTAssertEqual(all["dimensions"], "600x900")
+        XCTAssertEqual(all["mimes"], "image/png")
+        XCTAssertEqual(all["nsfw"], "false")
+
+        // Logos have no size filter, so one that was set is not sent.
+        XCTAssertNil(query(SteamGridDBFilter(dimensions: "600x900"), .logo)["dimensions"])
+    }
+
+    func testEverySlotOffersItsOwnStylesAndSizes() {
+        for slot in OEArtworkStore.Slot.allCases { XCTAssertFalse(SteamGridDBFilter.styles(for: slot).isEmpty, slot.rawValue) }
+        XCTAssertTrue(SteamGridDBFilter.dimensions(for: .logo).isEmpty)
+        XCTAssertTrue(SteamGridDBFilter.dimensions(for: .hero).allSatisfy { $0.hasPrefix("1920") || $0.hasPrefix("3840") || $0.hasPrefix("1600") })
+        XCTAssertTrue(SteamGridDBFilter.dimensions(for: .poster).contains("600x900"))
+    }
+
+    func testAProviderThatOffersNoPicturesReturnsNone() async {
+        struct Quiet: OEBigPictureArtProvider {
+            var id: String { "quiet" }; var title: String { id }; var isThrottled: Bool { false }; var providesStandardPosters: Bool { false }
+            func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet { OEBigPictureArtSet() }
+        }
+        let key = OEBigPictureArt.GameKey(md5: "aa", name: "Zelda", systemIdentifier: "openemu.system.nes")
+        let none = await Quiet().pictures(for: key, slot: .poster)
+        XCTAssertTrue(none.isEmpty)
+    }
+
+    func testAPickedProviderPictureIsStoredAsReceivedAndPinnedWithItsProvider() throws {
+        let picture = OEProviderPicture(provider: "libretro", providerTitle: "libretro-thumbnails", data: data(8))
+        guard case .stored(let url) = OEArtworkChoice.choose(picture.data, for: game, slot: .poster, provider: picture.provider, store: store) else { return XCTFail() }
+        XCTAssertEqual(try Data(contentsOf: url), data(8), "the bytes the provider sent")
+        XCTAssertEqual(store.entry(game, .poster)?.origin, "provider:libretro")
+        XCTAssertEqual(store.entry(game, .poster)?.pinned, true)
+    }
 }

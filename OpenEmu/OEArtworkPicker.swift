@@ -56,8 +56,19 @@ final class OEArtworkPickerController: NSWindowController, NSCollectionViewDataS
     private let grid = NSCollectionView()
     private let useButton = NSButton(title: "Use This Picture", target: nil, action: nil)
     private let resetButton = NSButton(title: "Reset to Automatic", target: nil, action: nil)
-    private var candidates = [SteamGridDBItem]()
+    /// One picture in the grid: a SteamGridDB entry (downloaded when picked) or a single result from another provider
+    /// (already downloaded, as sent).
+    private enum Candidate {
+        case steamGridDB(SteamGridDBItem)
+        case provider(OEProviderPicture)
+    }
+    private var candidates = [Candidate]()
     private var thumbnails = [URL: NSImage]()
+    private var providerThumbnails = [Int: NSImage]()
+    private var gameID: Int?
+    private let styleFilter = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let sizeFilter = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let typeFilter = NSPopUpButton(frame: .zero, pullsDown: false)
     private var loading: Task<Void, Never>?
     private static var open = [OEArtworkPickerController]()
 
@@ -132,7 +143,19 @@ final class OEArtworkPickerController: NSWindowController, NSCollectionViewDataS
         let buttons = NSStackView(views: [resetButton, fileButton, NSView(), useButton])
         buttons.spacing = 8
 
-        let stack = NSStackView(views: [slotPicker, status, scroll, buttons])
+        for filter in [styleFilter, sizeFilter, typeFilter] {
+            filter.target = self
+            filter.action = #selector(filterChanged)
+            filter.controlSize = .small
+            filter.font = .systemFont(ofSize: 11)
+        }
+        let filterLabel = NSTextField(labelWithString: "SteamGridDB:")
+        filterLabel.font = .systemFont(ofSize: 11)
+        filterLabel.textColor = .secondaryLabelColor
+        let filterRow = NSStackView(views: [filterLabel, styleFilter, sizeFilter, typeFilter])
+        filterRow.spacing = 8
+
+        let stack = NSStackView(views: [slotPicker, filterRow, status, scroll, buttons])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
@@ -152,29 +175,86 @@ final class OEArtworkPickerController: NSWindowController, NSCollectionViewDataS
 
     // MARK: Loading
 
+    private var filter: SteamGridDBFilter {
+        let style = styleFilter.indexOfSelectedItem > 0 ? SteamGridDBFilter.styles(for: slot)[styleFilter.indexOfSelectedItem - 1] : nil
+        let size = sizeFilter.indexOfSelectedItem > 0 ? SteamGridDBFilter.dimensions(for: slot)[sizeFilter.indexOfSelectedItem - 1] : nil
+        let type = typeFilter.indexOfSelectedItem > 0 ? SteamGridDBFilter.mimes[typeFilter.indexOfSelectedItem - 1] : nil
+        return SteamGridDBFilter(style: style, dimensions: size, mime: type)
+    }
+
+    /// Fills the three menus for the slot on show, each starting at "any".
+    private func resetFilters() {
+        func fill(_ popup: NSPopUpButton, any: String, _ values: [String], label: (String) -> String) {
+            popup.removeAllItems()
+            popup.addItem(withTitle: any)
+            values.forEach { popup.addItem(withTitle: label($0)) }
+            popup.selectItem(at: 0)
+            popup.isEnabled = !values.isEmpty
+        }
+        fill(styleFilter, any: "Any style", SteamGridDBFilter.styles(for: slot)) { $0.replacingOccurrences(of: "_", with: " ").capitalized }
+        fill(sizeFilter, any: "Any size", SteamGridDBFilter.dimensions(for: slot)) { $0 }
+        fill(typeFilter, any: "Any file type", SteamGridDBFilter.mimes) { $0.replacingOccurrences(of: "image/", with: "").uppercased() }
+    }
+
     @objc private func slotChanged() {
+        resetFilters()
+        reload(lookUpGame: true)
+    }
+
+    @objc private func filterChanged() { reload(lookUpGame: false) }
+
+    private func reload(lookUpGame: Bool) {
         loading?.cancel()
         candidates = []
+        providerThumbnails = [:]
         useButton.isEnabled = false
         grid.reloadData()
         let entry = OEArtworkStore.shared.entry(artworkGame, slot)
         resetButton.isEnabled = entry?.pinned == true
         let current = entry.map { $0.pinned ? "A picture you chose is pinned for this slot." : "This slot is filled automatically." }
             ?? "This slot has no picture yet."
-        guard SteamGridDBClient.isConfigured else {
+        let hasKey = SteamGridDBClient.isConfigured
+        let others = Self.otherProviders()
+        if !hasKey && others.isEmpty {
             status.stringValue = current + " Add a SteamGridDB key in Preferences → Artwork to browse pictures, or use From File…"
             return
         }
-        status.stringValue = current + " Looking up pictures on SteamGridDB…"
-        let slot = self.slot, name = game.displayName
+        status.stringValue = current + " Looking up pictures…"
+        let slot = self.slot, name = game.displayName, filter = self.filter, key = OEBigPictureArt.GameKey(game)
         loading = Task { @MainActor [weak self] in
-            let id = await SteamGridDBClient.shared.gameID(for: name)
-            let found = id == nil ? [] : await SteamGridDBClient.shared.candidates(gameID: id!, slot: slot)
+            var steam = [SteamGridDBItem]()
+            if hasKey {
+                if lookUpGame || self?.gameID == nil { self?.gameID = await SteamGridDBClient.shared.gameID(for: name) }
+                if let id = self?.gameID { steam = await SteamGridDBClient.shared.candidates(gameID: id, slot: slot, filter: filter) }
+            }
             guard let self = self, !Task.isCancelled, self.slot == slot else { return }
-            self.candidates = found
+            self.candidates = steam.map { .steamGridDB($0) }
             self.grid.reloadData()
-            self.status.stringValue = current + (found.isEmpty ? " SteamGridDB has nothing for this slot." : " \(found.count) pictures from SteamGridDB, best first.")
+            self.status.stringValue = current + (steam.isEmpty ? " SteamGridDB has nothing for this slot and filter." : " \(steam.count) pictures from SteamGridDB, best first.")
+                + (others.isEmpty ? "" : " Asking \(others.map { $0.title }.joined(separator: " and "))…")
+
+            // One result each from the other sources set up here. They are not affected by the SteamGridDB filters.
+            var added = [String]()
+            for provider in others {
+                let pictures = await provider.pictures(for: key, slot: slot)
+                guard !Task.isCancelled, self.slot == slot else { return }
+                for picture in pictures { self.candidates.append(.provider(picture)) }
+                if !pictures.isEmpty { added.append(provider.title) }
+            }
+            self.grid.reloadData()
+            if !others.isEmpty {
+                self.status.stringValue = current + (steam.isEmpty ? "" : " \(steam.count) from SteamGridDB, best first.")
+                    + (added.isEmpty ? " No other source has a picture for this slot." : " Also from \(added.joined(separator: " and ")).")
+            }
         }
+    }
+
+    /// Sources other than SteamGridDB that are ready to use: libretro always, ScreenScraper when signed in.
+    private static func otherProviders() -> [OEBigPictureArtProvider] {
+        var providers: [OEBigPictureArtProvider] = []
+        if OEBigPictureArtSource.screenScraperAvailable { providers.append(ScreenScraperArtProvider.shared) }
+        providers.append(LibretroThumbnailsArtProvider.shared)
+        return providers
     }
 
     func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int { candidates.count }
@@ -182,15 +262,23 @@ final class OEArtworkPickerController: NSWindowController, NSCollectionViewDataS
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
         let item = collectionView.makeItem(withIdentifier: PickerItem.identifier, for: indexPath)
         guard let picker = item as? PickerItem, candidates.indices.contains(indexPath.item) else { return item }
-        let candidate = candidates[indexPath.item]
-        picker.configure(text: "\(candidate.width)×\(candidate.height) · ★\(candidate.score)\n\(candidate.authorName ?? "")")
-        picker.setImage(thumbnails[candidate.thumbURL])
-        if thumbnails[candidate.thumbURL] == nil {
-            Task { @MainActor [weak self] in
-                guard let (data, _) = try? await URLSession.shared.data(from: candidate.thumbURL), let image = NSImage(data: data) else { return }
-                self?.thumbnails[candidate.thumbURL] = image
-                (self?.grid.item(at: indexPath) as? PickerItem)?.setImage(image)
+        switch candidates[indexPath.item] {
+        case .steamGridDB(let candidate):
+            picker.configure(text: "\(candidate.width)×\(candidate.height) · ★\(candidate.score)\n\(candidate.authorName ?? "")")
+            picker.setImage(thumbnails[candidate.thumbURL])
+            if thumbnails[candidate.thumbURL] == nil {
+                Task { @MainActor [weak self] in
+                    guard let (data, _) = try? await URLSession.shared.data(from: candidate.thumbURL), let image = NSImage(data: data) else { return }
+                    self?.thumbnails[candidate.thumbURL] = image
+                    (self?.grid.item(at: indexPath) as? PickerItem)?.setImage(image)
+                }
             }
+        case .provider(let picture):
+            let image = providerThumbnails[indexPath.item] ?? picture.image
+            providerThumbnails[indexPath.item] = image
+            let size = image.map { "\(Int($0.size.width))×\(Int($0.size.height))" } ?? ""
+            picker.configure(text: "\(picture.providerTitle)\n\(size)")
+            picker.setImage(image)
         }
         return item
     }
@@ -202,18 +290,22 @@ final class OEArtworkPickerController: NSWindowController, NSCollectionViewDataS
 
     @objc private func useSelected() {
         guard let index = grid.selectionIndexPaths.first?.item, candidates.indices.contains(index) else { return }
-        let candidate = candidates[index]
-        status.stringValue = "Downloading…"
-        useButton.isEnabled = false
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            guard let (data, response) = try? await URLSession.shared.data(from: candidate.url),
-                  (response as? HTTPURLResponse)?.statusCode == 200, NSImage(data: data) != nil else {
-                self.status.stringValue = "Could not download that picture. Nothing was changed."
-                self.useButton.isEnabled = true
-                return
+        switch candidates[index] {
+        case .provider(let picture):
+            apply(picture.data, provider: picture.provider)
+        case .steamGridDB(let candidate):
+            status.stringValue = "Downloading…"
+            useButton.isEnabled = false
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                guard let (data, response) = try? await URLSession.shared.data(from: candidate.url),
+                      (response as? HTTPURLResponse)?.statusCode == 200, NSImage(data: data) != nil else {
+                    self.status.stringValue = "Could not download that picture. Nothing was changed."
+                    self.useButton.isEnabled = true
+                    return
+                }
+                self.apply(data, provider: "steamgriddb")
             }
-            self.apply(data, provider: "steamgriddb")
         }
     }
 

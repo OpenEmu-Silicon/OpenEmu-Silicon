@@ -421,12 +421,24 @@ protocol OEBigPictureArtProvider: Sendable {
     /// True when the poster it supplies is always a portrait poster of the same shape.
     var providesStandardPosters: Bool { get }
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet
+    /// Pictures this provider has for one slot of one game, as the original bytes, for the artwork picker. Nothing is
+    /// saved: the picker stores one only when a person picks it.
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture]
     /// True while the provider is holding back because its quota is used up. A bulk fetch stops instead of waiting.
     func isOutOfQuota() async -> Bool
 }
 
 extension OEBigPictureArtProvider {
     func isOutOfQuota() async -> Bool { false }
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] { [] }
+}
+
+/// One picture a provider offers for a slot, exactly as it was sent.
+struct OEProviderPicture: @unchecked Sendable {
+    let provider: String
+    let providerTitle: String
+    let data: Data
+    var image: NSImage? { NSImage(data: data) }
 }
 
 /// Which provider supplies big-picture art. Only these two: others need a developer key that large libraries would
@@ -613,6 +625,41 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
 
     func isOutOfQuota() async -> Bool { pausedUntil > Date() }
 
+    /// The picker asks once per slot tab, and a lookup costs a request, so a game's answer is kept for a few minutes.
+    private var pickerLookups = [String: (at: Date, found: ScreenScraperResult?)]()
+
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] {
+        guard !key.md5.isEmpty, let systemIdentifier = key.systemIdentifier else { return [] }
+        let found: ScreenScraperResult?
+        if let cached = pickerLookups[key.md5], Date().timeIntervalSince(cached.at) < 600 {
+            found = cached.found
+        } else {
+            await waitForSlot()
+            let outcome = await Task.detached {
+                ScreenScraperClient.shared.fetchGameInfo(md5: key.md5, romName: key.romFileName, fileSize: key.fileSize, systemIdentifier: systemIdentifier)
+            }.value
+            switch outcome {
+            case .failure(.rateLimited): pausedUntil = Date().addingTimeInterval(pause); return []
+            case .failure: return []
+            case .success(let result): found = result; pickerLookups[key.md5] = (Date(), result)
+            }
+        }
+        guard let found = found else { return [] }
+        let addresses: [URL?]
+        switch slot {
+        case .cover, .poster: addresses = [found.boxImageURL]
+        case .hero: addresses = [found.heroImageURL]
+        case .logo: addresses = [found.logoImageURL]
+        case .icon: addresses = found.iconImageURLs.map { Optional($0) }
+        }
+        var pictures = [OEProviderPicture]()
+        for address in addresses.compactMap({ $0 }) {
+            guard let (data, _) = try? await URLSession.shared.data(from: address), NSImage(data: data) != nil else { continue }
+            pictures.append(OEProviderPicture(provider: id, providerTitle: title, data: data))
+        }
+        return pictures
+    }
+
     /// Reserves the next free request time before waiting, so callers queue up in order.
     private func waitForSlot() async {
         let now = Date()
@@ -651,6 +698,21 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
         let result = await task.value
         inFlight[key.md5] = nil
         return result
+    }
+
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] {
+        guard slot == .cover || slot == .poster, let systemIdentifier = key.systemIdentifier else { return [] }
+        let tagged = key.fullName != key.name
+        let candidates = tagged ? [key.fullName] : [key.name + " (USA)", key.name + " (Europe)", key.name + " (World)", key.name + " (Japan)"]
+        for candidate in candidates {
+            let address = await Task.detached {
+                LibretroThumbnailsClient.shared.fetchBoxArtURL(gameName: candidate, systemIdentifier: systemIdentifier)
+            }.value
+            guard let address = address, let url = URL(string: address),
+                  let (data, _) = try? await URLSession.shared.data(from: url), NSImage(data: data) != nil else { continue }
+            return [OEProviderPicture(provider: id, providerTitle: title, data: data)]
+        }
+        return []
     }
 
     private func load(_ key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
