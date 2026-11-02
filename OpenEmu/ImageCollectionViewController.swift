@@ -42,6 +42,8 @@ class ImageCollectionViewController: NSViewController {
     var sectionHeaderHeight: CGFloat { 46 }
     /// Scales the slider value to the item size. The default matches the zoom level of the old grid.
     var gridZoomMultiplier: CGFloat { 1.07 }
+    /// Like `gridZoomMultiplier`, but for the width of an item only.
+    var gridWidthMultiplier: CGFloat { gridZoomMultiplier }
     /// Key in user defaults that remembers the selection.
     var selectionDefaultsKey: String { "\(dataSourceDelegate.entityName)_OESelectedMediaKey" }
     
@@ -299,8 +301,7 @@ class ImageCollectionViewController: NSViewController {
     }
     
     func zoomGridView(zoomValue: CGFloat) {
-        let finalZoom = zoomValue * gridZoomMultiplier
-        flowLayout.itemSize = itemSize.applying(CGAffineTransform(scaleX: finalZoom, y: finalZoom))
+        flowLayout.itemSize = itemSize.applying(CGAffineTransform(scaleX: zoomValue * gridWidthMultiplier, y: zoomValue * gridZoomMultiplier))
         Self.lastGridSize = Float(zoomValue)
         // required if implementing NSCollectionViewDelegateFlowLayout methods
         flowLayout.invalidateLayout()
