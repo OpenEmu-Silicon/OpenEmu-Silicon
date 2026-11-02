@@ -21,6 +21,11 @@ for f in ScreenScraperDevCredentials CheatWorksSecrets; do [ -f "OpenEmu/$f.swif
 if [ -z "$missing" ]; then ok "credential stubs present"
 else bad "missing:$missing   (fix: check.sh and playtest.sh create them, or copy the *.template.swift files)"; fi
 
+# 1b. Real credentials. Placeholders build fine but cannot sign in to ScreenScraper or CheatWorks.
+holders=$(harness_placeholder_credentials "$PWD" | tr '\n' ' ')
+if [ -z "$holders" ]; then ok "credential files hold real values"
+else warn "placeholders in:$holders  (a debug build cannot sign in to those services; copy the real files from the worktree that has them)"; fi
+
 # 2. Signing certificate.
 NAME="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}"
 N=$(harness_sign_hashes "$NAME" | wc -l | tr -d ' ')

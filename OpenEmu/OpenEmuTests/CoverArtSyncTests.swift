@@ -41,6 +41,8 @@ class CoverArtSyncTests: XCTestCase {
 
         try OELibraryDatabase.load(from: folder)
         let database = try XCTUnwrap(OELibraryDatabase.default)
+        XCTAssertEqual(UserDefaults.standard.object(forKey: OELibraryDatabase.databasePathKey) as? String, savedPath as? String,
+                       "loading a throwaway library must not become the app's library")
 
         // The bug only shows once a lookup thread has finished and is being replaced, so ask in
         // rounds with a pause in between to let each one finish.

@@ -3,13 +3,52 @@
 # Default build folder, shared so one build serves check.sh and playtest.sh.
 harness_build_dir() { echo "${OE_BUILD_DIR:-${OE_PLAYTEST_BUILD:-$HOME/Builds/openemu/harness}}"; }
 
-# A fresh worktree has no copy of the gitignored credential stubs, and the app does not build without them.
+# The text that marks a credential file as the placeholder copy of its template. A build with placeholders compiles
+# but cannot sign in to the service (ScreenScraper answers "bad credentials"). Only ScreenScraper is checked: a real
+# CheatWorks token is not kept in any worktree on the maintainer's Mac, so a check on it would only ever complain.
+harness_placeholder_marker() {
+  case "$1" in
+    ScreenScraperDevCredentials) echo "YOUR_DEV_ID" ;;
+    CheatWorksSecrets) echo "placeholderClientAccessToken" ;;
+  esac
+}
+
+# Prints the name of each checked credential file that is missing or still holds the placeholders.
+harness_placeholder_credentials() {
+  local root="$1" f marker
+  for f in ScreenScraperDevCredentials; do
+    marker=$(harness_placeholder_marker "$f")
+    if [ ! -f "$root/OpenEmu/$f.swift" ] || grep -q "$marker" "$root/OpenEmu/$f.swift"; then echo "$f"; fi
+  done
+}
+
+# The first other worktree of this repository that holds a real (non-placeholder) copy of a credential file.
+harness_find_real_credentials() {
+  local root="$1" f="$2" marker dir
+  marker=$(harness_placeholder_marker "$f")
+  git -C "$root" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' | while read -r dir; do
+    [ "$dir" = "$root" ] && continue
+    if [ -f "$dir/OpenEmu/$f.swift" ] && ! grep -q "$marker" "$dir/OpenEmu/$f.swift"; then echo "$dir/OpenEmu/$f.swift"; break; fi
+  done
+}
+
+# A fresh worktree has no copy of the gitignored credential files, and the app does not build without them. Use a
+# real copy from another worktree of this repository when there is one (they are gitignored and stay on this Mac);
+# otherwise the template, with a warning, because a build with the placeholders cannot sign in to the service.
 harness_ensure_stubs() {
-  local root="$1" f
+  local root="$1" f real
   for f in ScreenScraperDevCredentials CheatWorksSecrets; do
-    if [ ! -f "$root/OpenEmu/$f.swift" ] && [ -f "$root/OpenEmu/$f.template.swift" ]; then
-      cp "$root/OpenEmu/$f.template.swift" "$root/OpenEmu/$f.swift" && echo "----  created OpenEmu/$f.swift from its template"
+    if [ ! -f "$root/OpenEmu/$f.swift" ]; then
+      real=$(harness_find_real_credentials "$root" "$f")
+      if [ -n "$real" ]; then
+        cp "$real" "$root/OpenEmu/$f.swift" && echo "----  copied OpenEmu/$f.swift from another worktree of this repository"
+      elif [ -f "$root/OpenEmu/$f.template.swift" ]; then
+        cp "$root/OpenEmu/$f.template.swift" "$root/OpenEmu/$f.swift" && echo "----  created OpenEmu/$f.swift from its template"
+      fi
     fi
+  done
+  for f in $(harness_placeholder_credentials "$root"); do
+    echo "WARN  OpenEmu/$f.swift holds placeholders: this build cannot sign in to its service. Copy the real file from a worktree that has it." >&2
   done
 }
 
