@@ -274,6 +274,25 @@ final class OEArtworkStore: @unchecked Sendable {
         return true
     }
 
+    /// Adds index entries for games and slots this folder has no entry for, when the picture they name is here.
+    /// An entry already present is never changed. Returns how many were added.
+    @discardableResult
+    func adoptMissing(_ incoming: [String: [String: Entry]]) -> Int {
+        if let next = lockedOrForwarded() { return next.adoptMissing(incoming) }
+        defer { lock.unlock() }
+        loadIndexIfNeeded()
+        var added = 0
+        for (md5, slots) in incoming {
+            for (slot, entry) in slots where index?[md5]?[slot] == nil {
+                guard FileManager.default.fileExists(atPath: root.appendingPathComponent(entry.file).path) else { continue }
+                index?[md5, default: [:]][slot] = entry
+                added += 1
+            }
+        }
+        if added > 0 { scheduleSave() }
+        return added
+    }
+
     private func merge(_ incoming: [String: [String: Entry]], renamed: [String: String]) {
         lock.lock(); defer { lock.unlock() }
         loadIndexIfNeeded()

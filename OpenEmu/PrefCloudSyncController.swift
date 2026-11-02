@@ -39,6 +39,10 @@ final class PrefCloudSyncController: NSViewController {
     private let bkRemoveButton    = NSButton()
     private let bkLastSyncedLabel = NSTextField(labelWithString: "")
     private let bkNoteLabel       = NSTextField(wrappingLabelWithString: "")
+    private let awHeaderLabel     = NSTextField(labelWithString: "Artwork")
+    private let awScopePopup      = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let awRestoreButton   = NSButton()
+    private let awStatusLabel     = NSTextField(wrappingLabelWithString: "")
     private var bkStatusToken: NSObjectProtocol?
     
     private lazy var dateFormatter: DateFormatter = {
@@ -51,7 +55,7 @@ final class PrefCloudSyncController: NSViewController {
     // MARK: - Lifecycle
     
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 468, height: 320))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 468, height: 440))
         buildUI()
     }
     
@@ -145,6 +149,38 @@ final class PrefCloudSyncController: NSViewController {
         bkNoteLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(bkNoteLabel)
 
+        // ── Artwork ──────────────────────────────────────────────────
+        awHeaderLabel.font = .boldSystemFont(ofSize: 15)
+        awScopePopup.addItems(withTitles: ["Don't back up artwork", "Pinned picks and history", "All artwork"])
+        awScopePopup.item(at: 0)?.tag = OEArtworkBackup.Scope.off.rawValue
+        awScopePopup.item(at: 1)?.tag = OEArtworkBackup.Scope.pinnedAndHistory.rawValue
+        awScopePopup.item(at: 2)?.tag = OEArtworkBackup.Scope.everything.rawValue
+        awScopePopup.selectItem(withTag: OEArtworkBackup.configuredScope.rawValue)
+        awScopePopup.target = self
+        awScopePopup.action = #selector(artworkScopeChanged)
+        awRestoreButton.title = "Restore Artwork from Backup"
+        awRestoreButton.bezelStyle = .rounded
+        awRestoreButton.target = self
+        awRestoreButton.action = #selector(restoreArtwork)
+        awStatusLabel.stringValue = "Artwork is only ever added to the backup. Deleting a picture here removes nothing there, and a restore never replaces a picture you have; when two differ, both are kept."
+        awStatusLabel.font = .systemFont(ofSize: 11)
+        awStatusLabel.textColor = .secondaryLabelColor
+        for item in [awHeaderLabel, awScopePopup, awRestoreButton, awStatusLabel] {
+            item.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(item)
+        }
+        NSLayoutConstraint.activate([
+            awHeaderLabel.topAnchor.constraint(equalTo: bkNoteLabel.bottomAnchor, constant: 22),
+            awHeaderLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
+            awScopePopup.topAnchor.constraint(equalTo: awHeaderLabel.bottomAnchor, constant: 10),
+            awScopePopup.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 34),
+            awRestoreButton.centerYAnchor.constraint(equalTo: awScopePopup.centerYAnchor),
+            awRestoreButton.leadingAnchor.constraint(equalTo: awScopePopup.trailingAnchor, constant: 8),
+            awStatusLabel.topAnchor.constraint(equalTo: awScopePopup.bottomAnchor, constant: 10),
+            awStatusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 36),
+            awStatusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -36),
+        ])
+
         // ── Layout ───────────────────────────────────────────────────
         NSLayoutConstraint.activate([
             bkHeaderLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 24),
@@ -234,6 +270,30 @@ final class PrefCloudSyncController: NSViewController {
         }
     }
 
+    @objc private func artworkScopeChanged() {
+        OEArtworkBackup.configuredScope = OEArtworkBackup.Scope(rawValue: awScopePopup.selectedTag()) ?? .pinnedAndHistory
+    }
+
+    @objc private func restoreArtwork() {
+        awRestoreButton.isEnabled = false
+        awStatusLabel.stringValue = "Restoring…"
+        OEFolderBackupManager.shared.restoreArtwork { [weak self] result in
+            guard let self = self else { return }
+            self.awRestoreButton.isEnabled = true
+            switch result {
+            case .success(let report):
+                self.awStatusLabel.stringValue = "Restored \(report.copied) picture(s). \(report.keptBoth) differed from one you have and were kept beside it. Nothing was replaced."
+                Task { @MainActor in OEBigPictureArt.shared.reset() }
+            case .failure(.nothingToRestore):
+                self.awStatusLabel.stringValue = "There is no artwork in the backup folder yet."
+            case .failure(.overlapping):
+                self.awStatusLabel.stringValue = "The artwork folder and the backup folder overlap, so there is nothing to copy."
+            case .failure:
+                self.awStatusLabel.stringValue = "The restore stopped partway. Nothing was replaced; run it again to carry on."
+            }
+        }
+    }
+
     @objc private func openBackupInFinder() {
         guard let url = OEFolderBackupManager.shared.backupFolderURL else { return }
         NSWorkspace.shared.open(url)
@@ -259,5 +319,5 @@ extension PrefCloudSyncController: PreferencePane {
     
     var panelTitle: String { "Cloud Sync" }
     
-    var viewSize: NSSize { NSSize(width: 468, height: 320) }
+    var viewSize: NSSize { NSSize(width: 468, height: 440) }
 }

@@ -100,6 +100,8 @@ Progress: done and checked. "Import Artwork from Folder…" now reads `Game.png`
 - Skip the copy when the artwork folder is already inside the backup folder.
 - Check: conflicting versions on two Macs keep both; deleting locally deletes nothing in the backup.
 
+Progress: done and checked. `OEArtworkBackup` copies to `{backup}/Artwork/` when the existing backup runs (launch and quit) and has its own scope setting in Cloud Sync: off, pinned picks and history (default), or all artwork. It is add-only: same bytes are skipped, different bytes are kept beside the existing file as `Name (from <Mac>).png`, nothing is deleted, and each Mac writes only its own `index-<id>.json`. A restore adds missing files, keeps both when a file differs, and adopts index entries (with their pins) only for pictures this Mac has no entry for. An artwork folder that overlaps the backup folder is skipped. 13 unit tests, including two Macs changing the same picture and a local delete changing nothing in the backup. In the real app (backup pointed at a throwaway folder by a launch argument) only the pinned hero and the index snapshot were copied, and Restore left the real artwork folder byte-identical. Not done: a progress display for large libraries, and restoring when the other Mac's index names a different file for a slot this Mac already has (the pick is kept as is; the other file is saved beside it).
+
 ### Phase 6: polish
 
 - Bulk fetch with a small worker pool, pause and resume, and a clean stop on a provider quota error.
