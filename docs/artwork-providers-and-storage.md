@@ -52,8 +52,17 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
   - Icons come as Windows `.ico` files that hold several sizes. They need a reader before they can be drawn from the store.
 - Decision: keep the rule to store originals. Move the opt-in "save space" mode (lossy, originals kept in `History`) up to Phase 2, since it is the only thing that changes the size. Back up pinned art only by default.
 - libretro-thumbnails, 5 posters from a 60 second run: all PNG, 94 KB to 834 KB, average about 450 KB, at most 512 pixels on the long side. Posters only, so about 0.5 MB per game. Small enough that lossless storage is fine.
-- ScreenScraper: not measured. In this worktree the app is built with placeholder developer credentials (`harness_ensure_stubs`), so every lookup came back `badCredentials`. It needs a build with the real developer credentials. Fan art is a ScreenScraper media type and has the same requirement.
-- Decision unchanged: ScreenScraper is the only unknown, and it does not change the plan. The store keeps whatever arrives.
+- ScreenScraper, measured 2026-11-01 on the same 17 library games with the real developer credentials (a debug-only report, `-OEMeasureScreenScraper <file>`, that downloads and counts and stores nothing):
+
+  | Slot | Formats | Median | Average | Largest | Usual size |
+  |---|---|---|---|---|---|
+  | Cover (box 2D) | 17 PNG | 564 KB | 697 KB | 1.6 MB | 497 x 680 |
+  | Hero (fan art / screenshot) | 17 JPEG | 269 KB | 279 KB | 579 KB | 1920 x 1080 |
+  | Logo (wheel) | 17 PNG | 48 KB | 75 KB | 189 KB | 600 x 300 |
+  | Icon (cartridge, 3D box, mix; up to 4 offered per game) | 65 PNG | 491 KB | 499 KB | 997 KB | 745 x 745 |
+
+  Every game had a picture in every slot. Storing the first picture of each slot is about 1.55 MB per game, against about 2.3 MB for SteamGridDB, and ScreenScraper's hero is already JPEG. Nothing here changes the plan.
+- Decision unchanged: the measurements did not change the plan. The store keeps whatever arrives.
 
 ### Phase 1: the durable store
 
@@ -111,6 +120,11 @@ Progress: done and checked. `OEArtworkBackup` copies to `{backup}/Artwork/` when
 - Save-space option if Phase 0 says it is worth it.
 
 Progress: bulk fetch and cleanup are done and checked; save-space is dropped. Preferences → Artwork has a "Whole library" section: "Fetch Missing Artwork" runs a small worker pool (3 at a time, 1 for ScreenScraper, which has a shared limit) with Pause and Stop. It stops by itself, cleanly, when a provider says its quota is used up or when six games in a row get no answer; the game that hit the quota is not counted, and every finished game keeps its picture, so running it again carries on. A game whose slots are already covered is skipped without asking anyone, and a provider that already answered for a game (found nothing, within a week) is not asked again. "Clean Up Unused Artwork…" lists automatic provider pictures for games no longer in the library, asks first, and moves them into a dated `Cleaned <time>` folder inside the artwork folder; it never deletes, leaves pinned, own, library-cover and History pictures alone, and refuses to run when the library list is empty. 10 new unit tests (pool size, pause and resume, stop, quota stop, no-answer stop, no double fetch, cleanup keeps every byte). In the real app (libretro chosen for one run): the first run fetched 4 posters and found none for 13 games, replacing an unpinned SteamGridDB poster whose bytes went to History; the second run fetched nothing and changed no file; Clean Up reported nothing to clean. Pause and Stop were not clicked live because the keyless source finished in seconds; they are covered by the tests. Save-space mode is not built: it would store a lossy copy, and the rule is that originals are always kept, so the only saving left is a second smaller file per picture, which is not worth a writer and a restore path.
+
+### Closing notes
+
+- Logins in library cover addresses: ScreenScraper's media addresses include the developer's and the user's login in the query string, and the library stored them as a cover's source. The library now stores the address without the login (`ScreenScraperClient.redacted`) and signs it again to download (`signed`), and a launch-time scrub removes the login from covers saved earlier (2 of 17 in the maintainer's library; 0 after). Only the address text changed; no picture was touched.
+- Still open outside this branch: PR 818 is stacked on #795 (Big Picture) and must be retargeted to `main` once #795 merges.
 
 ## Open questions
 

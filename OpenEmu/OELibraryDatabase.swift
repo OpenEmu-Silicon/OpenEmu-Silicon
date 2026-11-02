@@ -194,6 +194,12 @@ final class OELibraryDatabase: NSObject {
             defaultDB.startOpenVGDBSync()
             romImporter.start()
             OEArtworkStore.importLibraryCovers(from: defaultDB)
+            // Older libraries stored ScreenScraper addresses with the user's login in them.
+            let scrubbed = OEDBImage.scrubStoredCredentials(in: defaultDB.mainThreadContext)
+            if scrubbed > 0 { os_log(.info, log: .library, "Removed the login from %d stored cover addresses", scrubbed) }
+            #if DEBUG
+            OEArtworkMeasure.runIfRequested(defaultDB)
+            #endif
         }
     }
     
