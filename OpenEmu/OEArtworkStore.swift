@@ -216,6 +216,38 @@ final class OEArtworkStore: @unchecked Sendable {
         replace(data, game, slot, origin: origin, pinned: false, onlyIfUnpinned: true)
     }
 
+    /// What a provider download does to a slot. With `preferred` (the person chose this provider on its own), its
+    /// picture replaces an automatic one that came from somewhere else; the old one moves to `History`. Otherwise,
+    /// and for a pinned picture or one the person supplied, it only fills an empty slot.
+    @discardableResult
+    func supply(_ data: Data, for game: Game, slot: Slot, origin: Origin, preferred: Bool) -> Outcome {
+        if preferred, let current = entry(game, slot), !current.pinned,
+           case .provider(let other) = Origin(raw: current.origin), origin != .provider(other) {
+            return replaceAutomatic(data, for: game, slot: slot, origin: origin)
+        }
+        return fill(data, for: game, slot: slot, origin: origin)
+    }
+
+    /// The active picture for a slot when it already does the job of a download, so the provider need not be asked:
+    /// a pinned pick or the person's own file always; a provider's picture when that provider is the one preferred
+    /// (a source chosen on its own) or, with no single source chosen, any provider in use. Library covers and other
+    /// providers' pictures do not count, so a change of provider still fetches.
+    func reusable(_ game: Game, _ slot: Slot, providers: [String], preferred: String?) -> (url: URL, provider: String?)? {
+        guard let current = entry(game, slot), let url = active(game, slot) else { return nil }
+        let origin = Origin(raw: current.origin)
+        if current.pinned {
+            if case .provider(let id) = origin { return (url, id) }
+            return (url, nil)
+        }
+        switch origin {
+        case .user, .unknown: return (url, nil)
+        case .library: return nil
+        case .provider(let id):
+            if let preferred = preferred { return id == preferred ? (url, id) : nil }
+            return providers.contains(id) ? (url, id) : nil
+        }
+    }
+
     /// Keeps a picture that is about to be lost somewhere else (a library cover about to be replaced or deleted).
     /// An empty slot is filled with it. A slot that holds different bytes gets it in `History`. The active picture is
     /// never changed and nothing is overwritten.

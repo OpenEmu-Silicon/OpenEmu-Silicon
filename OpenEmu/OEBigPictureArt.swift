@@ -225,9 +225,29 @@ final class OEBigPictureArt: ObservableObject {
             self.pending[key.md5] = nil
 
             // 2. Only a provider that has not answered for this game yet is asked, and only while something is missing.
+            // The artwork folder is read first: a picture saved there by the provider in use (or chosen by the person)
+            // is not downloaded again, for example after the small copies were cleared or the source was changed back.
             var gathered = OEBigPictureArtSet()
             var standard = snapshot.stored.standardPoster
             var square = snapshot.stored.squareIcon
+            let ids = chain.map { $0.id }, preferredID = OEBigPictureArtSource.preferredID, wantedFromFolder = key.artworkGame
+            let reused = await Task.detached(priority: .utility) { () -> (set: OEBigPictureArtSet, standard: Bool, square: Bool) in
+                var set = OEBigPictureArtSet()
+                var standard = false, square = false
+                func image(_ slot: OEArtworkStore.Slot) -> (NSImage, String?)? {
+                    guard let found = OEArtworkStore.shared.reusable(wantedFromFolder, slot, providers: ids, preferred: preferredID),
+                          let picture = NSImage(contentsOf: found.url) else { return nil }
+                    return (picture, found.provider)
+                }
+                if snapshot.stored.backdrop == nil, let (picture, _) = image(.hero) { set.hero = picture }
+                if snapshot.stored.poster == nil, let (picture, from) = image(.poster) { set.grid = picture; standard = from == "steamgriddb" }
+                if snapshot.stored.icon == nil, let (picture, from) = image(.icon) { set.icon = picture; square = from == "steamgriddb" }
+                if snapshot.stored.logo == nil, let (picture, _) = image(.logo) { set.logo = picture }
+                return (set, standard, square)
+            }.value
+            gathered.fillGaps(from: reused.set)
+            if reused.set.grid != nil { standard = reused.standard }
+            if reused.set.icon != nil { square = reused.square }
             func hasEverything() -> Bool {
                 (snapshot.stored.backdrop != nil || gathered.hero != nil) && (snapshot.stored.poster != nil || gathered.grid != nil)
                     && (snapshot.stored.icon != nil || gathered.icon != nil) && (snapshot.stored.logo != nil || gathered.logo != nil)
@@ -350,6 +370,11 @@ final class OEBigPictureArt: ObservableObject {
             return trimmed.isEmpty ? name : trimmed
         }
 
+        init(md5: String, name: String, systemIdentifier: String?, romFileName: String? = nil, fileSize: Int = 0, fullName: String? = nil) {
+            self.md5 = md5; self.name = name; self.systemIdentifier = systemIdentifier
+            self.romFileName = romFileName; self.fileSize = fileSize; self.fullName = fullName ?? name
+        }
+
         @MainActor
         init(_ game: OEDBGame) {
             md5 = game.defaultROM?.md5Hash ?? ""
@@ -457,6 +482,17 @@ enum OEBigPictureArtSource: String, CaseIterable {
             guard let first = preferred(chosen) else { return fallbackEnabled ? available : [] }
             // The preferred source is asked first. With the fallback on, the others follow in the automatic order.
             return fallbackEnabled ? [first] + available.filter { $0.id != first.id } : [first]
+        }
+    }
+
+    /// The id of the provider chosen on its own, or nil for Automatic and library covers only. Its pictures replace
+    /// automatic ones from other providers; with nothing chosen, whichever provider answers first keeps the slot.
+    static var preferredID: String? {
+        switch chosen {
+        case .steamGridDB: return "steamgriddb"
+        case .screenScraper: return "screenscraper"
+        case .libretro: return "libretro"
+        case .automatic, .libraryOnly: return nil
         }
     }
 

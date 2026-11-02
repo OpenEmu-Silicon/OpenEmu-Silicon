@@ -401,4 +401,100 @@ final class ArtworkStoreTests: XCTestCase {
         display.syncPinned(game, md5: game.md5)
         XCTAssertEqual(display.read(md5: game.md5, providerIDs: []).stored.poster.map { Int($0.size.width) }, 40, "the newer pick wins")
     }
+
+    // MARK: Changing provider
+
+    func testAPreferredProviderReplacesAnotherProvidersAutomaticPictureAndKeepsTheOldOne() throws {
+        _ = store.fill(data(1), for: game, slot: .poster, origin: .provider("libretro"))
+        guard case .stored(let url) = store.supply(data(2), for: game, slot: .poster, origin: .provider("steamgriddb"), preferred: true) else { return XCTFail() }
+        XCTAssertEqual(try Data(contentsOf: url), data(2))
+        XCTAssertEqual(store.entry(game, .poster)?.origin, "provider:steamgriddb")
+        XCTAssertEqual(try store.history(game, .poster).map { try Data(contentsOf: $0) }, [data(1)], "the old picture is kept")
+    }
+
+    func testWithoutAPreferredProviderTheFirstPictureStays() throws {
+        _ = store.fill(data(1), for: game, slot: .poster, origin: .provider("libretro"))
+        guard case .keptExisting = store.supply(data(2), for: game, slot: .poster, origin: .provider("steamgriddb"), preferred: false) else { return XCTFail() }
+        XCTAssertEqual(store.entry(game, .poster)?.origin, "provider:libretro")
+        XCTAssertTrue(store.history(game, .poster).isEmpty)
+    }
+
+    func testAPreferredProviderNeverReplacesAPinnedOrOwnPicture() throws {
+        _ = store.choose(data(1), for: game, slot: .poster, origin: .user)
+        guard case .keptExisting = store.supply(data(2), for: game, slot: .poster, origin: .provider("steamgriddb"), preferred: true) else { return XCTFail() }
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(store.active(game, .poster))), data(1))
+        store.unpin(game, .poster)
+        // Unpinned but the person's own file: only a provider's automatic picture is replaced.
+        guard case .keptExisting = store.supply(data(2), for: game, slot: .poster, origin: .provider("steamgriddb"), preferred: true) else { return XCTFail() }
+    }
+
+    func testSwitchingProvidersBackAndForthLosesNothing() throws {
+        _ = store.fill(data(1), for: game, slot: .hero, origin: .provider("libretro"))
+        _ = store.supply(data(2), for: game, slot: .hero, origin: .provider("steamgriddb"), preferred: true)
+        _ = store.supply(data(3), for: game, slot: .hero, origin: .provider("libretro"), preferred: true)
+        let everything = Set(snapshot().values)
+        XCTAssertTrue(everything.isSuperset(of: [data(1), data(2), data(3)]), "every picture ever stored is still a file")
+    }
+
+    func testReusableOnlyCountsPicturesThatAlreadyDoTheJob() throws {
+        _ = store.fill(data(1), for: game, slot: .poster, origin: .provider("libretro"))
+        // Nothing chosen on its own: any provider in use counts.
+        XCTAssertNotNil(store.reusable(game, .poster, providers: ["steamgriddb", "libretro"], preferred: nil))
+        XCTAssertNil(store.reusable(game, .poster, providers: ["steamgriddb"], preferred: nil))
+        // A source chosen on its own: only its own pictures count, so a change of provider fetches.
+        XCTAssertNil(store.reusable(game, .poster, providers: ["steamgriddb"], preferred: "steamgriddb"))
+        XCTAssertNotNil(store.reusable(game, .poster, providers: ["libretro"], preferred: "libretro"))
+        // A pick always counts, and a library cover never does.
+        _ = store.choose(data(5), for: game, slot: .hero, origin: .user)
+        XCTAssertNotNil(store.reusable(game, .hero, providers: [], preferred: "steamgriddb"))
+        _ = store.fill(data(6), for: game, slot: .cover, origin: .library)
+        XCTAssertNil(store.reusable(game, .cover, providers: ["steamgriddb"], preferred: nil))
+    }
+
+    func testAFailedReplaceLeavesThePictureAndTheIndexAsTheyWere() throws {
+        _ = store.fill(data(1), for: game, slot: .poster, origin: .provider("libretro"))
+        let before = try XCTUnwrap(store.entry(game, .poster))
+        let beforeFiles = snapshot()
+        // A plain file where History must go makes the replace fail after it has started.
+        let folder = try XCTUnwrap(store.active(game, .poster)).deletingLastPathComponent()
+        try Data("in the way".utf8).write(to: folder.appendingPathComponent(OEArtworkStore.historyName))
+
+        XCTAssertEqual(store.supply(data(2), for: game, slot: .poster, origin: .provider("steamgriddb"), preferred: true), .failed)
+        XCTAssertEqual(store.entry(game, .poster), before)
+        var after = snapshot()
+        after.removeValue(forKey: "snes/poster/" + OEArtworkStore.historyName)
+        XCTAssertEqual(after, beforeFiles, "no picture lost and no staging file left behind")
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(store.active(game, .poster))), data(1))
+    }
+
+    // MARK: Library covers from the chosen source
+
+    private struct FakeProvider: OEBigPictureArtProvider {
+        let id: String
+        let picture: NSImage?
+        var title: String { id }
+        var isThrottled: Bool { false }
+        var providesStandardPosters: Bool { true }
+        func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet { OEBigPictureArtSet(grid: picture, isDefinitive: true) }
+    }
+
+    func testACoverComesFromTheFirstProviderThatHasOne() async throws {
+        let first = NSImage(size: NSSize(width: 10, height: 20)), second = NSImage(size: NSSize(width: 30, height: 40))
+        let key = OEBigPictureArt.GameKey(md5: "aa", name: "Zelda", systemIdentifier: "openemu.system.nes")
+        let found = await OEArtworkCoverSource.cover(for: key, providers: [FakeProvider(id: "a", picture: nil), FakeProvider(id: "b", picture: first), FakeProvider(id: "c", picture: second)])
+        XCTAssertTrue(found === first)
+        let none = await OEArtworkCoverSource.cover(for: key, providers: [FakeProvider(id: "a", picture: nil)])
+        XCTAssertNil(none)
+    }
+
+    func testAutomaticAndLibraryOnlyLeaveCoversToTheLibrary() throws {
+        let key = OEBigPictureArtSource.defaultsKey, saved = UserDefaults.standard.object(forKey: key)
+        defer { UserDefaults.standard.set(saved, forKey: key) }
+        for source in [OEBigPictureArtSource.automatic, .libraryOnly] {
+            UserDefaults.standard.set(source.rawValue, forKey: key)
+            XCTAssertNil(OEArtworkCoverSource.providersForCovers(), source.rawValue)
+        }
+        UserDefaults.standard.set(OEBigPictureArtSource.libretro.rawValue, forKey: key)
+        XCTAssertEqual(OEArtworkCoverSource.providersForCovers()?.first?.id, "libretro")
+    }
 }

@@ -232,7 +232,7 @@ enum OEArtworkOriginals {
     static func save(_ data: Data, provider: String, md5: String, slot: String, game: OEArtworkStore.Game? = nil, in root: URL = directory) -> URL? {
         // The artwork folder keeps the same bytes under the game's name, where a person can find them.
         if let game = game, let artSlot = OEArtworkStore.Slot(rawValue: slot) {
-            OEArtworkStore.shared.fill(data, for: game, slot: artSlot, origin: .provider(provider))
+            OEArtworkStore.shared.supply(data, for: game, slot: artSlot, origin: .provider(provider), preferred: OEBigPictureArtSource.preferredID == provider)
         }
         let safe = { (text: String) in text.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" } }
         let provider = safe(provider), md5 = safe(md5), slot = safe(slot)

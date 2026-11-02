@@ -282,7 +282,11 @@ final class OEDBGame: OEDBItem {
         if status == .alert || status == .ok {
             status = .processing
             save()
-            libraryDatabase.startOpenVGDBSync()
+            // A provider chosen on its own in Preferences → Artwork supplies the cover; the library's lookup takes over
+            // when it has none.
+            let library: () -> Void = { [weak self] in self?.libraryDatabase.startOpenVGDBSync() }
+            if Thread.isMainThread, MainActor.assumeIsolated({ requestCoverFromChosenSource(onMiss: library) }) { return }
+            library()
         }
     }
     
