@@ -47,6 +47,11 @@ final class PrefArtworkProvidersController: NSViewController {
     private let folderPath   = NSTextField(labelWithString: "")
     private let folderStatus = NSTextField(wrappingLabelWithString: "")
     private var folderButtons = [NSButton]()
+    private let bulkStatus = NSTextField(wrappingLabelWithString: "")
+    private let bulkStart = NSButton(title: "Fetch Missing Artwork", target: nil, action: nil)
+    private let bulkPause = NSButton(title: "Pause", target: nil, action: nil)
+    private let bulkStop = NSButton(title: "Stop", target: nil, action: nil)
+    private var bulk: OEArtworkBulkFetch?
 
     override func loadView() {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 468, height: 600))
@@ -94,6 +99,18 @@ final class PrefArtworkProvidersController: NSViewController {
         let folderRow = NSStackView(views: folderButtons)
         folderRow.spacing = 8
 
+        bulkStatus.font = .systemFont(ofSize: 11)
+        bulkStatus.textColor = .secondaryLabelColor
+        bulkStatus.stringValue = "Fetches posters, backdrops, icons and logos for every game that does not have them yet. Games that do are skipped, so it is safe to stop and run again."
+        bulkStart.target = self; bulkStart.action = #selector(startBulk)
+        bulkPause.target = self; bulkPause.action = #selector(togglePauseBulk)
+        bulkStop.target = self; bulkStop.action = #selector(stopBulk)
+        let cleanUp = NSButton(title: "Clean Up Unused Artwork…", target: self, action: #selector(cleanUp))
+        for button in [bulkStart, bulkPause, bulkStop, cleanUp] { button.bezelStyle = .rounded }
+        bulkPause.isEnabled = false; bulkStop.isEnabled = false
+        let bulkRow = NSStackView(views: [bulkStart, bulkPause, bulkStop])
+        bulkRow.spacing = 8
+
         let steamSave = NSButton(title: "Save", target: self, action: #selector(saveSteamGrid))
         steamSave.bezelStyle = .rounded
         let steamClear = NSButton(title: "Clear", target: self, action: #selector(clearSteamGrid))
@@ -130,6 +147,7 @@ final class PrefArtworkProvidersController: NSViewController {
             builtIn, links,
             label("Preferred source"), sourcePopUp, fallbackCheck, statusLabel,
             label("Artwork folder"), folderPath, folderRow, folderStatus,
+            label("Whole library"), bulkRow, bulkStatus, cleanUp,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -153,7 +171,7 @@ final class PrefArtworkProvidersController: NSViewController {
         scroll.documentView = content
         view.addSubview(scroll)
 
-        let fields: [NSView] = [description, steamGridKey, scraperUser, scraperPassword, scraperStatus, builtIn, links, folderPath, folderStatus]
+        let fields: [NSView] = [bulkStatus, description, steamGridKey, scraperUser, scraperPassword, scraperStatus, builtIn, links, folderPath, folderStatus]
         NSLayoutConstraint.activate([
             scroll.topAnchor.constraint(equalTo: view.topAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -205,6 +223,103 @@ final class PrefArtworkProvidersController: NSViewController {
         UserDefaults.standard.set(fallbackCheck.state == .on, forKey: OEBigPictureArtSource.fallbackKey)
         Task { @MainActor in OEBigPictureArt.shared.reset() }
         refresh()
+    }
+
+    // MARK: Whole library
+
+    @objc private func startBulk() {
+        guard bulk == nil, let database = OELibraryDatabase.default else { return }
+        let providers = OEBigPictureArtSource.providers()
+        guard !providers.isEmpty else {
+            bulkStatus.stringValue = "No online source is ready. Set up SteamGridDB or ScreenScraper above, or choose libretro-thumbnails."
+            return
+        }
+        let games = libraryGames(database)
+        let keys = games.map { OEBigPictureArt.GameKey($0) }.filter { !$0.md5.isEmpty }
+        guard !keys.isEmpty else {
+            bulkStatus.stringValue = "No games in the library to fetch artwork for."
+            return
+        }
+        // ScreenScraper has a shared request limit, so it goes one game at a time; the others can overlap.
+        let run = OEArtworkBulkFetch(keys: keys, workers: providers.contains { $0.isThrottled } ? 1 : 3,
+                                     fetch: OEArtworkBulkFetch.libraryFetch(providers: providers, preferred: OEBigPictureArtSource.preferredID))
+        run.onProgress = { [weak self] progress in
+            DispatchQueue.main.async { self?.showBulk(progress) }
+        }
+        bulk = run
+        bulkStart.isEnabled = false; bulkPause.isEnabled = true; bulkStop.isEnabled = true
+        showBulk(run.current)
+        Task { @MainActor [weak self] in
+            let finish = await run.run()
+            self?.finishBulk(finish, progress: run.current)
+        }
+    }
+
+    /// Every game in the library, read on the main thread from the main context.
+    private func libraryGames(_ database: OELibraryDatabase) -> [OEDBGame] {
+        let request = OEDBGame.fetchRequest()
+        request.fetchBatchSize = 200
+        return ((try? database.mainThreadContext.fetch(request)) as? [OEDBGame]) ?? []
+    }
+
+    private func showBulk(_ p: OEArtworkBulkFetch.Progress) {
+        guard bulk != nil else { return }
+        let paused = bulk?.isPaused == true ? " (paused)" : ""
+        bulkStatus.stringValue = "\(p.processed) of \(p.total) games\(paused): \(p.filled) fetched, \(p.alreadyHad) already had art, \(p.noArt) with none found."
+    }
+
+    private func finishBulk(_ finish: OEArtworkBulkFetch.Finish, progress p: OEArtworkBulkFetch.Progress) {
+        bulk = nil
+        bulkStart.isEnabled = true; bulkPause.isEnabled = false; bulkStop.isEnabled = false
+        bulkPause.title = "Pause"
+        let counts = "\(p.filled) fetched, \(p.alreadyHad) already had art, \(p.noArt) with none found, \(p.total - p.processed) not done."
+        switch finish {
+        case .finished: bulkStatus.stringValue = "Done. " + counts
+        case .stopped: bulkStatus.stringValue = "Stopped. " + counts + " Run it again to carry on."
+        case .outOfQuota: bulkStatus.stringValue = "Stopped: the source says its limit is used up for now. " + counts + " Run it again later; finished games are skipped."
+        case .unreachable: bulkStatus.stringValue = "Stopped: no source answered several games in a row (offline, or a bad login). " + counts
+        }
+        Task { @MainActor in OEBigPictureArt.shared.reset() }
+    }
+
+    @objc private func togglePauseBulk() {
+        guard let run = bulk else { return }
+        if run.isPaused { run.resume(); bulkPause.title = "Pause" } else { run.pause(); bulkPause.title = "Resume" }
+        showBulk(run.current)
+    }
+
+    @objc private func stopBulk() {
+        bulk?.resume()
+        bulk?.stop()
+    }
+
+    @objc private func cleanUp() {
+        guard let database = OELibraryDatabase.default else { return }
+        let games = libraryGames(database)
+        let alert = NSAlert()
+        // An empty list means the library did not load, not that every picture is unused.
+        guard !games.isEmpty else {
+            alert.messageText = "The library has no games loaded"
+            alert.informativeText = "Nothing was moved. Try again once your library is showing."
+            alert.runModal()
+            return
+        }
+        let inLibrary = Set(games.map { OEArtworkStore.Game($0).md5 })
+        let plan = OEArtworkCleanup.plan(inLibrary: inLibrary)
+        if plan.isEmpty {
+            alert.messageText = "Nothing to clean up"
+            alert.informativeText = "Every automatic picture in the artwork folder belongs to a game that is still in your library."
+            alert.runModal()
+            return
+        }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(plan.reduce(0) { $0 + $1.bytes }), countStyle: .file)
+        alert.messageText = "Move \(plan.count) unused pictures?"
+        alert.informativeText = "These are automatic pictures for games that are no longer in your library (\(size)). They are moved into a dated \"Cleaned\" folder inside the artwork folder. Nothing is deleted, and pictures you picked or added yourself are left alone."
+        alert.addButton(withTitle: "Move Them")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let outcome = OEArtworkCleanup.perform(plan)
+        folderStatus.stringValue = "Moved \(outcome.moved) pictures to \(outcome.folder?.lastPathComponent ?? "—")" + (outcome.failed > 0 ? "; \(outcome.failed) could not be moved and were left in place." : ".")
     }
 
     // MARK: Artwork folder

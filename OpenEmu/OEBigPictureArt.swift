@@ -421,6 +421,12 @@ protocol OEBigPictureArtProvider: Sendable {
     /// True when the poster it supplies is always a portrait poster of the same shape.
     var providesStandardPosters: Bool { get }
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet
+    /// True while the provider is holding back because its quota is used up. A bulk fetch stops instead of waiting.
+    func isOutOfQuota() async -> Bool
+}
+
+extension OEBigPictureArtProvider {
+    func isOutOfQuota() async -> Bool { false }
 }
 
 /// Which provider supplies big-picture art. Only these two: others need a developer key that large libraries would
@@ -605,6 +611,8 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         }
     }
 
+    func isOutOfQuota() async -> Bool { pausedUntil > Date() }
+
     /// Reserves the next free request time before waiting, so callers queue up in order.
     private func waitForSlot() async {
         let now = Date()
@@ -742,6 +750,19 @@ final class OEBigPictureArtStore: @unchecked Sendable {
             if foundSomething || age < Self.retryAfterNothing { answered.insert(id) }
         }
         return (stored, answered)
+    }
+
+    /// Which of these providers already answered for this game, without reading any picture.
+    func answered(md5: String, providerIDs: [String]) -> Set<String> {
+        var answered = Set<String>()
+        for id in providerIDs {
+            let url = marker(md5, "answered-\(id)")
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { continue }
+            let foundSomething = (try? String(contentsOf: url)) == "found"
+            let age = Date().timeIntervalSince((attributes[.modificationDate] as? Date) ?? .distantPast)
+            if foundSomething || age < Self.retryAfterNothing { answered.insert(id) }
+        }
+        return answered
     }
 
     /// The large backdrop for the featured game's hero.

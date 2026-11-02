@@ -216,6 +216,24 @@ final class OEArtworkStore: @unchecked Sendable {
         replace(data, game, slot, origin: origin, pinned: false, onlyIfUnpinned: true)
     }
 
+    /// A copy of the index: md5, then slot, then what is stored.
+    func allEntries() -> [String: [String: Entry]] {
+        if let next = lockedOrForwarded() { return next.allEntries() }
+        defer { lock.unlock() }
+        loadIndexIfNeeded()
+        return index ?? [:]
+    }
+
+    /// Forgets a slot's index entry. The file is not touched: the caller has already moved it.
+    func release(md5: String, slot: Slot) {
+        if let next = lockedOrForwarded() { return next.release(md5: md5, slot: slot) }
+        defer { lock.unlock() }
+        loadIndexIfNeeded()
+        index?[md5]?[slot.rawValue] = nil
+        if index?[md5]?.isEmpty == true { index?[md5] = nil }
+        scheduleSave()
+    }
+
     /// What a provider download does to a slot. With `preferred` (the person chose this provider on its own), its
     /// picture replaces an automatic one that came from somewhere else; the old one moves to `History`. Otherwise,
     /// and for a pinned picture or one the person supplied, it only fills an empty slot.
