@@ -30,6 +30,7 @@ import OpenEmuKit
 import OpenEmuBase
 import UserNotifications
 import IOKit.hid
+import UniformTypeIdentifiers
 import os.log
 
 private var appearancePrefChangedKVOContext = 0
@@ -332,7 +333,7 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             let openPanel = NSOpenPanel()
             
             openPanel.canChooseFiles = true
-            openPanel.allowedFileTypes = [OELibraryDatabase.databaseFileExtension]
+            openPanel.allowedContentTypes = [UTType(filenameExtension: OELibraryDatabase.databaseFileExtension)].compactMap { $0 }
             openPanel.canChooseDirectories = false
             openPanel.allowsMultipleSelection = false
             

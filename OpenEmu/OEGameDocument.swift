@@ -27,6 +27,7 @@ import IOKit.pwr_mgt
 import OpenEmuBase
 import OpenEmuSystem
 import OpenEmuKit
+import UniformTypeIdentifiers
 import UserNotifications
 import os.log
 
@@ -2647,7 +2648,7 @@ final class OEGameDocument: NSDocument {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
-        panel.allowedFileTypes = validExtensions
+        panel.allowedContentTypes = validExtensions.compactMap { UTType(filenameExtension: $0) }
         
         panel.beginSheetModal(for: gameWindowController!.window!) { result in
             guard

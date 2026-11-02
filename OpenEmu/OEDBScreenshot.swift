@@ -23,6 +23,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import UniformTypeIdentifiers
 
 @objc
 final class OEDBScreenshot: OEDBItem {
@@ -112,14 +113,14 @@ final class OEDBScreenshot: OEDBItem {
 extension OEDBScreenshot: NSPasteboardWriting {
     
     func writableTypes(for pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {
-        return [.fileURL, kUTTypeImage as NSPasteboard.PasteboardType]
+        return [.fileURL, NSPasteboard.PasteboardType(UTType.image.identifier)]
     }
     
     func pasteboardPropertyList(forType type: NSPasteboard.PasteboardType) -> Any? {
         let url = url.absoluteURL
         if type == .fileURL {
             return (url as NSURL).pasteboardPropertyList(forType: type)
-        } else if type.rawValue == kUTTypeImage as String {
+        } else if type.rawValue == UTType.image.identifier {
             let image = NSImage(contentsOf: url)
             return image?.pasteboardPropertyList(forType: type)
         }

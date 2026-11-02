@@ -25,6 +25,7 @@
 import Foundation
 import CryptoKit
 import IOKit
+import LocalAuthentication
 import Security
 import os.log
 
@@ -362,13 +363,16 @@ final class OECredentialStore {
     // MARK: - Low-level Keychain Helpers (migration use only)
 
     private func keychainRead(service: String, account: String) -> String? {
+        // Fail instead of prompting if the item needs authentication.
+        let context = LAContext()
+        context.interactionNotAllowed = true
         let query: [CFString: Any] = [
-            kSecClass:               kSecClassGenericPassword,
-            kSecAttrService:         service,
-            kSecAttrAccount:         account,
-            kSecReturnData:          kCFBooleanTrue!,
-            kSecMatchLimit:          kSecMatchLimitOne,
-            kSecUseAuthenticationUI: kSecUseAuthenticationUIFail,
+            kSecClass:                    kSecClassGenericPassword,
+            kSecAttrService:              service,
+            kSecAttrAccount:              account,
+            kSecReturnData:               kCFBooleanTrue!,
+            kSecMatchLimit:               kSecMatchLimitOne,
+            kSecUseAuthenticationContext: context,
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)

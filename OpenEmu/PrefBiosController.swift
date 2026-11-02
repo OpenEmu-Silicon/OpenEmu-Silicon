@@ -97,8 +97,8 @@ final class PrefBiosController: NSViewController {
         var items: [AnyHashable] = []
 
         for core in OECorePlugin.allPlugins {
-            guard !core.requiredFiles.isEmpty,
-                  let entries = core.requiredFiles as? [[String: Any]] else { continue }
+            let entries = core.requiredFiles
+            guard !entries.isEmpty else { continue }
 
             // Group entries by filename — multiple entries for the same filename are alternate hashes.
             var groups: [String: BIOSFileGroup] = [:]
