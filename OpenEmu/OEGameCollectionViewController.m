@@ -555,7 +555,7 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
     [openPanel setCanChooseDirectories:YES];
     [openPanel setCanChooseFiles:NO];
     [openPanel setPrompt:NSLocalizedString(@"Choose", @"")];
-    [openPanel setMessage:NSLocalizedString(@"Choose a folder of artwork images. Files are matched to games by exact name.", @"")];
+    [openPanel setMessage:NSLocalizedString(@"Choose a folder of artwork images. Files are matched to games by name. Add -poster, -hero, -icon or -logo to a name to pick the kind. Your folder is never changed.", @"")];
 
     __weak typeof(self) weakSelf = self;
     [openPanel beginWithCompletionHandler:^(NSInteger result) {
@@ -575,13 +575,7 @@ static NSString * const OEGameTableSortDescriptorsKey = @"OEGameTableSortDescrip
             if(strongSelf == nil || confirmedMatches.count == 0)
                 return;
 
-            NSManagedObjectContext *context = nil;
-            for(OEArtworkFolderMatcherMatch *match in confirmedMatches)
-            {
-                [match.game setBoxImageByURL:match.fileURL];
-                context = match.game.managedObjectContext;
-            }
-            [context save:nil];
+            [OEArtworkFolderMatcher applyMatches:confirmedMatches];
 
             [strongSelf reloadDataIndexes:[strongSelf selectionIndexes]];
         };

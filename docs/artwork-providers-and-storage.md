@@ -90,6 +90,8 @@ Progress: "Choose Artwork…" is in the game's right-click menu (single game). A
 - Aspect ratio checks with a warning.
 - Check: the folder's files are byte-for-byte unchanged afterward.
 
+Progress: done and checked. "Import Artwork from Folder…" now reads `Game.png` (cover), `Game-poster|hero|icon|logo|cover.png` (also with `_`), and folders named for a slot or an ES-DE media kind (`covers`, `fanart`, `marquees`, `miximages`), up to three levels deep. History folders, links and non-pictures are skipped. Matching is by exact normalized name; two games with the same name are never guessed between. A wrong shape for a slot shows a warning in the review sheet but can still be applied. Applied pictures are stored as pinned user art, and a cover also becomes the library box art. Checked on a generated sample folder in the real app (one match applied as a pinned hero for Space Invaders; the folder's SHA-1s were identical afterward) and by 8 unit tests. Not done: scanning on its own schedule, and matching by system folder when two games share a name.
+
 ### Phase 5: cloud backup
 
 - `{backup}/Artwork/…` plus a manifest, in the existing backup manager.
