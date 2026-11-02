@@ -37,7 +37,11 @@ The maintainer is not a professional developer. Write commit messages, PR descri
 
 ## Build and Verify
 
-CI (`build-check.yml`) builds every PR, including every core the PR touches, and the test scripts below build the app themselves. A separate local build-and-analyze pass is not a step any more. Use the script that fits the change:
+CI (`build-check.yml`) builds every PR, including every core the PR touches, and the test scripts below build the app themselves. A separate local build-and-analyze pass is not a step any more.
+
+**To check anything you can see in the app (windows, menus, preferences, the library, import), drive the real debug app with the computer-use tools first.** Follow [`docs/computer-use-testing.md`](docs/computer-use-testing.md). It has no password prompt and does not stall. `check.sh` goes through Apple's UI test runner, which makes macOS ask for a password each run, so it is not the first choice. If your agent has no computer-use tools, use the scripts below.
+
+Use the script that fits the change:
 
 ```bash
 ./Scripts/check.sh                  # build, then drive the real app (windows, panes, Cores) against your real library
@@ -97,7 +101,7 @@ Pick the cheapest check that can really see the bug:
 |------------------|-----|
 | A pure function, parser, or data rule | A unit test in the matching `*Tests` target (`./Scripts/unit-tests.sh`) |
 | A core: loading, picture, sound, button input, save states | `./Scripts/headless/gb-checks.sh` for Game Boy, or `./Scripts/headless/run.sh <Core> --rom <file> ...` for any core. It runs the core with no window, so no one has to play the game |
-| The app window, menus, preferences, import, quick save | `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
+| The app window, menus, preferences, import, quick save | Drive the debug app with computer use ([`docs/computer-use-testing.md`](docs/computer-use-testing.md)). Without those tools: `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
 | A crash | The crash report plus `./Scripts/collect-diagnostics.sh`. Write the check that triggers it, then fix |
 
 `./Scripts/prove.sh` chains the build, tests, headless checks, and diagnostics and prints one pass or fail line. A change is proven only when it ends with `PROVEN`.

@@ -203,11 +203,34 @@ final class BigPictureTests: XCTestCase {
 
     func testLibretroCanBeChosenOnItsOwn() {
         let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey)
-        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey) }
+        let before = defaults.object(forKey: OEBigPictureArtSource.defaultsKey), fallback = defaults.object(forKey: OEBigPictureArtSource.fallbackKey)
+        defer { defaults.set(before, forKey: OEBigPictureArtSource.defaultsKey); defaults.set(fallback, forKey: OEBigPictureArtSource.fallbackKey) }
         defaults.set("libretro", forKey: OEBigPictureArtSource.defaultsKey)
+        defaults.set(false, forKey: OEBigPictureArtSource.fallbackKey)
         XCTAssertEqual(OEBigPictureArtSource.providers().map { $0.id }, ["libretro"])
         XCTAssertEqual(OEBigPictureArtSource.libretro.title, "libretro-thumbnails")
+    }
+
+    func testAChosenSourceIsFollowedByTheOthersWhenFallbackIsOn() {
+        let defaults = UserDefaults.standard
+        let source = defaults.object(forKey: OEBigPictureArtSource.defaultsKey), fallback = defaults.object(forKey: OEBigPictureArtSource.fallbackKey)
+        defer { defaults.set(source, forKey: OEBigPictureArtSource.defaultsKey); defaults.set(fallback, forKey: OEBigPictureArtSource.fallbackKey) }
+
+        defaults.set("automatic", forKey: OEBigPictureArtSource.defaultsKey)
+        let everything = OEBigPictureArtSource.providers().map { $0.id }
+
+        defaults.set("libretro", forKey: OEBigPictureArtSource.defaultsKey)
+        defaults.set(false, forKey: OEBigPictureArtSource.fallbackKey)
+        XCTAssertEqual(OEBigPictureArtSource.providers().map { $0.id }, ["libretro"], "off: the chosen source alone")
+
+        defaults.set(true, forKey: OEBigPictureArtSource.fallbackKey)
+        let ids = OEBigPictureArtSource.providers().map { $0.id }
+        XCTAssertEqual(ids.first, "libretro", "on: the chosen source is asked first")
+        XCTAssertEqual(Set(ids), Set(everything), "on: every ready source follows")
+        XCTAssertEqual(ids.count, Set(ids).count, "no source twice")
+
+        defaults.set("libraryOnly", forKey: OEBigPictureArtSource.defaultsKey)
+        XCTAssertTrue(OEBigPictureArtSource.providers().isEmpty, "library covers only never reaches out")
     }
 
     func testAGameTakesEachPictureFromTheFirstProviderThatHasIt() {
@@ -279,5 +302,55 @@ final class BigPictureTests: XCTestCase {
         XCTAssertNotNil(one.read(md5: md5, providerIDs: []).stored.poster)
         XCTAssertTrue(one.read(md5: md5, providerIDs: []).stored.standardPoster)
         XCTAssertNil(two.read(md5: md5, providerIDs: []).stored.poster)
+    }
+}
+
+/// `OEArtworkOriginals` keeps downloads exactly as they arrived and never replaces a file. These use a throwaway folder.
+final class ArtworkOriginalsTests: XCTestCase {
+
+    private var root: URL!
+
+    override func setUpWithError() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("ArtworkOriginalsTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3])
+    private let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 9, 8, 7])
+
+    func testKeepsTheExactBytesAndNamesTheFileByWhatItIs() throws {
+        let url = try XCTUnwrap(OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "abc123", slot: "logo", in: root))
+        XCTAssertEqual(url.lastPathComponent, "abc123-logo.png")
+        XCTAssertEqual(try Data(contentsOf: url), png)
+        XCTAssertEqual(OEArtworkOriginals.fileExtension(for: jpeg), "jpg")
+        XCTAssertEqual(OEArtworkOriginals.fileExtension(for: Data([0, 0, 1, 0, 1, 0, 0x80, 0x80])), "ico")
+        XCTAssertEqual(OEArtworkOriginals.fileExtension(for: Data([1, 2, 3])), "img")
+    }
+
+    func testNeverReplacesAnExistingFile() throws {
+        let first = try XCTUnwrap(OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "abc123", slot: "hero", in: root))
+        // A later download of the same game and slot, even in another format, leaves the first one alone.
+        let second = OEArtworkOriginals.save(jpeg, provider: "steamgriddb", md5: "abc123", slot: "hero", in: root)
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(try Data(contentsOf: first), png)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: first.deletingLastPathComponent().path).count, 1)
+    }
+
+    func testProvidersAndSlotsKeepSeparateFiles() throws {
+        OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "abc123", slot: "poster", in: root)
+        OEArtworkOriginals.save(jpeg, provider: "screenscraper", md5: "abc123", slot: "poster", in: root)
+        OEArtworkOriginals.save(jpeg, provider: "screenscraper", md5: "abc123", slot: "hero", in: root)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("screenscraper").path).count, 2)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("steamgriddb").path).count, 1)
+    }
+
+    func testPathPiecesCannotEscapeTheFolder() throws {
+        let url = try XCTUnwrap(OEArtworkOriginals.save(png, provider: "../evil", md5: "../../abc", slot: "a/b", in: root))
+        XCTAssertTrue(url.standardized.path.hasPrefix(root.standardized.path))
+        XCTAssertNil(OEArtworkOriginals.save(Data(), provider: "steamgriddb", md5: "abc", slot: "hero", in: root))
+        XCTAssertNil(OEArtworkOriginals.save(png, provider: "steamgriddb", md5: "", slot: "hero", in: root))
     }
 }

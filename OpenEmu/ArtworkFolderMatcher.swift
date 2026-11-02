@@ -24,20 +24,24 @@
 
 import Cocoa
 
-/// Matches image files in a folder to games by exact, normalized filename.
-///
-/// Normalization mirrors the extensionless-filename matching already used by
-/// `GameInfoHelper` and `ImportOperation`: lowercased, extension stripped.
+/// Matches the pictures in a person's own folder to games by normalized name, and puts the chosen ones in the
+/// artwork folder as pinned, user-origin art. The person's folder is only read.
 @objc(OEArtworkFolderMatcher)
 final class ArtworkFolderMatcher: NSObject {
 
     @objc(OEArtworkFolderMatcherMatch) final class Match: NSObject {
         @objc let game: OEDBGame
         @objc let fileURL: URL
+        let slot: OEArtworkStore.Slot
+        @objc let warning: String?
 
-        init(game: OEDBGame, fileURL: URL) {
+        @objc var slotName: String { slot.rawValue }
+
+        init(game: OEDBGame, fileURL: URL, slot: OEArtworkStore.Slot = .cover, warning: String? = nil) {
             self.game = game
             self.fileURL = fileURL
+            self.slot = slot
+            self.warning = warning
         }
     }
 
@@ -51,54 +55,66 @@ final class ArtworkFolderMatcher: NSObject {
         }
     }
 
-    private static func normalize(_ name: String) -> String {
-        (name as NSString).deletingPathExtension
-            .precomposedStringWithCanonicalMapping
-            .lowercased()
+    static func normalize(_ name: String) -> String {
+        name.precomposedStringWithCanonicalMapping.lowercased()
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Scans `folderURL` (non-recursively) for image files and matches each one
-    /// to a game in `games` whose display name normalizes to the same string.
-    ///
-    /// If more than one file normalizes to the same game (e.g. `Sonic.png` and
-    /// `sonic.jpg`), only the first one encountered is matched; the rest are
-    /// reported as unmatched rather than silently overwriting one another.
-    @objc(matchWithFolderURL:games:) static func match(folderURL: URL, games: [OEDBGame]) -> Result {
-        let imageTypes = Set(NSImage.imageTypes)
-
-        let fileURLs = (try? FileManager.default.contentsOfDirectory(
-            at: folderURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .typeIdentifierKey],
-            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
-        )) ?? []
-
-        let imageFileURLs = fileURLs.filter { url in
-            let resourceValues = try? url.resourceValues(forKeys: [.isRegularFileKey, .typeIdentifierKey])
-            guard resourceValues?.isRegularFile == true,
-                  let uti = resourceValues?.typeIdentifier
-            else { return false }
-            return imageTypes.contains(uti)
+    /// Pairs found files with game names. A file matches only when exactly one game has that name; two games with the
+    /// same name are left alone rather than guessed at. If several files fit the same game and slot, the first (by
+    /// path) is kept and the rest are reported as unmatched.
+    static func assign(_ found: [ArtworkFolderScan.Found], gameNames: [String]) -> (matched: [(found: ArtworkFolderScan.Found, game: Int)], unmatched: [ArtworkFolderScan.Found]) {
+        var owner = [String: Int]()
+        var ambiguous = Set<String>()
+        for (index, name) in gameNames.enumerated() {
+            let key = normalize(name)
+            if owner[key] != nil { ambiguous.insert(key) } else { owner[key] = index }
         }
 
-        var gamesByNormalizedName: [String: OEDBGame] = [:]
-        for game in games {
-            gamesByNormalizedName[normalize(game.displayName)] = game
-        }
-
-        var matches: [Match] = []
-        var unmatchedFileURLs: [URL] = []
-        var matchedNormalizedNames: Set<String> = []
-
-        for fileURL in imageFileURLs {
-            let key = normalize(fileURL.lastPathComponent)
-            if let game = gamesByNormalizedName[key], !matchedNormalizedNames.contains(key) {
-                matches.append(Match(game: game, fileURL: fileURL))
-                matchedNormalizedNames.insert(key)
+        var matched = [(found: ArtworkFolderScan.Found, game: Int)]()
+        var unmatched = [ArtworkFolderScan.Found]()
+        var taken = Set<String>()
+        for file in found {
+            let key = normalize(file.title)
+            let slotKey = key + "\u{0}" + file.slot.rawValue
+            if let game = owner[key], !ambiguous.contains(key), !taken.contains(slotKey) {
+                matched.append((file, game))
+                taken.insert(slotKey)
             } else {
-                unmatchedFileURLs.append(fileURL)
+                unmatched.append(file)
             }
         }
+        return (matched, unmatched)
+    }
 
-        return Result(matches: matches, unmatchedFileURLs: unmatchedFileURLs)
+    @objc(matchWithFolderURL:games:) static func match(folderURL: URL, games: [OEDBGame]) -> Result {
+        let found = ArtworkFolderScan.scan(folderURL)
+        let names = games.map { $0.displayName }
+        let result = assign(found, gameNames: names)
+        return Result(
+            matches: result.matched.map { Match(game: games[$0.game], fileURL: $0.found.url, slot: $0.found.slot, warning: $0.found.warning) },
+            unmatchedFileURLs: result.unmatched.map { $0.url })
+    }
+
+    /// Stores the confirmed matches as the person's own pinned art. Returns how many were stored.
+    @objc(applyMatches:) @discardableResult static func apply(_ matches: [Match]) -> Int {
+        var stored = 0
+        var contexts = Set<NSManagedObjectContext>()
+        for match in matches {
+            guard let data = try? Data(contentsOf: match.fileURL), !data.isEmpty else { continue }
+            let outcome = OEArtworkChoice.choose(data, for: OEArtworkStore.Game(match.game), slot: match.slot, provider: nil)
+            switch outcome {
+            case .stored, .alreadyActive: stored += 1
+            default: continue
+            }
+            // The library's own cover is the game's box art; the other slots are read from the artwork folder.
+            if match.slot == .cover {
+                match.game.setBoxImage(url: match.fileURL)
+                if let context = match.game.managedObjectContext { contexts.insert(context) }
+            }
+        }
+        for context in contexts { try? context.save() }
+        Task { @MainActor in OEBigPictureArt.shared.reset() }
+        return stored
     }
 }

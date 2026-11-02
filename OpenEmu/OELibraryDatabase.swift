@@ -115,6 +115,7 @@ final class OELibraryDatabase: NSObject {
     }
     
     @objc func applicationWillTerminate(_ notification: Notification) {
+        OEArtworkStore.shared.flush()
         importer.saveQueue()
 
         writerContext.performAndWait {
@@ -156,6 +157,9 @@ final class OELibraryDatabase: NSObject {
     private static func rememberLocation(of url: URL) {
         let launchOverrides = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
         guard launchOverrides[databasePathKey] == nil else { return }
+        // The unit tests load throwaway libraries inside the app itself. Remembering one would point the real debug
+        // app at an empty library whenever a test run is cut short before it can put the old path back.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         let path = (url.path as NSString).abbreviatingWithTildeInPath
         UserDefaults.standard.set(path, forKey: databasePathKey)
     }
@@ -189,6 +193,13 @@ final class OELibraryDatabase: NSObject {
         DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(2)) {
             defaultDB.startOpenVGDBSync()
             romImporter.start()
+            OEArtworkStore.importLibraryCovers(from: defaultDB)
+            // Older libraries stored ScreenScraper addresses with the user's login in them.
+            let scrubbed = OEDBImage.scrubStoredCredentials(in: defaultDB.mainThreadContext)
+            if scrubbed > 0 { os_log(.info, log: .library, "Removed the login from %d stored cover addresses", scrubbed) }
+            #if DEBUG
+            OEArtworkMeasure.runIfRequested(defaultDB)
+            #endif
         }
     }
     
