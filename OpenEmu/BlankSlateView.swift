@@ -43,10 +43,10 @@ class BlankSlateView: NSView {
         static let bottomTextHeight: CGFloat = 67 // height of bottom text
     }
     
-    @objc // OECollectionViewController
+    @objc // old collection view controller
     weak var delegate: BlankSlateViewDelegate?
     
-    @objc // OECollectionViewController
+    @objc // old collection view controller
     var representedObject: Any? {
         didSet {
             guard representedObject != nil else { return }

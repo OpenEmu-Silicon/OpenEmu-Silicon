@@ -9,14 +9,10 @@
 #import "OELibraryDatabase.h"
 #import "ALIterativeMigrator.h"
 
-#import "OECoverGridDataSourceItem.h"
 #import "OEListViewDataSourceItem.h"
 #import "OECollectionViewItemProtocol.h"
 #import "OEGameCollectionViewItemProtocol.h"
 
-#import "OECollectionViewController.h"
-#import "OEGameCollectionViewController.h"
-#import "OEMediaViewController.h"
 #import "OEVersionMigrationController.h"
 #import "OEAudioDeviceManager.h"
 

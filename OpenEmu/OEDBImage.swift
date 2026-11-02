@@ -310,17 +310,11 @@ final class OEDBImage: OEDBItem {
 
     /// A cheap on-disk existence check (a single stat() call), answered
     /// synchronously and cached per relativePath. This intentionally does NOT
-    /// defer to a background check the way `image` does: imageUID() reflects
-    /// identity, not availability, but imageRepresentationType()/
-    /// imageRepresentation() still key off this to choose between the
-    /// placeholder and the real artwork — and IKImageBrowserView caches
-    /// representations by UID, so if this answer changed *after* the browser
-    /// already asked for a representation under a given UID, the browser
-    /// would be told to swap representation kind (placeholder image -> URL)
-    /// for an identity it considers unchanged. It doesn't handle that
-    /// gracefully — cells go blank/black instead of updating. A stat() call
-    /// is cheap enough to answer up front; the actual decode in `image` is
-    /// what needed to move off the main thread.
+    /// defer to a background check the way `image` does: the library grid
+    /// uses it to choose between the placeholder and the real artwork, and
+    /// an answer that changed after the item was made would leave the wrong
+    /// one showing. A stat() call is cheap enough to answer up front; the
+    /// actual decode in `image` is what needed to move off the main thread.
     var isLocalImageAvailable: Bool {
         let currentRelativePath = relativePath
         if let cached = _cachedIsLocalImageAvailable,
