@@ -21,6 +21,9 @@
 #   At the end the source and installed MD5 hashes are printed side by side
 #   so a stale install (e.g. wrong configuration, OpenEmu still holding the
 #   binary open, copy silently failed) jumps off the screen.
+#
+#   A failed build can leave a plugin folder with no binary in it. The script
+#   refuses to install one, and leaves the installed core as it was.
 
 set -euo pipefail
 
@@ -105,6 +108,20 @@ if [ -z "$DERIVED" ]; then
   exit 1
 fi
 
+# Stop here on an incomplete plugin, before OpenEmu is quit or the installed core is touched.
+require_complete_plugin() {
+  local missing=""
+  [ -s "$1/Contents/MacOS/${CORE}" ] || missing="Contents/MacOS/${CORE}"
+  [ -s "$1/Contents/Info.plist" ] || missing="${missing:+$missing and }Contents/Info.plist"
+  [ -z "$missing" ] && return 0
+  echo "error: refusing to install an incomplete plugin: $1" >&2
+  echo "       Missing or empty: $missing" >&2
+  echo "       The installed core was not changed. Fix the build, then run this again." >&2
+  exit 1
+}
+
+require_complete_plugin "${DERIVED}"
+
 if pgrep -xq "OpenEmu"; then
   echo "Quitting OpenEmu..."
   osascript -e 'tell application "OpenEmu" to quit'
@@ -149,8 +166,10 @@ echo "Installing ${CORE}.oecoreplugin (${CONFIG}) from:"
 echo "  ${DERIVED}"
 mkdir -p "$(dirname "$DEST")"
 TMP_DEST="${DEST}.tmp.$$"
+trap 'rm -rf "${TMP_DEST}"' EXIT
 rm -rf "${TMP_DEST}"
 cp -R "${DERIVED}" "${TMP_DEST}"
+require_complete_plugin "${TMP_DEST}"
 rm -rf "${DEST}"
 mv "${TMP_DEST}" "${DEST}"
 
