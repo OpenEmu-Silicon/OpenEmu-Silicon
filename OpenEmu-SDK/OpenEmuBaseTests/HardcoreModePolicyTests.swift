@@ -74,6 +74,12 @@ final class HardcoreModePolicyTests: XCTestCase {
                        "RA spec: cheats must be blocked in hardcore.")
     }
 
+    func testHardcoreBlocksLiveMemoryAccess() {
+        XCTAssertFalse(HardcoreModePolicy.allows(.liveMemoryAccess, hardcoreEnabled: true),
+                       "An outside tool writing game memory is a cheat, so Archipelago connections must be refused in hardcore.")
+        XCTAssertTrue(HardcoreModePolicy.allows(.liveMemoryAccess, hardcoreEnabled: false))
+    }
+
     // MARK: - Hardcore ON — explicitly permitted actions
 
     func testHardcoreAllowsSaveState() {

@@ -34,6 +34,7 @@
 #include <mgba/gba/core.h>
 #include <mgba/internal/gba/cheats.h>
 #include <mgba/internal/gba/input.h>
+#include <mgba/internal/gba/memory.h>
 #include <mgba-util/circle-buffer.h>
 #include <mgba-util/memory.h>
 #include <mgba-util/vfs.h>
@@ -436,6 +437,120 @@ const int GBAMap[] = {
 		}
 	}
 	return regions;
+}
+
+#pragma mark - Live Memory
+
+// Live memory areas for Archipelago clients. The names and layouts match what those
+// clients expect from other GBA emulators:
+//   ROM         the cartridge ROM from 0x08000000, writable (some games patch ROM at runtime)
+//   EWRAM       0x02000000, 256 KiB
+//   IWRAM       0x03000000, 32 KiB
+//   System Bus  the full 32-bit GBA bus; writes reach RAM, ROM and SRAM
+
+static NSString *const mGBALiveMemorySystemBus = @"System Bus";
+static const uint32_t mGBASystemBusSize = 0x10000000;
+
+/// The memory block behind a plain area, or NO if the name is not one of them.
+static BOOL mGBALiveMemoryArea(struct mCore *core, NSString *area, uint8_t **data, size_t *size, uint32_t *base)
+{
+	size_t region;
+	if ([area isEqualToString:@"ROM"]) {
+		region = REGION_CART0;
+		*base = BASE_CART0;
+	} else if ([area isEqualToString:@"EWRAM"]) {
+		region = REGION_WORKING_RAM;
+		*base = BASE_WORKING_RAM;
+	} else if ([area isEqualToString:@"IWRAM"]) {
+		region = REGION_WORKING_IRAM;
+		*base = BASE_WORKING_IRAM;
+	} else {
+		return NO;
+	}
+
+	size_t blockSize = 0;
+	*data = core->getMemoryBlock(core, region, &blockSize);
+	*size = *data ? blockSize : 0;
+	return YES;
+}
+
+- (BOOL)mGBAHasLiveMemory
+{
+	uint8_t *rom = NULL;
+	size_t romSize = 0;
+	uint32_t base = 0;
+	return mGBALiveMemoryArea(core, @"ROM", &rom, &romSize, &base) && rom && romSize > 0;
+}
+
+- (NSString *)liveMemoryPlatform
+{
+	return [self mGBAHasLiveMemory] ? @"GBA" : nil;
+}
+
+- (NSArray<NSString *> *)liveMemoryAreaNames
+{
+	if (![self mGBAHasLiveMemory]) return @[];
+	return @[@"ROM", @"EWRAM", @"IWRAM", mGBALiveMemorySystemBus];
+}
+
+- (NSUInteger)sizeOfLiveMemoryArea:(NSString *)area
+{
+	if (![self mGBAHasLiveMemory]) return 0;
+	if ([area isEqualToString:mGBALiveMemorySystemBus]) return mGBASystemBusSize;
+
+	uint8_t *data = NULL;
+	size_t size = 0;
+	uint32_t base = 0;
+	return mGBALiveMemoryArea(core, area, &data, &size, &base) ? size : 0;
+}
+
+- (BOOL)readLiveMemoryArea:(NSString *)area offset:(uint64_t)offset length:(NSUInteger)length into:(uint8_t *)buffer
+{
+	if (![self mGBAHasLiveMemory]) return NO;
+	memset(buffer, 0, length);
+
+	if ([area isEqualToString:mGBALiveMemorySystemBus]) {
+		// rawRead8 looks at memory without the side effects of a real bus read.
+		for (NSUInteger i = 0; i < length && offset + i < mGBASystemBusSize; i++)
+			buffer[i] = (uint8_t)core->rawRead8(core, (uint32_t)(offset + i), -1);
+		return YES;
+	}
+
+	uint8_t *data = NULL;
+	size_t size = 0;
+	uint32_t base = 0;
+	if (!mGBALiveMemoryArea(core, area, &data, &size, &base)) return NO;
+	if (offset < size)
+		memcpy(buffer, data + offset, MIN(length, size - offset));
+	return YES;
+}
+
+- (BOOL)writeLiveMemoryArea:(NSString *)area offset:(uint64_t)offset bytes:(const uint8_t *)bytes length:(NSUInteger)length
+{
+	if (![self mGBAHasLiveMemory]) return NO;
+
+	if ([area isEqualToString:mGBALiveMemorySystemBus]) {
+		for (NSUInteger i = 0; i < length && offset + i < mGBASystemBusSize; i++)
+			core->rawWrite8(core, (uint32_t)(offset + i), -1, bytes[i]);
+		return YES;
+	}
+
+	uint8_t *data = NULL;
+	size_t size = 0;
+	uint32_t base = 0;
+	if (!mGBALiveMemoryArea(core, area, &data, &size, &base)) return NO;
+	if (offset >= size) return YES;
+
+	NSUInteger count = MIN(length, size - offset);
+	if ([area isEqualToString:@"ROM"]) {
+		// The ROM may be mapped straight from the file. rawWrite8 copies it first, and the
+		// bounds check above keeps it from growing the ROM.
+		for (NSUInteger i = 0; i < count; i++)
+			core->rawWrite8(core, base + (uint32_t)(offset + i), -1, bytes[i]);
+	} else {
+		memcpy(data + offset, bytes, count);
+	}
+	return YES;
 }
 
 @end
