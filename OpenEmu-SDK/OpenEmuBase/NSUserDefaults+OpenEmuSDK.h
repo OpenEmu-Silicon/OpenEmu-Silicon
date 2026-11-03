@@ -30,4 +30,10 @@
 
 + (nonnull instancetype)oe_applicationUserDefaults NS_SWIFT_UNAVAILABLE("Use oe_application instead");
 
+/// The settings domain of the OpenEmu app, given the running bundle's identifier and the identifier of
+/// the app bundle around it (the helper lives in OpenEmu.app/Contents/MacOS). Debug builds use
+/// org.openemu.OpenEmu.debug; everything else falls back to org.openemu.OpenEmu.
++ (nonnull NSString *)oe_applicationIdentifierForMainIdentifier:(nullable NSString *)mainIdentifier
+                                         enclosingAppIdentifier:(nullable NSString *)enclosingIdentifier;
+
 @end

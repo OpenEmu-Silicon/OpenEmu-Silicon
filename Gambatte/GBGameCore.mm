@@ -738,4 +738,94 @@ const int GBMap[] = {gambatte::InputGetter::UP, gambatte::InputGetter::DOWN, gam
     ];
 }
 
+#pragma mark - Live Memory
+
+// Live memory areas for Archipelago clients. The names and layouts match what those
+// clients expect from other Game Boy emulators:
+//   ROM         the whole ROM image, writable (some games patch ROM at runtime)
+//   WRAM        all work RAM banks in order, bank n at n * 0x1000 (0x2000 bytes on GB, 0x8000 on GBC)
+//   CartRAM     all cartridge RAM banks in order
+//   System Bus  the 16-bit Game Boy bus; writes only reach work RAM and enabled cartridge RAM
+
+static NSString *const GBLiveMemorySystemBus = @"System Bus";
+static const NSUInteger GBSystemBusSize = 0x10000;
+
+/// Finds a plain memory area. Returns NO if the name is not one of them.
+static BOOL GBLiveMemoryArea(NSString *area, unsigned char **data, size_t *size)
+{
+    gambatte::GB::MemoryArea which;
+    if ([area isEqualToString:@"ROM"])
+        which = gambatte::GB::MEMORY_ROM;
+    else if ([area isEqualToString:@"WRAM"])
+        which = gambatte::GB::MEMORY_WRAM;
+    else if ([area isEqualToString:@"CartRAM"])
+        which = gambatte::GB::MEMORY_CARTRAM;
+    else
+        return NO;
+
+    std::size_t areaSize = 0;
+    *data = gb.memoryArea(which, areaSize);
+    *size = *data ? areaSize : 0;
+    return YES;
+}
+
+- (NSString *)liveMemoryPlatform
+{
+    if (!gb.isLoaded()) return nil;
+    return gb.isCgb() ? @"GBC" : @"GB";
+}
+
+- (NSArray<NSString *> *)liveMemoryAreaNames
+{
+    if (!gb.isLoaded()) return @[];
+    return @[@"ROM", @"WRAM", @"CartRAM", GBLiveMemorySystemBus];
+}
+
+- (NSUInteger)sizeOfLiveMemoryArea:(NSString *)area
+{
+    if (!gb.isLoaded()) return 0;
+    if ([area isEqualToString:GBLiveMemorySystemBus]) return GBSystemBusSize;
+
+    unsigned char *data = NULL;
+    size_t size = 0;
+    return GBLiveMemoryArea(area, &data, &size) ? size : 0;
+}
+
+- (BOOL)readLiveMemoryArea:(NSString *)area offset:(uint64_t)offset length:(NSUInteger)length into:(uint8_t *)buffer
+{
+    if (!gb.isLoaded()) return NO;
+    memset(buffer, 0, length);
+
+    if ([area isEqualToString:GBLiveMemorySystemBus]) {
+        for (NSUInteger i = 0; i < length && offset + i < GBSystemBusSize; i++)
+            buffer[i] = gb.busRead8((uint16_t)(offset + i));
+        return YES;
+    }
+
+    unsigned char *data = NULL;
+    size_t size = 0;
+    if (!GBLiveMemoryArea(area, &data, &size)) return NO;
+    if (offset < size)
+        memcpy(buffer, data + offset, MIN(length, size - offset));
+    return YES;
+}
+
+- (BOOL)writeLiveMemoryArea:(NSString *)area offset:(uint64_t)offset bytes:(const uint8_t *)bytes length:(NSUInteger)length
+{
+    if (!gb.isLoaded()) return NO;
+
+    if ([area isEqualToString:GBLiveMemorySystemBus]) {
+        for (NSUInteger i = 0; i < length && offset + i < GBSystemBusSize; i++)
+            gb.busWritePlain((uint16_t)(offset + i), bytes[i]);
+        return YES;
+    }
+
+    unsigned char *data = NULL;
+    size_t size = 0;
+    if (!GBLiveMemoryArea(area, &data, &size)) return NO;
+    if (offset < size)
+        memcpy(data + offset, bytes, MIN(length, size - offset));
+    return YES;
+}
+
 @end

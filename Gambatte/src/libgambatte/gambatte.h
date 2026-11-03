@@ -148,6 +148,22 @@ public:
       */
     uint8_t busRead8(uint16_t address) const;
 
+    /** Memory areas an outside tool (such as an Archipelago client) can read and write. */
+    enum MemoryArea { MEMORY_ROM = 0, MEMORY_WRAM = 1, MEMORY_CARTRAM = 2 };
+
+    /**
+      * Points at the start of a whole memory area and sets 'size' to its length in bytes.
+      * The ROM is the full image, work RAM is all banks in order (bank n at n * 0x1000),
+      * and cartridge RAM is all banks in order. Returns 0 with size 0 if no ROM is loaded.
+      */
+    unsigned char * memoryArea(MemoryArea area, std::size_t &size) const;
+
+    /**
+      * Writes a byte on the Game Boy bus where plain memory backs the address
+      * (work RAM and enabled cartridge RAM). Other addresses are left alone.
+      */
+    void busWritePlain(uint16_t address, uint8_t value);
+
 //< OpenEmu
 	/**
 	  * Saves emulator state to the state slot selected with selectState().
