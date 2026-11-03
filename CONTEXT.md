@@ -20,7 +20,8 @@ This file is the source of truth for what each term means *in this codebase*. If
 | Term | Meaning |
 |---|---|
 | **host app** | The main `OpenEmu.app` — the library, preferences, controllers UI, save state browser. |
-| **helper / broker / `OpenEmuHelperApp`** | The sandboxed XPC process that actually runs an emulator core. Lives in `OpenEmu/broker/`. The host app and helper communicate via XPC; the helper isolates crashes so a bad core can't take down the library. |
+| **helper / `OpenEmuHelperApp`** | The process that actually runs an emulator core, one per running game. The host app starts it from `OpenEmu.app/Contents/MacOS/OpenEmuHelperApp` and talks to it over XPC; it isolates crashes so a bad core can't take down the library. It is not sandboxed. |
+| **broker** | The small XPC service in `OpenEmu/broker/` that only introduces the host app and a helper to each other. |
 | **rcheevos** | The vendored C library that talks to the RetroAchievements service. Built into the helper. Cores integrate it directly. |
 
 ## Update / distribution
@@ -62,6 +63,9 @@ This file is the source of truth for what each term means *in this codebase*. If
 | **RetroAchievements (RA)** | Third-party achievement system. Phase 1 covers the cores listed in the v1.0.7 release notes. The pref pane and HUD live in the host app; the rcheevos C library lives in the helper. |
 | **hardcore mode** | A RetroAchievements concept (no save states or rewind) — *not currently supported* in this repo. Do not claim it in release notes or documentation. |
 | **rewind** | The host-side save-state ring buffer that lets the player step backward. Implemented in the helper, controlled from the host. |
+| **Archipelago connections** | Lets an Archipelago randomizer client read and write a running game's memory. Off by default; see [`docs/archipelago.md`](docs/archipelago.md). |
+| **live memory** | The optional `OEGameCore` methods (`liveMemoryAreaNames`, `readLiveMemoryArea:…`, `writeLiveMemoryArea:…`, `performLiveMemoryTransaction:`) that let an outside tool read and write game memory between frames. Different from `readableMemoryRegions`, which copies memory for the cheat finder. |
+| **adapter** (Archipelago) | The layer that speaks one Archipelago client's protocol and turns it into live memory steps. The first is BizHawk Client (`BizHawkClientCodec`, `BizHawkClientListener`). |
 
 ## What this file is not
 

@@ -928,6 +928,38 @@ static Class GameCoreClass = Nil;
     return @[];
 }
 
+#pragma mark - Live Memory
+
+- (NSString *)liveMemoryPlatform
+{
+    return nil;
+}
+
+- (NSArray<NSString *> *)liveMemoryAreaNames
+{
+    return @[];
+}
+
+- (NSUInteger)sizeOfLiveMemoryArea:(NSString *)area
+{
+    return 0;
+}
+
+- (BOOL)readLiveMemoryArea:(NSString *)area offset:(uint64_t)offset length:(NSUInteger)length into:(uint8_t *)buffer
+{
+    return NO;
+}
+
+- (BOOL)writeLiveMemoryArea:(NSString *)area offset:(uint64_t)offset bytes:(const uint8_t *)bytes length:(NSUInteger)length
+{
+    return NO;
+}
+
+- (void)performLiveMemoryTransaction:(void (^)(void))block
+{
+    [self performBlock:block];
+}
+
 #pragma mark - Misc
 
 #pragma clang diagnostic push

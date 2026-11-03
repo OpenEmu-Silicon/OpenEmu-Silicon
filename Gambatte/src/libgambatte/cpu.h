@@ -81,6 +81,11 @@ public:
 		return static_cast<uint8_t>(const_cast<Memory &>(mem_).read(addr, 0));
 	}
 
+//> OpenEmu
+	unsigned char * memoryArea(int area, std::size_t &size) const { return mem_.memoryArea(area, size); }
+	void busWritePlain(uint16_t addr, uint8_t data) { mem_.plainWrite(addr, data); }
+//< OpenEmu
+
 private:
 	Memory mem_;
 	unsigned long cycleCounter_;
