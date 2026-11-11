@@ -53,6 +53,11 @@ bool RunFrame(std::string *error);
 void Reset();
 void Shutdown();
 
+/// Whole-machine save states, written to and read from a file. Both wait for the game's pending
+/// kernel work first, so call them from the thread that runs frames.
+bool SaveState(const std::string &path, std::string *error);
+bool LoadState(const std::string &path, std::string *error);
+
 // Input. The core sets these from OpenEmu's responder; the engine reads them each frame through
 // the "openemu" input factory registered in Initialize.
 enum class Button { A, B, X, Y, Up, Down, Left, Right, L, R, Start, Select, ZL, ZR, Count };

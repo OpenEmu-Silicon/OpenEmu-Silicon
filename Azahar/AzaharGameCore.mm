@@ -143,6 +143,29 @@ static const NSUInteger kFrameHeight = 480;
     }
 }
 
+- (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
+{
+    // The engine is not thread safe: run on the thread that runs frames.
+    [self performBlock:^{
+        std::string failure;
+        const BOOL ok = self->_loaded && AzaharHost::SaveState(fileName.fileSystemRepresentation, &failure);
+        block(ok, ok ? nil : [NSError errorWithDomain:OEGameCoreErrorDomain
+                                                 code:OEGameCoreCouldNotSaveStateError
+                                             userInfo:@{NSLocalizedDescriptionKey: @(failure.c_str())}]);
+    }];
+}
+
+- (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
+{
+    [self performBlock:^{
+        std::string failure;
+        const BOOL ok = self->_loaded && AzaharHost::LoadState(fileName.fileSystemRepresentation, &failure);
+        block(ok, ok ? nil : [NSError errorWithDomain:OEGameCoreErrorDomain
+                                                 code:OEGameCoreCouldNotLoadStateError
+                                             userInfo:@{NSLocalizedDescriptionKey: @(failure.c_str())}]);
+    }];
+}
+
 - (void)executeFrame
 {
     if (!_loaded) {
