@@ -27,7 +27,7 @@ import OpenEmuKit
 
 /// The library's games, as a grid of box art or a list.
 ///
-/// This replaces `OEGameCollectionViewController`, which used the deprecated `IKImageBrowserView`.
+/// It replaced the old games grid.
 /// The grid is an `NSCollectionView` (see `ImageCollectionViewController`) and the list is an
 /// `NSTableView` (`GameTableView`). Both show the same sorted array of games from `GamesDataSource`,
 /// so a row and a grid item have the same index.
@@ -64,8 +64,9 @@ class GameCollectionViewController: ImageCollectionViewController {
     
     override var itemIdentifier: NSUserInterfaceItemIdentifier { NSUserInterfaceItemIdentifier("GameCollectionViewItem") }
     override var sectionHeaderHeight: CGFloat { 0 }
-    // the old games grid drew its cells at about this scale
+    // the old games grid drew its covers about this tall, in cells as wide as the nib's item
     override var gridZoomMultiplier: CGFloat { 1.4 }
+    override var gridWidthMultiplier: CGFloat { 1.0 }
     override var selectionDefaultsKey: String { "OESelectedGamesKey" }
     
     override var representedObject: Any? {
