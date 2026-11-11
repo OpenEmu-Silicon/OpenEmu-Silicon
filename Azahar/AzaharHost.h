@@ -50,6 +50,13 @@ bool Load(const std::string &path, std::string *error);
 /// Run the engine until it has drawn one frame. Returns false if the engine reported an error.
 bool RunFrame(std::string *error);
 
+/// How the two screens are arranged in the picture.
+enum class Layout { Stacked, TopOnly, BottomOnly, SideBySide, LargeTop };
+
+/// Choose the screen layout and the render scale (1 to 4 times the 3DS's own resolution). Safe to
+/// call before Load (it is remembered) and while a game runs, from the thread that runs frames.
+void SetDisplay(Layout layout, unsigned scale);
+
 void Reset();
 void Shutdown();
 
