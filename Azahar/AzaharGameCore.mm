@@ -38,6 +38,9 @@
 #import <QuartzCore/QuartzCore.h>
 #import <OpenEmuBase/OEAudioBuffer.h>
 
+static NSString *const kLayoutKey = @"azahar.layout";
+static NSString *const kScaleKey = @"azahar.resolution";
+
 static const NSUInteger kFrameWidth = 400;
 static const NSUInteger kFrameHeight = 480;
 
@@ -81,6 +84,13 @@ static const NSUInteger kFrameHeight = 480;
         return [self failLoad:error message:@(failure.c_str())];
     }
     _loaded = YES;
+    // Bring back the layout and resolution picked last time.
+    for (NSString *key in @[kLayoutKey, kScaleKey]) {
+        NSString *saved = self.displayModeInfo[key];
+        if ([saved isKindOfClass:NSString.class]) {
+            [self changeDisplayWithMode:saved];
+        }
+    }
 
     _videoBuffer = (uint32_t *)calloc(kFrameWidth * kFrameHeight, sizeof(uint32_t));
     _ownsVideoBuffer = YES;
@@ -146,9 +156,6 @@ static const NSUInteger kFrameHeight = 480;
 }
 
 #pragma mark - Display modes
-
-static NSString *const kLayoutKey = @"azahar.layout";
-static NSString *const kScaleKey = @"azahar.resolution";
 
 static NSArray<NSString *> *LayoutNames(void)
 {

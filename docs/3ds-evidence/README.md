@@ -28,9 +28,11 @@ Display Modes menu in the game's options (gear) menu, with two groups: Screen La
 | `display-modes/headless-*.png` | Super Mario 3D Land's welcome dialog in each layout, read back from the GPU: stacked 400x480, side by side 720x240, top only 400x240, bottom only 320x240, stacked at 2x 800x960. |
 | `display-modes/app-menu-screen-layout.jpg` | The menu in the real app, with the five layouts. |
 | `display-modes/app-side-by-side.jpg` | Side by side chosen in the real app, picture drawn live. |
+| `display-modes/app-layout-remembered-after-relaunch.jpg` | App quit and reopened, game launched again: Side by side is applied without choosing it again. |
 | `display-modes/app-side-by-side-after-touch.jpg` | Clicking OK on the bottom screen in that layout advanced the game to its next dialog: touch follows the layout. |
 
 Notes from the work:
 - The menu did not show at first. A core must declare `OEGameCoreSupportsDisplayModeChange` per system in its `Info.plist` (`OEGameCoreOptions`), even when it implements `displayModes`.
 - The game window keeps its shape when the layout changes, so a wide layout is letterboxed. Resizing the window to the new shape is not done yet.
+- OpenEmu saves the choice but the core must read it back on load (`displayModeInfo`); the first build forgot it on relaunch.
 - The headless harness gained `--display-mode-at FRAME:NAME`.
