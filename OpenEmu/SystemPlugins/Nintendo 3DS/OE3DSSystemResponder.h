@@ -27,7 +27,9 @@
 
 #import <Foundation/Foundation.h>
 #import <OpenEmuSystem/OpenEmuSystem.h>
+#import "OE3DSSystemResponderClient.h"
 
 OE_EXPORTED_CLASS
 @interface OE3DSSystemResponder : OESystemResponder
+@property (nonatomic, weak) id<OE3DSSystemResponderClient> client;
 @end

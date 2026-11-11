@@ -36,6 +36,7 @@ NSString *const OESystemIdentifierN64           = @"openemu.system.n64";
 NSString *const OESystemIdentifierGB            = @"openemu.system.gb";
 NSString *const OESystemIdentifierGBA           = @"openemu.system.gba";
 NSString *const OESystemIdentifierNDS           = @"openemu.system.nds";
+NSString *const OESystemIdentifier3DS           = @"openemu.system.3ds";
 NSString *const OESystemIdentifierGenesis       = @"openemu.system.sg";
 NSString *const OESystemIdentifierSMS           = @"openemu.system.sms";
 NSString *const OESystemIdentifierGameGear      = @"openemu.system.gg";

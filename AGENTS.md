@@ -152,6 +152,7 @@ Before you report any in-game result, make sure the thing you ran is the thing y
 | MSX | blueMSX |
 | Neo Geo Pocket | Mednafen |
 | Nintendo (NES) | Nestopia (default), FCEU |
+| Nintendo 3DS | (system only; native Azahar core in progress, tracked in [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814)) |
 | Nintendo 64 | Mupen64Plus |
 | Nintendo DS | DeSmuME |
 | Odyssey² / Videopac+ | O2EM |
