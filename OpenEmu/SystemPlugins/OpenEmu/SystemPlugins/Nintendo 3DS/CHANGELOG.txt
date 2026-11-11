@@ -1,0 +1,113 @@
+v24 — Read-only workspace provenance and dependency review (2026-11-07)
+-------------------------------------------------------------------------
+- Baseline Core v219 / System v23 user-compiled and gameplay-tested. Latest
+  v219 diagnostic: 1,280 rendered frames, 0 readback/copy/pitch errors,
+  save write PASS, clean GPU teardown; 2 nonfatal Core Xcode notices.
+- Add privacy-conscious tools/workspace-report.py for Git/checkout and SDK
+  visibility without user paths, Git remote URLs or personal identifiers.
+- Add DEPENDENCY_REVIEW.md with exact references to source-archive license
+  files and outstanding artifact, binary, artwork and upstream review gates.
+- Refresh reproducibility and maintainer handoff documentation and report
+  Core v220 paired with System Plugin v24. All frozen gameplay paths, build
+  scripts, bundled dependencies, source patches and Xcode projects unchanged.
+- Native v220/v24 build, independent clean checkout and legal review pending.
+
+v23 — Xcode build-script/header-map cleanup (2026-11-07)
+---------------------------------------------------------------
+- Migrate System Debug/Release settings to separate modern header maps.
+- Explicitly mark SDK compatibility/rebuild check as every-build script; avoids
+  Xcode warning about an output-less dependency-analysed script phase.
+- Preserve controller manifest, artwork, input bindings and framework copies.
+- Update build identity and release gate to Core v219 / System Plugin v23.
+- Xcode 27.2 build and OpenEmu test remain to be verified on Mac.
+
+v22 — Read-only release readiness evidence (2026-11-07)
+-----------------------------------------------------------------------
+- Add automated release-gate checks for both plugins, optional verified
+  runtime logs, full SHA-256 development artifact inventory and explicit
+  PENDING status for absent source, licensing, fresh-build or human evidence.
+- Add documented release candidate criteria and actual follow-up checklist.
+- Do not change renderer, controller mapping/artwork, source patching,
+  third-party binaries, Xcode project, or framework rebuild scripts.
+- Mac runtime build and upstream Git pins remain to be verified.
+
+3DS-System-Plugin v21 — Fresh-checkout source lock handoff (2026-11-07)
+-------------------------------------------------------------------------
+- Preserve working v20 22-control order, responder input dispatch,
+  controller artwork/mask, custom highlight coordinates and framework binaries.
+- Add source-lock workflow compatible with Core v217, documentation and offline
+  source/bootstrap tests. Review all upstream commit pins before publication.
+- Update version metadata and diagnostic strings only; Xcode project and
+  framework rebuilding scripts unchanged. Mac runtime build still required.
+
+3DS-System-Plugin v20 — GitHub handoff cleanup and source provenance (2026-11-07)
+-------------------------------------------------------------------------------
+- Preserve 22-control mapping, UI highlight coordinates, Swift system
+  controller behavior, artwork and keyboard/controller presets from v19.
+- Add DEVELOPER_HANDOFF.md for source, control-order ABI and publication review.
+- Add read-only tools/capture-source-revisions.py and one-command
+  tools/run-source-checks.py for portable regression testing.
+- Update responder diagnostic labels to v20; add enum stability comment.
+  No functional input translation or build command changes.
+- Update the current README's test and dependency instructions.
+- Portable tests/ZIP verified; Xcode compilation and Mac gameplay remain to be tested.
+
+3DS-System-Plugin v19 — Xcode 27.2 Swift module compatibility (2026-11-04)
+----------------------------------------------------------------------------
+- v18 compiled against an earlier macOS SDK, but its bundled OpenEmuBase and
+  OpenEmuSystem swiftmodules are compiler/SDK-specific and failed with 27.2.
+- Add a first-position Xcode build phase that automatically builds BOTH
+  frameworks from sibling orig_source/OpenEmu-Silicon-main/OpenEmu-SDK.
+- Copy the resulting current-SDK frameworks, preserving symlinks, before
+  compiling the plugin Swift source. Stamp the toolchain for incremental builds.
+- Preserve all v18 22-control definitions, mappings, artwork and responder logic.
+- Xcode/macOS compilation of the new preparation phase is still to be verified.
+
+3DS-System-Plugin v18 — Source-quality and GitHub handoff pass (2026-11-04)
+----------------------------------------------------------------------------
+- No gameplay or controller-mapping behavior intentionally changed from Mac-tested v17.
+- Expanded reviewer comments on the ordered UI key ABI, Start/Select translation,
+  dedicated ZL/ZR selectors, axis state, touchscreen forwarding, and Swift registration.
+- Added a clearer single README with a component map, exact input-order contract,
+  development-versus-distribution warnings, dependency provenance and GitHub checklist.
+- Hardened the local build helper with Xcode and OpenEmu framework/symlink checks;
+  retained ad-hoc signing for local builds only, not public notarization.
+- Expanded .gitignore for Xcode derived data; carried forward the v17 mapping test
+  into tests/v18_contract_test.py and archived the v17 test for reference.
+- Preserved every v17 artwork pixel, highlight coordinate, keyboard mapping,
+  controller preset, and Objective-C input forwarding implementation.
+
+3DS System Plugin — cumulative change history (newest first)
+
+v17 — 2026-11-02 — Remove nonfunctional Home control; retain working input mappings
+- Remove Home from the control display list, ordered control names, responder enum, and controller highlight metadata (23 controls to 22).
+- Preserve all 22 other named controls, keyboard defaults, controller presets, responder selectors, actual game button IDs, analog directions, artwork/mask pixels and OpenEmu frameworks.
+- Start/Select UI keys stay 12/13 and map to libretro IDs 10/11. Analog UI ordinals shift by one after Home removal; existing custom mappings may need rebinding if OpenEmu persists raw indices.
+- Update responder identification, README and release contract tests. No changes to 3DS-Azahar-Core or stock OpenEmu.
+- Mac input and UI verification required after build. Static mapping tests cannot verify all controller hardware.
+
+v16 — 2026-11-02 — Input contract audit and GitHub source documentation
+- Keep v15 artwork, mask, highlights, key order, keyboard/controller defaults, and input forwarding behavior unchanged.
+- Update version metadata to 1.16/16 and responder diagnostic identity to v16.
+- Document the exact Start/Select remapping, ZL/ZR extra buttons, analog-axis directions and intentional Home no-op behavior.
+- Add static asset/metadata/mapping compatibility tests, current README, installation and licensing guidance.
+- Source/ZIP verified; Apple Silicon Xcode build and real Mac input still require testing.
+
+v15 - 2026-10-31 - Vertically centered controller illustration, with transparent canvas only
+=========================================================================================
+- Screenshot from v14 shows the correctly sized controller image aligned to the
+  bottom of OpenEmu's wood-background controller view, leaving approximately
+  100 screen pixels unused above and zero below.
+- Retained the original 744x799 pixel illustration *unchanged in every pixel*.
+  The v15 display resource is a 744x851 pixel RGBA canvas, constructed only by
+  adding 52 fully transparent PNG pixels BELOW the original illustration.
+  All original 744x799 pixels are identical, no scaling, cropping or resampling.
+- Padded the controller mask by the identical 52 transparent pixels below.
+- Kept @2x Retina naming. Controller illustration still renders at a native
+  372x399.5 logical point size, with a transparent bottom offset of 26 points.
+- Added exactly +26 logical points to the Y coordinates of all 23 highlights;
+  X coordinates and control names are unchanged.
+- Preserved the original controller PNG in Artwork-References byte-for-byte.
+- 3DS icon, Swift/Obj-C source, control mappings, Xcode project, bundle
+  identifier, and the separate Azahar Core v190 are unchanged.
+- Full Xcode/macOS runtime verification remains to be performed on user's Mac.

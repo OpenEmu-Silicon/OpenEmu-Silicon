@@ -1,0 +1,290 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000016 /* OE3DSSystemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* OE3DSSystemController.swift */; };
+		A00000000000000000000017 /* OpenEmuSystem.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* OpenEmuSystem.framework */; };
+		A00000000000000000000018 /* Keyboard-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000008 /* Keyboard-Mappings.plist */; };
+		A00000000000000000000019 /* Controller-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000009 /* Controller-Mappings.plist */; };
+		A00000000000000000000033 /* Controller-Preferences.plist in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000030 /* Controller-Preferences.plist */; };
+		A00000000000000000000034 /* controller_3ds@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* controller_3ds@2x.png */; };
+		A00000000000000000000035 /* controller_3ds_mask@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* controller_3ds_mask@2x.png */; };
+		A00000000000000000000042 /* OE3DSSystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000041 /* OE3DSSystemResponder.m */; };
+		A00000000000000000000051 /* icon.png in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000050 /* icon.png */; };
+		A00000000000000000000061 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000060 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000004 /* OE3DSSystemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OE3DSSystemController.swift; sourceTree = "<group>"; };
+		A00000000000000000000007 /* Nintendo3DS-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Nintendo3DS-Info.plist"; sourceTree = "<group>"; };
+		A00000000000000000000008 /* Keyboard-Mappings.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Keyboard-Mappings.plist"; sourceTree = "<group>"; };
+		A00000000000000000000009 /* Controller-Mappings.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
+		A00000000000000000000011 /* Nintendo 3DS.oesystemplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Nintendo 3DS.oesystemplugin"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000012 /* OpenEmuSystem.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenEmuSystem.framework; sourceTree = "<group>"; };
+		A00000000000000000000030 /* Controller-Preferences.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Controller-Preferences.plist"; sourceTree = "<group>"; };
+		A00000000000000000000031 /* controller_3ds@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "controller_3ds@2x.png"; sourceTree = "<group>"; };
+		A00000000000000000000032 /* controller_3ds_mask@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "controller_3ds_mask@2x.png"; sourceTree = "<group>"; };
+		A00000000000000000000040 /* OE3DSSystemResponder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OE3DSSystemResponder.h; sourceTree = "<group>"; };
+		A00000000000000000000041 /* OE3DSSystemResponder.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OE3DSSystemResponder.m; sourceTree = "<group>"; };
+		A00000000000000000000050 /* icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = icon.png; sourceTree = "<group>"; };
+		A00000000000000000000060 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000000000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000017 /* OpenEmuSystem.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000004 /* OE3DSSystemController.swift */,
+				A00000000000000000000040 /* OE3DSSystemResponder.h */,
+				A00000000000000000000041 /* OE3DSSystemResponder.m */,
+				A00000000000000000000005 /* Resources */,
+				A00000000000000000000006 /* Frameworks */,
+				A00000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000011 /* Nintendo 3DS.oesystemplugin */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000005 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000007 /* Nintendo3DS-Info.plist */,
+				A00000000000000000000008 /* Keyboard-Mappings.plist */,
+				A00000000000000000000009 /* Controller-Mappings.plist */,
+				A00000000000000000000030 /* Controller-Preferences.plist */,
+				A00000000000000000000031 /* controller_3ds@2x.png */,
+				A00000000000000000000032 /* controller_3ds_mask@2x.png */,
+				A00000000000000000000050 /* icon.png */,
+				A00000000000000000000060 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000006 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000012 /* OpenEmuSystem.framework */,
+			);
+			path = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000010 /* Nintendo3DSSystemPlugin */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000021 /* Build configuration list for PBXNativeTarget "Nintendo3DSSystemPlugin" */;
+			buildPhases = (
+                A00000000000000000000070 /* Rebuild OpenEmu Swift frameworks for this Xcode SDK */,
+				A00000000000000000000013 /* Sources */,
+				A00000000000000000000014 /* Frameworks */,
+				A00000000000000000000015 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Nintendo3DSSystemPlugin;
+			productName = "Nintendo 3DS";
+			productReference = A00000000000000000000011 /* Nintendo 3DS.oesystemplugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = A00000000000000000000020 /* Build configuration list for PBXProject "Nintendo3DSSystemPlugin" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00000000000000000000002;
+			productRefGroup = A00000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00000000000000000000010 /* Nintendo3DSSystemPlugin */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00000000000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000018 /* Keyboard-Mappings.plist in Resources */,
+				A00000000000000000000019 /* Controller-Mappings.plist in Resources */,
+				A00000000000000000000033 /* Controller-Preferences.plist in Resources */,
+				A00000000000000000000034 /* controller_3ds@2x.png in Resources */,
+				A00000000000000000000035 /* controller_3ds_mask@2x.png in Resources */,
+				A00000000000000000000051 /* icon.png in Resources */,
+				A00000000000000000000061 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00000000000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000016 /* OE3DSSystemController.swift in Sources */,
+				A00000000000000000000042 /* OE3DSSystemResponder.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        A00000000000000000000070 /* Rebuild OpenEmu Swift frameworks for this Xcode SDK */ = {
+            isa = PBXShellScriptBuildPhase;
+            buildActionMask = 2147483647;
+            name = "Check OpenEmu frameworks for active Xcode SDK";
+            alwaysOutOfDate = 1;
+            files = ( );
+            inputPaths = ( );
+            outputPaths = ( );
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/bash;
+            shellScript = "set -e\n\"${SRCROOT}/prepare-openemu-frameworks.sh\"\n";
+        };
+/* End PBXShellScriptBuildPhase section */
+
+
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000022 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		A00000000000000000000023 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		A00000000000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ALWAYS_USE_SEPARATE_HEADERMAPS = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEFINES_MODULE = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Resources/Nintendo3DS-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../../../../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.system.nintendo3ds;
+				PRODUCT_MODULE_NAME = Nintendo3DSSystemPlugin;
+				PRODUCT_NAME = "Nintendo 3DS";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				WRAPPER_EXTENSION = oesystemplugin;
+			};
+			name = Debug;
+		};
+		A00000000000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ALWAYS_USE_SEPARATE_HEADERMAPS = YES;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEFINES_MODULE = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Resources/Nintendo3DS-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../../../../Frameworks",
+				);
+				MACH_O_TYPE = mh_bundle;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.system.nintendo3ds;
+				PRODUCT_MODULE_NAME = Nintendo3DSSystemPlugin;
+				PRODUCT_NAME = "Nintendo 3DS";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				WRAPPER_EXTENSION = oesystemplugin;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000020 /* Build configuration list for PBXProject "Nintendo3DSSystemPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000022 /* Debug */,
+				A00000000000000000000023 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000021 /* Build configuration list for PBXNativeTarget "Nintendo3DSSystemPlugin" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000024 /* Debug */,
+				A00000000000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000001 /* Project object */;
+}
