@@ -2,7 +2,7 @@
 
 OpenEmu wrapper around the [Azahar](https://github.com/azahar-emu/azahar) engine (GPL-2.0-or-later, a Citra successor). Work is tracked in [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814). Read [`docs/3ds-azahar-port.md`](../docs/3ds-azahar-port.md) and [ADR-0007](../docs/adr/0007-3ds-core-from-azahar.md) first.
 
-**Status: boots, no picture yet.** Items 2 and 3 of #814 are in: the engine is pinned and builds from a clean clone with one script, and the core plugin loads a game and runs it. Checked with `./Scripts/headless/run.sh Azahar --rom <file> --frames 300`: the engine makes its Vulkan device through the bundled MoltenVK, loads the game (the devkitPro homebrew menu `boot.3dsx`), runs 300 frames and shuts down with no crash. The picture does not reach OpenEmu yet (it shows black), and there is no sound, input, touch or saves. Those are items 4 to 7.
+**Status: boots and draws, no sound or input yet.** Items 2, 3 and most of 4 of #814 are in: the engine is pinned and builds from a clean clone with one script, and the core plugin loads a game, runs it, and gives OpenEmu the picture as a Metal texture. Checked with `OE_HEADLESS_SHOT_DIR=<dir> ./Scripts/headless/run.sh Azahar --rom <file> --frames 300 --hash-at 300`: the devkitPro homebrew launcher (`boot.3dsx`) draws both screens (400 by 480), the picture changes frame to frame, and the run ends with no crash. Not yet checked inside the OpenEmu window. There is no sound, input, touch or saves; those are items 5 to 7.
 
 ## How it runs
 
@@ -35,6 +35,7 @@ This fetches the source, installs a MoltenVK copy checked against a pinned SHA-2
 |---|---|
 | `deps-azahar-revision.txt` | The pinned fork commit |
 | `patches/0001-openemu-host-hooks.patch` | Engine patch behind `OE_HOST`: load MoltenVK from the plugin bundle, and tell the host when a frame has been drawn |
+| `patches/0002-openemu-metal-texture-output.patch` | Engine patch behind `OE_HOST`: instead of copying each finished frame to a swapchain, wait for the GPU and take the frame's `MTLTexture` straight from MoltenVK (`VK_EXT_metal_objects`, no copy) |
 | `AzaharGameCore.{h,mm}` | The OpenEmu game core (no engine headers) |
 | `AzaharHost.{h,cpp}` | The engine side: settings, the window the engine draws into, load, run one frame |
 | `Azahar.xcodeproj` | Thin Xcode project; reads `build/engine.xcconfig` and `build/engine-link.rsp` |

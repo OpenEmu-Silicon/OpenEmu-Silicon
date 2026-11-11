@@ -33,6 +33,8 @@
 // files the first one saved (for example EEPROM or battery saves).
 
 #import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#import <ImageIO/ImageIO.h>
 #import <OpenEmuBase/OpenEmuBase.h>
 #import <CommonCrypto/CommonDigest.h>
 
@@ -71,6 +73,49 @@ static NSString *VideoHash(OEGameCore *core, const void *buffer)
         [visible appendBytes:row length:screen.size.width * bytesPerPixel];
     }
     return HashOfBytes(visible.bytes, visible.length);
+}
+
+// A core that draws with Metal (Dolphin, PS2, 3DS) gives OpenEmu a texture, not a CPU buffer. Copy it to
+// shared memory, hash it, and report its size and how much of it is not black. When OE_HEADLESS_SHOT_DIR
+// is set, also write the picture there as a PNG so a person can look at it.
+static NSString *MetalVideoHash(OEGameCore *core, NSInteger frame)
+{
+    id<MTLTexture> texture = core.metalTexture;
+    if (!texture) return @"none";
+    NSUInteger w = texture.width, h = texture.height, rowBytes = w * 4;
+    id<MTLDevice> device = texture.device;
+    id<MTLCommandQueue> queue = [device newCommandQueue];
+    id<MTLBuffer> buffer = [device newBufferWithLength:rowBytes * h options:MTLResourceStorageModeShared];
+    id<MTLCommandBuffer> command = [queue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [command blitCommandEncoder];
+    [blit copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0)
+               sourceSize:MTLSizeMake(w, h, 1) toBuffer:buffer destinationOffset:0
+        destinationBytesPerRow:rowBytes destinationBytesPerImage:rowBytes * h];
+    [blit endEncoding];
+    [command commit];
+    [command waitUntilCompleted];
+
+    const uint8_t *pixels = buffer.contents;
+    NSUInteger lit = 0;
+    for (NSUInteger i = 0; i < w * h; i++) {
+        if (pixels[i * 4] | pixels[i * 4 + 1] | pixels[i * 4 + 2]) lit++;
+    }
+
+    NSString *dir = NSProcessInfo.processInfo.environment[@"OE_HEADLESS_SHOT_DIR"];
+    if (dir.length > 0) {
+        [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+        CGContextRef context = CGBitmapContextCreate((void *)pixels, w, h, 8, rowBytes, space,
+                                                     kCGBitmapByteOrder32Little | kCGImageAlphaNoneSkipFirst);
+        CGImageRef image = CGBitmapContextCreateImage(context);
+        NSString *path = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"frame-%04ld.png", (long)frame]];
+        CGImageDestinationRef out = CGImageDestinationCreateWithURL((__bridge CFURLRef)[NSURL fileURLWithPath:path], CFSTR("public.png"), 1, NULL);
+        CGImageDestinationAddImage(out, image, NULL);
+        CGImageDestinationFinalize(out);
+        CFRelease(out); CGImageRelease(image); CGContextRelease(context); CGColorSpaceRelease(space);
+    }
+    return [NSString stringWithFormat:@"metal:%@ size=%lux%lu lit=%.1f%%", HashOfBytes(pixels, rowBytes * h),
+            (unsigned long)w, (unsigned long)h, 100.0 * lit / MAX(w * h, 1)];
 }
 
 // Drains whatever audio the core produced this frame into a running digest. Nobody else reads the ring
@@ -289,7 +334,8 @@ int main(int argc, char **argv)
                 }
             }
             if ([hashAt containsObject:@(frame)] || frame == frames) {
-                printf("frame %ld video=%s audio=%s\n", (long)frame, VideoHash(core, videoBuffer).UTF8String,
+                NSString *video = core.gameCoreRendering == OEGameCoreRenderingMetal2 ? MetalVideoHash(core, frame) : VideoHash(core, videoBuffer);
+                printf("frame %ld video=%s audio=%s\n", (long)frame, video.UTF8String,
                        wantAudio ? DigestString(audioDigest, audioBytes).UTF8String : "-");
             }
         }

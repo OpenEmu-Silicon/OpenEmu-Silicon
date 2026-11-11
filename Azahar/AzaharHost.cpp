@@ -71,6 +71,7 @@ bool gLoaded = false;
 std::atomic<bool> gFrameDone{false};
 std::atomic<uint32_t> gFrameWidth{0};
 std::atomic<uint32_t> gFrameHeight{0};
+std::atomic<void *> gFrameTexture{nullptr};
 
 void ApplyOpenEmuSettings() {
     // OpenEmu drives the engine one frame at a time and paces it, so the engine's own
@@ -101,9 +102,10 @@ extern "C" const char *OEHostMoltenVKPath() {
     return gMoltenVKPath.empty() ? nullptr : gMoltenVKPath.c_str();
 }
 
-extern "C" void OEHostFrameRendered(u32 width, u32 height) {
+extern "C" void OEHostFrameRendered(u32 width, u32 height, void *metalTexture) {
     gFrameWidth = width;
     gFrameHeight = height;
+    gFrameTexture = metalTexture;
     gFrameDone = true;
 }
 
@@ -215,10 +217,12 @@ void Shutdown() {
         Core::System::GetInstance().Shutdown();
     }
     gLoaded = false;
+    gFrameTexture = nullptr;
     gWindow.reset();
 }
 
 uint32_t FrameWidth() { return gFrameWidth; }
 uint32_t FrameHeight() { return gFrameHeight; }
+void *FrameTexture() { return gFrameTexture; }
 
 } // namespace AzaharHost

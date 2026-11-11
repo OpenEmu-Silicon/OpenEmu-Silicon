@@ -56,4 +56,9 @@ void Shutdown();
 uint32_t FrameWidth();
 uint32_t FrameHeight();
 
+/// The id<MTLTexture> of the last frame the engine drew (not retained; null before the first one).
+/// The texture belongs to the engine's frame pool and stays valid until the frame size changes
+/// or the game stops, and the engine does not draw into it again for at least two frames.
+void *FrameTexture();
+
 } // namespace AzaharHost
