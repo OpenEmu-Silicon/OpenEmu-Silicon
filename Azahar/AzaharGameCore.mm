@@ -49,6 +49,8 @@ static const NSUInteger kFrameHeight = 480;
     id<MTLTexture> _frameTexture;   // the engine's newest finished frame (atomic via @synchronized)
     BOOL _loaded;
     BOOL _touching;
+    NSString *_layoutName;
+    NSUInteger _scale;
     uint32_t *_videoBuffer;
     BOOL _ownsVideoBuffer;
 }
@@ -141,6 +143,63 @@ static const NSUInteger kFrameHeight = 480;
     if (_loaded) {
         AzaharHost::Reset();
     }
+}
+
+#pragma mark - Display modes
+
+static NSString *const kLayoutKey = @"azahar.layout";
+static NSString *const kScaleKey = @"azahar.resolution";
+
+static NSArray<NSString *> *LayoutNames(void)
+{
+    return @[@"Stacked", @"Top screen only", @"Bottom screen only", @"Side by side", @"Large top screen"];
+}
+
+static AzaharHost::Layout LayoutForName(NSString *name)
+{
+    const NSUInteger i = [LayoutNames() indexOfObject:name];
+    switch (i) {
+        case 1: return AzaharHost::Layout::TopOnly;
+        case 2: return AzaharHost::Layout::BottomOnly;
+        case 3: return AzaharHost::Layout::SideBySide;
+        case 4: return AzaharHost::Layout::LargeTop;
+        default: return AzaharHost::Layout::Stacked;
+    }
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)displayModes
+{
+    NSString *layout = _layoutName ?: LayoutNames()[0];
+    const NSUInteger scale = _scale ?: 1;
+    NSMutableArray *layouts = [NSMutableArray array];
+    for (NSString *name in LayoutNames()) {
+        [layouts addObject:OEDisplayMode_OptionWithStateValue(name, kLayoutKey, @([name isEqualToString:layout]), name)];
+    }
+    NSMutableArray *scales = [NSMutableArray array];
+    for (NSUInteger s = 1; s <= 4; s++) {
+        NSString *name = [NSString stringWithFormat:@"%lux", (unsigned long)s];
+        [scales addObject:OEDisplayMode_OptionWithStateValue(name, kScaleKey, @(s == scale), name)];
+    }
+    return @[
+        @{OEGameCoreDisplayModeGroupNameKey: @"Screen Layout", OEGameCoreDisplayModeGroupItemsKey: layouts},
+        @{OEGameCoreDisplayModeGroupNameKey: @"Resolution", OEGameCoreDisplayModeGroupItemsKey: scales},
+    ];
+}
+
+- (void)changeDisplayWithMode:(NSString *)displayMode
+{
+    if ([LayoutNames() containsObject:displayMode]) {
+        _layoutName = displayMode;
+    } else if (displayMode.length == 2 && [displayMode hasSuffix:@"x"] && [displayMode integerValue] >= 1 && [displayMode integerValue] <= 4) {
+        _scale = (NSUInteger)[displayMode integerValue];
+    } else {
+        return;
+    }
+    NSString *layout = _layoutName ?: LayoutNames()[0];
+    const NSUInteger scale = _scale ?: 1;
+    [self performBlock:^{
+        AzaharHost::SetDisplay(LayoutForName(layout), (unsigned)scale);
+    }];
 }
 
 - (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block

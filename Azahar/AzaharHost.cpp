@@ -100,6 +100,42 @@ std::unique_ptr<OEEmuWindow> gWindow;
 bool gInitialized = false;
 bool gLoaded = false;
 
+AzaharHost::Layout gLayout = AzaharHost::Layout::Stacked;
+unsigned gScale = 1;
+
+/// Size of the picture for a layout at 1x. The engine fits its screens into this size.
+void LayoutSize(AzaharHost::Layout layout, unsigned *w, unsigned *h) {
+    using L = AzaharHost::Layout;
+    switch (layout) {
+    case L::TopOnly:    *w = Core::kScreenTopWidth;    *h = Core::kScreenTopHeight; break;
+    case L::BottomOnly: *w = Core::kScreenBottomWidth; *h = Core::kScreenBottomHeight; break;
+    case L::SideBySide: *w = Core::kScreenTopWidth + Core::kScreenBottomWidth; *h = Core::kScreenTopHeight; break;
+    case L::LargeTop:   *w = Core::kScreenTopWidth + Core::kScreenTopWidth / 4; *h = Core::kScreenTopHeight; break;
+    case L::Stacked:
+    default:            *w = Core::kScreenTopWidth; *h = Core::kScreenTopHeight + Core::kScreenBottomHeight; break;
+    }
+}
+
+void ApplyDisplay(bool running) {
+    using L = AzaharHost::Layout;
+    auto &v = Settings::values;
+    switch (gLayout) {
+    case L::TopOnly:    v.layout_option = Settings::LayoutOption::SingleScreen; v.swap_screen = false; break;
+    case L::BottomOnly: v.layout_option = Settings::LayoutOption::SingleScreen; v.swap_screen = true; break;
+    case L::SideBySide: v.layout_option = Settings::LayoutOption::SideScreen; v.swap_screen = false; break;
+    case L::LargeTop:   v.layout_option = Settings::LayoutOption::LargeScreen; v.swap_screen = false; break;
+    case L::Stacked:
+    default:            v.layout_option = Settings::LayoutOption::Default; v.swap_screen = false; break;
+    }
+    v.resolution_factor = gScale;
+    if (gWindow) {
+        unsigned w, h;
+        LayoutSize(gLayout, &w, &h);
+        gWindow->SetLayoutSize(w * gScale, h * gScale);
+    }
+    if (running) Core::System::GetInstance().ApplySettings();
+}
+
 std::atomic<bool> gFrameDone{false};
 std::atomic<uint32_t> gFrameWidth{0};
 std::atomic<uint32_t> gFrameHeight{0};
@@ -263,9 +299,7 @@ bool Load(const std::string &path, std::string *error) {
         return false;
     }
     gWindow = std::make_unique<OEEmuWindow>(gMetalLayer);
-    // First picture size: both screens stacked, at the engine's normal resolution.
-    const unsigned scale = Settings::values.resolution_factor.GetValue() ? Settings::values.resolution_factor.GetValue() : 1;
-    gWindow->SetLayoutSize(Core::kScreenTopWidth * scale, (Core::kScreenTopHeight + Core::kScreenBottomHeight) * scale);
+    ApplyDisplay(false);
 
     auto &system = Core::System::GetInstance();
     system.ApplySettings();
@@ -332,6 +366,12 @@ bool RunFrame(std::string *error) {
         }
     }
     return true;
+}
+
+void SetDisplay(Layout layout, unsigned scale) {
+    gLayout = layout;
+    gScale = scale < 1 ? 1 : (scale > 4 ? 4 : scale);
+    ApplyDisplay(gLoaded);
 }
 
 // A state saved while the kernel has asynchronous work in flight would lose that work, so let it

@@ -5,6 +5,7 @@
 //   oe-headless --core <X.oecoreplugin> --rom <file> --frames N [--input FRAME:SELECTOR:INT ...]
 //               [--hash-at FRAME ...] [--save-state-at FRAME] [--load-state-at FRAME] [--audio]
 //               [--search-byte FRAME:HEXVALUE ...] [--cheat-at FRAME:CODE ...] [--reset-at FRAME ...]
+//               [--display-mode-at FRAME:NAME ...]
 //               [--buffer-once] [--save-file-at FRAME:PATH ...] [--load-file-at FRAME:PATH ...]
 //
 // --buffer-once asks the core for its video buffer only before the first frame, the way Release builds
@@ -162,6 +163,7 @@ int main(int argc, char **argv)
         NSMutableSet<NSNumber *> *hashAt = [NSMutableSet set];
         NSMutableDictionary<NSNumber *, NSNumber *> *searchAt = [NSMutableDictionary dictionary];
         NSMutableDictionary<NSNumber *, NSMutableArray<NSString *> *> *cheatsAt = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSNumber *, NSMutableArray<NSString *> *> *displayModeAt = [NSMutableDictionary dictionary];
         NSMutableSet<NSNumber *> *resetAt = [NSMutableSet set];
         NSMutableDictionary<NSNumber *, NSString *> *saveFileAt = [NSMutableDictionary dictionary];
         NSMutableDictionary<NSNumber *, NSString *> *loadFileAt = [NSMutableDictionary dictionary];
@@ -185,6 +187,14 @@ int main(int argc, char **argv)
                 if (colon.location == NSNotFound) return Fail([arg stringByAppendingString:@" wants FRAME:PATH"]);
                 NSMutableDictionary *target = [arg isEqual:@"--save-file-at"] ? saveFileAt : loadFileAt;
                 target[@([next substringToIndex:colon.location].integerValue)] = [next substringFromIndex:colon.location + 1];
+                i++;
+            }
+            else if ([arg isEqual:@"--display-mode-at"] && next) {
+                NSRange colon = [next rangeOfString:@":"];
+                if (colon.location == NSNotFound) return Fail(@"--display-mode-at wants FRAME:NAME");
+                NSNumber *frame = @([next substringToIndex:colon.location].integerValue);
+                if (!displayModeAt[frame]) displayModeAt[frame] = [NSMutableArray array];
+                [displayModeAt[frame] addObject:[next substringFromIndex:colon.location + 1]];
                 i++;
             }
             else if ([arg isEqual:@"--cheat-at"] && next) {
@@ -283,6 +293,10 @@ int main(int argc, char **argv)
                 NSError *e = nil;
                 if (!savedState || ![core deserializeState:savedState withError:&e]) return Fail([NSString stringWithFormat:@"load state failed: %@", e]);
                 printf("state-loaded\n");
+            }
+            for (NSString *mode in displayModeAt[@(frame)]) {
+                [core changeDisplayWithMode:mode];
+                printf("display-mode %s\n", mode.UTF8String);
             }
             for (NSString *code in cheatsAt[@(frame)]) {
                 [core setCheat:code setType:@"Unknown" setEnabled:YES];
