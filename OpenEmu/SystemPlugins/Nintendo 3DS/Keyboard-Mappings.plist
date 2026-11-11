@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OE3DSButtonA</key>
+	<integer>27</integer>
+	<key>OE3DSButtonB</key>
+	<integer>29</integer>
+	<key>OE3DSButtonCStickDown</key>
+	<integer>10</integer>
+	<key>OE3DSButtonCStickLeft</key>
+	<integer>9</integer>
+	<key>OE3DSButtonCStickRight</key>
+	<integer>11</integer>
+	<key>OE3DSButtonCStickUp</key>
+	<integer>23</integer>
+	<key>OE3DSButtonCirclePadDown</key>
+	<integer>14</integer>
+	<key>OE3DSButtonCirclePadLeft</key>
+	<integer>13</integer>
+	<key>OE3DSButtonCirclePadRight</key>
+	<integer>15</integer>
+	<key>OE3DSButtonCirclePadUp</key>
+	<integer>12</integer>
+	<key>OE3DSButtonDown</key>
+	<integer>81</integer>
+	<key>OE3DSButtonL</key>
+	<integer>20</integer>
+	<key>OE3DSButtonLeft</key>
+	<integer>80</integer>
+	<key>OE3DSButtonR</key>
+	<integer>26</integer>
+	<key>OE3DSButtonRight</key>
+	<integer>79</integer>
+	<key>OE3DSButtonSelect</key>
+	<integer>229</integer>
+	<key>OE3DSButtonStart</key>
+	<integer>40</integer>
+	<key>OE3DSButtonUp</key>
+	<integer>82</integer>
+	<key>OE3DSButtonX</key>
+	<integer>22</integer>
+	<key>OE3DSButtonY</key>
+	<integer>4</integer>
+	<key>OE3DSButtonZL</key>
+	<integer>225</integer>
+	<key>OE3DSButtonZR</key>
+	<integer>224</integer>
+</dict>
+</plist>
