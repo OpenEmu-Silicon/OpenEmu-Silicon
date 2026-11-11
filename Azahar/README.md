@@ -2,7 +2,11 @@
 
 OpenEmu wrapper around the [Azahar](https://github.com/azahar-emu/azahar) engine (GPL-2.0-or-later, a Citra successor). Work is tracked in [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814). Read [`docs/3ds-azahar-port.md`](../docs/3ds-azahar-port.md) and [ADR-0007](../docs/adr/0007-3ds-core-from-azahar.md) first.
 
-**Status: engine build only.** There is no core plugin yet. Item 2 of #814 is in: the engine source is pinned and the engine libraries build from a clean clone with one script. Items 3 onward (the core plugin, the picture, audio, input, saves) are not started.
+**Status: boots, no picture yet.** Items 2 and 3 of #814 are in: the engine is pinned and builds from a clean clone with one script, and the core plugin loads a game and runs it. Checked with `./Scripts/headless/run.sh Azahar --rom <file> --frames 300`: the engine makes its Vulkan device through the bundled MoltenVK, loads the game (the devkitPro homebrew menu `boot.3dsx`), runs 300 frames and shuts down with no crash. The picture does not reach OpenEmu yet (it shows black), and there is no sound, input, touch or saves. Those are items 4 to 7.
+
+## How it runs
+
+Frame-driven. OpenEmu's game loop calls `executeFrame`, and each call runs the engine until it has drawn one frame (`AzaharHost::RunFrame`). Azahar's own libretro frontend runs the engine the same way. It keeps pause, reset, frame step and speed changes in OpenEmu's hands, with no second thread to hand frames over from. OpenEmu paces the loop, so the engine's own frame limiter is off. `AzaharGameCore.mm` includes no engine headers; `AzaharHost.cpp` is the only code that does.
 
 ## Source dependency
 
@@ -30,7 +34,12 @@ This fetches the source, installs a MoltenVK copy checked against a pinned SHA-2
 | File | What it does |
 |---|---|
 | `deps-azahar-revision.txt` | The pinned fork commit |
-| `patches/` | Our engine patches (none yet) |
+| `patches/0001-openemu-host-hooks.patch` | Engine patch behind `OE_HOST`: load MoltenVK from the plugin bundle, and tell the host when a frame has been drawn |
+| `AzaharGameCore.{h,mm}` | The OpenEmu game core (no engine headers) |
+| `AzaharHost.{h,cpp}` | The engine side: settings, the window the engine draws into, load, run one frame |
+| `Azahar.xcodeproj` | Thin Xcode project; reads `build/engine.xcconfig` and `build/engine-link.rsp` |
+| `Info.plist` | Core registration for `openemu.system.3ds`; update feed is `Appcasts/azahar.xml` (empty until release) |
+| `../Scripts/gen-azahar-xcconfig.py` | Writes the Xcode inputs from the CMake build |
 | `../Scripts/prepare-azahar-core.sh` | Fetches the pinned commit, all submodules, applies patches |
 | `../Scripts/build-azahar-deps.sh` | Installs the pinned MoltenVK |
 | `../Scripts/build-azahar-core.sh` | Configures and builds the engine libraries |
