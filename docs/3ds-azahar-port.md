@@ -120,7 +120,7 @@ Where our code touches Azahar, found by reading the pinned source. Keep each cha
 
 Forking `azahar` into the org snapshots Azahar's own source. It does **not** snapshot its submodules: they are separate repositories that the fork still points at on their original hosts. At the pinned commit there are 52 submodule entries (nested ones included), among them boost, dynarmic, oaknut, glslang, spirv-tools, vulkan-headers, sirit, cryptopp, libressl, fmt, soundtouch, faad2, teakra, zstd, enet, xxHash, SDL2, openal-soft, cubeb, libusb and more. A fresh shallow fetch of all of them is about 560 MB. Desktop-only ones (SDL2, openal-soft, cubeb, libusb, discord-rpc, Qt-related) are not needed for a core and can be skipped.
 
-- A network hiccup failed one submodule (`teakra`) in a trial fetch; a second run succeeded. The prepare script must retry.
+- The `teakra` submodule failed in an early trial fetch with "remote end hung up". That message was misleading: teakra marks one test file for Git LFS, and a global git setting that requires LFS on a Mac without `git-lfs` makes the checkout fail and leave the folder half-filled. `Scripts/prepare-azahar-core.sh` runs git without the user's global config, restores every submodule's files, and fails if any is empty. It also retries real network drops.
 - If a submodule host removes or rewrites a commit, the pin breaks. To make the snapshot real, mirror the submodules we use into the org and point the fork's `.gitmodules` at the mirrors. This is open decision 7 in the ADR.
 - Pin by commit, never by branch. Record every submodule commit by letting the fork's gitlinks do it; do not run `git submodule update --remote`.
 

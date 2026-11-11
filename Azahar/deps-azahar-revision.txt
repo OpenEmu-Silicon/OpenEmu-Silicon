@@ -1,0 +1,4 @@
+OpenEmu-Silicon/azahar commit: 219d743a1e698101fe1ab8bef43e6563126c3c27
+branch: master
+source: https://github.com/OpenEmu-Silicon/azahar.git
+azahar release: 2126.2 (2026-10-08)
