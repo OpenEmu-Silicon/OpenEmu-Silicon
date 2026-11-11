@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>OEControllerImageKey</key>
+	<string>controller_3ds</string>
+	<key>OEControllerImageMaskKey</key>
+	<string>controller_3ds_mask</string>
+	<key>OEControllerKeyPositionKey</key>
+	<dict>
+		<key>OE3DSButtonA</key>
+		<string>{351.5, 153.5}</string>
+		<key>OE3DSButtonB</key>
+		<string>{331.5, 134.5}</string>
+		<key>OE3DSButtonCStickDown</key>
+		<string>{311.5, 185.5}</string>
+		<key>OE3DSButtonCStickLeft</key>
+		<string>{304, 193.5}</string>
+		<key>OE3DSButtonCStickRight</key>
+		<string>{319.5, 193.5}</string>
+		<key>OE3DSButtonCStickUp</key>
+		<string>{311.5, 200.5}</string>
+		<key>OE3DSButtonCirclePadDown</key>
+		<string>{39.5, 159.5}</string>
+		<key>OE3DSButtonCirclePadLeft</key>
+		<string>{27, 172.5}</string>
+		<key>OE3DSButtonCirclePadRight</key>
+		<string>{52.5, 172.5}</string>
+		<key>OE3DSButtonCirclePadUp</key>
+		<string>{39.5, 185.5}</string>
+		<key>OE3DSButtonDown</key>
+		<string>{40, 101.5}</string>
+		<key>OE3DSButtonL</key>
+		<string>{21, 231.5}</string>
+		<key>OE3DSButtonLeft</key>
+		<string>{27, 114.5}</string>
+		<key>OE3DSButtonR</key>
+		<string>{352, 231.5}</string>
+		<key>OE3DSButtonRight</key>
+		<string>{53, 114.5}</string>
+		<key>OE3DSButtonSelect</key>
+		<string>{311, 69.5}</string>
+		<key>OE3DSButtonStart</key>
+		<string>{311, 93}</string>
+		<key>OE3DSButtonUp</key>
+		<string>{40, 127.5}</string>
+		<key>OE3DSButtonX</key>
+		<string>{331.5, 172.5}</string>
+		<key>OE3DSButtonY</key>
+		<string>{311, 153.5}</string>
+		<key>OE3DSButtonZL</key>
+		<string>{53.5, 231.5}</string>
+		<key>OE3DSButtonZR</key>
+		<string>{319, 231.5}</string>
+	</dict>
+</dict>
+</plist>
