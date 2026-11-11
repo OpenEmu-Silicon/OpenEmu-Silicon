@@ -1,0 +1,1065 @@
+v220 — Read-only workspace provenance and dependency review (2026-11-07)
+-------------------------------------------------------------------------
+- Baseline Core v219 / System v23 user-compiled and gameplay-tested. Latest
+  v219 diagnostic: 1,280 rendered frames, 0 readback/copy/pitch errors,
+  save write PASS, clean GPU teardown; 2 nonfatal Core Xcode notices.
+- Add privacy-conscious tools/workspace-report.py for Git/checkout and SDK
+  visibility without user paths, Git remote URLs or personal identifiers.
+- Add DEPENDENCY_REVIEW.md with exact references to source-archive license
+  files and outstanding artifact, binary, artwork and upstream review gates.
+- Refresh reproducibility and maintainer handoff documentation and report
+  Core v220 paired with System Plugin v24. All frozen gameplay paths, build
+  scripts, bundled dependencies, source patches and Xcode projects unchanged.
+- Native v220/v24 build, independent clean checkout and legal review pending.
+
+v219 — Xcode warning cleanup (2026-11-07)
+--------------------------------------------------------------
+- Migrate Core Debug/Release Xcode settings to separate modern header maps.
+- Correct OEAudioBuffer protocol declaration; actual audio callbacks unchanged.
+- Locally suppress four expected Clang constant-zero diagnostics solely within
+  historical v106–v108 Vulkan safety gates; preserve all disabled gate logic.
+- Update build identity and release gate to Core v219 / System Plugin v23.
+- No upstream Azahar link/dependency or runtime renderer/input/save changes.
+- Xcode 27.2 build and current runtime checks remain to be tested on Mac.
+
+v218 — Read-only release readiness evidence (2026-11-07)
+-----------------------------------------------------------------------
+- Add automated release-gate checks for both plugins, optional verified
+  runtime logs, full SHA-256 development artifact inventory and explicit
+  PENDING status for absent source, licensing, fresh-build or human evidence.
+- Add documented release candidate criteria and actual follow-up checklist.
+- Do not change renderer, controller mapping/artwork, source patching,
+  third-party binaries, Xcode project, or framework rebuild scripts.
+- Mac runtime build and upstream Git pins remain to be verified.
+
+3DS-Azahar-Core v217 — Upstream source lock + fresh checkout (2026-11-07)
+------------------------------------------------------------------------
+- Based on user-verified v216/v20 runtime with clean GPU/framebuffer/teardown
+  diagnostics. Leave rendering, stereo, bitmap copying, input, audio, saving,
+  Xcode build phases and bundled dependencies unchanged.
+- Add tools/source-lock.py with inspect, capture, verify and fail-closed
+  bootstrap; record actual upstream commits, recursive submodules and the
+  reviewed v199 stereo patch digest, never guess source revisions.
+- Allow only pristine Azahar or the exact known v199 stereo edit; reject other
+  tracked/untracked source changes. Never silently overwrite source folders.
+- Document source lock, dependency provenance, fresh Mac build steps,
+  historical diagnostics and outstanding GitHub maintainer/license decisions.
+- Add offline Git fixture tests and new v217 release contract; update only
+  build identification/version metadata in production code.
+- Native Mac/Xcode build and real upstream commit pins remain to be confirmed.
+
+3DS-Azahar-Core v216 — GitHub handoff cleanup and reproducible source metadata (2026-11-07)
+---------------------------------------------------------------------------------------
+- Preserve the v215 renderer, audio, input, framebuffer, menu, timing and build
+  scripts unchanged. No OpenEmu modifications and no added GPU waits.
+- Introduce DEVELOPER_HANDOFF.md with review order, ownership/Retina rules,
+  known fullscreen logical-vs-physical size limitation and publication gates.
+- Add read-only tools/capture-source-revisions.py (real upstream Git commits,
+  submodule revisions, dirty state, stereo patch SHA-256; never guess commits).
+- Add one-command tools/run-source-checks.py and a v216 source contract.
+- Add V216 build identity/policy diagnostics (without altering gameplay).
+- Updated docs and ignored generated local source-revisions.json only.
+- Portable tests/ZIP verified; Xcode compilation and Mac gameplay remain to be tested.
+
+v215 — 2026-11-04 — Xcode SDK / stale CMake cache compatibility repair
+- v214 failed at upstream Dynarmic's mach/mach_exc.defs processing after the
+  Xcode 27.2 update: stale CMake configuration pointed at MacOSX27.0.sdk.
+- Prefer Xcode's active SDKROOT (fall back to xcrun) and explicitly supply
+  CMAKE_OSX_SYSROOT to Azahar CMake; require its MIG definition header.
+- Reset ONLY $HOME/.azahar-openemu-build when its saved SDK+Xcode fingerprint
+  is absent or differs; prevents old SDK paths from surviving toolchain changes.
+- Retain renderer, fullscreen v214 audit, input, stereo, saves and dependencies.
+- Xcode/macOS compile remains to be confirmed on the user's updated Mac.
+
+v214 — 2026-11-04 — Fullscreen logical-versus-physical scale contract audit
+- User reported fullscreen OpenEmu Scale Fill → 1x unexpectedly enlarges the
+  picture when the Azahar internal resolution is 2x–6x, but not at 1x.
+- Inspected upstream OpenEmu GameViewController/GameWindowController: default
+  screen size follows screenRect, and fullscreen integral scale multiplies this
+  value. Physical 2x Retina pixels are therefore interpreted as 2x logical size.
+- Confirmed an immediate core-only geometry workaround would discard Retina
+  detail or introduce a brittle host preference dependency; no unsafe workaround
+  has been enabled. Fullscreen 1x requires a host logical/physical API fix.
+- Add V214 FULLSCREEN_SCALE_CONTRACT to report native logical geometry and
+  visible physical dimensions at native/Retina publication; renderer, row
+  stride/copy, 180-frame delay, stereo, save and input behavior unchanged.
+- Expand README for OpenEmu maintainer review and add regression model test.
+- v213 Mac log: 9,930 checked framebuffer copies across two sessions, zero
+  GPU readback errors, both V213 RELEASE_HEALTH status=PASS.
+- The known fullscreen Scale 1x defect is documented and NOT fixed by v214.
+
+3DS-Azahar-Core — CHANGELOG.txt (cumulative)
+Newest released version first; historical versions descend in numeric order.
+Earlier entries describe their original state, not the current capabilities of v214.
+
+v213 — 2026-11-02 — Session health summary and GitHub dependency preflight
+- Preserve the Mac-tested v212 Vulkan renderer, Retina/framebuffer paths, 1x–6x menu, stereo geometry, save behavior and diagnostic filtering. No GPU commands, waits, copies, frame scheduling, or OpenEmu host changes.
+- Add V213 RELEASE_HEALTH: consolidate already collected hardware frame/readback/format/copy/pitch counters into one unambiguous PASS/CHECK gate at session end.
+- Add read-only azcore/verify-source-layout.py checking expected orig_source Azahar/OpenEmu paths; no external sources copied or altered.
+- Add release/package regression tests and reviewer-oriented dependency guidance; ignore incidental Xcode and diagnostic outputs in Git staging.
+- v212 Mac log: 8,840/8,840 bitmap copy checks, zero GPU readback failures, one successful atomic state-file write, clean teardown, quieter diagnostics.
+- Source tests/archives verified; v213 Mac Xcode compilation and gameplay remain to be checked.
+
+v212 — 2026-11-02 — Release-hardening diagnostics, frame profile and save audit
+- Preserve v211 renderer, 1x–6x options, Retina screen-rectangle publication, stereo mode geometry, settings migration, and OpenEmu host compatibility byte-for-byte at the relevant code paths.
+- Default diagnostic output now filters historical preflight chatter before stderr/file I/O. `AZAHAR_DIAG_VERBOSE=1` restores all old traces; faults and failed checks are never hidden.
+- Add `V212 SESSION_PROFILE` for existing frame/start-gap and pitched-copy timing counters, with no new GPU waits or rendering work.
+- Add user-initiated `V212 SAVE_FILE_WRITE` / `SAVE_FILE_READ` reports without logging save paths. Clarify that serialization support does not prove a successful save-state round trip or persistent game saves.
+- Keep all third-party binaries/headers, source/tests and Xcode build dependencies; no modification to OpenEmu or v15/v16 System Plugin.
+- Previous Mac v211 log: 21,542/21,542 copy audits, zero GPU readback errors, and three clean teardowns (independent v212 build still requires Mac verification).
+- Source contract and ZIP checks run in Linux; actual Xcode build, game-save behavior and macOS performance require Mac testing.
+
+v211 — 2026-11-02 — Retina release cleanup, 1x–6x menu, public-review documentation
+- Remove 7x/8x internal resolution choices after v210 Mac tests showed negligible visual benefit and pronounced 8x performance cost.
+- Clamp pre-existing v210 saved 7x or 8x preferences to supported 6x; never silently replace them with 1x.
+- Keep automatic native/2x physical output, delayed sourceRect publication, padded bitmap row copies, stereo geometry and OpenEmu fullscreen behavior unchanged.
+- Add targeted architecture/ownership/lifecycle comments in first-party source; correct outdated experimental descriptions without changing the rendering algorithm.
+- Consolidate previous per-version Markdown notes into this descending-version changelog and one current root README.md. Preserve third-party licenses and all required source/build files.
+- v210 Mac log: 4,572/4,572 pitched bitmap audits passed, zero GPU readback failures, two clean hardware teardowns; no new v211 Mac build yet.
+- Package/static tests conducted in the release environment; Xcode compilation and gameplay still require Mac validation.
+
+v210 — 2026-11-01 — Automatic Retina physical output; 7x and 8x internal resolution
+- Based on v209: 7,778/7,778 host-pitch audits passed in Mac runtime logs.
+- Remove Physical Output submenu (and experimental 3x physical mode).
+- Keep 1x internal rendering at native visible pixels; internal 2x–8x use the
+  fixed 2x physical output, maintaining normal window size and SBS sizing.
+- Always allocate a fixed 2x physical bitmap at startup; no host reallocations.
+- Publish native or 2x screen rectangles on in-game resolution changes AFTER
+  the established 180-frame startup window-lock phase.
+- Ignore legacy persisted hostScale choices, including stale 3x selections;
+  no edits to OpenEmu application/system plugin or user settings required.
+- Add 7x and 8x to the core's Resolution menu and persistent selection guards;
+  both are supported by upstream Azahar libretro and renderer settings.
+- Preserve 128 MiB source-frame guard; 8x Side-by-Side Full is ~94 MiB/frame.
+- Preserve v209 framebuffer integrity and performance diagnostics.
+- Keep expensive v202–v206 GPU validation probes bounded at <=6x;
+  new 7x/8x images still use the live Vulkan/bitmap presentation path.
+- Source tests and ZIP checks run here; Xcode compilation and 7x/8x performance
+  must be verified on the user's Mac. Avoid promising a visual improvement.
+
+  --- Archived engineering notes from V210-RETINA-AUTO-RESOLUTION.md (historical, superseded) ---
+# v210 — Automatic Retina output and 7x–8x internal rendering
+
+**Player interface:** Resolution 1×–8×; stereoscopic mode/depth unchanged.
+The former Physical Output submenu has been removed entirely.
+
+**Physical presentation:** 1× internal uses native 400×480 (800×480 for
+Side-by-Side Full); 2×–8× internal uses physical Retina 800×960
+(1600×960 for Side-by-Side Full). The bitmap is allocated at the fixed 2×
+maximum at game startup, but the visible rectangle starts native to preserve
+the original window size and can change after 180 frames with no reallocation.
+
+Former persisted 3× host output preferences are ignored, so existing users
+migrate automatically. 7× and 8× are upstream Azahar options already supported
+by Settings::values.resolution_factor, whose supported range ends at 18.
+
+**Costs:** 8× full SBS source is 6400×3840 BGRA (~94 MiB), compared with
+6× full SBS at 4800×2880 (~52.7 MiB). The readback buffer limit is 128 MiB;
+performance and GPU memory at this mode have not yet been Mac-validated.
+
+**Suggested verification:** Start 1× 2D and confirm native window; switch to
+7× (then 8×) and confirm visible 2× detail without needing restart; return to
+1×; test 8× in Side-by-Side Full with a game restart, then 2D and restart.
+Try fullscreen/windowed. Look for V210 AUTO_OUTPUT and V209 SESSION_AUDIT
+rowfail=0. If 8× stutters, use 6× for daily play.
+
+No modification of OpenEmu.app or 3DS-System-Plugin.
+  --- End archived notes ---
+
+v209 — 2026-11-01 — High-resolution stability audit
+- Promotes v208 to the Mac-confirmed high-resolution native-window baseline.
+- Preserves v208 bitmap output, 180-frame screenRect publication, physical scales,
+  renderer mode, Metal probes, fallback, and window sizing without modification.
+- New nine-point per-frame host-row integrity audit after pitched bitmap copies.
+- Records startup-native versus high-resolution frame counts, copy costs, and errors.
+- Adds a consolidated V209 SESSION_AUDIT at shutdown; no GPU waits or host changes.
+- Adds 2D/stereo physical-output geometry and padded stride guard tests.
+- 3x/SBS functionality is not Mac-validated until user testing.
+
+  --- Archived engineering notes from V209-HIRES-STABILITY.md (historical, superseded) ---
+# v209 high-resolution stabilization (no display path changes)
+
+v208 was visually verified on an Apple Silicon Mac to retain the native window
+while showing real higher-resolution pixels, including fullscreen and
+normal/Side-by-Side Full window transitions. v209 deliberately does NOT change
+the display implementation. All v202–v208 functionality is retained.
+
+## Independent checks
+- Every padded bitmap output: check nine RGBA samples in the *actual host*
+  framebuffer against the compact image immediately after the row copy.
+- Track copy duration, maximum copy cost, and startup/native-vs-hires counts.
+- Log `V209 PITCH_AUDIT` on the first frame, every 600 copies, or on error.
+- Log `V209 SESSION_AUDIT` when the game closes.
+- Host pitch stays based on frozen maximum buffer width. There are no Metal2
+  switches, GPU waits, dynamic bitmap reallocations, or OpenEmu modifications.
+- Test infrastructure simulates 1x/2x/3x and normal/Side-by-Side Full geometry.
+
+## Suggested Mac test
+Use 6x Azahar rendering and 2x Physical Pixels first; restart the ROM and
+check the ordinary-size window, fullscreen, and clean shutdown. Then select
+Side-by-Side Full, restart, and confirm its window shape. Optional: select 3x
+Physical Pixels, restart, and verify performance and image detail. Restore 2D
+and compare the window size. A `V209 SESSION_AUDIT ... rowfail=0 ... status=PASS`
+means sampled host-memory pixels were correct, not that every screen pixel was
+checked. Any new visual regression should be reported alongside the log.
+
+The Xcode build and performance tests are pending actual Mac verification.
+  --- End archived notes ---
+
+v208 (2026-11-01): Test fixed maximum 3x OpenEmu bitmap buffer with startup native screenRect, delayed physical (2x/3x) screenRect after 180 actual frames, and compact frame/pitch-safe row copy. Avoid host auto-window resize if its GameWindowController startup settling works as source suggests. Add logs. Do not change OpenEmu or System Plugin. UI's saved fit-to-window zoom remains separate: reset with Select Scale -> 1x if previously enlarged.
+
+  --- Archived engineering notes from V208-DELAYED-WINDOW-TEST.md (historical, superseded) ---
+# v208 source-contract / field test
+
+Source verified in user-provided OpenEmu-Silicon-main.zip:
+- MTLGameRenderer.swift creates PixelBuffer once from `bufferSize` and `bytesPerRow`, but update() dynamically uses the current `screenRect` to change its Metal output texture dimensions.
+- OpenEmuHelperApp.swift setupCVBuffer() updates renderer and filter chain on screenRect changes.
+- GameWindowController.swift gameScreenSizeDidChange() auto-resizes only once when gameplay starts (`hasSettledInitialWindowSize`). Window scale and free size are independently persisted per system under `OEIntegralScale.<systemIdentifier>`.
+- GameControlsBar.swift has `Select Scale -> 1x` under its in-game settings gear menu.
+
+This is a **test** of whether the core can hold the actual window at native geometry while delivering a larger physical source rectangle later. It must not claim fully solved until hardware confirms window and pixels.
+
+Source checks: (1) no Metal2 mode, (2) no blocking Metal waits, (3) buffer size frozen, (4) physical rectangle changes after >=180 frames, (5) compact texture converted then row-pitched into host pixel buffer, (6) reserved 3x full/stereo capacity capped to 24MiB, (7) safe alloc fallback native, (8) v207 persistence and v202–v206 private probes kept, (9) host app unchanged, (10) System Plugin unchanged.
+  --- End archived notes ---
+
+v207 (2026-11-01): First opt-in, genuine higher-resolution stock OpenEmu bitmap handoff (2x/3x fixed-at-launch host screenRect/buffer, RGBA/BGRA exact copy, larger-surface scaling, stereo full/2D geometry, allocation failback, persisted core-only menu, v207 logging). Native-window compatible mode default; high-resolution host mode may enlarge startup window. Existing Metal probe suite v202–206 and system plugin retained. No OpenEmu changes.
+
+  --- Archived engineering notes from V207-HOST-PRESENTATION-TEST.md (historical, superseded) ---
+# v207 high-resolution presentation boundary: host implementation and parallel lanes
+
+Target: core-only 2×/3× bitmap delivery, with v206 compatible fallback. No OpenEmu or System Plugin source changes.
+
+OpenEmu host source evidence (user-provided `OpenEmu-Silicon-main`):
+- `OpenEmuKit/Source/MTLGameRenderer.swift`: OpenEmu's BITMAP renderer creates its PixelBuffer ONCE from `gameCore.bufferSize` and `gameCore.bytesPerRow`, then makes a BGRA Metal render texture from `gameCore.screenRect`. Thus any physical host output must be frozen at game load. Changing `bufferSize` mid-game can leave a too-small cached buffer.
+- `OpenEmuKit/Source/OpenEmuHelperApp.swift`: `screenRect` is forwarded to the source filter-chain and also the game UI's screen-size updates.
+- `OpenEmu/GameViewController.swift`: default/native window size comes from `screenRect` corrected by `aspectSize`. There is no independent window size override on `OEGameCore` for bitmap mode; selecting high-res may create a larger window. Therefore this is an opt-in experiment, not the final native-window solution.
+- `OpenEmuKit/Source/MTL3DGameRenderer.swift`: alternate Metal2 has blocking frame pacing semaphores, in addition to the synchronous GPU wait that caused concern in v201. Do not reactivate this backend in v207.
+
+### Independent diagnostics in one user run
+1. Active/pending scale and restart lock, including 1× v206 compatibility.
+2. Source frame >= physical host framebuffer check (detect fake 1× upscaling).
+3. 2×/3× physical pixel byte count, BGRA transport, no source truncation.
+4. Exact-size source fast path preserves each original pixel (including RGBA channel swizzle).
+5. Downsampling genuine 6× source to 2×/3× host retains higher density than v206.
+6. Original 2×/3× screenRect and aspectSize both communicate true physical surface to stock host.
+7. 2D and Side-by-Side Full logical aspect cases.
+8. Full-to-Off stereo pillarbox path preserves aspect for scaled host buffers.
+9. Immutable source stride and owned video buffer for full session.
+10. Memory budget and allocation-failure fallback before first frame.
+11. v205 handoff deliberately skipped when host != native dimensions to avoid stale/invalid results.
+12. v202/v203/v204/v206 GPU probes unchanged and still bounded.
+13. 0 extra GPU waits or change of host renderer.
+14. Clean stop and summary with eligible physical frame counts.
+15. Selection and persistence via existing core display submenu, no user terminal commands.
+
+The only hardware-grounded proof of **visible** high-resolution detail is a user observation/screenshot after selecting experimental mode and restarting the game. Logs alone prove only that the appropriate sized data were handed to the renderer; they cannot prove presentation resolution or retention of native 1× default window geometry.
+  --- End archived notes ---
+
+v206 (2026-11-01) — Multi-resolution Metal texture matrix + host-interface audit
+- User-verified v205: both six-times-resolution sessions completed and verified 120/120 Metal handoffs; no GPU readback failures.
+- One genuine high-resolution game frame tests multiple independent actual Metal output textures per resolution/stereo mode: 1x native, 2x, 3x (when <= source factor), and full source factor.
+- The full-source-size output is a GPU texture-to-texture blit with zero resampling. A 25-point byte-exact verification checks that no high-resolution pixels are lost at the texture stage.
+- Intermediate textures use the existing Metal compute shader and independent 25-point CPU reference. Only sparse 1-pixel GPU readbacks are used (rather than full output readbacks).
+- Every GPU job is one-shot per genuine-resolution/stereo combination and submitted asynchronously with an independent one-command-buffer cap. Busy work is deferred, never waited upon.
+- 40 simulated geometry checks run at core init across 4 stereo selections and factors 2x..6x. These are explicitly labelled simulated and do not assert host rendering success.
+- V206 MATRIX_BEGIN, GPU_MATRIX, MATRIX_RESULT, SESSION_MATRIX; environment AZAHAR_V206_SKIP_MATRIX=1 disables the private experiments.
+- Added host-interface audit explaining the remaining high-resolution display problem and why the current native bitmap path cannot preserve 6x pixels at fullscreen.
+- All v205 source, Vulkan/MoltenVK dependencies, System Plugin compatibility, controls, saves and window behavior preserved. NO OpenEmu changes, NO blocking GPU waits, NO Metal2 presenter.
+- This is a diagnostic release: full-resolution textures are PRIVATE, NOT visible full-resolution host presentation. Mac compilation and GPU runtime still require actual test.
+
+  --- Archived engineering notes from V206-HOST-PRESENTATION-AUDIT.md (historical, superseded) ---
+# v206: stock OpenEmu high-resolution presentation interface audit
+
+## Evidence from user's OpenEmu-Silicon source (not patched)
+
+1. `OpenEmuKit/Source/MTLGameRenderer.swift`: bitmap mode creates its conversion buffer using `gameCore.bufferSize` and `gameCore.bytesPerRow`, and builds an output texture from `gameCore.screenRect`. Merely creating a private 6x Metal texture does not make that texture available to this renderer.
+2. `OpenEmuKit/Source/MTL3DGameRenderer.swift`: Metal2 mode instead uses `gameCore.createMetalTexture(device:)` and obtains `gameCore.metalTexture` for presentation. It avoids the bitmap pixel format conversion path but has distinct frame scheduling and lifecycle concerns. v201 changed to this mode prematurely and produced black-screen/hang symptoms on the user's Mac.
+3. `OpenEmuKit/Source/OpenEmuHelperApp.swift`: the filter chain receives `gameCore.screenRect` as its source rectangle and `aspectSize` as its aspect correction, and window screen-size notifications derive from `screenRect.size`.
+4. `OpenEmu/GameViewController.swift`: it uses the provided screen size to calculate the game's default/native window size; `aspectSize` corrects aspect ratio but is NOT an independent physical-resolution selector.
+
+## Meaning
+
+The current v205/v206 bitmap interface supplies 400x480 or 800x480 pixels. GPU-downsampling a 2400x2880 or 4800x2880 image before bitmap delivery loses high-resolution pixels, even if it improves antialiasing. v206 separately verifies that **actual full-size Metal textures** can keep those pixels and remain available on the GPU; it does not claim stock OpenEmu displays them.
+
+Next high-risk milestone: design a resilient Metal2 rendering path where the host sees a high-resolution texture with appropriate source rectangle and where OpenEmu's native-size window logic remains correct. That is not yet demonstrated, and a host restriction may prevent it without an app change. No OpenEmu modifications are permitted for this project.
+  --- End archived notes ---
+
+v205 (2026-11-01) - bounded visible Metal-to-bitmap pilot
+- Based on v204 Fixed, preserving proven Vulkan renderer, OpenEmu bitmap ABI and System Plugin v15.
+- Metal composes genuinely rendered 2x-6x source frames; completed results are verified at 25 locations before optional display.
+- Normal v199 bitmap frame is produced every frame. No synchronous GPU waits or OpenEmu renderer switch; fallback applies automatically if Metal is late or fails.
+- Concurrency limited to two GPU operations; first 120 Metal submissions per resolution/stereo combination, sampling every other eligible frame.
+- Live visible output requires matching source geometry, OpenEmu bitmap geometry, stereo/depth mode, and freshness <=2 frames; no presenter changes in stereo geometry mismatch.
+- Set AZAHAR_V205_DISABLE_METAL_PRESENT=1 to disable experimental visible handoff entirely.
+- EXPERIMENTAL: actual Mac compilation, latency and visual accuracy remain unverified. Since OpenEmu still accepts a native bitmap, this does NOT provide native 6x detail in fullscreen.
+
+v204 Fixed — Objective-C++ compile correction (2026-11-01)
+- Fix Xcode compiler errors: local C arrays xs and ys cannot be referenced
+  inside asynchronously executed Objective-C blocks.
+- std::array<unsigned,5> captures coordinates by value, preventing dangling
+  stack pointers in GPU completion handlers.
+- Added fix-specific diagnostic build ID and Objective-C++ compilation test.
+- v204 stream, v203/v202 probes and v199 bitmap presenter are unchanged.
+- No OpenEmu app or System Plugin changes; Mac compilation still unverified.
+
+v204 — Bounded, asynchronous consecutive-frame Metal composition test (2026-11-01)
+- User-tested v203: genuine 2x,4x,6x Metal compositions each passed 25/25 sample checks.
+- New v204 tests 12 consecutive genuine high-resolution frames per resolution and
+  separate stereo geometry with per-frame Metal compute + reference readback.
+- Strict limit of two GPU command buffers in flight. If busy, skip the probe
+  immediately; NEVER stall the emulator thread, lock, or wait on the GPU.
+- Probe resources are retained through each completion callback; callbacks
+  retain independent atomic status, NOT the emulation core or host buffer.
+- Source geometry and correctness checks fail closed. Log V204 STREAM_BEGIN,
+  V204 STREAM_SOURCE and V204 STREAM_RESULT with frame counts & 25 checks/frame.
+- Visible presentation remains stable v199 bitmap. No application changes,
+  other installed components, renderer switching or extra UI controls.
+- Important: this milestone verifies sustained GPU behavior; it does NOT
+  implement full-resolution host texture presentation or improved fullscreen.
+- Linux tests verify source/ABI expectations; Mac Metal & Xcode must be tested.
+
+v203 — Asynchronous, isolated Metal composition experiment (2026-11-01)
+- Built atop user-tested v202: normal OpenEmu rendering stays v199's stable bitmap pathway.
+- NEW: for each observed genuine 2x–6x framebuffer, perform one nonblocking Metal
+  compute pass. Upload full Vulkan-readback pixels (no 1x image enlargement),
+  use linear GPU texture sampling to fit them into a private native-sized
+  verification surface (400x480 or 800x480 Side-by-Side Full).
+- Compare 25 points against an independent CPU bilinear reference. 8-bit rounding
+  tolerance <=2/channel. Log V203 METAL_COMPOSE_SUBMIT and V203 METAL_COMPOSE.
+- All resources live through the completion callback; no GPU waits, no work
+  on OpenEmu's real display surface, no added menus, no host patches.
+- Retains v202 three-scanline full-resolution transfer probe and its logging.
+- Manual Mac Xcode compilation and gameplay validation remain outstanding.
+- IMPORTANT: diagnostic, not a solution for true high-resolution fullscreen output.
+  Native-sized destination discards extra pixels; final full-resolution host
+  presentation remains unsolved with stock OpenEmu.
+
+v202 — Stable bitmap restoration and asynchronous, lossless Metal transport probe (2026-11-01)
+- Based on tested v199 source, not the unstable v201 Metal2 presentation experiment.
+- OEGameCoreRenderingBitmap and all v199 pixel conversion/stereo/window behavior restored.
+- Removed the blocking v201 Metal2 presenter and synchronous command-buffer waits.
+- Linked Apple's system Metal framework to the core plugin, with no extra dependencies.
+- For live 2x–6x source frames, one-shot Metal shared-texture -> private-texture blit,
+  original dimensions unchanged; asynchronous GPU completion handler checks three
+  copied scanlines for byte-for-byte fidelity and emits V202 METAL_TRANSFER.
+- If the source lacks genuine internal pixels or Metal allocation fails, the
+  v199 visible renderer is unaffected; no separate menu or host patch.
+- Reports V202 build ID and safety marker; source diagnostic works during gameplay.
+- Diagnostic-only by design. Does not yet solve native-window/fullscreen high-resolution output.
+- Xcode compile and real macOS run not available in packaging environment.
+
+v199 — 2026-11-01 — True-width stereoscopic framebuffer experiment
+- Auto-applies the source patch when building the Azahar libretro target in Xcode.
+- Fixes previously disconnected Xcode build phase so the new binary is actually rebuilt and packaged.
+- Requests doubled libretro geometry width in SideBySideFull only; preserves native height.
+- Adds pixel-exact BGRA copy for already-wide frames, retains v198 fallback for compact frames.
+- Expands telemetry to identify genuine upstream source dimensions and selected copy route.
+- Preserves v197 session-lock, v194 restart persistence, v195 depth, and other modes.
+- macOS/ARM64 rebuild still requires the user's Xcode environment; not built in this container.
+
+v198 — Correct Side-by-Side Full image proportions in wide sessions (2026-11-01)
+- ROOT CAUSE: The current Azahar libretro backend supplies the ordinary portrait-shaped 3DS geometry to its full-stereo renderer, which internally halves the width for each eye and leaves black padding above/below its two eye views. V197 projected the entire padded frame to an 800x480 bitmap, leaving both views vertically compressed.
+- FIX ATTEMPT: When the selected mode is Side-by-Side Full and the incoming frame has the compact portrait-shaped layout, crop the vertical central half before resampling to the existing locked output size. Both eye views are transformed identically; separation is retained.
+- SAFETY: Keep v197 session-locked buffers, width, and pixel-format paths. When input frames already have wide full-stereo geometry, do not crop. Do not change Off/Anaglyph/Half view processing.
+- DIAGNOSTICS: V198 BUILD_ID, GPU_FRAME behavior=V198_STEREO_CENTER_CROP, SW_FRAME crop_center flag.
+- LIMITATION: This corrects proportions but CANNOT increase per-eye pixel detail when the upstream libretro frame is already reduced; true full-resolution stereo requires upstream framebuffer-layout correction. OpenEmu may still need a game restart to resize its window.
+- Unchanged: Core v195 menus, v194 Anaglyph persistence, controller/save/shader support, native Scale, experimental 1x–6x Resolution behavior, frame pacing; System Plugin v15 unchanged.
+- Testing: restart with Full selected, inspect both eye proportions; switch to Off and back; test Anaglyph after restart; attach newest diagnostic log for frame geometry confirmation.
+
+v197 — Session-locked bitmap geometry and stereo transition diagnostics (2026-11-01)
+- INVESTIGATION: v196 produced a wider window after restart but corrupted images during live stereo switches.
+- FIX ATTEMPT: Lock OpenEmu-visible 400x480 or 800x480 bitmap geometry BEFORE Azahar loads, and do not resize/reallocate that host-visible buffer during gameplay.
+- SAFETY: Always keep an owned 800x480 capacity; ignore unknown-capacity OpenEmu buffer hints; decouple source frame size from session output size.
+- PRESENTATION: Convert each received frame into the session's fixed pixel geometry. When switching from full stereo back to 2D in an 800px window, pillarbox instead of horizontally stretching the 2D content.
+- BEHAVIOR: Changing to full stereo in a 400px session displays in the existing window; restarting with full selected should initialize the 800px-wide window. The app may NOT automatically resize during runtime. Do not claim true stereo-full source resolution until the logged libretro frame geometry is known.
+- DIAGNOSTICS: V197 GEOMETRY_LOCK, INITIAL_AV_GEOMETRY, UPSTREAM_GEOMETRY, GPU_FRAME/SW_FRAME, LIVE_MODE_CHANGE, OPENEMU_HINT, BUILD_ID. These log the actual Azahar frame width and stride separately from output size.
+- PRESERVED: v194 Anaglyph restart, v195 stereo modes/depth, shaders, input, game saves, v190 GPU hardware path and frame pacing; System Plugin v15 untouched.
+- KNOWN LIMITATIONS: Full stereo per-eye source fidelity and OpenEmu live window resize not yet verified. Higher internal resolution still downsampled to a fixed output size. Xcode and gameplay tests required.
+
+v196 — Full Side-by-Side window/presentation experiment
+- Present native 3DS full stereo as a predictable 800×480 bitmap; leave normal 2D, half-SBS, and Anaglyph presentation unchanged.
+- Convert/expand a narrower libretro frame safely to the two-eye window target; log source/output geometry and whether pixels were expanded.
+- Restore full-stereo output geometry before Azahar initializes and after the hardware/software load transition; advertise the changed dimensions when display mode changes.
+- Preserve v194 Anaglyph restart, v195 depth/mode menus, shaders, and all gameplay/input/save code.
+- Known limitation: OpenEmu live window resizing and genuinely full-width per-eye source resolution require Mac testing; true 2×–6× internal rendering output still pending.
+
+3DS AZAHAR CORE v195 — STEREO MODE/DEPTH CONTROLS (2026-11-01)
+- WORKING BASELINE: Core v194 user-confirmed Anaglyph persistence and existing
+  stereo renderer behavior, save support, controls, Vulkan and OpenEmu shaders.
+- UI: Show three adjacent core submenus inside Select Display Mode:
+  Resolution, Stereoscopic Mode, and Stereoscopic Depth. No nested sections.
+- DEPTH: Expose 10%,20%,30%,40%,50%,60%,70%,80%,90%,100% choices. Each change
+  updates citra_factor_3d dynamically via libretro GET_VARIABLE_UPDATE.
+- DEFAULT: 80% (nearest menu choice to legacy fixed 85%).
+- SAVE/RESTORE: Depth is recorded alongside stereo mode and resolution in the
+  existing AzaharDisplayPreferences-v193.plist and restored before retro_init;
+  retained by v194's live-renderer reassertions.
+- LIMITATION: OpenEmu owns the top-level Shaders and Scale menus, and the SDK
+  specifies only one submenu level for core-defined Display Modes. Exact
+  top-level order still needs an OpenEmu host source change; core-owned
+  Stereoscopic Mode and Stereoscopic Depth are supported as sibling submenus.
+- PRESERVED: v194 bitmap resolution downsample workaround. True high-res
+  presentation, full SBS window sizing, and Scale 2x/3x are not implemented.
+- DIAGNOSTICS: V195 BUILD_ID, GRAPHICS_INITIAL, GRAPHICS_REASSERT,
+  DISPLAY_MODES_ENUMERATED, DISPLAY_MODE_CHANGE, GRAPHICS_PERSIST.
+- VALIDATION: ZIP integrity and static sources checked; Xcode and runtime
+  validation require user testing on Apple Silicon.
+
+3DS AZAHAR CORE v194 — POST-LOAD GRAPHICS OPTION RESTORE (2026-11-01)
+- FIX ATTEMPT: Reassert saved stereo/resolution options after Vulkan hardware
+  promotion and over the first four actual gameplay frames. This addresses
+  the lifecycle gap where option changes used during preflight can be consumed
+  before the retained gameplay renderer is fully initialized.
+- HARDEN: Reapply selected values on the actual libretro GET_VARIABLE callback,
+  including if Azahar re-registers defaults after the Vulkan context is ready.
+- FIX: Selecting an already-checked mode explicitly requests a fresh libretro
+  variable-update; previously it was silently ignored.
+- DIAGNOSTICS: V194 STEREO_POST_LOAD_REARM, GRAPHICS_REASSERT,
+  DISPLAY_MODE_REASSERT and V194 BUILD_ID.
+- PRESERVED: v193 stable 400x480 presentation and Vulkan frame-copy path.
+  No changes to controller, shaders, saving, frame pacing or 85% depth.
+- OPEN ISSUE: Resolutions 2x-6x still pass through a 400x480 downsample before
+  OpenEmu; this does NOT provide a 6x pixel-dense bitmap to OpenEmu. Achieving
+  true resolution/window independence will require host-side presentation
+  coordination. Do not infer high-resolution fidelity from the menu setting.
+- OPEN ISSUE: Full SBS window width, and Scale 2x/3x, require OpenEmu window
+  integration work. Xcode compile and the 3D startup fix require user testing.
+
+3DS AZAHAR CORE v193 — RETINA-PRESERVING RESOLUTION OUTPUT AND STEREO RESTORE (2026-11-01)
+- FIX: Persist the selected resolution/stereo settings to a small plist in
+  the writable Azahar support directory at every menu change; restore before
+  Azahar option initialization on a subsequent game launch. Removes dependence
+  on OpenEmu displayModeInfo being available at the start of each helper.
+- FIX: For 2x–6x internal rendering in ordinary/Anaglyph/half-SBS modes,
+  normalize high-resolution GPU frames into a stable native-sized bitmap
+  (400x480) using a bounded four-tap sampling pass, retaining OpenEmu's
+  window geometry and framebuffer stride across live resolution changes.
+  Azahar still performs internal higher-resolution rendering; the final
+  OpenEmu bitmap is a downsampled native-sized output.
+- GUARD: Stable presentation, once activated, remains so until the game
+  session ends. Source frame and presentation size are logged separately.
+- PRESERVED: 1x Off, 1x Anaglyph, and 1x Side-by-Side Half normal bitmap path;
+  existing GPU readback; all game controls, shaders, saving, frame pacing.
+- NOT COMPLETE: Side-by-Side Full automatic window-width adjustment and
+  OpenEmu-owned Scale 2x/3x options. Avoid combining Full SBS with live
+  resolution changes until full geometry handling has been verified.
+- DIAGNOSTICS: V193 GRAPHICS_RESTORE, GRAPHICS_PERSIST, STABLE_PRESENT;
+  V193 BUILD_ID. Please test runtime resolution toggles then restart Anaglyph.
+- LIMITATION: Mac Xcode compile and gameplay validation still required.
+
+3DS AZAHAR CORE v192 — DISPLAY MODE DISCOVERY FIX (2026-11-01)
+- FIXED: Declare OEGameCoreSupportsDisplayModeChange = true in the
+  openemu.system.3ds dictionary under OEGameCoreOptions in Info.plist.
+  OpenEmu gates the HUD Select Display Mode menu on this capability.
+- FIXED: Info.plist bundle version was still incorrectly at 190 in v191.
+  Set CFBundleVersion=192 and CFBundleShortVersionString=0.192.
+- ADDED: V192 DISPLAY_MODES_ENUMERATED diagnostics to verify that
+  OpenEmu calls the core and retrieves the two submenu definitions.
+- PRESERVED: v191 Resolution (1x–6x) / Stereoscopic 3D options; 85% depth;
+  unchanged libretro/Vulkan path, shaders, frame pacing, controls, saving.
+- NOT IMPLEMENTED: additional window Scale items beyond what OpenEmu fits
+  to the screen. Scale is host-owned and may legitimately offer only 1x.
+- TEST PLAN: Build; ensure "Select Display Mode" appears in gear menu;
+  choose Resolution 2x, then stereo Anaglyph, restore Off/1x; inspect logs.
+- LIMITATION: macOS full Xcode build and runtime verification still required.
+
+3DS Azahar Core v191 (corrected Xcode build package) — 2026-11-01
+- Fix Xcode Objective-C++ compiler error in the Resolution submenu: precompute NSString before OEDisplayMode_OptionWithStateValue macro invocation.
+- No rendering, libretro, frame timing, graphics settings, or bundled binary changes. Retains v191 build identification.
+
+3DS Azahar Core v191 — in-game resolution + stereo graphics controls (2026-11-01)
+Build ID: 3DS_AZAHAR_CORE_191_RESOLUTION_STEREOSCOPY_20261101
+- Add OpenEmu OEGameCore displayModes / changeDisplayWithMode entries for internal resolution 1x–6x and Azahar stereoscopic modes Off, side-by-side half, side-by-side full, anaglyph; 85% depth is fixed via core option.
+- Restore display selections from displayModeInfo; apply at initial core option registration and accept libretro GET_VARIABLE_UPDATE after user changes.
+- Accept valid SET_GEOMETRY callbacks; use actual video frame dimensions for bitmap buffer.
+- Broaden hardware readback support to at most 8192 per axis and 128 MiB per buffer, guard overflowing sizes and handle borrowed OpenEmu video buffer hints without unsafe free/realloc.
+- Maintain working hardware rendering and v190 frame pacing unchanged. Core source unchanged outside video/menu/options/geometry; bundle dylibs unchanged.
+- Shader selection delegated to OpenEmu's built-in postprocessor, not a new plugin feature. Host window Scale 1x–3x not added: core API has no supported window resizing hook; use OpenEmu UI.
+- Runtime GPU output scaling, shader operation and depth behavior require macOS verification. Status: DEVELOPMENT / UNVERIFIED.
+
+3DS Azahar Core v190 — input bridge, frame pacing and save capability (2026-10-28)
+Build ID: 3DS_AZAHAR_CORE_190_INPUT_TIMING_SAVES_20261028
+- Preserve v188 GPU hardware gameplay and v189 GPU readback allocation reuse.
+- Remove redundant 60 FPS hardware sleep governor causing pauses on top of OpenEmu scheduler; log gap/run timings for future optimization.
+- Add 3DS-System-Plugin-v12 analog Circle Pad/C-Stick axis selectors and ZL/ZR extras mapped to libretro analog/joypad indices.
+- Preserve NDS-compatible button protocol for Start/Select but fix UI control ID translation in the separate System Plugin v12.
+- Capture save-state capability via retro_serialize_size; no unverified claims of working saves.
+- New independent root package path and version semantics.
+
+  --- Archived engineering notes from azcore/README.md (historical, superseded) ---
+# 3DS-Azahar-Core v196 — Side-by-Side Full Window Geometry (experimental)
+
+- **Goal:** Give Side-by-Side Full a 800×480 output geometry at 1× instead of treating its two eye views as a 400×480 presentation. The normal stereo modes remain at the working v195 geometry.
+- The output is resampled into a fixed 800×480 bitmap if Azahar's supplied frame dimensions differ. **Resampling does not create missing per-eye detail.** A diagnostic reports when horizontal expansion occurs.
+- Core reloads previous mode/depth selections and advertises the selected full stereo geometry before the first gameplay frame. Live mode-switch resizing depends on OpenEmu's handling of changes to `bufferSize`, `screenRect`, and `aspectSize`; test it separately.
+- Retains the existing OpenEmu Scale menu, shaders, stereo depth (10–100%), Anaglyph restart fix, and v193 resolution downsampling fallback. Does not attempt true high-resolution output.
+- **Tests:** First 2D at 1×; switch to Full SBS; check width, height, two views and both 3DS screens; close and reopen Full SBS; switch back to Off and verify normal window. Check Anaglyph restart once. Upload the newest diagnostic log and screenshots.
+- **Limitation:** This environment cannot run Apple's Xcode or OpenEmu; runtime window resizing remains unverified. Keep working v195 as a fallback.
+
+---
+
+# Azahar OpenEmu Core — fourteenth pass
+
+This is the OpenEmu adapter for the Azahar libretro core. This pass updates the
+source path to the complete recursive Git checkout and validates the submodule
+files that were missing from the original GitHub source ZIP.
+
+## Expected source layout
+
+    3ds Core Development/
+    ├── orig_source/
+    │   ├── OpenEmu-Silicon-main/
+    │   ├── azahar-master/       # Original ZIP; preserved
+    │   └── azahar-git/          # Complete recursive Git checkout
+    └── azcore/
+
+## Build notes
+
+- The Xcode project uses `../orig_source/azahar-git` as `AZAHAR_SOURCE`.
+- The build phase checks for the compatibility-list, Crypto++, and canonical
+  libretro submodule files before running CMake.
+- The Azahar libretro dylib is built for Apple Silicon and copied into the
+  OpenEmu core plugin's Resources directory.
+- CMake is located through common standalone CMake.app/Homebrew paths, since
+  Xcode build phases may not inherit the interactive shell's PATH.
+
+This ZIP has been checked for archive integrity and script syntax, but the
+actual Xcode build must be run on the user's Mac.
+
+
+### Build note (14th-pass follow-up)
+
+The Azahar build now configures and compiles successfully from the recursive checkout. The 14th-pass link failed because an upstream macOS linker flag split the source path at spaces in `3ds Core Development`. The build script now configures through a no-space symlink under your home folder and stores its CMake build tree there, then copies the finished `azahar_libretro.dylib` back into the project source tree for Xcode to bundle. The original source checkout remains in `orig_source/azahar-git`.
+
+
+## Castle 54 compile fix
+The graphics-pipeline create-info pStages field now uses an ABI-compatible opaque pointer because the Castle 53 shader-stage typedef is local to its function. This resolves the unknown-type and aggregate-initializer compiler errors. Xcode compilation and Vulkan runtime success remain to be tested on macOS.
+
+
+Castle 159: independent private sync-callback and mixed-ingress batch gates; no hardware ABI publication. See CASTLE-159-TEST-PLAN.md.
+  --- End archived notes ---
+
+Castle v189 — live hardware gameplay refinement, 2026-10-28
+BUILD ID: CASTLE_189_HARDWARE_FRAME_PACING_INPUT_RELIABILITY_20261028
+Mac v188 diagnostic confirmed: 12,271 actual Azahar GPU-originated 400x480 bitmap frames, 0 readback failures, 11,389 changing hashes, all 12,271 nonzero, Vulkan teardown PASS. User confirmed first playable Vulkan game in OpenEmu. Observed occasional half-second speed bursts; Start did not work while D-pad and A/B/X/Y worked.
+
+BATCHED WORKSTREAMS:
+1. Hardware-only 60 fps minimum wall-clock interval in executeFrame; avoid catch-up bursts after expensive GPU frame transfers, and count caps and long stalls. Does not alter software fallback or 8-frame preflight. Tradeoff: may reduce intentional fast-forward in hardware mode, pending configuration support.
+2. Instrument Start/Select responder DOWN/UP events and libretro polls/readbacks, with periodic aggregate logs. Two-poll post-release latch prevents lost ultra-short key taps if an OpenEmu event occurs between core polls. DO NOT claim this fixes missing OpenEmu bindings; logs will isolate source.
+3. Reuse a core-owned CPU buffer for real 400x480 GPU image readback instead of malloc/free on every frame (12k+ allocations per observed session). Clean up in dealloc.
+4. Rate-limit successful V187 interface-request and readback messages to preserve startup sections in cumulative diagnostics; failures always log. V188 bitmap checks continue every 60 frames.
+5. Log consolidated V189 pacing and input diagnostics during session and teardown; preserve hardware promotion and safe device retirement.
+
+First hardware rendering ACHIEVED in v188. Next quality milestones: correct all controls, stabilize pacing and audio, verify more games, optimize Vulkan->OpenEmu presentation (currently GPU rendering + CPU bitmap readback), packaging and long-run regression.
+Verification: isolated Vulkan ABI C++ syntax + ZIP integrity, source marker/callback consistency. Entire Xcode build must be tested on macOS.
+
+Castle v188 — multi-frame real Azahar GPU rendering and live OpenEmu bitmap bridge, 2026-10-28
+Build ID: CASTLE_188_LIVE_HARDWARE_BITMAP_PROMOTION_20261028
+Confirmed v187 macOS result: actual stage2 accepted, official Vulkan v5 requested twice, context_reset returned, first Azahar GPU sentinel received, real core image readback mask=0xff, context_destroy/unpublish/retire successful, 300 software fallback frames.
+Parallel workstreams in v188:
+1. Extend actual Azahar Vulkan preflight to 8 sequential hardware `retro_run` frames, instrumenting every frame and callback stats (not private synthetic output).
+2. Convert real core-originated 8-bit VkImage readback into OpenEmu's BGRA bitmap with format gating, dimensions, sparse content hash, nonzero-pixel counts, frame-change audit; no hardware sentinel is dereferenced.
+3. Promote directly into a persistent real Azahar hardware session only after all eight warmup frames produced clean GPU image readback and bitmap copies. This is the first opt-out-of-software-fallback hardware gameplay path.
+4. Keep OpenEmu bitmap renderer and existing libretro input/audio; report gameplay frame count and real pixel activity at major checkpoints.
+5. Add live-session teardown for context_destroy, retro_deinit, official Vulkan unpublication, shared-device retirement, owner release, stale callback clearing. Preserve fallback when warmup fails.
+6. Preserve prior 187 and earlier Vulkan tests on unsuccessful promotion, while avoiding redundant synthetic tests after successful hardware-mode promotion.
+Limitations: renderer uses GPU, presentation still CPU image readback (not zero-copy Metal); timings not yet optimized. Native macOS Xcode and real gameplay must confirm correctness, color channel layout and resource ownership. A crash in upstream code may prevent fallback.
+
+Castle v187 — First bounded real Azahar Vulkan hardware preflight, 2026-10-28
+Build ID: CASTLE_187_FIRST_REAL_HARDWARE_PREFLIGHT_20261028
+Parallel workstreams:
+1. Correct v186 v2/v1 negotiation interpretation: this specific core provides a v1 create_device callback within Vulkan negotiation v2 and neither optional v2 creation callback.
+2. On live core-negotiated VkInstance/VkDevice/VkQueue, construct Vulkan v5 interface and expose it through GET_HW_RENDER_INTERFACE for disposable hardware preflight.
+3. Accept live stage2 negotiation only after interface checks pass; instrument GET_HW requests and lifecycle.
+4. Call actual libretro context_reset after hardware ROM load and attempt exactly one retro_run; trace entry/return and actual hardware frame marker. This may expose new renderer failure or cause OpenEmu to terminate if the upstream core is incompatible.
+5. Implement bounded core-originated GPU frame readback on real instance/device with semaphores and Vulkan fences for supported 8-bit formats; no synthetic frame in this lane.
+6. On completed preflight, invoke context_destroy, retro_deinit, unpublish/retire interface and device, then restore existing software mode. Retain all prior diagnostics.
+Limitations: actual hardware init/first frame must be measured on macOS. A crash in upstream renderer cannot be recovered in-process. Hardware session is not persistent; real-time OpenEmu game presentation is not yet supported.
+
+Castle v186 — Real core Vulkan negotiation v2 wrapper integration, 2026-10-28
+Build ID: CASTLE_186_CORE_V2_WRAPPERS_PUBLICATION_AUDIT_20261028
+Batched workstreams:
+1. Invoke actual Azahar libretro Vulkan negotiation v2 create_instance and create_device2 callbacks using frontend wrapper functions; honor core pNext/extension/feature requests; use one physical-device attempt and disposable ownership.
+2. Verify device selection, queue dispatch and queue drain, destroy core auxiliary resources and owned Vulkan handles; isolate from retained v1 core device.
+3. Cross-check the actual retained core-created device against full Vulkan v5 interface callback, queue and GPU consumption requirements; explicitly report remaining publication blockers.
+4. Preserve v185 image consumer, full-frame OpenEmu CPU bitmap bridge, earlier diagnostic gates and safe software fallback.
+Safety: SET_HW_RENDER/negotiation stage-2 intentionally do NOT publish an interface. No actual Azahar renderer starts and no hardware frames are claimed.
+Runtime results of v2 wrapper must be measured on macOS; failure there will be reported as BLOCKED and will not disable software fallback.
+Legacy v164/v171 FAIL markers refer to superseded assumptions that accepted stage1 cannot lead to stage2 and are not current v186 tests.
+
+Castle v185a compile hotfix — 2026-10-28
+Fixed all six incorrectly prefixed gAzV178Negotiated*() calls in AzaharGameCore.mm.
+The actual functions are exported by AzaharOfficialVulkanABI.mm as AzaharV178Negotiated*().
+No existing v185 GPU tests or safety gates removed; no new GPU behavior claimed.
+Build ID: CASTLE_185A_ACCESSOR_COMPILE_FIX_20261028
+
+Castle v185 — 2026-10-28 — MULTI-LANE REAL GPU CONSUMER / FULL FRAME BRIDGE
+Lane A: VkImage producer signal -> queue consumer waits semaphore AND actually records VkCmdCopyImageToBuffer; fence; host map+invalidate; verified 8x8 RGBA pixels; private set_image acknowledgement and resource teardown. Image now requests official required TRANSFER_SRC|SAMPLED|MUTABLE_FORMAT bits.
+Lane B: Reuse already-proven full 400x240 GPU-image-to-CPU OpenEmu bitmap bridge, but with Azahar callback-created instance/device/queue, replacing cached CPU bitmap only on verified PASS. Visual overlay remains disabled by default to preserve gameplay.
+Lane C: private Vulkan image contract gate, explicit truthful rendering status and lifecycle diagnostics.
+Hardware still NOT enabled: no genuine Azahar game-renderer frames; no public libretro HW interface; GPU content synthetic and core-negotiated device remains private.
+
+Castle v184 — 2026-10-28 — BATCHED integration release
+Workstream A: real VkImage + VkImageView cleared by producer command buffer on Azahar callback-created device; producer signals Vulkan semaphore; consumer queue submission waits, fence completes, then private set_image callback receives image and acknowledges. Workstream B: full official Vulkan v5 descriptor audit bound to that same negotiated device, with callback completeness and inactive-callback safeguard; not published. Workstream C: persistent progress/handoff record, enhanced test diagnostics, updated build ID.
+KNOWN LIMITATIONS: consumer submission waits on semaphore but does NOT sample/read back image; core does not render this frame; no official HW interface publication; no Azahar renderer init or OpenEmu hardware presenter. Software fallback remains enabled.
+
+Castle v183 — 2026-10-28
+Added two real queue submissions with Vulkan binary semaphore signal/wait and fence completion on Azahar callback-created device, plus safe queue-drain teardown and explicit v183 logging. This is a PRIVATE synchronous preflight test and does not exercise an Azahar-created semaphore/image, publish the official libretro Vulkan interface, initialize Azahar Vulkan renderer, or present GPU gameplay frames. Previous v182 image handoff and software fallback retained.
+
+Castle v182 — 2026-10-28
+Private GPU-backed image and view created on Azahar callback-negotiated Vulkan device; allocate and bind memory, record image barriers and clear-color commands, submit on negotiated queue with fence, then pass an actual image descriptor to the private v5 set_image callback, acknowledge and release in order. Does NOT publish the libretro interface, initialize the Azahar renderer, wait on Azahar semaphores, or present an Azahar frame. Prior v181/v180/v179/v178 checks and software fallback retained.
+
+Castle v181 — 2026-10-28
+Bind private libretro Vulkan v5 image/sync/queue callbacks to the ACTUAL Azahar callback-created Vulkan device descriptor; test callback identity, sync index, queue mutex, malformed-image rejection, pending-image overwrite refusal and acknowledgement in isolated preflight. The accepted image is simulated METADATA ONLY; no image is sent to the GPU and interface publication remains blocked. Retain v180 ABI, v179 queue fence and v178 teardown checks and software fallback.
+
+Castle v180 — 2026-10-27
+Milestone 4: Stage a private libretro Vulkan v5 ABI descriptor using the actual Azahar callback-created device, instance, queue, queue-family and device dispatch. Check pointer identity, function dispatch, official layout and the missing frame/synchronization callback contract. The interface is intentionally NOT published to the core. Preserve the validated v179 real queue submission and v178 lifecycle and software fallback.
+
+Castle v179 — 2026-10-27
+Milestone 4: Submit a real primary empty Vulkan command buffer with a fence on the Azahar create_device callback-created and retained queue. The queue/fence gate records eight distinct bits, checks fence completion and returns before deinit and safe resource release. Official interface publication remains blocked; GPU gameplay is not claimed.
+
+Castle v178 — 2026-10-27
+Milestone 4: Retain the ACTUAL Azahar callback-created Vulkan device beyond the negotiation callback, inspect live function dispatch through the preflight and retro_deinit boundary, then wait idle and release resources before software fallback. Explicit diagnostics V178 CORE_DEVICE_RETENTION, CORE_DEVICE_PRE_DEINIT, CORE_DEVICE_CROSS_DEINIT. The second disposable device is intentionally unpublished: this does NOT initialize the renderer or provide an Azahar image. v177 historical gate remains independently executed. Correct device ownership and graphics/compute queue are validated. GPU gameplay remains blocked until full interface, image, and synchronization lifetime are implemented.
+
+Castle v173 — 2026-10-26
+Milestones 2 and 3: synchronous, controlled GPU-to-OpenEmu frame proof.
+Changed the existing 400x240 full-frame Vulkan path: an official-shape libretro set_image callback now captures a real source VkImage BEFORE vkCmdCopyImageToBuffer; the GPU readback explicitly uses the borrowed callback image, not a bypassed local handle. Its fence and 384,000-byte RGBA verification gate the existing visible OpenEmu bitmap overlay. Image/view lifetime remains scoped and cleanup occurs after completion. Hardware handshake remains rejected; no actual Azahar GPU frame is consumed.
+Runtime marker: V173 CALLBACK_TO_OPENEMU_FRAME. The older V141 FULL_FRAME and V141 PRESENT markers provide correlated proof of GPU copy and actual OpenEmu display. This does not complete milestone 2 or 3 for Azahar-produced frames.
+
+CASTLE v172 — Real Vulkan source-image capture at the callback/consumer boundary
+
+- Adds an actual C-compatible framebuffer consumer API in the official Vulkan
+  ABI translation unit, AzaharV172TakeFrameDescriptor, which atomically takes
+  the pending set_image descriptor and includes the underlying borrowed VkImage,
+  VkImageView, layout, format, queue family, semaphore array, and owner generation.
+  Prior callback ingress only retained the VkImageView and could not feed an
+  image readback routine. No borrowed VkImage is dereferenced in the gate.
+- Fail-closed checks reject missing image handles, generation mismatch, wrong
+  queue family, and invalid size; duplicate/unconsumed callback messages remain
+  rejected. A focused ABI-callback/consumer regression checks real code paths.
+- Reconciles v170 legacy stage1 assertions with early-owner ordering in v171;
+  full preflight still rejects actual HW rendering and retains software fallback.
+- Milestone 2 is in progress, NOT complete: GPU waits/readback and real Azahar
+  producer lifetime must still be connected. Milestones 3–6 remain incomplete.
+- No renderer switch, no experimental blue/yellow overlay, no fake HW publish.
+- Xcode + macOS Vulkan runtime unavailable in build container; user validation required.
+
+CASTLE v171 — Device installed before the real libretro stage-one Vulkan request
+
+- Moves actual MoltenVK device/queue creation and Vulkan v5 callback binding
+  *before* retro_load_game initiates Azahar's SET_HW_RENDER request. Previously
+  the private owner was created only after the hardware request was denied.
+- Reuses the owner after preflight to prevent duplicate GPU device creation;
+  preserves cross-deinit checks and releases before software initialization.
+- Adds actual request-time V171 REAL_STAGE1_EARLY_OWNER diagnostic plus four
+  lifecycle regression lanes. No interface is published: a working Azahar
+  GPU-frame consumer and OpenEmu presenter do not yet exist.
+- Preserves software fallback, no legacy blue/yellow overlay, all prior checks.
+- Full Xcode compilation and macOS runtime must be tested by user.
+
+CASTLE v170 — Real Azahar stage-one publication readiness instrumentation
+
+- Connects a live Vulkan readiness check to Azahar's *actual* libretro
+  RETRO_ENVIRONMENT_SET_HW_RENDER request handler. This is a functional
+  callback-path implementation, not another isolated queue-submission probe.
+- Reports owner, Vulkan v5 device handles, dispatch and callback readiness
+  at the precise time stage one is requested. Deliberately reserves both
+  consumer and presenter prerequisites: no misleading "GPU ready" response.
+- Adds eight regression lanes verifying the retained device descriptor and
+  that no unsupported hardware interface is published. Software fallback
+  and original video path remain unchanged. Future integration will need
+  to create the device before the stage-one request, implement negotiation
+  and make the image consumer and presenter real.
+- Cumulative changelog retained.
+
+CASTLE v169 — Persistent Vulkan interface dispatch contract (8 new targeted lanes)
+
+- Added a runtime audit of the *actual* persistent official libretro Vulkan v5
+  descriptor, populated from the preflight's real owned Vulkan instance, GPU,
+  device and queue. Unlike the earlier stack-only probes this validates the
+  exact descriptor retained by the frontend for its owner lifetime.
+- Checks ABI version, owner generation, live device dispatch, actual callbacks,
+  sync-index behavior, and that no unfinished image handoff is pending.
+- Eight independent V169 OWNED_INTERFACE_LANE_01..08 diagnostics. 82 earlier
+  lanes retained. The interface is NOT published to Azahar, whose Vulkan
+  stage-one hardware request continues to be rejected. No GPU gameplay yet.
+- The next implementation boundary is functional end-to-end Vulkan negotiation
+  plus a real frame consumer; this build does not pretend otherwise.
+- One cumulative CHANGELOG.txt. Software fallback preserved.
+
+CASTLE v168 — Recorded-command submission and real fence-completion (12 new lanes)
+
+- Added actual VkCommandPool creation and primary VkCommandBuffer allocation.
+- Records and ends a one-time command buffer; submits it with a newly created,
+  initially unsignaled VkFence to the owned graphics queue.
+- Waits using the actual official Vulkan ABI wait_sync_index callback and
+  verifies GPU fence completion, then releases resources after synchronization.
+- 12 independently logged V168 COMMAND_LANE_01..12 checks. Earlier 70 lanes
+  retained. Live Azahar hardware interface still intentionally unpublished;
+  this test executes no game renderer commands. Software fallback unchanged.
+- Root documentation continues in this single cumulative CHANGELOG.txt.
+
+CASTLE v167 — Submitted unsignaled Vulkan fence (12 new lanes)
+
+- Replaced the v166 test's pre-signaled-fence premise with a second independent
+  gate using a NEW, initially unsignaled fence linked to real vkQueueSubmit.
+- 12 independently logged V167 SUBMIT_LANE_01..12 checks validate device
+  ownership, Vulkan entry points, initial VK_NOT_READY, real queue submission,
+  completion via wait_sync_index, successful fence status, lifetime hygiene,
+  and fallback to vkDeviceWaitIdle after cleanup.
+- This deliberately uses an empty GPU queue submission, NOT a rendered game
+  frame. The Vulkan interface remains unpublished. Software fallback retained.
+- Prior 58 regression lanes retained. One cumulative changelog in root.
+
+CASTLE v166 — Real Vulkan frame-fence synchronization (12 additional lanes)
+
+- Added a real VkFence-backed wait route to the previously validated
+  wait_sync_index callback, retaining vkDeviceWaitIdle as an idle fallback.
+- In a private owned-device test, creates a signaled VkFence via Vulkan,
+  validates direct wait, registers it for the callback, validates callback
+  dispatch and success, then unbinds and destroys it. Revalidates fallback.
+- V166 FENCE_LANE_01..12 and FENCE_SUMMARY validate 12 independent checks.
+- Prior 46 tests retained; single cumulative changelog maintained.
+- This test does NOT synchronize genuine Azahar game submissions, does not
+  accept the real Vulkan handshake, and does not provide OpenEmu presentation.
+- The private fence registration is never exposed to the core; safe software
+  fallback continues. The signaled fence is an integration regression,
+  not proof of asynchronous real-frame producer synchronization.
+
+CASTLE v165 — Real Vulkan GPU completion fallback (12 independent lanes)
+
+- Replaces private Vulkan ABI wait_sync_index no-op with ownership-guarded
+  vkDeviceWaitIdle dispatched against the real frontend-owned VkDevice.
+- Twelve new per-lane diagnostics V165 LIVE_WAIT_LANE_01 through _12,
+  including actual device wait twice, ownership rejection, callback dispatch,
+  synchronization index consistency and teardown hygiene.
+- Device-wide wait is a *correctness backstop*, not an efficient per-frame
+  synchronization architecture. Per-frame fences / semaphores, real Azahar
+  shared-device lifecycle and an OpenEmu image presenter are NOT implemented.
+- Vulkan interface stays unpublished, SET_HW_RENDER remains rejected, and
+  software fallback remains enabled. No blue/yellow visual overlay.
+- All earlier v160–v164 regression checks retained, one cumulative changelog.
+
+CASTLE v164 — Real libretro preflight boundary (12 independent checks)
+
+- Adds twelve evidence-based observations of the actual Azahar libretro Vulkan
+  request, normalized version, retained callbacks, request sequencing, and safe
+  absence of premature negotiation. Results: V164 REAL_LANE_01 through _12.
+- Adds V164 REAL_BOUNDARY_SUMMARY with live counts and PASS/FAIL.
+- These assertions cover the real core request, NOT actual GPU rendering.
+- Does not publish Vulkan HW ABI or accept stage one; full presenter is still
+  unimplemented. Software fallback and retired visual overlay behavior retained.
+- One cumulative CHANGELOG.txt retained at package root.
+- Next integration target: live frontend-owned Vulkan device/interface,
+  executable queue waits, game image handoff, and OpenEmu presentation.
+
+AZAHAR CASTLE 163 — VISUAL TEST RETIREMENT
+
+The historical v141 blue GPU-clear image with its CPU-animated yellow bar is
+now disabled during normal game launch. The original code stays in place behind
+a compile-time false guard for possible future presentation-regression work.
+The libretro software framebuffer path and private Vulkan validation probes
+are preserved. This does NOT enable native Azahar Vulkan hardware rendering.
+Diagnostic markers:
+  V163 BUILD_ID CASTLE_163_LEGACY_VISUAL_OVERLAY_DISABLED_20261026
+  V163 VISUAL_POLICY legacy_blue_yellow_overlay=DISABLED ... status=PASS
+
+AZAHAR CASTLE — CUMULATIVE CHANGELOG AND TEST DOCUMENTATION
+Current release: 162
+Hardware rendering: BLOCKED. Vulkan callback tests are private, not actual Azahar GPU frames.
+Software fallback: RETAINED.
+
+CASTLE 162 — EIGHT NEW TEST LANES (22 total from v160–v162)
+Eight tests exercise valid semaphore-array counts 0–7, correct one-shot consumption,
+replay rejection, malformed-image rejection, recovery, and cleanup for each count.
+Expected: V162 LANE_A through LANE_H mask=0x3f status=PASS.
+The tests are PRIVATE and DO NOT implement Vulkan negotiation, device sharing,
+actual synchronization waits, Azahar GPU output, or OpenEmu presentation.
+Next real engineering objective: build and enable the genuine libretro Vulkan device/context
+negotiation, GPU image handoff and OpenEmu-compatible frame presentation.
+
+HISTORICAL DOCUMENTATION (original text preserved)
+
+========================================================================
+BEGIN CASTLE-147-BRIDGE-REVIEW.md
+========================================================================
+# Castle 147 — Azahar/OpenEmu Vulkan bridge architecture review
+
+## Verdict
+
+Castle 146 proves a *private* Vulkan owner can survive Azahar preflight
+`retro_deinit`, then be released before software reinitialization. It does not
+prove the bundled Azahar libretro core can produce Vulkan frames. The next
+milestone is a real core-to-frontend Vulkan handoff, not another private render.
+
+## Verified source map (line numbers approximate, Castle 146 snapshot)
+
+| Area | Source location | Current behavior |
+|---|---|---|
+| Environment dispatch | `azcore/AzaharCore/AzaharGameCore.mm` ~748–920 | Hardware interface and negotiation support GETs rejected; preferred renderer NONE; `SET_HW_RENDER` Vulkan request observed then rejected; negotiation SET rejected. |
+| Official Vulkan ABI | `azcore/AzaharCore/AzaharOfficialVulkanABI.mm` | ABI v5 interface and v2 negotiation compile/layout checks; staging of live private handles; **no published live interface**. |
+| Private Vulkan ownership | `azcore/AzaharCore/AzaharGameCore.mm` ~34031–34040 and ~35388 | Owner stores loader/instance/device/destroy functions; release destroys device then instance, closes loader. |
+| Preflight boundary | `azcore/AzaharCore/AzaharGameCore.mm` ~35740–35880 | Core requests observed during preflight; owner retained across deinit, released before software restart. |
+| Libretro core dynamic loading | `azcore/AzaharCore/AzaharGameCore.mm` ~35400–35570 | Bundled `azahar_libretro.dylib` loaded, 16 required exports audited; export presence does not prove Vulkan renderer support. |
+| Software presentation | `azcore/AzaharCore/AzaharGameCore.mm` `retro_set_video_refresh`, software video callback path | Existing CPU bitmap/video callback is operational. Private Vulkan readback can feed it, but has not received a game-rendered Vulkan image. |
+
+## Required live data path
+
+1. **Frontend lifetime**: OpenEmu wrapper owns VkInstance, selected VkPhysicalDevice,
+   VkDevice, graphics VkQueue, and the resources needed for image transfer/presentation.
+   Ownership must cover all libretro initialization, frame callbacks, and deinit.
+2. **Core hardware request**: Azahar calls `RETRO_ENVIRONMENT_SET_HW_RENDER`
+   with `RETRO_HW_CONTEXT_VULKAN`; wrapper validates the complete official callback
+   and only accepts if the real Vulkan backend is operational.
+3. **Negotiation**: Azahar supplies v2 negotiation callbacks. The frontend must
+   honor the actual ABI contract and determine instance/device creation and
+   ownership order. Do not assume the existing private owner can simply be
+   substituted without checking the core's negotiation sequence.
+4. **Publish interface**: `GET_HW_RENDER_INTERFACE` must return a persistent
+   `retro_hw_render_interface_vulkan` v5 with valid instance/gpu/device/queue,
+   proc addresses, and fully implemented `set_image` and synchronization hooks.
+   Do not publish a stack-local or partially filled interface.
+5. **Receive real images**: The core calls `set_image` with a borrowed
+   `retro_vulkan_image` and semaphores. Record the image view/layout and relevant
+   sync information without taking ownership of the core's image/view.
+6. **Synchronize**: Handle queue ownership, semaphore waits, layouts, barriers,
+   and fence lifetimes before reading/copying image data. `lock_queue`,
+   `unlock_queue`, `get_sync_index`, `get_sync_index_mask`, and `wait_sync_index`
+   must have correct semantics where required by the core.
+7. **Present**: First safe milestone can be synchronized Vulkan image -> staging
+   buffer -> CPU OpenEmu video callback (slower, but leverages known working
+   presentation). Later optimize to direct GPU-backed OpenEmu presentation.
+8. **Shutdown**: Stop core use of shared handles, wait for outstanding GPU work,
+   free frontend transfer/presenter resources, destroy VkDevice, then VkInstance.
+   No hardware handle survives owner destruction.
+
+## The central missing components
+
+- A core-facing Vulkan state machine spanning hardware request, negotiation,
+  interface publication, image submission, and teardown.
+- A complete persistent interface object (v5), not just successful ABI checks.
+- A synchronized `set_image` receiver and real frame transfer.
+- Proof that the *bundled prebuilt* `azahar_libretro.dylib` actually enters
+  hardware Vulkan mode and produces a nonzero number of game images.
+- A tested fallback policy when any required feature is missing.
+
+## Minimal implementation order / acceptance gates
+
+**Castle 148 — Negotiation and callback contract instrumentation**
+- Instrument the real core's callback sequence and hardware callback fields
+  using the official ABI translation unit; keep `SET_HW_RENDER` rejected.
+- Identify which frontend callbacks the actual binary requests and whether
+  it calls the negotiation SET before/after stage 1 acceptance.
+- Capture explicit pass/fail evidence; do not claim a GPU frame.
+
+**Castle 149+ — Persistent frontend interface with fail-closed guard**
+- Build a single owner/state object and complete ABI callbacks; test callbacks
+  privately, then publish only when image/sync/presenter path is real.
+- If the core cannot negotiate with the frontend-owned instance/device,
+  revise ownership according to the actual ABI rather than fabricating handles.
+
+**First hardware frame — Acceptance criteria**
+- Actual Azahar `SET_HW_RENDER` returns true, core negotiation succeeds,
+  `GET_HW_RENDER_INTERFACE` supplies a valid persistent v5 interface,
+  real Azahar `set_image` callback count > 0, synchronization passes,
+  and the *game-generated* image appears in OpenEmu.
+- Log separate counters for private GPU tests and Azahar-origin frames.
+- No fake GPU handles, silent software-only success, or dangling callbacks.
+
+## Risk register
+
+1. **Core capability unknown**: export audit alone cannot establish that the
+   bundled binary supports the Vulkan renderer. Inspect the binary/source
+   configuration and prove behavior with live callbacks.
+2. **Handshake ordering**: accepting stage 1 prematurely can make the core
+   invoke missing negotiation and crash. Fail closed until complete.
+3. **Lifetime**: private owner currently is explicitly released before
+   software reinit; a real shared owner needs a different, audited lifetime.
+4. **Synchronization**: treating `set_image` as a ready-to-read bitmap risks
+   races, undefined layouts, corruption, and device loss.
+5. **OpenEmu display**: Vulkan rendering is not complete until a real frame
+   reaches the OpenEmu callback/presenter, not merely an offscreen test.
+
+## Scope and limitations
+
+This is a source review and concrete implementation plan, not a working
+hardware bridge. No source code changes from Castle 146. No Xcode build or
+runtime execution performed here. Earlier private Vulkan PASS messages are
+not evidence of Azahar GPU frames.
+
+END CASTLE-147-BRIDGE-REVIEW.md
+
+========================================================================
+BEGIN CASTLE-148-TEST-PLAN.md
+========================================================================
+# Castle 148 — Interpretation and decision gate
+
+This build instruments the actual core environment callback path during the existing Vulkan preflight. It does not fabricate a negotiation response or invoke the core's reset/destroy callbacks.
+
+- `V148 EVENT`: sequence-numbered GET/SET events while preflight is active. `detail` is the requested context enum, negotiation version, or presence of a non-null data pointer.
+- `LANE_A`: event ordering. Zero means the call was not observed.
+- `LANE_B`: Vulkan request presence and validation of the core-supplied lifecycle callbacks and API version.
+- `LANE_C`: whether a stage-two negotiation SET was observed despite stage-one rejection. If not, the next task is to determine the core's post-acceptance requirements from source/binary, not to claim negotiation is implemented.
+- `LANE_D`: guard still blocks unsafe hardware acceptance.
+
+**Next step:** examine actual call ordering and inspect bundled Azahar core's Vulkan negotiation code; implement a complete, persistent official interface and image receiver before any stage-one acceptance.
+
+END CASTLE-148-TEST-PLAN.md
+
+========================================================================
+BEGIN CASTLE-159-TEST-PLAN.md
+========================================================================
+# Castle 159 — Parallel private integration-contract tests
+
+Lane A: sync callback pointer/scope and queue-lock invocation, **not** real GPU synchronization. Expected mask 0xff.
+Lane B: four invalid-family submissions, four successful accept/consume cycles, pending collision, stale generation, drop and successful recovery. Expected mask 0xff.
+Both lanes run independently and restore private counters. V159 POST_TEST_CLEANUP must PASS.
+Hardware handshake remains rejected; software fallback remains enabled. No GPU frames from Azahar are claimed.
+Mac Xcode build/runtime not verified in this environment.
+
+END CASTLE-159-TEST-PLAN.md
+
+========================================================================
+BEGIN CASTLE-160-TEST-PLAN.md
+========================================================================
+# Castle 160 — Six isolated private integration lanes
+
+A: Vulkan v5 official descriptor contract (0xff)
+B: Invalid owner/null image followed by successful recovery (0x1f)
+C: 0/8 valid semaphore slots and 9 rejected (0x1f)
+D: Pending collision, consume-once, replay rejection (0x1f)
+E: Stale generation, mismatched queue family, safe drop (0x1f)
+F: Queue lock and sync callback ABI (0x1f; wait_sync_index remains a STUB)
+
+Each lane runs independently and stores/restores private counters. All six expected
+results must report PASS; V160 POST_TEST_CLEANUP must also PASS. There is no
+real Azahar Vulkan context, no real shared device, no OpenEmu GPU presenter,
+and no accepted Vulkan hardware handshake. Software fallback is unchanged.
+
+This is six independent TEST LANES executed in sequence in ONE Xcode build,
+not six simultaneous threads contending for GPU memory, queue or image lifetime.
+
+Build azcore/Azahar.xcodeproj in Xcode, launch New Super Mario Bros. 2,
+then upload the Azahar diagnostic log. macOS compile/runtime is unverified.
+
+END CASTLE-160-TEST-PLAN.md
+
+========================================================================
+BEGIN CASTLE-161-TEST-PLAN.md
+========================================================================
+# Castle 161 — 14 private independent lanes total
+
+Retains all six Castle 160 lanes and adds eight new lanes:
+A null image view rejection and recovery
+B invalid descriptor sType rejection and recovery
+C invalid image view type rejection and recovery
+D null wait-array rejection and recovery
+E valid wait counts 1,2,4,7
+F invalid callback while an image is pending
+G stale generation and wrong queue family then valid recovery
+H sixteen frames queued and consumed without replay
+
+Expected for each V161 lane: mask=0x1f status=PASS.
+Final cleanup must pass. All data are private metadata; no Vulkan handles
+are dereferenced, no actual Azahar GPU frames are produced, no interface is
+published. wait_sync_index is still STUB_ONLY. Software fallback retained.
+
+Important remaining work: real Vulkan synchronization and genuine libretro
+Vulkan handshake, device handoff, image consumption and OpenEmu presentation.
+macOS compilation and runtime tests must be performed in Xcode.
+
+END CASTLE-161-TEST-PLAN.md
+
+========================================================================
+BEGIN README.txt
+========================================================================
+CASTLE 161 — 14 independent private integration test lanes
+
+Open azcore/Azahar.xcodeproj in Xcode, build/install and run the game.
+Upload diagnostic logs. See CASTLE-161-TEST-PLAN.md.
+The Vulkan frontend bridge is still unpublished; software fallback retained.
+
+END README.txt
+
+
+CASTLE 174 — DISPOSABLE REAL LIBRETRO HANDSHAKE EXPLORATION (2026-10-27)
+Actual integration boundary experiment, NOT GPU gameplay:
+- Only during the disposable Vulkan preflight, SET_HW_RENDER accepts a validated
+  Vulkan lifecycle request if live frontend device and callback prerequisites
+  are available. This allows Azahar to issue its genuine next-stage requests.
+- Capture stage-2 negotiation type/version and HW interface queries, reject
+  both without invoking renderer lifecycle callbacks or publishing any Vulkan
+  interface. Do not claim a negotiated GPU device or rendered Azahar frames.
+- Always deinitialize the preflight and retain software fallback.
+- Log V174 REAL_HANDSHAKE_DISCOVERY plus rejection and teardown information.
+- IMPORTANT: this exercises new upstream behavior and can trigger unsupported
+  core code paths. If the preflight unexpectedly returns success or crashes,
+  that is a blocker, not a completed milestone.
+- Historical tests expecting stage1 rejection may report FAIL due to the
+  intentional contract experiment. They should not be reinterpreted as PASS.
+
+
+CASTLE 175 — REAL AZAHAR VULKAN V2 CALLBACK CONTRACT (2026-10-27)
+- Retain a read-only copy of the real, core-provided v2 Vulkan negotiation
+  callback table only within disposable preflight; record essential callback
+  presence, then safely clear it on teardown. No callbacks are invoked.
+- Log V175 REAL_NEGOTIATION_V2_CALLBACKS and REAL_V2_CONTRACT_SUMMARY.
+- Unlike v174, preflight retro_load_game=true is expressly treated as
+  neither successful Vulkan negotiation nor renderer initialization.
+- Stage2 still returns false; no GPU device is shared with Azahar, and
+  software fallback is preserved. Historic stage1-denial checks may FAIL.
+- Next integration gate: correctly implement core-supplied instance/device
+  creation callback wrappers and frontend-owned Vulkan interface publication.
+
+
+CASTLE 176 — REAL AZAHAR APPLICATION-INFO-DRIVEN VULKAN INSTANCE
+- Invoke Azahar's real get_application_info callback synchronously during stage2 disposable preflight.
+- Validate the supplied VkApplicationInfo and create/destroy a REAL new Vulkan instance using the frontend-owned loader.
+- Record creation and destruction independently; fail closed if metadata or Vulkan instance is unavailable.
+- Does NOT call core create_device, publish the hardware interface, or claim Azahar renderer startup.
+- Stage2 still rejected; preflight teardown and software fallback remain required.
+- Next integration: correctly negotiate device extensions/features and let core create_device populate context, preserving frontend ownership.
+
+
+CASTLE 177 — INVOKE REAL AZAHAR VULKAN DEVICE-CREATION CALLBACK
+- In disposable preflight only, use core Vulkan application metadata to create real instance, enumerate graphics+compute physical device, and invoke Azahar original create_device callback.
+- Validate returned context device, GPU and graphics queue and tear down device before instance.
+- New V177 REAL_CORE_DEVICE and V177 DEVICE_TEARDOWN diagnostics.
+- Never publish hardware Vulkan interface or run renderer callbacks; retain software fallback.
+- Result may be BLOCKED by required extensions/features or core device expectations: investigate exact result before advancing.
+
+Historical project-state snapshot (superseded by v211):
+# 3DS Core for OpenEmu — status through v204 (2026-11-01)
+
+- Confirmed working and playable by user: v203, including dynamic resolution switching and transitions between fullscreen and windowed mode. v202 and v203 diagnostic logs verify actual Azahar GPU source textures at 2×–6×; v203 validated GPU linear composition of full 2×/4×/6× frames at 25/25 reference points (max byte error 0–1).
+- v204 milestone: bounded consecutive-frame (12 per selected internal resolution and stereo geometry) Metal composition probe. GPU in-flight budget strictly two; probes are nonblocking, owned independently of OpenEmu's bitmap and frame scheduler. Source-format and geometry guards reject invalid frames. Native-sized Metal test outputs are sampled against a CPU reference and never presented visibly.
+- Current visible renderer: v199-compatible OpenEmu bitmap; hardware Vulkan rendering remains active. No host modifications or additional installation; 3DS System Plugin v15 unchanged. The earlier v201 Metal2 presenter caused black window/lockup and is NOT active.
+- Major remaining milestones: (1) prove sustained v204 GPU composition at runtime, (2) integrate safe visible Metal2 presentation and lifecycle without deadlock or host modification, (3) preserve high-resolution display detail when OpenEmu Scale/fullscreen displays at larger pixel sizes, (4) verify all live display modes and portable installation. A fixed native presentation texture does NOT satisfy #3; don't claim resolution is complete.
+- Release checks on Linux: original files, project dependencies and source-level contracts; only macOS Xcode and actual GPU testing can certify successful runtime compilation and presentation.
+
+# Project status through v198 (experimental)
+
+Core v198 attempts to correct vertically compressed Full Side-by-Side images when a game starts in an 800×480 wide window. The upstream Azahar libretro layout can place the active dual-eye imagery in the middle half of a 400×480 portrait frame; v197 enlarged the entire padded image, producing wide but short eye views. v198 detects that compact geometry, selects its central half, and fits it to the existing session-locked output; already-wide frames are not cropped. **This corrects layout, not native per-eye fidelity**. v197 user-tested runtime mode transitions and stable window sizing, while the initial Full view remained distorted. Core v195 and System Plugin v15 remain the earlier fully confirmed visual/menu baseline. Stereo mode/depth menus, shaders, native OpenEmu Scale, Anaglyph persistence and game saves have been confirmed. True output-resolution 2×–6× remains incomplete. Upstream Azahar/MoltenVK bundled binaries unchanged. No OpenEmu modifications. macOS Xcode/gameplay verification needed; see CHANGELOG.txt.
+
+# Project status through v196 (experimental)
+
+Core v195 + System Plugin v15 is the last Mac-confirmed baseline. v196 changes **only** the fullscreen Side-by-Side Full output geometry/presentation. Normal 2D geometry and previously working stereo controls remain the reference. Upstream Azahar libretro `ComputeLayoutGeometry` may not advertise stereo-full width separately; bridge now explicitly uses 800×480 for Full SBS and logs source geometry when resampling. This may fix window sizing on re-open; live resizing depends on OpenEmu and needs a Mac test. Do not call true high-resolution rendering or window resizing fully solved until verified.
+
+Current core: v195 (stereo mode/depth UI iteration).
+System plugin: v15 (unchanged).
+Last user-confirmed core: v194 (Anaglyph persists across game restart).
+See CHANGELOG.txt for implemented v195 controls and OpenEmu host menu limitations.
+
+# 3DS Core for OpenEmu — state at v191
+
+Core: **3DS-Azahar-Core v191** (experimental graphics build). System plugin: **3DS-System-Plugin v15** (unchanged, tested by user). v190 was the confirmed playable baseline.
+
+New implementation: OpenEmu Display Mode menus for Azahar 1–6× internal resolution and Off/SBS-half/SBS-full/Anaglyph stereo. Fixed libretro depth option 85%. Core variable-update signaling; safer bounded framebuffer sizes to accommodate stereo/hi-res if Azahar emits them. Vulkan/SDL paths preserved; OpenEmu bitmap shaders should continue to be controlled by OpenEmu, require user testing. Host window scaling remains outside core API scope.
+
+Verification remaining: Xcode build, graphical effect of resolution 2×–6×, dynamic menu updates, switch stereo across modes, GPU render copy at increased size, OpenEmu shader compatibility, regression in saving/controllers and 2D fallback. Limitations documented in README.
+
+Build correction: v191 Resolution display-mode macro invocation fixed for Apple Clang; Xcode compile pending user re-test. No changes to functional feature scope.
+
+V192: Enabled OEGameCoreSupportsDisplayModeChange in core Info.plist (OpenEmu HUD gate). Version metadata now 192, added displayModes enumeration diagnostics. Rendering path from v191 unchanged. Await Mac run to validate display-mode menu and each mode.
+
+V193: User confirmed half SBS, Anaglyph, Off all work, shaders work; also reported Anaglyph menu selection persists but rendering resets after reopen, dynamic resolution changes cause frame-stride corruption, and 2x restart enlarged window. Added independent graphics setting file and fixed native bitmap presentation for resolution>1 except full SBS. Needs Mac runtime validation. Window Scale 2x/3x and full SBS window resizing still outstanding. System Plugin v15 unchanged.

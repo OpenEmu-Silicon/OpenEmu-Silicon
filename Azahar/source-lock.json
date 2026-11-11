@@ -1,0 +1,224 @@
+{
+  "notes": "Commit pins identify unpatched upstream sources; the reviewed v199 stereo patch is applied by the Core build. Fill in explicit reviewed URLs to enable bootstrap. Do not publish a private URL.",
+  "patches": {
+    "full_stereo_v199_sha256": "3bdbfa948d95e97feeaf62fb0427b872314c8596fd1e02cdd0e37142e7e4f338"
+  },
+  "repositories": {
+    "azahar": {
+      "commit": "a5c3d4f8eb34493f37479158128de134c3e700a9",
+      "submodules": [
+        {
+          "commit": "d282515cd6a66b694ac0657eef250c24b7410495",
+          "path": "dist/compatibility_list"
+        },
+        {
+          "commit": "6a85c3100499e886e11c87a5c2109eedacea0a61",
+          "path": "externals/boost"
+        },
+        {
+          "commit": "914aeecfe23b1e16af6ea675a4fb5dbd5a5b8d0a",
+          "path": "externals/catch2"
+        },
+        {
+          "commit": "4a970bc302d671476122cbc6b43cc89fbf4a96ec",
+          "path": "externals/cpp-jwt"
+        },
+        {
+          "commit": "8d92d788421483a43e09acf1cd4a2861cb2b8cab",
+          "path": "externals/cryptopp"
+        },
+        {
+          "commit": "832fcf38e600bf80b4b728a3e0227403088d992c",
+          "path": "externals/cubeb"
+        },
+        {
+          "commit": "aab6948fa863bc1cbe5d0850bc46b9ef02ed4c1a",
+          "path": "externals/cubeb/cmake/sanitizers-cmake"
+        },
+        {
+          "commit": "40412d85124f7c6f3d88454583c4633e5e10fc8c",
+          "path": "externals/cubeb/googletest"
+        },
+        {
+          "commit": "8f39e9fc3ad4868e6ff7188c52575087a1a02777",
+          "path": "externals/cubeb/src/cubeb-coreaudio-rs"
+        },
+        {
+          "commit": "6bac666467e4a37cf057f0e17e8c9e8a024b060b",
+          "path": "externals/cubeb/src/cubeb-pulse-rs"
+        },
+        {
+          "commit": "c3ca8febc2457ab5c581604f3236a8a511fc2e45",
+          "path": "externals/dds-ktx"
+        },
+        {
+          "commit": "049826c3f42875c2f9599552f425e76435789cc7",
+          "path": "externals/discord-rpc"
+        },
+        {
+          "commit": "2f8b349c26832cae612aa7082154c0697a9cbc8e",
+          "path": "externals/dllwalker"
+        },
+        {
+          "commit": "a46601580d5512d324104f985b5f0209dc980ddc",
+          "path": "externals/dynarmic"
+        },
+        {
+          "commit": "8bd0f7538b9ed7bedf90e789ffbd9eaeb484b28d",
+          "path": "externals/dynarmic/externals/biscuit"
+        },
+        {
+          "commit": "76f70b1403dbc0781216f49e20e45b71f7eccdd8",
+          "path": "externals/dynarmic/externals/catch"
+        },
+        {
+          "commit": "7b273fbb541c7c9058800bc613f4291274b2d26e",
+          "path": "externals/dynarmic/externals/fmt"
+        },
+        {
+          "commit": "5fc4beaf331037649b10625736b41365defb4f50",
+          "path": "externals/dynarmic/externals/mcl"
+        },
+        {
+          "commit": "94c726ce0338b054eb8cb5ea91de8fe6c19f4392",
+          "path": "externals/dynarmic/externals/oaknut"
+        },
+        {
+          "commit": "054ec5ad67440fcd65e0497e5a27ef31f53fcc7f",
+          "path": "externals/dynarmic/externals/robin-map"
+        },
+        {
+          "commit": "8c0098b69f95d02dea47efcdd42ab5aa2d03c72d",
+          "path": "externals/dynarmic/externals/xbyak"
+        },
+        {
+          "commit": "0b2432ced0884fd152b471d97ecf0258ff4d859f",
+          "path": "externals/dynarmic/externals/zycore"
+        },
+        {
+          "commit": "bffbb610cfea643b98e87658b9058382f7522807",
+          "path": "externals/dynarmic/externals/zydis"
+        },
+        {
+          "commit": "38d4f0285e6157ee840ea82a9b90aba71c8a705d",
+          "path": "externals/dynarmic/externals/zydis/dependencies/zycore"
+        },
+        {
+          "commit": "2662c0de09e36f2a2030ccc2c528a3e4c9e8138a",
+          "path": "externals/enet"
+        },
+        {
+          "commit": "216f00e8ddba6f2c64caf481a04f1ddd78b93e78",
+          "path": "externals/faad2/faad2"
+        },
+        {
+          "commit": "e424e3f2e607da02742f73db84873b8084fc714c",
+          "path": "externals/fmt"
+        },
+        {
+          "commit": "fc9889c889561c5882e83819dcaffef5ed45529b",
+          "path": "externals/glslang"
+        },
+        {
+          "commit": "5cc5e2c24642513aaa5b19126aad42d0e4e0923e",
+          "path": "externals/inih/inih"
+        },
+        {
+          "commit": "8fae8ce254dfc1344527e05301e43f37dea2df80",
+          "path": "externals/libadrenotools"
+        },
+        {
+          "commit": "aa3975893d83ef1bc84c321ec60c65fbf1287887",
+          "path": "externals/libadrenotools/lib/linkernsbypass"
+        },
+        {
+          "commit": "88b8e41b71099fabc57813bc06d8bc1aba050a19",
+          "path": "externals/libressl"
+        },
+        {
+          "commit": "7fc7feeddca391be65c94e6541381467684b814d",
+          "path": "externals/libretro-common/libretro-common"
+        },
+        {
+          "commit": "d52e355daa09f17ce64819122cb067b8a2ee0d4b",
+          "path": "externals/libusb/libusb"
+        },
+        {
+          "commit": "6f729fbe658a40dfd993fa8b22bd612bb17cde5c",
+          "path": "externals/libyuv"
+        },
+        {
+          "commit": "0b1d9ccfc2093e5d6620cd9a11d03ee6ff6705f5",
+          "path": "externals/lodepng/lodepng"
+        },
+        {
+          "commit": "f4d8659decbfe5d234f04134b5002b82dc515a44",
+          "path": "externals/nihstro"
+        },
+        {
+          "commit": "6b1d57ea7ed4882d32a91eeaa6557b0ecb4da152",
+          "path": "externals/oaknut"
+        },
+        {
+          "commit": "e399840fc6aba5f7bc3f0633e8ff10bba0640906",
+          "path": "externals/openal-soft"
+        },
+        {
+          "commit": "5d249570393f7a37e037abf22cd6012a4cc56a71",
+          "path": "externals/sdl2/SDL"
+        },
+        {
+          "commit": "37d49d2aa4c0a62f872720d6e5f2eaf90b2c95fa",
+          "path": "externals/sirit/sirit"
+        },
+        {
+          "commit": "3f17b2af6784bfa2c5aa5dbb8e0e74a607dd8b3b",
+          "path": "externals/sirit/sirit/externals/SPIRV-Headers"
+        },
+        {
+          "commit": "9ef8458d8561d9471dd20e9619e3be4cfe564796",
+          "path": "externals/soundtouch"
+        },
+        {
+          "commit": "aa6cef192b8e693916eb713e7a9ccadf06062ceb",
+          "path": "externals/spirv-headers"
+        },
+        {
+          "commit": "a62abcb402009b9ca5975e6167c09f237f630e0e",
+          "path": "externals/spirv-tools"
+        },
+        {
+          "commit": "3d697a18df504f4677b65129d9ab14c7c597e3eb",
+          "path": "externals/teakra"
+        },
+        {
+          "commit": "c788c52156f3ef7bc7ab769cb03c110a53ac8fcb",
+          "path": "externals/vma"
+        },
+        {
+          "commit": "409c16be502e39fe70dd6fe2d9ad4842ef2c9a53",
+          "path": "externals/vulkan-headers"
+        },
+        {
+          "commit": "0d67fd1530016b7c56f3cd74b3fca920f4c3e2b4",
+          "path": "externals/xbyak"
+        },
+        {
+          "commit": "e626a72bc2321cd320e953a0ccf1584cad60f363",
+          "path": "externals/xxHash"
+        },
+        {
+          "commit": "f8745da6ff1ad1e7bab384bd1f9d742439278e99",
+          "path": "externals/zstd"
+        }
+      ],
+      "url": "https://github.com/azahar-emu/azahar.git"
+    },
+    "openemu": {
+      "commit": "2b1c21c2c336ad4fb98b5722e0b8ef8963ca5369",
+      "submodules": [],
+      "url": "https://github.com/OpenEmu-Silicon/OpenEmu-Silicon.git"
+    }
+  },
+  "schema": "3ds-openemu-source-lock-v1"
+}

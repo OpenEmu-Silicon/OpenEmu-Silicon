@@ -1,0 +1,306 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A000000000000002 /* AzaharOfficialVulkanABI.mm in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000012 /* AzaharOfficialVulkanABI.mm */; };
+		A000000000000001 /* AzaharGameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000011 /* AzaharGameCore.mm */; };
+		A000000000000006 /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A000000000000023 /* OpenEmuBase.framework */; };
+		A000000000000003 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A000000000000022 /* Cocoa.framework */; };
+		A000000000000005 /* Copy Azahar libretro */ = {isa = PBXBuildFile; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A000000000000010 /* Azahar.oecoreplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Azahar.oecoreplugin; sourceTree = BUILT_PRODUCTS_DIR; };
+		A000000000000012 /* AzaharOfficialVulkanABI.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = AzaharOfficialVulkanABI.mm; sourceTree = "<group>"; };
+		A000000000000011 /* AzaharGameCore.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = AzaharGameCore.mm; sourceTree = "<group>"; };
+		A000000000000013 /* AzaharGameCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AzaharGameCore.h; sourceTree = "<group>"; };
+		A000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A000000000000021 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenEmuBase.framework; path = "$(OPENEMU_BASE_BUILD_DIR)/Build/Products/Debug/OpenEmuBase.framework"; sourceTree = SOURCE_ROOT; };
+		A000000000000023 /* OpenEmuBase.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenEmuBase.framework; path = "$(OPENEMU_BASE_BUILD_DIR)/Build/Products/Debug/OpenEmuBase.framework"; sourceTree = SOURCE_ROOT; };
+		A000000000000022 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		AA8H00000000000000000001 /* libretro.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = libretro.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A000000000000030 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A000000000000006 /* OpenEmuBase.framework in Frameworks */,
+				A000000000000003 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A000000000000040 /* AzaharCore */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000011 /* AzaharGameCore.mm */,
+				A000000000000012 /* AzaharOfficialVulkanABI.mm */,
+				A000000000000013 /* AzaharGameCore.h */,
+				A000000000000014 /* Info.plist */,
+			);
+			name = AzaharCore;
+			path = AzaharCore;
+			sourceTree = "<group>";
+		};
+		A000000000000041 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000010 /* Azahar.oecoreplugin */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A000000000000042 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000023 /* OpenEmuBase.framework */,
+				A000000000000022 /* Cocoa.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A000000000000043 /* Root */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000040 /* AzaharCore */,
+				A000000000000042 /* Frameworks */,
+				A000000000000041 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A000000000000050 /* Azahar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A000000000000060 /* Build configuration list for PBXNativeTarget "Azahar" */;
+			buildPhases = (
+				A000000000000034 /* Build OpenEmuBase */,
+
+				A000000000000035 /* Build Azahar libretro */,
+				A000000000000031 /* Sources */,
+				A000000000000030 /* Frameworks */,
+				A000000000000032 /* Resources */,
+				A000000000000033 /* Copy Azahar dylib */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = Azahar;
+			productName = Azahar;
+			productReference = A000000000000010 /* Azahar.oecoreplugin */;
+			productType = "com.apple.product-type.bundle";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A000000000000070 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1600;
+				ORGANIZATIONNAME = "OpenEmu";
+				TargetAttributes = {
+					A000000000000050 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A000000000000080 /* Build configuration list for PBXProject "Azahar" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en,);
+			mainGroup = A000000000000043 /* Root */;
+			productRefGroup = A000000000000041 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A000000000000050 /* Azahar */,);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A000000000000032 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A000000000000033 /* Copy Azahar dylib */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(AZAHAR_LIBRETRO_PATH)",);
+			name = "Copy Azahar libretro dylib";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/azahar_libretro.dylib",);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nif [ ! -s \"${SRCROOT}/AzaharCore/.v199_libretro_built.sha256\" ]; then echo \"V199: rebuilt Azahar dylib verification stamp missing; aborting rather than packaging v198 binary\" >&2; exit 4; fi\n(cd \"${SRCROOT}/AzaharCore\" && shasum -a 256 -c .v199_libretro_built.sha256)\nmkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\ncp \"${AZAHAR_LIBRETRO_PATH}\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/azahar_libretro.dylib\"\nif [ -f \"${SRCROOT}/AzaharCore/Vulkan/libMoltenVK.dylib\" ]; then\n  mkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Vulkan\"\n  cp \"${SRCROOT}/AzaharCore/Vulkan/libMoltenVK.dylib\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Vulkan/libMoltenVK.dylib\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A000000000000035 /* Build Azahar libretro */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+            alwaysOutOfDate = 1;
+			files = ();
+			inputPaths = (
+				"$(AZAHAR_SOURCE)/CMakeLists.txt",
+				"$(SRCROOT)/build-azahar-libretro.sh",
+                "$(SRCROOT)/patch-azahar-full-stereo-v199.py",
+			);
+			name = "Build Azahar libretro";
+			outputPaths = ("$(AZAHAR_LIBRETRO_PATH)",);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nchmod +x \"${SRCROOT}/build-azahar-libretro.sh\"\npython3 \"${SRCROOT}/patch-azahar-full-stereo-v199.py\" \"${AZAHAR_SOURCE}\"\n\"${SRCROOT}/build-azahar-libretro.sh\" \"${AZAHAR_SOURCE}\" \"${SRCROOT}/AzaharCore\"\n";
+		};
+
+		A000000000000034 /* Build OpenEmuBase */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(OPENEMU_SOURCE)/OpenEmu-SDK/OpenEmu-SDK.xcodeproj");
+			name = "Build OpenEmuBase";
+			outputPaths = ("$(OPENEMU_BASE_BUILD_DIR)/Build/Products/Debug/OpenEmuBase.framework");
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nmkdir -p \"${OPENEMU_BASE_BUILD_DIR}\"\n xcodebuild -project \"${OPENEMU_SOURCE}/OpenEmu-SDK/OpenEmu-SDK.xcodeproj\" -scheme OpenEmuBase -configuration Debug -derivedDataPath \"${OPENEMU_BASE_BUILD_DIR}\" -destination 'platform=macOS,arch=arm64' MACOSX_DEPLOYMENT_TARGET=13.4 build\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A000000000000031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A000000000000001 /* AzaharGameCore.mm in Sources */,
+				A000000000000002 /* AzaharOfficialVulkanABI.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A000000000000090 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ALWAYS_USE_SEPARATE_HEADERMAPS = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
+				FRAMEWORK_SEARCH_PATHS = ("$(OPENEMU_BASE_BUILD_DIR)/Build/Products/Debug",);
+				OTHER_LDFLAGS = ("$(inherited)", "-framework", "QuartzCore", "-framework", "Metal");
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/AzaharCore/OfficialABI",
+                    "$(SRCROOT)/AzaharCore/VulkanSDK/include",
+                    "$(VULKAN_SDK)/include",
+                    "$(AZAHAR_SOURCE)/externals/Vulkan-Headers/include",
+                    "$(AZAHAR_SOURCE)/externals/vulkan-headers/include",
+					"$(AZAHAR_SOURCE)/externals/libretro-common/libretro-common/include",
+					"$(OPENEMU_SOURCE)/OpenEmu-SDK",
+					"$(OPENEMU_SOURCE)/OpenEmu/SystemPlugins/NDS",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.4;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.Azahar;
+				PRODUCT_NAME = Azahar;
+				WRAPPER_EXTENSION = oecoreplugin;
+				INFOPLIST_FILE = "$(SRCROOT)/AzaharCore/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = ("@loader_path/../Frameworks", "@loader_path/../../../../Frameworks");
+				SKIP_INSTALL = NO;
+				ARCHS = arm64;
+				ONLY_ACTIVE_ARCH = YES;
+			};
+			name = Debug;
+		};
+		A000000000000091 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_ARC = YES;
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ALWAYS_USE_SEPARATE_HEADERMAPS = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
+				FRAMEWORK_SEARCH_PATHS = ("$(OPENEMU_BASE_BUILD_DIR)/Build/Products/Debug",);
+				OTHER_LDFLAGS = ("$(inherited)", "-framework", "QuartzCore", "-framework", "Metal");
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/AzaharCore/OfficialABI",
+                    "$(SRCROOT)/AzaharCore/VulkanSDK/include",
+                    "$(VULKAN_SDK)/include",
+                    "$(AZAHAR_SOURCE)/externals/Vulkan-Headers/include",
+                    "$(AZAHAR_SOURCE)/externals/vulkan-headers/include",
+					"$(AZAHAR_SOURCE)/externals/libretro-common/libretro-common/include",
+					"$(OPENEMU_SOURCE)/OpenEmu-SDK",
+					"$(OPENEMU_SOURCE)/OpenEmu/SystemPlugins/NDS",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.4;
+				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.Azahar;
+				PRODUCT_NAME = Azahar;
+				WRAPPER_EXTENSION = oecoreplugin;
+				INFOPLIST_FILE = "$(SRCROOT)/AzaharCore/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = ("@loader_path/../Frameworks", "@loader_path/../../../../Frameworks");
+				SKIP_INSTALL = NO;
+				ARCHS = arm64;
+				ONLY_ACTIVE_ARCH = YES;
+			};
+			name = Release;
+		};
+		A000000000000081 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.4;
+				OPENEMU_SOURCE = "$(SRCROOT)/../../orig_source/OpenEmu-Silicon-main";
+				OPENEMU_BASE_BUILD_DIR = "$(SRCROOT)/.build/OpenEmuBase";
+				AZAHAR_SOURCE = "$(SRCROOT)/../../orig_source/azahar-git";
+				AZAHAR_LIBRETRO_PATH = "$(SRCROOT)/AzaharCore/azahar_libretro.dylib";
+			};
+			name = Debug;
+		};
+		A000000000000082 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 13.4;
+				OPENEMU_SOURCE = "$(SRCROOT)/../../orig_source/OpenEmu-Silicon-main";
+				OPENEMU_BASE_BUILD_DIR = "$(SRCROOT)/.build/OpenEmuBase";
+				AZAHAR_SOURCE = "$(SRCROOT)/../../orig_source/azahar-git";
+				AZAHAR_LIBRETRO_PATH = "$(SRCROOT)/AzaharCore/azahar_libretro.dylib";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A000000000000060 /* Build configuration list for PBXNativeTarget "Azahar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A000000000000090 /* Debug */,
+				A000000000000091 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A000000000000080 /* Build configuration list for PBXProject "Azahar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A000000000000081 /* Debug */,
+				A000000000000082 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A000000000000070 /* Project object */;
+}
