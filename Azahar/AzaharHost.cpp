@@ -24,10 +24,17 @@
 
 #include "AzaharHost.h"
 
+#include <algorithm>
+#include <array>
 #include <atomic>
+#include <deque>
 #include <memory>
+#include <mutex>
+#include <tuple>
 
 #include "audio_core/audio_types.h"
+#include "audio_core/sink.h"
+#include "audio_core/sink_details.h"
 #include "common/file_util.h"
 #include "common/logging/backend.h"
 #include "common/logging/filter.h"
@@ -36,6 +43,7 @@
 #include "core/frontend/applets/default_applets.h"
 #include "core/frontend/emu_window.h"
 #include "core/frontend/image_interface.h"
+#include "core/frontend/input.h"
 #include "core/hle/service/service.h"
 #include "core/loader/loader.h"
 #include "video_core/gpu.h"
@@ -43,6 +51,28 @@
 #include "video_core/renderer_base.h"
 
 namespace {
+
+/// Samples the engine has produced and OpenEmu has not taken yet. The engine pushes them from the
+/// emulation thread as it makes them; the core drains them in executeFrame.
+std::mutex gAudioLock;
+std::deque<int16_t> gAudio;
+
+class OEAudioSink final : public AudioCore::Sink {
+public:
+    unsigned int GetNativeSampleRate() const override { return 32728; }
+    void SetCallback(std::function<void(s16 *, std::size_t)>) override {}
+    bool ImmediateSubmission() override { return true; }
+    void PushSamples(const void *data, std::size_t numSamples) override {
+        const int16_t *samples = static_cast<const int16_t *>(data);
+        std::lock_guard<std::mutex> lock(gAudioLock);
+        gAudio.insert(gAudio.end(), samples, samples + numSamples * 2);
+        // Never hold more than about a second; if OpenEmu stops draining, drop the oldest.
+        constexpr size_t kMaxSamples = 32728 * 2;
+        if (gAudio.size() > kMaxSamples) {
+            gAudio.erase(gAudio.begin(), gAudio.begin() + (gAudio.size() - kMaxSamples));
+        }
+    }
+};
 
 /// The window the engine draws into. The engine never shows it; each finished frame is
 /// handed to OpenEmu instead (see the engine patch 0001-openemu-host-hooks.patch).
@@ -73,6 +103,55 @@ std::atomic<uint32_t> gFrameWidth{0};
 std::atomic<uint32_t> gFrameHeight{0};
 std::atomic<void *> gFrameTexture{nullptr};
 
+// Input state written by OpenEmu's input thread and read by the engine on the emulation thread.
+std::array<std::atomic<bool>, static_cast<size_t>(AzaharHost::Button::Count)> gButtons{};
+std::array<std::atomic<float>, static_cast<size_t>(AzaharHost::Axis::Count)> gAxes{};
+
+/// The engine's buttons, in OpenEmu's order (AzaharHost::Button), by their native index.
+constexpr std::array<int, static_cast<size_t>(AzaharHost::Button::Count)> kNativeButtons = {
+    Settings::NativeButton::A,     Settings::NativeButton::B,    Settings::NativeButton::X,
+    Settings::NativeButton::Y,     Settings::NativeButton::Up,   Settings::NativeButton::Down,
+    Settings::NativeButton::Left,  Settings::NativeButton::Right, Settings::NativeButton::L,
+    Settings::NativeButton::R,     Settings::NativeButton::Start, Settings::NativeButton::Select,
+    Settings::NativeButton::ZL,    Settings::NativeButton::ZR,
+};
+
+class OEButton final : public ::Input::ButtonDevice {
+public:
+    explicit OEButton(size_t index) : index(index) {}
+    bool GetStatus() const override { return gButtons[index]; }
+
+private:
+    size_t index;
+};
+
+class OEButtonFactory final : public ::Input::Factory<::Input::ButtonDevice> {
+public:
+    std::unique_ptr<::Input::ButtonDevice> Create(const Common::ParamPackage &params) override {
+        const size_t index = static_cast<size_t>(params.Get("button", 0));
+        return std::make_unique<OEButton>(index < gButtons.size() ? index : 0);
+    }
+};
+
+/// A stick: axis 0 is the Circle Pad, axis 1 the C-Stick. The engine wants up to be positive Y.
+class OEStick final : public ::Input::AnalogDevice {
+public:
+    explicit OEStick(size_t stick) : stick(stick) {}
+    std::tuple<float, float> GetStatus() const override {
+        return {gAxes[stick * 2], -gAxes[stick * 2 + 1]};
+    }
+
+private:
+    size_t stick;
+};
+
+class OEStickFactory final : public ::Input::Factory<::Input::AnalogDevice> {
+public:
+    std::unique_ptr<::Input::AnalogDevice> Create(const Common::ParamPackage &params) override {
+        return std::make_unique<OEStick>(params.Get("axis", 0) == 1 ? 1 : 0);
+    }
+};
+
 void ApplyOpenEmuSettings() {
     // OpenEmu drives the engine one frame at a time and paces it, so the engine's own
     // limiter and audio stretching stay off (the same choice Azahar's libretro frontend makes).
@@ -88,15 +167,28 @@ void ApplyOpenEmuSettings() {
     Settings::values.filter_mode = false;
 
     Settings::values.audio_emulation = Settings::AudioEmulation::HLE;
-    Settings::values.output_type = AudioCore::SinkType::Null;
+    Settings::values.output_type = AudioCore::SinkType::OpenEmu;
     Settings::values.input_type = AudioCore::InputType::Null;
 
     Settings::values.use_cpu_jit = true;
     Settings::values.use_virtual_sd = true;
-    Settings::values.current_input_profile.touch_device = "engine:emu_window";
+    // Bind every 3DS button and both sticks to the "openemu" factory registered in Initialize.
+    auto &profile = Settings::values.current_input_profile;
+    profile.touch_device = "engine:emu_window";
+    for (size_t i = 0; i < kNativeButtons.size(); i++) {
+        profile.buttons[kNativeButtons[i]] = "button:" + std::to_string(i) + ",engine:openemu";
+    }
+    profile.analogs[Settings::NativeAnalog::CirclePad] = "axis:0,engine:openemu";
+    profile.analogs[Settings::NativeAnalog::CStick] = "axis:1,engine:openemu";
 }
 
 } // namespace
+
+namespace AudioCore {
+std::unique_ptr<Sink> OEHostCreateAudioSink() {
+    return std::make_unique<OEAudioSink>();
+}
+} // namespace AudioCore
 
 extern "C" const char *OEHostMoltenVKPath() {
     return gMoltenVKPath.empty() ? nullptr : gMoltenVKPath.c_str();
@@ -131,6 +223,9 @@ bool Initialize(const Folders &folders, std::string *error) {
     auto &system = Core::System::GetInstance();
     Frontend::RegisterDefaultApplets(system);
     system.RegisterImageInterface(std::make_shared<Frontend::ImageInterface>());
+
+    ::Input::RegisterFactory<::Input::ButtonDevice>("openemu", std::make_shared<OEButtonFactory>());
+    ::Input::RegisterFactory<::Input::AnalogDevice>("openemu", std::make_shared<OEStickFactory>());
 
     ApplyOpenEmuSettings();
     gInitialized = true;
@@ -218,11 +313,43 @@ void Shutdown() {
     }
     gLoaded = false;
     gFrameTexture = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gAudioLock);
+        gAudio.clear();
+    }
     gWindow.reset();
+}
+
+void SetButton(Button button, bool pressed) {
+    if (button < Button::Count) gButtons[static_cast<size_t>(button)] = pressed;
+}
+
+void SetAxis(Axis axis, float value) {
+    if (axis < Axis::Count) gAxes[static_cast<size_t>(axis)] = value < -1.0f ? -1.0f : (value > 1.0f ? 1.0f : value);
+}
+
+void TouchPressed(unsigned x, unsigned y) {
+    if (gWindow) gWindow->TouchPressed(x, y);
+}
+
+void TouchMoved(unsigned x, unsigned y) {
+    if (gWindow) gWindow->TouchMoved(x, y);
+}
+
+void TouchReleased() {
+    if (gWindow) gWindow->TouchReleased();
 }
 
 uint32_t FrameWidth() { return gFrameWidth; }
 uint32_t FrameHeight() { return gFrameHeight; }
 void *FrameTexture() { return gFrameTexture; }
+
+size_t PullAudio(int16_t *out, size_t maxFrames) {
+    std::lock_guard<std::mutex> lock(gAudioLock);
+    const size_t frames = std::min(maxFrames, gAudio.size() / 2);
+    std::copy_n(gAudio.begin(), frames * 2, out);
+    gAudio.erase(gAudio.begin(), gAudio.begin() + frames * 2);
+    return frames;
+}
 
 } // namespace AzaharHost

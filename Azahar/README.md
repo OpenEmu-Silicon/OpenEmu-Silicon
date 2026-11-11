@@ -2,7 +2,7 @@
 
 OpenEmu wrapper around the [Azahar](https://github.com/azahar-emu/azahar) engine (GPL-2.0-or-later, a Citra successor). Work is tracked in [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814). Read [`docs/3ds-azahar-port.md`](../docs/3ds-azahar-port.md) and [ADR-0007](../docs/adr/0007-3ds-core-from-azahar.md) first.
 
-**Status: boots and draws, no sound or input yet.** Items 2, 3 and most of 4 of #814 are in: the engine is pinned and builds from a clean clone with one script, and the core plugin loads a game, runs it, and gives OpenEmu the picture as a Metal texture. Checked with `OE_HEADLESS_SHOT_DIR=<dir> ./Scripts/headless/run.sh Azahar --rom <file> --frames 300 --hash-at 300`: the devkitPro homebrew launcher (`boot.3dsx`) draws both screens (400 by 480), the picture changes frame to frame, and the run ends with no crash. Not yet checked inside the OpenEmu window. There is no sound, input, touch or saves; those are items 5 to 7.
+**Status: plays in OpenEmu, experimental.** Items 2 to 4 of #814 are in, and input and sound work. In the real app (`./Scripts/playtest.sh --game "Super Mario 3D Land"`), a real encrypted commercial dump boots to its welcome screen, draws both screens through OpenEmu's Metal renderer (400 by 480), averages about 59 fps on Apple Silicon, plays sound, and closes cleanly. Headless (`./Scripts/headless/run.sh Azahar --rom <file> --frames 900 --audio --input 500:didPush3DSButton:forPlayer:4 ...`) a press of A moves the game on to its next dialog. Not done yet: saves and save states, touch in the OpenEmu window, display layouts and resolution scaling, a long-session check, and compatibility across games.
 
 ## How it runs
 
