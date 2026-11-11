@@ -177,6 +177,12 @@ final class ArchipelagoConnections: @unchecked Sendable {
 
     // MARK: - Lock
 
+    /// The player paused or unpaused the game. Runs on the emulation thread.
+    /// The pause is theirs from now on: a later UNLOCK leaves it alone, and a later LOCK can pause again.
+    func playerChangedPause() {
+        pausedByLock = false
+    }
+
     /// Runs on the emulation thread.
     private func applyLockRequest(_ request: Bool?) {
         switch request {

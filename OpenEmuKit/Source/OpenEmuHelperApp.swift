@@ -536,6 +536,7 @@ final class PresentationWatchdog: @unchecked Sendable {
     public func setPauseEmulation(_ paused: Bool) {
         gameCore.perform {
             self.gameCore.setPauseEmulation(paused)
+            self._archipelagoConnections?.playerChangedPause()
         }
         if paused {
             startRetroAchievementsIdleTimer()

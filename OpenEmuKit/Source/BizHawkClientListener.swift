@@ -98,7 +98,8 @@ final class BizHawkClientListener: @unchecked Sendable {
             return
         }
 
-        // Loopback only: nothing outside this Mac can connect.
+        // Loopback only: nothing outside this Mac can connect. There is no authentication, as in BizHawk's own
+        // connector, so any program on this Mac can. docs/archipelago.md and the Debug checkbox say so.
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: nwPort)
         parameters.acceptLocalOnly = true
