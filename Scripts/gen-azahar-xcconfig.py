@@ -87,6 +87,10 @@ def main():
     for fw in FRAMEWORKS:
         args += ["-framework", fw]
     args += ["-lc++"]
+    # The plugin shares a process with OpenEmu's frameworks, and OpenEmuShaders carries its own copy
+    # of glslang. If the plugin exports the engine's glslang symbols too, the two collide (glslang's
+    # thread-local pool index) and the helper aborts. Export only the core class; the rest stay private.
+    args += ["-Wl,-exported_symbol,_OBJC_CLASS_$_AzaharGameCore", "-Wl,-exported_symbol,_OBJC_METACLASS_$_AzaharGameCore"]
     with open(os.path.join(out_dir, "engine-link.rsp"), "w") as f:
         f.write("\n".join(quote(a) for a in args) + "\n")
     print("Wrote %s and %s (%d libraries)" % (os.path.join(out_dir, "engine.xcconfig"),
