@@ -96,9 +96,10 @@ static NSString *MetalVideoHash(OEGameCore *core, NSInteger frame)
     [command waitUntilCompleted];
 
     const uint8_t *pixels = buffer.contents;
-    NSUInteger lit = 0;
+    NSUInteger lit = 0, opaque = 0;
     for (NSUInteger i = 0; i < w * h; i++) {
         if (pixels[i * 4] | pixels[i * 4 + 1] | pixels[i * 4 + 2]) lit++;
+        if (pixels[i * 4 + 3] == 255) opaque++;
     }
 
     NSString *dir = NSProcessInfo.processInfo.environment[@"OE_HEADLESS_SHOT_DIR"];
@@ -114,8 +115,8 @@ static NSString *MetalVideoHash(OEGameCore *core, NSInteger frame)
         CGImageDestinationFinalize(out);
         CFRelease(out); CGImageRelease(image); CGContextRelease(context); CGColorSpaceRelease(space);
     }
-    return [NSString stringWithFormat:@"metal:%@ size=%lux%lu lit=%.1f%%", HashOfBytes(pixels, rowBytes * h),
-            (unsigned long)w, (unsigned long)h, 100.0 * lit / MAX(w * h, 1)];
+    return [NSString stringWithFormat:@"metal:%@ size=%lux%lu lit=%.1f%% opaque=%.1f%%", HashOfBytes(pixels, rowBytes * h),
+            (unsigned long)w, (unsigned long)h, 100.0 * lit / MAX(w * h, 1), 100.0 * opaque / MAX(w * h, 1)];
 }
 
 // Drains whatever audio the core produced this frame into a running digest. Nobody else reads the ring

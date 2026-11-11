@@ -105,6 +105,14 @@ std::atomic<void *> gFrameTexture{nullptr};
 
 // Input state written by OpenEmu's input thread and read by the engine on the emulation thread.
 std::array<std::atomic<bool>, static_cast<size_t>(AzaharHost::Button::Count)> gButtons{};
+/// Frames since each button was last pressed. A press is kept for at least kMinHoldFrames so a very
+/// quick tap (a click or a key pressed and released within one frame) is still seen: the engine only
+/// looks at its buttons a few times per frame.
+std::array<std::atomic<int>, static_cast<size_t>(AzaharHost::Button::Count)> gButtonAge{};
+constexpr int kMinHoldFrames = 4;
+std::atomic<bool> gTouchDown{false};
+std::atomic<bool> gTouchReleaseWanted{false};
+std::atomic<int> gTouchAge{0};
 std::array<std::atomic<float>, static_cast<size_t>(AzaharHost::Axis::Count)> gAxes{};
 
 /// The engine's buttons, in OpenEmu's order (AzaharHost::Button), by their native index.
@@ -119,7 +127,7 @@ constexpr std::array<int, static_cast<size_t>(AzaharHost::Button::Count)> kNativ
 class OEButton final : public ::Input::ButtonDevice {
 public:
     explicit OEButton(size_t index) : index(index) {}
-    bool GetStatus() const override { return gButtons[index]; }
+    bool GetStatus() const override { return gButtons[index] || gButtonAge[index] < kMinHoldFrames; }
 
 private:
     size_t index;
@@ -153,6 +161,7 @@ public:
 };
 
 void ApplyOpenEmuSettings() {
+    for (auto &age : gButtonAge) age = 1000;
     // OpenEmu drives the engine one frame at a time and paces it, so the engine's own
     // limiter and audio stretching stay off (the same choice Azahar's libretro frontend makes).
     Settings::values.frame_limit = 0;
@@ -163,7 +172,11 @@ void ApplyOpenEmuSettings() {
     Settings::values.graphics_api = Settings::GraphicsAPI::Vulkan;
     Settings::values.async_presentation = false;
     Settings::values.use_vsync = false;
-    Settings::values.use_disk_shader_cache = false;
+    // Compiled shaders are kept on disk (in the user directory), so a game stutters the first time an
+    // effect appears and not again. Asynchronous compilation stays off: it skips drawing until a
+    // shader is ready, which shows as a black picture at the start of a game.
+    Settings::values.use_disk_shader_cache = true;
+    Settings::values.async_shader_compilation = false;
     Settings::values.filter_mode = false;
 
     Settings::values.audio_emulation = Settings::AudioEmulation::HLE;
@@ -208,13 +221,18 @@ bool Initialize(const Folders &folders, std::string *error) {
         return true;
     }
     gMoltenVKPath = folders.moltenVKPath;
+    // The engine builds each sub-folder path by appending to this one, so it needs a trailing slash.
+    std::string userDir = folders.userDir;
+    if (userDir.empty() || userDir.back() != '/') userDir += '/';
+
+    // Point every Azahar folder (sdmc, nand, sysdata, shaders, logs) at OpenEmu's support folder and
+    // never touch a standalone Azahar's own. This must come before anything else asks for a path
+    // (the logger does): the engine fills in each sub-folder once, on first use, and keeps whatever
+    // it chose then.
+    FileUtil::SetUserPath(userDir);
 
     Common::Log::Initialize();
     Common::Log::Start();
-
-    // Point every Azahar folder (sdmc, nand, sysdata) at OpenEmu's support folder and never
-    // read a standalone Azahar's own settings.
-    FileUtil::SetUserPath(folders.userDir);
 
     // The same one-time setup Azahar's libretro frontend does in retro_init.
     for (const auto &module : Service::service_module_map) {
@@ -288,6 +306,19 @@ bool RunFrame(std::string *error) {
         system.RegisterCoreLoopThreadId();
     }
 
+    // Age the held inputs, and let go of a touch that was released too quickly to be seen.
+    for (auto &age : gButtonAge) {
+        if (age < 1000) age++;
+    }
+    if (gTouchDown) {
+        if (gTouchAge < 1000) gTouchAge++;
+        if (gTouchReleaseWanted && gTouchAge >= kMinHoldFrames) {
+            gTouchReleaseWanted = false;
+            gTouchDown = false;
+            gWindow->TouchReleased();
+        }
+    }
+
     gFrameDone = false;
     // A frame normally takes a few engine slices. The cap keeps OpenEmu's loop alive if a
     // game goes a long while without drawing (loading screens, a hang).
@@ -321,7 +352,10 @@ void Shutdown() {
 }
 
 void SetButton(Button button, bool pressed) {
-    if (button < Button::Count) gButtons[static_cast<size_t>(button)] = pressed;
+    if (button >= Button::Count) return;
+    const size_t index = static_cast<size_t>(button);
+    if (pressed && !gButtons[index]) gButtonAge[index] = 0;
+    gButtons[index] = pressed;
 }
 
 void SetAxis(Axis axis, float value) {
@@ -329,7 +363,11 @@ void SetAxis(Axis axis, float value) {
 }
 
 void TouchPressed(unsigned x, unsigned y) {
-    if (gWindow) gWindow->TouchPressed(x, y);
+    if (!gWindow) return;
+    gTouchReleaseWanted = false;
+    gTouchAge = 0;
+    gTouchDown = true;
+    gWindow->TouchPressed(x, y);
 }
 
 void TouchMoved(unsigned x, unsigned y) {
@@ -337,7 +375,14 @@ void TouchMoved(unsigned x, unsigned y) {
 }
 
 void TouchReleased() {
-    if (gWindow) gWindow->TouchReleased();
+    if (!gWindow || !gTouchDown) return;
+    // A very short tap is held to the minimum; RunFrame lets go of it.
+    if (gTouchAge < kMinHoldFrames) {
+        gTouchReleaseWanted = true;
+    } else {
+        gTouchDown = false;
+        gWindow->TouchReleased();
+    }
 }
 
 uint32_t FrameWidth() { return gFrameWidth; }
