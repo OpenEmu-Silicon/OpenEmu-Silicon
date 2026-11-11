@@ -1,4 +1,4 @@
-# Archipelago connections
+# Archipelago Setup Guide for Users
 
 [Archipelago](https://archipelago.gg) is a multiworld randomizer: items from many games are shuffled together, and an Archipelago client on your Mac sends and receives them while you play. The client needs to read the game's memory to see what you picked up, and write to it to hand you items from other players.
 
@@ -6,27 +6,23 @@ OpenEmu can let those clients connect to a running game. It is off unless you tu
 
 ## What works
 
-| System | Core | Games (built into Archipelago 0.6.8) |
-|---|---|---|
-| Game Boy / Game Boy Color | Gambatte | Pokémon Red and Blue, Super Mario Land 2 |
-| Game Boy Advance | mGBA | Pokémon Emerald, Castlevania: Circle of the Moon, Mario & Luigi: Superstar Saga, Yu-Gi-Oh! 2006 |
-
-Third-party games ("APWorlds") that use Archipelago's **BizHawk Client** on these systems work too, for example Pokémon Crystal.
-
-Not yet: other systems and cores, SNES games (they use a different Archipelago tool, SNI), GameCube games, and the older games that ship their own BizHawk-only scripts (Ocarina of Time, Zelda 1, Mega Man Battle Network 3, Adventure).
+Only Game Boy, Game Boy Color, and Game Boy Advance games using Archipelago's **Bizhawk Client** are supported. This includes both core (such as Pokémon Red/Blue) and non core games (such as Pokémon Crystal). More cores may be supported in the future.
 
 ## Setting it up
 
 1. Run Archipelago from source on your Mac (see Archipelago's [macOS guide](https://github.com/ArchipelagoMW/Archipelago/blob/main/worlds/generic/docs/mac_en.md)).
 2. In OpenEmu, open Preferences → Debug and turn on **Allow Archipelago connections**. (The Debug pane appears after you enter the Konami code in Preferences.) The setting takes effect from the next game you start.
 3. Patch your ROM the usual way for that game, add the patched ROM to OpenEmu, and start it.
-4. In the Archipelago Launcher, open **BizHawk Client** and connect to the server. The client finds OpenEmu by itself; there is no script to load.
+4. In the Archipelago Launcher, open **BizHawk Client** (if opening your patch doesn't do it automatically) and connect to the server. The client finds OpenEmu by itself; there is no script to load.
 
 You can play more than one game at once. Each game uses its own port (43055, then 43056, and so on), and each needs its own BizHawk Client.
 
-OpenEmu refuses Archipelago connections while RetroAchievements hardcore mode is in force, because writing game memory from outside counts as cheating there.
+Notes:
 
-**Any program on this Mac can connect.** There is no password or other check, the same as BizHawk's own connector. Once the setting is on, any app running on your Mac can read and change the memory of the game you are playing, but nothing on another computer can. Turn the setting off when you are not playing Archipelago.
+- OpenEmu refuses Archipelago connections while RetroAchievements hardcore mode is in force, because writing game memory from outside counts as cheating there.
+- With this setting on, **Any program on your Mac can connect to OpenEmu and modify its memory.** There is no password or other check, the same as BizHawk's own connector. Once the setting is on, any app running on your Mac can read and change the memory of the game you are playing, **but nothing on another computer can.** We recommend turning **Allow Archipelago connections** off when you aren't using it.
+
+# Archipelago Info for Developers
 
 ## How it works
 
