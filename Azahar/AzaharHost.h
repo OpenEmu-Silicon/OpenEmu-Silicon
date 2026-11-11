@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -66,6 +67,10 @@ void SetAxis(Axis axis, float value);
 void TouchPressed(unsigned x, unsigned y);
 void TouchMoved(unsigned x, unsigned y);
 void TouchReleased();
+
+/// Audio the engine has produced, as interleaved stereo 16-bit samples at 32728 Hz. Copies up to
+/// maxFrames frames (a frame is a left and a right sample) and returns how many it copied.
+size_t PullAudio(int16_t *out, size_t maxFrames);
 
 /// Size in pixels of the last frame the engine drew; 0 before the first one.
 uint32_t FrameWidth();

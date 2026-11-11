@@ -153,6 +153,19 @@ static const NSUInteger kFrameHeight = 480;
         _loaded = NO;
         return;
     }
+    // The sound the engine made this frame goes into OpenEmu's ring. At any speed but normal it
+    // would only crackle and overflow the ring, so drain it and drop it. (A rate of 0 means the
+    // host has not set one, which is normal speed.)
+    const BOOL silent = self.rate > 0.0f && self.rate != 1.0f;
+    id<OEAudioBuffer> ring = [self audioBufferAtIndex:0];
+    int16_t pcm[2048 * 2];
+    size_t frames;
+    while ((frames = AzaharHost::PullAudio(pcm, 2048)) > 0) {
+        if (!silent) {
+            [ring write:pcm maxLength:frames * 2 * sizeof(int16_t)];
+        }
+    }
+
     // The engine's texture is its own frame; keep a reference to the newest one for OpenEmu to show.
     id<MTLTexture> frame = (__bridge id<MTLTexture>)AzaharHost::FrameTexture();
     @synchronized (self) {

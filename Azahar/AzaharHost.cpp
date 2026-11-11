@@ -24,12 +24,17 @@
 
 #include "AzaharHost.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
+#include <deque>
 #include <memory>
+#include <mutex>
 #include <tuple>
 
 #include "audio_core/audio_types.h"
+#include "audio_core/sink.h"
+#include "audio_core/sink_details.h"
 #include "common/file_util.h"
 #include "common/logging/backend.h"
 #include "common/logging/filter.h"
@@ -46,6 +51,28 @@
 #include "video_core/renderer_base.h"
 
 namespace {
+
+/// Samples the engine has produced and OpenEmu has not taken yet. The engine pushes them from the
+/// emulation thread as it makes them; the core drains them in executeFrame.
+std::mutex gAudioLock;
+std::deque<int16_t> gAudio;
+
+class OEAudioSink final : public AudioCore::Sink {
+public:
+    unsigned int GetNativeSampleRate() const override { return 32728; }
+    void SetCallback(std::function<void(s16 *, std::size_t)>) override {}
+    bool ImmediateSubmission() override { return true; }
+    void PushSamples(const void *data, std::size_t numSamples) override {
+        const int16_t *samples = static_cast<const int16_t *>(data);
+        std::lock_guard<std::mutex> lock(gAudioLock);
+        gAudio.insert(gAudio.end(), samples, samples + numSamples * 2);
+        // Never hold more than about a second; if OpenEmu stops draining, drop the oldest.
+        constexpr size_t kMaxSamples = 32728 * 2;
+        if (gAudio.size() > kMaxSamples) {
+            gAudio.erase(gAudio.begin(), gAudio.begin() + (gAudio.size() - kMaxSamples));
+        }
+    }
+};
 
 /// The window the engine draws into. The engine never shows it; each finished frame is
 /// handed to OpenEmu instead (see the engine patch 0001-openemu-host-hooks.patch).
@@ -140,7 +167,7 @@ void ApplyOpenEmuSettings() {
     Settings::values.filter_mode = false;
 
     Settings::values.audio_emulation = Settings::AudioEmulation::HLE;
-    Settings::values.output_type = AudioCore::SinkType::Null;
+    Settings::values.output_type = AudioCore::SinkType::OpenEmu;
     Settings::values.input_type = AudioCore::InputType::Null;
 
     Settings::values.use_cpu_jit = true;
@@ -156,6 +183,12 @@ void ApplyOpenEmuSettings() {
 }
 
 } // namespace
+
+namespace AudioCore {
+std::unique_ptr<Sink> OEHostCreateAudioSink() {
+    return std::make_unique<OEAudioSink>();
+}
+} // namespace AudioCore
 
 extern "C" const char *OEHostMoltenVKPath() {
     return gMoltenVKPath.empty() ? nullptr : gMoltenVKPath.c_str();
@@ -280,6 +313,10 @@ void Shutdown() {
     }
     gLoaded = false;
     gFrameTexture = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gAudioLock);
+        gAudio.clear();
+    }
     gWindow.reset();
 }
 
@@ -306,5 +343,13 @@ void TouchReleased() {
 uint32_t FrameWidth() { return gFrameWidth; }
 uint32_t FrameHeight() { return gFrameHeight; }
 void *FrameTexture() { return gFrameTexture; }
+
+size_t PullAudio(int16_t *out, size_t maxFrames) {
+    std::lock_guard<std::mutex> lock(gAudioLock);
+    const size_t frames = std::min(maxFrames, gAudio.size() / 2);
+    std::copy_n(gAudio.begin(), frames * 2, out);
+    gAudio.erase(gAudio.begin(), gAudio.begin() + frames * 2);
+    return frames;
+}
 
 } // namespace AzaharHost
