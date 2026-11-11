@@ -2,9 +2,10 @@
 # Build the Azahar (Nintendo 3DS) engine for the Azahar core (arm64, Vulkan through MoltenVK).
 #
 # Stage 1: build the engine as static libraries with CMake. No Qt, no desktop
-# frontends, no libretro. The libraries land under Azahar/build/engine.
-# Stage 2 (not written yet): write the compile flags and link line the Xcode project
-# needs, then build Azahar.oecoreplugin. That arrives with the core plugin (item 3 of #814).
+# frontends, no libretro. The libraries land under Azahar/build/engine, and the compile
+# flags and link line the Xcode project needs are written to Azahar/build/engine.xcconfig
+# and engine-link.rsp.
+# Stage 2: build OpenEmuBase and Azahar.oecoreplugin, which links the libraries.
 #
 # Needs Apple Silicon, Xcode and cmake (brew install cmake). Set AZAHAR_EXTRA_CMAKE_ARGS
 # to pass more flags to CMake.
@@ -43,11 +44,14 @@ mkdir -p "$BUILD_DIR"
 # - Qt, SDL2, cubeb, OpenAL, libusb, tests, room, web services, scripting, the GDB stub
 #   and Discord are off. The engine libraries are all we want.
 # - Vulkan and the software renderer are on; OpenGL is not available on macOS.
+# - OE_HOST turns on Azahar/patches/0001-openemu-host-hooks.patch: load MoltenVK from the
+#   plugin bundle and tell the host when a frame has been drawn.
 # shellcheck disable=SC2086
 cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=13.4 \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DCMAKE_CXX_FLAGS=-DOE_HOST -DCMAKE_OBJCXX_FLAGS=-DOE_HOST \
   -DCMAKE_PREFIX_PATH="$DEPS_PREFIX" \
   -DUSE_SYSTEM_MOLTENVK=ON \
   -DENABLE_LIBRETRO=OFF \
@@ -65,5 +69,40 @@ cmake --build "$BUILD_DIR/engine" \
   -j"$(sysctl -n hw.ncpu)"
 
 git -C "$SRC_DIR" rev-parse HEAD > "$BUILD_DIR/ENGINE_COMMIT"
+
+# The Xcode project reads the engine's compile flags and link line from these, so they
+# follow whatever the engine's CMake decided.
+python3 "$SCRIPT_DIR/gen-azahar-xcconfig.py" "$BUILD_DIR/engine" "$BUILD_DIR"
+
 echo ""
 echo "Built the Azahar engine libraries in $BUILD_DIR/engine (commit $(cat "$BUILD_DIR/ENGINE_COMMIT"))."
+
+# --- Stage 2: OpenEmuBase + the Azahar.oecoreplugin that links the engine ---
+
+DD="$BUILD_DIR/XcodeDerived"
+
+xcodebuild \
+  -project "$REPO_ROOT/OpenEmu-SDK/OpenEmu-SDK.xcodeproj" \
+  -scheme OpenEmuBase \
+  -configuration Release \
+  -derivedDataPath "$DD" \
+  ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+  build
+
+xcodebuild \
+  -project "$AZAHAR_DIR/Azahar.xcodeproj" \
+  -scheme Azahar \
+  -configuration Release \
+  -derivedDataPath "$DD" \
+  ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
+  build
+
+PLUGIN="$DD/Build/Products/Release/Azahar.oecoreplugin"
+if [ ! -d "$PLUGIN" ]; then
+  echo "error: build did not produce $PLUGIN" >&2
+  exit 1
+fi
+
+echo ""
+echo "Built plugin: $PLUGIN"
+file "$PLUGIN/Contents/MacOS/Azahar"
