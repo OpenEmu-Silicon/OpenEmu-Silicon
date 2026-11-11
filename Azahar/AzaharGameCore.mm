@@ -45,7 +45,8 @@ static const NSUInteger kFrameHeight = 480;
     NSURL *_gameURL;
     NSView *_renderView;       // carries the CAMetalLayer the engine creates its Vulkan surface from
     id<MTLDevice> _device;
-    id<MTLTexture> _texture;
+    id<MTLTexture> _texture;        // black, shown until the engine has drawn a frame
+    id<MTLTexture> _frameTexture;   // the engine's newest finished frame (atomic via @synchronized)
     BOOL _loaded;
     uint32_t *_videoBuffer;
     BOOL _ownsVideoBuffer;
@@ -149,6 +150,12 @@ static const NSUInteger kFrameHeight = 480;
     if (!AzaharHost::RunFrame(&failure)) {
         NSLog(@"[Azahar] %s", failure.c_str());
         _loaded = NO;
+        return;
+    }
+    // The engine's texture is its own frame; keep a reference to the newest one for OpenEmu to show.
+    id<MTLTexture> frame = (__bridge id<MTLTexture>)AzaharHost::FrameTexture();
+    @synchronized (self) {
+        _frameTexture = frame;
     }
 }
 
@@ -166,7 +173,7 @@ static const NSUInteger kFrameHeight = 480;
     return OEGameCoreRenderingMetal2;
 }
 
-// Until the engine's picture reaches OpenEmu (a later step), show a black texture.
+// A black texture is shown until the engine has drawn its first frame.
 - (void)createMetalTextureWithDevice:(id<MTLDevice>)device
 {
     _device = device;
@@ -196,7 +203,9 @@ static const NSUInteger kFrameHeight = 480;
 
 - (id<MTLTexture>)metalTexture
 {
-    return _texture;
+    @synchronized (self) {
+        return _frameTexture ?: _texture;
+    }
 }
 
 - (const void *)getVideoBufferWithHint:(void *)hint
@@ -211,19 +220,23 @@ static const NSUInteger kFrameHeight = 480;
     return _videoBuffer;
 }
 
+// The picture is the size of the engine's last frame (both screens, in its current layout),
+// or 400 by 480 until it has drawn one.
 - (OEIntSize)bufferSize
 {
-    return OEIntSizeMake((int)kFrameWidth, (int)kFrameHeight);
+    const int w = (int)AzaharHost::FrameWidth(), h = (int)AzaharHost::FrameHeight();
+    return w > 0 && h > 0 ? OEIntSizeMake(w, h) : OEIntSizeMake((int)kFrameWidth, (int)kFrameHeight);
 }
 
 - (OEIntRect)screenRect
 {
-    return OEIntRectMake(0, 0, (int)kFrameWidth, (int)kFrameHeight);
+    const OEIntSize size = [self bufferSize];
+    return OEIntRectMake(0, 0, size.width, size.height);
 }
 
 - (OEIntSize)aspectSize
 {
-    return OEIntSizeMake((int)kFrameWidth, (int)kFrameHeight);
+    return [self bufferSize];
 }
 
 - (NSTimeInterval)frameInterval
