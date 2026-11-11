@@ -48,6 +48,7 @@ static const NSUInteger kFrameHeight = 480;
     id<MTLTexture> _texture;        // black, shown until the engine has drawn a frame
     id<MTLTexture> _frameTexture;   // the engine's newest finished frame (atomic via @synchronized)
     BOOL _loaded;
+    BOOL _touching;
     uint32_t *_videoBuffer;
     BOOL _ownsVideoBuffer;
 }
@@ -266,12 +267,71 @@ static const NSUInteger kFrameHeight = 480;
     return 32728;
 }
 
-#pragma mark - Input (wired in a later step)
+#pragma mark - Input
 
-- (oneway void)didPush3DSButton:(OE3DSButton)button forPlayer:(NSUInteger)player {}
-- (oneway void)didRelease3DSButton:(OE3DSButton)button forPlayer:(NSUInteger)player {}
-- (oneway void)didChange3DSAxis:(OE3DSAxis)axis value:(float)value forPlayer:(NSUInteger)player {}
-- (oneway void)didTouchScreenPoint:(OEIntPoint)point {}
-- (oneway void)didReleaseTouch {}
+// OpenEmu's buttons, as the engine's.
+static BOOL EngineButtonForButton(OE3DSButton button, AzaharHost::Button *out)
+{
+    switch (button) {
+        case OE3DSButtonUp:     *out = AzaharHost::Button::Up; return YES;
+        case OE3DSButtonDown:   *out = AzaharHost::Button::Down; return YES;
+        case OE3DSButtonLeft:   *out = AzaharHost::Button::Left; return YES;
+        case OE3DSButtonRight:  *out = AzaharHost::Button::Right; return YES;
+        case OE3DSButtonA:      *out = AzaharHost::Button::A; return YES;
+        case OE3DSButtonB:      *out = AzaharHost::Button::B; return YES;
+        case OE3DSButtonX:      *out = AzaharHost::Button::X; return YES;
+        case OE3DSButtonY:      *out = AzaharHost::Button::Y; return YES;
+        case OE3DSButtonL:      *out = AzaharHost::Button::L; return YES;
+        case OE3DSButtonR:      *out = AzaharHost::Button::R; return YES;
+        case OE3DSButtonZL:     *out = AzaharHost::Button::ZL; return YES;
+        case OE3DSButtonZR:     *out = AzaharHost::Button::ZR; return YES;
+        case OE3DSButtonStart:  *out = AzaharHost::Button::Start; return YES;
+        case OE3DSButtonSelect: *out = AzaharHost::Button::Select; return YES;
+        default: return NO;
+    }
+}
+
+- (oneway void)didPush3DSButton:(OE3DSButton)button forPlayer:(NSUInteger)player
+{
+    AzaharHost::Button engine;
+    if (EngineButtonForButton(button, &engine)) AzaharHost::SetButton(engine, true);
+}
+
+- (oneway void)didRelease3DSButton:(OE3DSButton)button forPlayer:(NSUInteger)player
+{
+    AzaharHost::Button engine;
+    if (EngineButtonForButton(button, &engine)) AzaharHost::SetButton(engine, false);
+}
+
+- (oneway void)didChange3DSAxis:(OE3DSAxis)axis value:(float)value forPlayer:(NSUInteger)player
+{
+    switch (axis) {
+        case OE3DSAxisCirclePadX: AzaharHost::SetAxis(AzaharHost::Axis::CirclePadX, value); break;
+        case OE3DSAxisCirclePadY: AzaharHost::SetAxis(AzaharHost::Axis::CirclePadY, value); break;
+        case OE3DSAxisCStickX:    AzaharHost::SetAxis(AzaharHost::Axis::CStickX, value); break;
+        case OE3DSAxisCStickY:    AzaharHost::SetAxis(AzaharHost::Axis::CStickY, value); break;
+        default: break;
+    }
+}
+
+// OpenEmu sends touch points in the displayed picture, whose size is aspectSize, which is the
+// engine's frame. The engine finds the bottom screen in its layout itself and ignores a touch
+// that lands elsewhere.
+- (oneway void)didTouchScreenPoint:(OEIntPoint)point
+{
+    const unsigned x = point.x < 0 ? 0 : (unsigned)point.x, y = point.y < 0 ? 0 : (unsigned)point.y;
+    if (_touching) {
+        AzaharHost::TouchMoved(x, y);
+    } else {
+        _touching = YES;
+        AzaharHost::TouchPressed(x, y);
+    }
+}
+
+- (oneway void)didReleaseTouch
+{
+    _touching = NO;
+    AzaharHost::TouchReleased();
+}
 
 @end

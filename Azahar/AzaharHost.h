@@ -52,6 +52,21 @@ bool RunFrame(std::string *error);
 void Reset();
 void Shutdown();
 
+// Input. The core sets these from OpenEmu's responder; the engine reads them each frame through
+// the "openemu" input factory registered in Initialize.
+enum class Button { A, B, X, Y, Up, Down, Left, Right, L, R, Start, Select, ZL, ZR, Count };
+enum class Axis { CirclePadX, CirclePadY, CStickX, CStickY, Count };
+
+void SetButton(Button button, bool pressed);
+/// value runs from -1.0 to 1.0; negative is left on X and up on Y.
+void SetAxis(Axis axis, float value);
+
+/// Touch in the picture's own pixels, the size of the engine's frame (OpenEmu sends points in the
+/// displayed picture, which is this frame). The engine maps them through the current layout.
+void TouchPressed(unsigned x, unsigned y);
+void TouchMoved(unsigned x, unsigned y);
+void TouchReleased();
+
 /// Size in pixels of the last frame the engine drew; 0 before the first one.
 uint32_t FrameWidth();
 uint32_t FrameHeight();
