@@ -1,0 +1,25 @@
+# Developer-local files; keep source, bundled headers and required dylibs.
+.DS_Store
+*.log
+*.crash
+*.xcresult
+*.xcuserstate
+xcuserdata/
+DerivedData/
+build/
+__pycache__/
+*.pyc
+
+# Local reproducibility manifest: review before intentionally committing.
+source-revisions.json
+
+# Generated CMake/Xcode intermediates; retain required bundled binaries.
+.build/
+.derivedData/
+
+# Generated on the working Mac; review before explicitly committing.
+# The pinned source-lock.json is intentionally committed for review.
+# source-lock.json
+
+# Local review evidence and automated report output
+release-readiness.json
