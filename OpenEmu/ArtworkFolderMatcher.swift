@@ -105,9 +105,10 @@ final class ArtworkFolderMatcher: NSObject {
             let outcome = OEArtworkChoice.choose(data, for: OEArtworkStore.Game(match.game), slot: match.slot, provider: nil)
             switch outcome {
             case .stored, .alreadyActive: stored += 1
-            default: continue
+            default: NSLog("Artwork import: could not keep %@ in the artwork folder; the library cover is still updated", match.fileURL.lastPathComponent)
             }
-            // The library's own cover is the game's box art; the other slots are read from the artwork folder.
+            // The library's own cover is the game's box art; the other slots are read from the artwork folder. A cover
+            // the person confirmed is set even if the artwork folder could not keep a copy.
             if match.slot == .cover {
                 match.game.setBoxImage(url: match.fileURL)
                 if let context = match.game.managedObjectContext { contexts.insert(context) }

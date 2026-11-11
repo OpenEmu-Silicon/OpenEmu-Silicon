@@ -198,4 +198,40 @@ final class ArtworkBackupTests: XCTestCase {
     func testRestoreFromAnEmptyBackupSaysSo() throws {
         XCTAssertEqual(OEArtworkBackup.restore(from: backup, into: rootB, machineName: "B"), .failure(.nothingToRestore))
     }
+
+    func testAnUnreadableIndexBacksUpEverythingInsteadOfNothing() throws {
+        populate(rootA)
+        // The index is damaged. Pinned picks cannot be told apart, so none may be left out.
+        try Data("not json".utf8).write(to: rootA.appendingPathComponent(OEArtworkStore.indexName))
+        let result = OEArtworkBackup.backUp(root: rootA, to: backup, scope: .pinnedAndHistory, machineID: "a", machineName: "MacA")
+        guard case .success(let report) = result else { return XCTFail("\(result)") }
+        XCTAssertTrue(report.indexUnreadable)
+        XCTAssertTrue(pictureNames(backedUp).contains { $0.hasPrefix("snes/poster/") && !$0.contains("History") }, "the pinned poster is in the backup")
+        XCTAssertTrue(pictureNames(backedUp).contains { $0.contains("/cover/") }, "so is everything else")
+
+        // A readable index goes back to the normal rule.
+        try FileManager.default.removeItem(at: rootA.appendingPathComponent(OEArtworkStore.indexName))
+        let fresh = OEArtworkStore(root: rootA); fresh.flush()
+        if case .success(let again) = OEArtworkBackup.backUp(root: rootA, to: backup, scope: .pinnedAndHistory, machineID: "a", machineName: "MacA") { XCTAssertFalse(again.indexUnreadable) }
+    }
+
+    func testAFileWithTheSameSizeAndDateIsNotReadAgainAndADifferentSizeIsKeptBeside() throws {
+        populate(rootA)
+        _ = try run(rootA, scope: .everything)
+        let relative = try XCTUnwrap(pictureNames(backedUp).first { $0.hasPrefix("snes/poster/") && !$0.contains("History") })
+        let theirs = backup.appendingPathComponent("Artwork/" + relative), mine = rootA.appendingPathComponent(relative)
+
+        // Same size, same date, different bytes: treated as the same file without reading it. This is the cost of
+        // not reading every file on every run, and only happens if a file is rewritten without its date changing.
+        var sameSize = try Data(contentsOf: mine); sameSize[sameSize.count - 1] ^= 0xFF
+        let date = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: mine.path)[.modificationDate] as? Date)
+        try sameSize.write(to: theirs)
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: theirs.path)
+        XCTAssertEqual(try run(rootA, scope: .everything).keptBoth, 0)
+
+        // A different size is certainly different, so it is kept beside the file there.
+        try (sameSize + Data([1])).write(to: theirs)
+        XCTAssertEqual(try run(rootA, scope: .everything).keptBoth, 1)
+        XCTAssertEqual(try Data(contentsOf: theirs), sameSize + Data([1]), "the file there is never replaced")
+    }
 }

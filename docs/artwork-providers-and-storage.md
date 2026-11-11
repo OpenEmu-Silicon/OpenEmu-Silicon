@@ -52,7 +52,7 @@ Each phase is its own PR. Each ends with checks that must pass before the next s
   - Icons come as Windows `.ico` files that hold several sizes. They need a reader before they can be drawn from the store.
 - Decision: keep the rule to store originals. Move the opt-in "save space" mode (lossy, originals kept in `History`) up to Phase 2, since it is the only thing that changes the size. Back up pinned art only by default.
 - libretro-thumbnails, 5 posters from a 60 second run: all PNG, 94 KB to 834 KB, average about 450 KB, at most 512 pixels on the long side. Posters only, so about 0.5 MB per game. Small enough that lossless storage is fine.
-- ScreenScraper, measured 2026-11-01 on the same 17 library games with the real developer credentials (a debug-only report, `-OEMeasureScreenScraper <file>`, that downloads and counts and stores nothing):
+- ScreenScraper, measured 2026-11-01 on the same 17 library games with the real developer credentials (a one-off debug report that downloaded each picture, counted it and stored nothing; the code was removed afterward):
 
   | Slot | Formats | Median | Average | Largest | Usual size |
   |---|---|---|---|---|---|
@@ -124,6 +124,7 @@ Progress: bulk fetch and cleanup are done and checked; save-space is dropped. Pr
 ### Closing notes
 
 - Logins in library cover addresses: ScreenScraper's media addresses include the developer's and the user's login in the query string, and the library stored them as a cover's source. The library now stores the address without the login (`ScreenScraperClient.redacted`) and signs it again to download (`signed`), and a launch-time scrub removes the login from covers saved earlier (2 of 17 in the maintainer's library; 0 after). Only the address text changed; no picture was touched.
+- Adversarial review follow-ups: the login is only ever added to `screenscraper.fr` and its subdomains over https (a look-alike host or plain http gets nothing; removing a login still works for any scheme). The artwork backup no longer reads every backed-up file on every run (different size means different; same size and the same date to the millisecond means the same; anything else is compared byte by byte), and an index that cannot be read makes that run back up everything instead of silently skipping pinned picks. "Cancel Cover Art Download" now also stops a provider cover that was still on its way. Import warnings about a picture's shape are worked out only for files that matched a game. A confirmed cover is set even if the artwork folder could not keep a copy. Clean Up counts every ROM of a game, not only the default one. ScreenScraper pictures in the picker are kept for ten minutes with the lookup. The debug measuring code was removed. Not changed: the PR is stacked on #795 and large (split it after #795 merges if the maintainer wants), and the Preferences buttons and the backup hook in the folder backup manager have no automated test.
 - Still open outside this branch: PR 818 is stacked on #795 (Big Picture) and must be retargeted to `main` once #795 merges.
 
 ## Open questions

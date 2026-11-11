@@ -71,11 +71,21 @@ extension ScreenScraperClient {
 
     private static let secretQueryNames: Set<String> = ["devid", "devpassword", "devdebugpassword", "ssid", "sspassword"]
 
-    static func isScreenScraperAddress(_ url: URL) -> Bool { url.host?.lowercased().hasSuffix("screenscraper.fr") == true }
+    /// ScreenScraper's own host, not a look-alike such as `evilscreenscraper.fr`.
+    static func isScreenScraperHost(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "screenscraper.fr" || host.hasSuffix(".screenscraper.fr")
+    }
+
+    /// ScreenScraper itself over https: the only address that may be given the login. Removing a login is safe for any
+    /// scheme, so `redacted` only checks the host.
+    static func isScreenScraperAddress(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https" && isScreenScraperHost(url)
+    }
 
     /// The address with every login value removed. Any other address is returned as it is.
     static func redacted(_ url: URL) -> URL {
-        guard isScreenScraperAddress(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+        guard isScreenScraperHost(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let items = parts.queryItems, items.contains(where: { secretQueryNames.contains($0.name.lowercased()) }) else { return url }
         let kept = items.filter { !secretQueryNames.contains($0.name.lowercased()) }
         parts.queryItems = kept.isEmpty ? nil : kept

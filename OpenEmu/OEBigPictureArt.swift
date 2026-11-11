@@ -231,19 +231,10 @@ final class OEBigPictureArt: ObservableObject {
             var standard = snapshot.stored.standardPoster
             var square = snapshot.stored.squareIcon
             let ids = chain.map { $0.id }, preferredID = OEBigPictureArtSource.preferredID, wantedFromFolder = key.artworkGame
-            let reused = await Task.detached(priority: .utility) { () -> (set: OEBigPictureArtSet, standard: Bool, square: Bool) in
-                var set = OEBigPictureArtSet()
-                var standard = false, square = false
-                func image(_ slot: OEArtworkStore.Slot) -> (NSImage, String?)? {
-                    guard let found = OEArtworkStore.shared.reusable(wantedFromFolder, slot, providers: ids, preferred: preferredID),
-                          let picture = NSImage(contentsOf: found.url) else { return nil }
-                    return (picture, found.provider)
-                }
-                if snapshot.stored.backdrop == nil, let (picture, _) = image(.hero) { set.hero = picture }
-                if snapshot.stored.poster == nil, let (picture, from) = image(.poster) { set.grid = picture; standard = from == "steamgriddb" }
-                if snapshot.stored.icon == nil, let (picture, from) = image(.icon) { set.icon = picture; square = from == "steamgriddb" }
-                if snapshot.stored.logo == nil, let (picture, _) = image(.logo) { set.logo = picture }
-                return (set, standard, square)
+            let missing = (hero: snapshot.stored.backdrop == nil, poster: snapshot.stored.poster == nil,
+                           icon: snapshot.stored.icon == nil, logo: snapshot.stored.logo == nil)
+            let reused = await Task.detached(priority: .utility) {
+                OEArtworkFolderReuse.pictures(for: wantedFromFolder, providers: ids, preferred: preferredID, missing: missing)
             }.value
             gathered.fillGaps(from: reused.set)
             if reused.set.grid != nil { standard = reused.standard }
@@ -627,9 +618,13 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
 
     /// The picker asks once per slot tab, and a lookup costs a request, so a game's answer is kept for a few minutes.
     private var pickerLookups = [String: (at: Date, found: ScreenScraperResult?)]()
+    /// What was downloaded for each game and slot, kept as long as the lookup, so opening a tab again costs nothing.
+    private var pickerPictures = [String: (at: Date, pictures: [OEProviderPicture])]()
 
     func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] {
         guard !key.md5.isEmpty, let systemIdentifier = key.systemIdentifier else { return [] }
+        let cacheKey = "\(key.md5)|\(slot.rawValue)"
+        if let cached = pickerPictures[cacheKey], Date().timeIntervalSince(cached.at) < 600 { return cached.pictures }
         let found: ScreenScraperResult?
         if let cached = pickerLookups[key.md5], Date().timeIntervalSince(cached.at) < 600 {
             found = cached.found
@@ -657,6 +652,7 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
             guard let (data, _) = try? await URLSession.shared.data(from: address), NSImage(data: data) != nil else { continue }
             pictures.append(OEProviderPicture(provider: id, providerTitle: title, data: data))
         }
+        pickerPictures[cacheKey] = (Date(), pictures)
         return pictures
     }
 

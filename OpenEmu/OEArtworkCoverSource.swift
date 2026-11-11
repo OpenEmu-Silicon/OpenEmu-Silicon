@@ -37,6 +37,10 @@ enum OEArtworkCoverSource {
         return chain.isEmpty ? nil : chain
     }
 
+    /// A finished download is applied only while the game is still waiting for it. "Cancel Cover Art Download" sets the
+    /// game back to ok, and a picture arriving after that must not change the cover.
+    static func shouldApply(_ status: OEDBGame.Status) -> Bool { status == .processing }
+
     /// The first picture a provider has for the cover, in order. nil when none has one.
     static func cover(for key: OEBigPictureArt.GameKey, providers: [OEBigPictureArtProvider]) async -> NSImage? {
         for provider in providers {
@@ -56,7 +60,7 @@ extension OEDBGame {
         let key = OEBigPictureArt.GameKey(self)
         Task { @MainActor [weak self] in
             let picture = await OEArtworkCoverSource.cover(for: key, providers: providers)
-            guard let self = self, self.managedObjectContext != nil else { return }
+            guard let self = self, self.managedObjectContext != nil, OEArtworkCoverSource.shouldApply(self.status) else { return }
             if let picture = picture {
                 self.setBoxImage(image: picture)
                 self.status = .ok
@@ -67,5 +71,27 @@ extension OEDBGame {
             }
         }
         return true
+    }
+}
+
+/// Big picture reads the artwork folder before asking a provider. This is that read: for each slot still missing, the
+/// folder's picture when it already does the job (see `OEArtworkStore.reusable`).
+enum OEArtworkFolderReuse {
+
+    static func pictures(for game: OEArtworkStore.Game, providers: [String], preferred: String?, store: OEArtworkStore = .shared,
+                         missing: (hero: Bool, poster: Bool, icon: Bool, logo: Bool)) -> (set: OEBigPictureArtSet, standard: Bool, square: Bool) {
+        var set = OEBigPictureArtSet()
+        var standard = false, square = false
+        func image(_ slot: OEArtworkStore.Slot) -> (NSImage, String?)? {
+            guard let found = store.reusable(game, slot, providers: providers, preferred: preferred),
+                  let picture = NSImage(contentsOf: found.url) else { return nil }
+            return (picture, found.provider)
+        }
+        if missing.hero, let (picture, _) = image(.hero) { set.hero = picture }
+        // SteamGridDB makes poster and tile art in the shape the screens want; other sources' pictures are built differently.
+        if missing.poster, let (picture, from) = image(.poster) { set.grid = picture; standard = from == "steamgriddb" }
+        if missing.icon, let (picture, from) = image(.icon) { set.icon = picture; square = from == "steamgriddb" }
+        if missing.logo, let (picture, _) = image(.logo) { set.logo = picture }
+        return (set, standard, square)
     }
 }

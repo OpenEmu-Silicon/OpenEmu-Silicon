@@ -39,8 +39,9 @@ enum ArtworkFolderScan {
         /// The title as written in the file name, with any slot suffix removed.
         let title: String
         let slot: OEArtworkStore.Slot
-        /// Set when the picture's shape does not suit the slot. The file can still be used.
-        let warning: String?
+        /// Set when the picture's shape does not suit the slot. The file can still be used. Worked out on request:
+        /// it reads the file's header, which is too slow to do for every picture in a big folder.
+        var warning: String? { ArtworkFolderScan.shapeWarning(url, slot) }
     }
 
     /// ES-DE media folder names and the slot each one feeds. Other media kinds (screenshots, videos, manuals) have no
@@ -94,7 +95,7 @@ enum ArtworkFolderScan {
             stem = String(stem.dropLast(hit.suffix.count))
             slot = hit.slot
         }
-        return Found(url: url, title: stem, slot: slot, warning: shapeWarning(url, slot))
+        return Found(url: url, title: stem, slot: slot)
     }
 
     /// Pixel size from the file header, without decoding the picture.

@@ -197,9 +197,6 @@ final class OELibraryDatabase: NSObject {
             // Older libraries stored ScreenScraper addresses with the user's login in them.
             let scrubbed = OEDBImage.scrubStoredCredentials(in: defaultDB.mainThreadContext)
             if scrubbed > 0 { os_log(.info, log: .library, "Removed the login from %d stored cover addresses", scrubbed) }
-            #if DEBUG
-            OEArtworkMeasure.runIfRequested(defaultDB)
-            #endif
         }
     }
     

@@ -130,11 +130,11 @@ final class ArtworkFolderScanTests: XCTestCase {
 
     func testMatchingIsByNameAndNeverGuessesBetweenTwoGamesWithTheSameName() throws {
         let found = [
-            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/Sonic.png"), title: "Sonic", slot: .cover, warning: nil),
-            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/sonic-hero.png"), title: "sonic", slot: .hero, warning: nil),
-            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/b/SONIC.jpg"), title: "SONIC", slot: .cover, warning: nil),
-            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/Twin.png"), title: "Twin", slot: .cover, warning: nil),
-            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/Nothing.png"), title: "Nothing", slot: .cover, warning: nil),
+            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/Sonic.png"), title: "Sonic", slot: .cover),
+            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/sonic-hero.png"), title: "sonic", slot: .hero),
+            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/b/SONIC.jpg"), title: "SONIC", slot: .cover),
+            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/Twin.png"), title: "Twin", slot: .cover),
+            ArtworkFolderScan.Found(url: URL(fileURLWithPath: "/a/Nothing.png"), title: "Nothing", slot: .cover),
         ]
         let result = ArtworkFolderMatcher.assign(found, gameNames: ["Sonic", "Twin", "Twin"])
         XCTAssertEqual(result.matched.map { "\($0.found.url.lastPathComponent)>\($0.game)" }, ["Sonic.png>0", "sonic-hero.png>0"])

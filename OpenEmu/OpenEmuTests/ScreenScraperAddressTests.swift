@@ -44,6 +44,25 @@ final class ScreenScraperAddressTests: XCTestCase {
         XCTAssertEqual(ScreenScraperClient.redacted(plain), plain)
     }
 
+    func testOnlyScreenScraperOverHttpsIsTrusted() {
+        let trusted = ["https://screenscraper.fr/a?x=1", "https://neoclone.screenscraper.fr/a?x=1", "https://NEOCLONE.ScreenScraper.FR/a"]
+        let notTrusted = ["https://evilscreenscraper.fr/a", "https://notscreenscraper.fr/a", "https://screenscraper.fr.evil.com/a",
+                          "http://neoclone.screenscraper.fr/a", "https://example.com/screenscraper.fr", "ftp://screenscraper.fr/a"]
+        for text in trusted { XCTAssertTrue(ScreenScraperClient.isScreenScraperAddress(URL(string: text)!), text) }
+        for text in notTrusted {
+            let url = URL(string: text)!
+            XCTAssertFalse(ScreenScraperClient.isScreenScraperAddress(url), text)
+            XCTAssertEqual(ScreenScraperClient.signed(url, username: "nick", password: "pw"), url, "no login added to \(text)")
+        }
+    }
+
+    func testALoginIsRemovedFromAnyScreenScraperAddressEvenOverHttp() {
+        let old = URL(string: "http://neoclone.screenscraper.fr/api2/mediaJeu.php?ssid=nick&sspassword=pw&jeuid=1")!
+        XCTAssertFalse(ScreenScraperClient.redacted(old).absoluteString.contains("pw"))
+        let other = URL(string: "https://evilscreenscraper.fr/a?sspassword=pw")!
+        XCTAssertEqual(ScreenScraperClient.redacted(other), other, "another site's address is not ours to change")
+    }
+
     func testSigningAddsTheLoginBackAndOnlyOnce() throws {
         let clean = ScreenScraperClient.redacted(leaky)
         let signed = ScreenScraperClient.signed(clean, username: "nick", password: "pw")

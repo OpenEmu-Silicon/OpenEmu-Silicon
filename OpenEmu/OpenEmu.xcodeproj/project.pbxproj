@@ -632,7 +632,6 @@
 		0B1C9F0E000000000000A107 /* OEArtworkBulk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */; };
 		0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */; };
 		0B1C9F0E000000000000A109 /* ScreenScraperAddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B109 /* ScreenScraperAddressTests.swift */; };
-		0B1C9F0E000000000000A10A /* OEArtworkMeasure.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B10A /* OEArtworkMeasure.swift */; };
 		0B1C9F0E000000000000A102 /* ArtworkFolderScan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B102 /* ArtworkFolderScan.swift */; };
 		C0D2C87DC8E70B924B0364B8 /* ArtworkFolderMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5948C5F42D3088794677A8C0 /* ArtworkFolderMatcher.swift */; };
 		C6252DAC14E752E300350A13 /* Controller-Preferences.plist in Resources */ = {isa = PBXBuildFile; fileRef = C6252DAA14E752E300350A13 /* Controller-Preferences.plist */; };
@@ -1371,7 +1370,6 @@
 		0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBulk.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBulkTests.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B109 /* ScreenScraperAddressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenScraperAddressTests.swift; sourceTree = "<group>"; };
-		0B1C9F0E000000000000B10A /* OEArtworkMeasure.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkMeasure.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B102 /* ArtworkFolderScan.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkFolderScan.swift; sourceTree = "<group>"; };
 		5948C5F42D3088794677A8C0 /* ArtworkFolderMatcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArtworkFolderMatcher.swift; sourceTree = "<group>"; };
 		5A2CE899206EA61B00790F89 /* NSArray+OEAdditions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSArray+OEAdditions.swift"; sourceTree = "<group>"; };
@@ -3277,7 +3275,6 @@
 				8F5074751C10BCEC00F52B83 /* LibraryGamesViewController.xib */,
 				5948C5F42D3088794677A8C0 /* ArtworkFolderMatcher.swift */,
 				0B1C9F0E000000000000B102 /* ArtworkFolderScan.swift */,
-				0B1C9F0E000000000000B10A /* OEArtworkMeasure.swift */,
 				0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */,
 				0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */,
 				0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */,
@@ -6694,7 +6691,6 @@
 				F2E3C43668DB03A494D5B16E /* OECredentialStore.swift in Sources */,
 				C0D2C87DC8E70B924B0364B8 /* ArtworkFolderMatcher.swift in Sources */,
 				0B1C9F0E000000000000A102 /* ArtworkFolderScan.swift in Sources */,
-				0B1C9F0E000000000000A10A /* OEArtworkMeasure.swift in Sources */,
 				0B1C9F0E000000000000A107 /* OEArtworkBulk.swift in Sources */,
 				0B1C9F0E000000000000A106 /* OEArtworkCoverSource.swift in Sources */,
 				0B1C9F0E000000000000A104 /* OEArtworkBackup.swift in Sources */,

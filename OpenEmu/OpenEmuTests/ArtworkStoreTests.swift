@@ -544,4 +544,39 @@ final class ArtworkStoreTests: XCTestCase {
         XCTAssertEqual(store.entry(game, .poster)?.origin, "provider:libretro")
         XCTAssertEqual(store.entry(game, .poster)?.pinned, true)
     }
+
+    // MARK: Review follow-ups
+
+    func testAFinishedCoverDownloadIsAppliedOnlyWhileTheGameIsStillWaiting() {
+        XCTAssertTrue(OEArtworkCoverSource.shouldApply(.processing))
+        for status in [OEDBGame.Status.ok, .alert, .downloading] { XCTAssertFalse(OEArtworkCoverSource.shouldApply(status), "\(status)") }
+    }
+
+    func testBigPictureReadsThePicturesTheFolderAlreadyHasAndOnlyForMissingSlots() throws {
+        let png = try png(width: 600, height: 900)
+        _ = store.fill(png, for: game, slot: .poster, origin: .provider("steamgriddb"))
+        _ = store.fill(png, for: game, slot: .hero, origin: .provider("libretro"))
+        _ = store.fill(png, for: game, slot: .icon, origin: .provider("steamgriddb"))
+
+        // Automatic: any provider in use counts. The SteamGridDB poster and icon are the shape the screens want.
+        let all = (hero: true, poster: true, icon: true, logo: true)
+        let automatic = OEArtworkFolderReuse.pictures(for: game, providers: ["steamgriddb", "libretro"], preferred: nil, store: store, missing: all)
+        XCTAssertNotNil(automatic.set.grid); XCTAssertNotNil(automatic.set.hero); XCTAssertNotNil(automatic.set.icon)
+        XCTAssertNil(automatic.set.logo, "nothing stored for the logo")
+        XCTAssertTrue(automatic.standard); XCTAssertTrue(automatic.square)
+
+        // A slot already supplied is not read again.
+        let onlyHero = OEArtworkFolderReuse.pictures(for: game, providers: ["steamgriddb", "libretro"], preferred: nil, store: store,
+                                                     missing: (hero: true, poster: false, icon: false, logo: false))
+        XCTAssertNotNil(onlyHero.set.hero); XCTAssertNil(onlyHero.set.grid); XCTAssertNil(onlyHero.set.icon)
+
+        // A source chosen on its own: only its pictures count, so the others are fetched again.
+        let libretro = OEArtworkFolderReuse.pictures(for: game, providers: ["libretro"], preferred: "libretro", store: store, missing: all)
+        XCTAssertNotNil(libretro.set.hero); XCTAssertNil(libretro.set.grid); XCTAssertNil(libretro.set.icon)
+        XCTAssertFalse(libretro.standard)
+
+        // Nothing is read from a folder with nothing in it.
+        let empty = OEArtworkFolderReuse.pictures(for: .init(md5: "zz", system: "openemu.system.nes", title: "None"), providers: ["steamgriddb"], preferred: nil, store: store, missing: all)
+        XCTAssertFalse(empty.set.hasAny)
+    }
 }

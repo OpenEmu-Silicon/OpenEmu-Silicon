@@ -52,6 +52,8 @@ enum OEArtworkBackup {
         /// Files that differed from one already there and were kept beside it.
         var keptBoth = 0
         var indexEntriesAdopted = 0
+        /// The index could not be read, so pinned picks could not be told apart and every picture was backed up instead.
+        var indexUnreadable = false
     }
 
     enum Problem: Error, Equatable {
@@ -87,16 +89,21 @@ enum OEArtworkBackup {
         guard fm.fileExists(atPath: root.path) else { return .success(Report()) }
         do { try fm.createDirectory(at: destination, withIntermediateDirectories: true) } catch { return .failure(.notWritable) }
 
-        let index = readIndex(root.appendingPathComponent(OEArtworkStore.indexName))
+        let indexURL = root.appendingPathComponent(OEArtworkStore.indexName)
+        let index = readIndex(indexURL)
         let pinned = Set(index.values.flatMap { $0.values }.filter { $0.pinned }.map { $0.file })
+        // An index that exists but cannot be read must not turn "pinned picks" into "nothing": back up everything this
+        // time (adding is safe) and say so.
+        let unreadable = fm.fileExists(atPath: indexURL.path) && !hasReadableIndex(indexURL)
 
         var report = Report()
+        report.indexUnreadable = unreadable
         for (rel, real) in OEArtworkLocation.listFiles(in: root).files {
             let name = (rel as NSString).lastPathComponent
             if rel == OEArtworkStore.indexName || name.hasPrefix(".") || name.hasPrefix("index.") { continue }
             // History sits inside each slot folder: `snes/poster/History/…`.
             let inHistory = rel.split(separator: "/").dropLast().contains { $0 == OEArtworkStore.historyName }
-            if scope == .pinnedAndHistory, !inHistory, !pinned.contains(rel) { continue }
+            if scope == .pinnedAndHistory, !unreadable, !inHistory, !pinned.contains(rel) { continue }
             switch add(real, as: rel, in: destination, machineName: machineName) {
             case .success(let outcome): outcome.add(to: &report)
             case .failure(let problem): return .failure(problem)
@@ -111,6 +118,7 @@ enum OEArtworkBackup {
             encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
             if let data = try? encoder.encode(index), (try? Data(contentsOf: snapshot)) != data { try? data.write(to: snapshot, options: .atomic) }
         }
+        if unreadable { os_log(.error, log: log, "Artwork index could not be read: every picture was backed up instead of only the pinned ones") }
         os_log(.info, log: log, "Artwork backup: %d copied, %d unchanged, %d kept both", report.copied, report.unchanged, report.keptBoth)
         return .success(report)
     }
@@ -173,7 +181,7 @@ enum OEArtworkBackup {
                 try fm.copyItem(at: real, to: target)
                 return fm.contentsEqual(atPath: real.path, andPath: target.path) ? .success(.copied) : .failure(.copyFailed(rel))
             }
-            if fm.contentsEqual(atPath: real.path, andPath: target.path) { return .success(.unchanged) }
+            if sameFile(real.path, target.path) { return .success(.unchanged) }
 
             // Different bytes. An earlier run may already have kept this very file beside it.
             let ns = rel as NSString
@@ -181,7 +189,7 @@ enum OEArtworkBackup {
             let dir = target.deletingLastPathComponent()
             let tag = " (" + (label ?? "from \(machineName)")
             for sibling in (try? fm.contentsOfDirectory(atPath: dir.path)) ?? [] where sibling.hasPrefix(stem + tag) && sibling.hasSuffix(ext.isEmpty ? "" : "." + ext) {
-                if fm.contentsEqual(atPath: real.path, andPath: dir.appendingPathComponent(sibling).path) { return .success(.unchanged) }
+                if sameFile(real.path, dir.appendingPathComponent(sibling).path) { return .success(.unchanged) }
             }
             var n = 1
             while true {
@@ -198,9 +206,28 @@ enum OEArtworkBackup {
         }
     }
 
+    /// Whether two files already hold the same picture, without reading them when that can be told from the outside.
+    /// A different size means different. The same size with the same modification date, to the millisecond (a copy
+    /// keeps the date exactly, while two different files made close together do not), means the same: reading the backup side of every file on every run is slow, and on iCloud Drive it downloads a file
+    /// that was only a placeholder. Anything else is compared byte by byte.
+    private static func sameFile(_ a: String, _ b: String) -> Bool {
+        let fm = FileManager.default
+        guard let x = try? fm.attributesOfItem(atPath: a), let y = try? fm.attributesOfItem(atPath: b) else { return false }
+        guard (x[.size] as? NSNumber) == (y[.size] as? NSNumber) else { return false }
+        if let dx = x[.modificationDate] as? Date, let dy = y[.modificationDate] as? Date, abs(dx.timeIntervalSince(dy)) < 0.001 { return true }
+        return fm.contentsEqual(atPath: a, andPath: b)
+    }
+
     private static func overlapping(_ a: URL, _ b: URL) -> Bool {
         let x = OEArtworkLocation.canonicalPath(a), y = OEArtworkLocation.canonicalPath(b)
         return x == y || x.hasPrefix(y + "/") || y.hasPrefix(x + "/")
+    }
+
+    private static func hasReadableIndex(_ url: URL) -> Bool {
+        guard let data = try? Data(contentsOf: url) else { return false }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (try? decoder.decode([String: [String: OEArtworkStore.Entry]].self, from: data)) != nil
     }
 
     private static func readIndex(_ url: URL) -> [String: [String: OEArtworkStore.Entry]] {

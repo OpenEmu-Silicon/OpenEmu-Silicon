@@ -304,7 +304,13 @@ final class PrefArtworkProvidersController: NSViewController {
             alert.runModal()
             return
         }
-        let inLibrary = Set(games.map { OEArtworkStore.Game($0).md5 })
+        // Every disc or version of a game counts, not only the default one: changing the default must not make the
+        // pictures filed under the other look unused.
+        var inLibrary = Set<String>()
+        for game in games {
+            inLibrary.insert(OEArtworkStore.Game(game).md5)
+            for rom in game.roms { if let hash = rom.md5Hash, !hash.isEmpty { inLibrary.insert(hash); inLibrary.insert(hash.lowercased()) } }
+        }
         let plan = OEArtworkCleanup.plan(inLibrary: inLibrary)
         if plan.isEmpty {
             alert.messageText = "Nothing to clean up"
