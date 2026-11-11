@@ -3,25 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleIconFile</key>
-	<string>icon.png</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.openemu.system.nintendo3ds</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Nintendo 3DS</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
-	<string>BNDL</string>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.24</string>
+	<string>1.0</string>
 	<key>CFBundleVersion</key>
-	<string>24</string>
+	<string>1</string>
 	<key>NSPrincipalClass</key>
-	<string>$(PRODUCT_MODULE_NAME).OE3DSSystemController</string>
+	<string>$(PRODUCT_NAME:c99extidentifier).OE3DSSystemController</string>
 	<key>OEAnalogControlsKey</key>
 	<array>
 		<string>OE3DSButtonCirclePadUp</string>
@@ -225,7 +223,6 @@
 		<string>cci</string>
 		<string>cxi</string>
 		<string>3dsx</string>
-		<string>app</string>
 	</array>
 	<key>OEGenericControlNamesKey</key>
 	<array>
