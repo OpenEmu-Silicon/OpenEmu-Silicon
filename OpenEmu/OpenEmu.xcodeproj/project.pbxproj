@@ -60,6 +60,7 @@
 				940553B217A35DE0009B505D /* PBXTargetDependency */,
 				94454F2E178B49E4006C057B /* PBXTargetDependency */,
 				94D7E8E9150741B500FBDD85 /* PBXTargetDependency */,
+				933BE4298F75AC126FFB2DE8 /* PBXTargetDependency */,
 				8291C4E0148958F500A72540 /* PBXTargetDependency */,
 				8227756F14894A2100B19E27 /* PBXTargetDependency */,
 				820EB7631483FBEF008EC398 /* PBXTargetDependency */,
@@ -720,6 +721,14 @@
 		OE0RALOGIN0BUILDFILE0002 /* OERetroAchievementsLoginClient.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0RALOGIN0FILEREF0002 /* OERetroAchievementsLoginClient.m */; };
 		OE0RC0APPBUILDFILE0000002 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0RC0FILEREF00000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1"; }; };
 		OE0RC0BUILDFILE0000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0RC0FILEREF00000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1"; }; };
+		FE3B03381BE876C88FA7ED5D /* OE3DSSystemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80DC8D35770B7C68B5455247 /* OE3DSSystemController.swift */; };
+		16B4DC265089D0D2EC64D6CB /* OE3DSSystemResponder.m in Sources */ = {isa = PBXBuildFile; fileRef = 6223507A9A58470101D73726 /* OE3DSSystemResponder.m */; };
+		FD826EFAB57F7FA87BF3734D /* OpenEmuSystem.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C6D120C417112E1300E868A8 /* OpenEmuSystem.framework */; };
+		A5497E9B5A9B36F60D9C1C46 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 52104327866079057DD7283B /* Images.xcassets */; };
+		1378E50F7EB3349FC00D9479 /* Controller-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9CD18D88F15FB0324896A90F /* Controller-Mappings.plist */; };
+		ECAA2C7353045B5E20D251A5 /* Controller-Preferences.plist in Resources */ = {isa = PBXBuildFile; fileRef = 00018065CF8F5C7169D3F5F0 /* Controller-Preferences.plist */; };
+		DEA09E21CC6A4AD9A52F8628 /* Keyboard-Mappings.plist in Resources */ = {isa = PBXBuildFile; fileRef = 8415E4136B5D48C504C18A61 /* Keyboard-Mappings.plist */; };
+		BAC3CE5CE5F39E00229E0C02 /* Nintendo 3DS.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = A41C6F6CB2765433EAF7DCDF /* Nintendo 3DS.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1003,6 +1012,13 @@
 			remoteGlobalIDString = 8D15AC270486D014006FF6A4;
 			remoteInfo = OpenEmu;
 		};
+		64C137FBF71D583AF4F27801 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2A37F4A9FDCFA73011CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 17E0F2EA8687B81A90B352AC;
+			remoteInfo = "Nintendo 3DS";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -1117,6 +1133,7 @@
 				940553B917A35FB4009B505D /* PC Engine.oesystemplugin in Copy System Plugins to App Plugins */,
 				94454F31178B4ABA006C057B /* Virtual Boy.oesystemplugin in Copy System Plugins to App Plugins */,
 				94DEA000171896AE00073397 /* NDS.oesystemplugin in Copy System Plugins to App Plugins */,
+				BAC3CE5CE5F39E00229E0C02 /* Nintendo 3DS.oesystemplugin in Copy System Plugins to App Plugins */,
 				948E540E1571D78D002D26E0 /* SegaMasterSystem.oesystemplugin in Copy System Plugins to App Plugins */,
 				948E540F1571D78D002D26E0 /* NES.oesystemplugin in Copy System Plugins to App Plugins */,
 				948E54101571D78D002D26E0 /* SuperNES.oesystemplugin in Copy System Plugins to App Plugins */,
@@ -1986,6 +2003,16 @@
 		OE0RALOGIN0FILEREF0001 /* OERetroAchievementsLoginClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OERetroAchievementsLoginClient.h; path = ../OpenEmuKit/Source/OERetroAchievementsLoginClient.h; sourceTree = SOURCE_ROOT; };
 		OE0RALOGIN0FILEREF0002 /* OERetroAchievementsLoginClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsLoginClient.m; path = ../OpenEmuKit/Source/OERetroAchievementsLoginClient.m; sourceTree = SOURCE_ROOT; };
 		OE0RC0FILEREF00000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
+		A41C6F6CB2765433EAF7DCDF /* Nintendo 3DS.oesystemplugin */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Nintendo 3DS.oesystemplugin"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3DD47D25590FA5632D4C7DAD /* Nintendo3DS-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Nintendo3DS-Info.plist"; sourceTree = "<group>"; };
+		9CD18D88F15FB0324896A90F /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
+		00018065CF8F5C7169D3F5F0 /* Controller-Preferences.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Preferences.plist"; sourceTree = "<group>"; };
+		8415E4136B5D48C504C18A61 /* Keyboard-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Keyboard-Mappings.plist"; sourceTree = "<group>"; };
+		52104327866079057DD7283B /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
+		80DC8D35770B7C68B5455247 /* OE3DSSystemController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OE3DSSystemController.swift; sourceTree = "<group>"; };
+		486E559517FB360A5E23CB8A /* OE3DSSystemResponder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OE3DSSystemResponder.h; sourceTree = "<group>"; };
+		6223507A9A58470101D73726 /* OE3DSSystemResponder.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OE3DSSystemResponder.m; sourceTree = "<group>"; };
+		83CE0A30997642401C115EBE /* OE3DSSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OE3DSSystemResponderClient.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2439,6 +2466,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7210A0FF705756847113C83C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD826EFAB57F7FA87BF3734D /* OpenEmuSystem.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -2689,6 +2724,7 @@
 				820EB74A1483F9A2008EC398 /* NeoGeo Pocket.oesystemplugin */,
 				8227754F148946DF00B19E27 /* GameGear.oesystemplugin */,
 				94D7E8C915073BA000FBDD85 /* NDS.oesystemplugin */,
+				A41C6F6CB2765433EAF7DCDF /* Nintendo 3DS.oesystemplugin */,
 				945E42FB1517F2B500057D08 /* Arcade.oesystemplugin */,
 				94A224331707537F00098DA0 /* PC Engine.oesystemplugin */,
 				94A224431707539D00098DA0 /* WonderSwan.oesystemplugin */,
@@ -4276,6 +4312,7 @@
 				820EB74D1483F9D3008EC398 /* NeoGeoPocket */,
 				C64BB08F136478E600C1AB23 /* NES */,
 				94A224C51707544B00098DA0 /* Nintendo FDS */,
+				3699D348595ECD490AB01E3B /* Nintendo 3DS */,
 				94404757199D4DF0002D805E /* Odyssey2 */,
 				94A224351707537F00098DA0 /* PC Engine */,
 				9405538617A34C6B009B505D /* PC Engine CD */,
@@ -4414,6 +4451,30 @@
 				FEB66279187B812800D14713 /* Keyboard-Mappings.plist */,
 				FEB66277187B812800D14713 /* Controller-Mappings.plist */,
 				FEB66278187B812800D14713 /* Controller-Preferences.plist */,
+			);
+			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		3699D348595ECD490AB01E3B /* Nintendo 3DS */ = {
+			isa = PBXGroup;
+			children = (
+				80DC8D35770B7C68B5455247 /* OE3DSSystemController.swift */,
+				486E559517FB360A5E23CB8A /* OE3DSSystemResponder.h */,
+				6223507A9A58470101D73726 /* OE3DSSystemResponder.m */,
+				83CE0A30997642401C115EBE /* OE3DSSystemResponderClient.h */,
+				C72B5A2A12C6867C25432F9D /* Supporting Files */,
+			);
+			path = "Nintendo 3DS";
+			sourceTree = "<group>";
+		};
+		C72B5A2A12C6867C25432F9D /* Supporting Files */ = {
+			isa = PBXGroup;
+			children = (
+				52104327866079057DD7283B /* Images.xcassets */,
+				3DD47D25590FA5632D4C7DAD /* Nintendo3DS-Info.plist */,
+				8415E4136B5D48C504C18A61 /* Keyboard-Mappings.plist */,
+				9CD18D88F15FB0324896A90F /* Controller-Mappings.plist */,
+				00018065CF8F5C7169D3F5F0 /* Controller-Preferences.plist */,
 			);
 			name = "Supporting Files";
 			sourceTree = "<group>";
@@ -5391,6 +5452,23 @@
 			productReference = FEB6625B187B791800D14713 /* MSX.oesystemplugin */;
 			productType = "com.apple.product-type.bundle";
 		};
+		17E0F2EA8687B81A90B352AC /* Nintendo 3DS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D0681AF82BF0EFA04396368 /* Build configuration list for PBXNativeTarget "Nintendo 3DS" */;
+			buildPhases = (
+				A9ADABBBB3DD23CF860440FA /* Sources */,
+				7210A0FF705756847113C83C /* Frameworks */,
+				DCDE5D386DFBF9C82A0A0777 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Nintendo 3DS";
+			productName = "Nintendo 3DS";
+			productReference = A41C6F6CB2765433EAF7DCDF /* Nintendo 3DS.oesystemplugin */;
+			productType = "com.apple.product-type.bundle";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -5497,6 +5575,7 @@
 				FEB6625A187B791800D14713 /* MSX */,
 				1415540E1442B3B300A01683 /* N64 */,
 				94D7E8C815073BA000FBDD85 /* NDS */,
+				17E0F2EA8687B81A90B352AC /* Nintendo 3DS */,
 				820EB7391483F9A2008EC398 /* NeoGeoPocket */,
 				C64BB08C136478E600C1AB23 /* NES */,
 				94A224C21707544B00098DA0 /* Nintendo FDS */,
@@ -6115,6 +6194,17 @@
 				FEB6627B187B812800D14713 /* Controller-Preferences.plist in Resources */,
 				FEB6627C187B812800D14713 /* Keyboard-Mappings.plist in Resources */,
 				FEB6627A187B812800D14713 /* Controller-Mappings.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DCDE5D386DFBF9C82A0A0777 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5497E9B5A9B36F60D9C1C46 /* Images.xcassets in Resources */,
+				ECAA2C7353045B5E20D251A5 /* Controller-Preferences.plist in Resources */,
+				1378E50F7EB3349FC00D9479 /* Controller-Mappings.plist in Resources */,
+				DEA09E21CC6A4AD9A52F8628 /* Keyboard-Mappings.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -6852,6 +6942,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A9ADABBBB3DD23CF860440FA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FE3B03381BE876C88FA7ED5D /* OE3DSSystemController.swift in Sources */,
+				16B4DC265089D0D2EC64D6CB /* OE3DSSystemResponder.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -7055,6 +7154,11 @@
 			isa = PBXTargetDependency;
 			target = 94D7E8C815073BA000FBDD85 /* NDS */;
 			targetProxy = 94D7E8E8150741B500FBDD85 /* PBXContainerItemProxy */;
+		};
+		933BE4298F75AC126FFB2DE8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 17E0F2EA8687B81A90B352AC /* Nintendo 3DS */;
+			targetProxy = 64C137FBF71D583AF4F27801 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -8843,6 +8947,26 @@
 			};
 			name = Release;
 		};
+		8F373B97553801E88F0FA40E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = "SystemPlugins/Nintendo 3DS/Nintendo3DS-Info.plist";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = oesystemplugin;
+			};
+			name = Debug;
+		};
+		CAAAE41DF6217FEFFD99629C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				INFOPLIST_FILE = "SystemPlugins/Nintendo 3DS/Nintendo3DS-Info.plist";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				WRAPPER_EXTENSION = oesystemplugin;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -9373,6 +9497,15 @@
 			buildConfigurations = (
 				FEB66266187B791800D14713 /* Debug */,
 				FEB66267187B791800D14713 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8D0681AF82BF0EFA04396368 /* Build configuration list for PBXNativeTarget "Nintendo 3DS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8F373B97553801E88F0FA40E /* Debug */,
+				CAAAE41DF6217FEFFD99629C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

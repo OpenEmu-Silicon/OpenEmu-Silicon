@@ -11,7 +11,7 @@ OpenEmu-Silicon has no Nintendo 3DS system plugin and no 3DS core. Issue #176 (A
 Two engines were looked at:
 
 - **Panda3DS** (GPL-3.0). An HLE emulator with a ready OpenEmu plugin in an unreviewed upstream PR (`wheremyfoodat/Panda3DS#845`). Its README says many games do not boot, and its last release is v0.9 (December 2024). The plugin runs on the OpenGL renderer only; the Metal renderer does not work yet. It needs about 25 submodules.
-- **Azahar** (GPL-3.0, a Citra successor). Far better compatibility and active releases (stable 2126.2 on 2026-10-08, 2127 alphas since). Its core is already separate from its frontends.
+- **Azahar** (GPL-2.0-or-later, a Citra successor; the root `license.txt` is GPLv2 and file headers say "GPLv2 or any later version"). Far better compatibility and active releases (stable 2126.2 on 2026-10-08, 2127 alphas since). Its core is already separate from its frontends.
 
 A source read of Azahar at commit `01623d2` (2026-10-29), without its submodules, found:
 
@@ -24,7 +24,7 @@ A source read of Azahar at commit `01623d2` (2026-10-29), without its submodules
 - Each rendered frame is an offscreen image that `PresentWindow::CopyToSwapchain` copies to the window. That is the place to patch, as PS2's `EndPresent` patch does.
 - The audio sink interface is small, and its libretro implementation is 27 lines.
 - The CPU recompiler (Dynarmic with Oaknut) maps its code memory with `MAP_JIT` on Apple.
-- At the pinned commit there are 52 submodule entries, about 560 MB when fetched shallow. They stay on their original hosts when the main repo is forked.
+- At the pinned commit there are 36 top-level submodules (52 counting nested ones), about 560 MB when fetched shallow. They stay on their original hosts when the main repo is forked. Azahar's CMake refuses to configure unless every one of them is present, including the desktop-only ones, so they cannot just be skipped (a configure test with all frontends off hit this).
 - Azahar has an AI use policy (`AI-POLICY.md`, effective 2026-03-20). It rejects AI-written submissions of any real size. Patches from this repo would not be accepted upstream, so we carry them ourselves.
 
 Someone outside the project says they have Azahar running in OpenEmu. We have not seen their code. This ADR and the port doc are written so their work can be checked against the plan and so they can fill in what is missing.
@@ -38,7 +38,7 @@ Build the 3DS core natively on Azahar, using the same pattern as FBNeo and the P
 - Keep the fork an untouched snapshot of the pinned release. Our changes to the engine are small flagged patches in `Azahar/patches/`, applied by the prepare script, the way PS2 does it.
 - Build the engine as static libraries with CMake (Qt, SDL, audio backends, tests, room, web services and scripting off, Vulkan on, OpenGL not available), wrapped by a thin Xcode project that makes `Azahar.oecoreplugin`. Same two-stage shape as `Scripts/build-fbneo-core.sh` and the PS2 `Scripts/build-armsx2-core.sh`.
 - Do **not** set Azahar's `ENABLE_LIBRETRO`. PS2 sets the equivalent ARMSX2 switch to mean "the host owns pads, audio and video". In Azahar it makes the Vulkan renderer take its device and images from a libretro frontend, which is the wrong path.
-- Fetch third-party downloads from pinned sources with a checked hash. Azahar's CMake downloads MoltenVK at configure time; replace that with a pinned copy.
+- Fetch third-party downloads from pinned sources with a checked hash. Azahar's CMake downloads MoltenVK at configure time from a fixed release tag with no hash check; replace that with a pinned copy and a checked hash.
 - Use the Vulkan renderer through MoltenVK. Send its final image into OpenEmu's Metal texture with a small patch behind a build flag, as the PS2 core does.
 - Keep Azahar patches small and flagged, as `patches/*.patch` or fork commits.
 - Do **not** use the libretro build or the libretro API. #721 removed the libretro bridge. Azahar's libretro frontend is a reference to read, not a path to ship.
@@ -57,7 +57,7 @@ The full map and work breakdown are in [`docs/3ds-azahar-port.md`](../3ds-azahar
 - The libretro frontend (about 4,300 lines) is a worked example of every host hook the engine needs: window, input, touch, audio, mic, settings, Vulkan present.
 
 **Harder:**
-- The engine is large (36 submodules) and brings MoltenVK, SDL, OpenAL or cubeb, boost and more. Packaging and signing will take work.
+- The engine is large (36 top-level submodules) and brings MoltenVK, SDL, OpenAL or cubeb, boost and more. Packaging and signing will take work.
 - Presenting Vulkan output into a host-owned Metal texture inside the helper process is unproven.
 - A 3DS needs more input than any core here: two screens, touch, circle pad and C-stick, motion, mic, optionally a camera and stereo 3D.
 - ROM formats, encrypted dumps and keys need decisions (see below).

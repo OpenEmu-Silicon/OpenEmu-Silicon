@@ -38,6 +38,7 @@ extern NSString *const OESystemIdentifierN64;
 extern NSString *const OESystemIdentifierGB;
 extern NSString *const OESystemIdentifierGBA;
 extern NSString *const OESystemIdentifierNDS;
+extern NSString *const OESystemIdentifier3DS;
 extern NSString *const OESystemIdentifierGenesis;
 extern NSString *const OESystemIdentifierSMS;
 extern NSString *const OESystemIdentifierGameGear;

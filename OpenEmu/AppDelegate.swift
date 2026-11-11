@@ -693,7 +693,7 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             "openemu.system.gba", "openemu.system.c64",  "openemu.system.arcade",
             "openemu.system.n64", "openemu.system.dc",   "openemu.system.saturn",
             "openemu.system.nds", "openemu.system.gc",   "openemu.system.wii",
-            "openemu.system.ps2",
+            "openemu.system.ps2", "openemu.system.3ds",
         ]
         out += "\n--- Per-system rollup ---\n"
         for sysID in systemsOfInterest {
