@@ -61,6 +61,7 @@ final class LibretroThumbnailsClient {
         "openemu.system.gba":          "Nintendo - Game Boy Advance",
         "openemu.system.gc":           "Nintendo - GameCube",
         "openemu.system.n64":          "Nintendo - Nintendo 64",
+        "openemu.system.3ds":          "Nintendo - Nintendo 3DS",
         "openemu.system.nds":          "Nintendo - Nintendo DS",
         "openemu.system.nes":          "Nintendo - Nintendo Entertainment System",
         "openemu.system.pokemonmini":  "Nintendo - Pokemon Mini",
