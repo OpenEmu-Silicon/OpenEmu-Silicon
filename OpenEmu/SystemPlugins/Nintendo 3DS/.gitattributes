@@ -1,0 +1,5 @@
+# Preserve first-party text diffs; identify binary runtime/artwork resources.
+*.png binary
+*.dylib binary
+*.jpg binary
+*.jpeg binary

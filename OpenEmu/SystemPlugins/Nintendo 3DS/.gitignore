@@ -1,0 +1,25 @@
+# Developer-local files; bundled frameworks and artwork must be retained.
+.DS_Store
+*.log
+*.xcuserstate
+xcuserdata/
+DerivedData/
+build/
+__pycache__/
+*.pyc
+
+# Xcode local derived data and editor overrides.
+.derivedData/
+*.xcuserdatad/
+
+# Local reproducibility manifest: review before intentionally committing.
+source-revisions.json
+
+# Xcode-compatible locally generated frameworks and intermediates.
+.build/
+
+# Generated on the working Mac; review before explicitly committing.
+source-lock.json
+
+# Local review evidence and automated report output
+release-readiness.json
