@@ -26,6 +26,8 @@ You can play more than one game at once. Each game uses its own port (43055, the
 
 OpenEmu refuses Archipelago connections while RetroAchievements hardcore mode is in force, because writing game memory from outside counts as cheating there.
 
+**Any program on this Mac can connect.** There is no password or other check, the same as BizHawk's own connector. Once the setting is on, any app running on your Mac can read and change the memory of the game you are playing, but nothing on another computer can. Turn the setting off when you are not playing Archipelago.
+
 ## How it works
 
 Archipelago's clients send lists of requests: read these bytes, write those bytes, and "only carry on if these bytes still match". OpenEmu runs each whole list between two frames of the game, so the game never moves on halfway through. If a check fails, nothing after it in the list happens. That is what lets a client safely do things like "add 5 to the rupee count" without the game changing the count in between.
@@ -36,7 +38,12 @@ There are three layers, so OpenEmu is not tied to one Archipelago client:
 2. **The list runner** (`LiveMemoryChain` in OpenEmuBase) runs reads, writes and checks in order and applies the "stop after a failed check" rule. It runs inside `-performLiveMemoryTransaction:`, which by default uses `-performBlock:` to run between frames.
 3. **Adapters** speak one client's protocol. Today that is BizHawk Client (`BizHawkClientCodec` in OpenEmuBase, `BizHawkClientListener` in OpenEmuKit). Archipelago is working on a newer client, PolyEmu, that uses the same read, write and check model, so it will be another adapter on the same two layers.
 
-The listener only accepts connections from this Mac (127.0.0.1). Nothing reads OpenEmu's memory from another process, so the app keeps the Hardened Runtime and notarization.
+The listener only accepts connections from this Mac (127.0.0.1), and it does not check who is connecting. Nothing reads OpenEmu's memory from another process, so the app keeps the Hardened Runtime and notarization.
+
+## Notes for client authors
+
+- **System Bus writes can be dropped.** A write through the `System Bus` area only lands where the core can write plainly: work RAM and enabled cartridge RAM on Game Boy, and RAM, ROM and SRAM on Game Boy Advance. Writes to other addresses, such as hardware registers or unmapped space, are dropped, and the WRITE still reports success. To be sure a write landed, write through a named area (`WRAM`, `CartRAM`, `EWRAM` and so on) or read it back.
+- **Reads past the end of an area** return zeros, and writes past the end are ignored.
 
 ## Adding a core
 

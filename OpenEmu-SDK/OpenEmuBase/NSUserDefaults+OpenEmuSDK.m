@@ -27,38 +27,12 @@
 
 @implementation NSUserDefaults (OpenEmuSDK)
 
-static NSString *const OEReleaseAppIdentifier = @"org.openemu.OpenEmu";
-static NSString *const OEDebugAppIdentifier = @"org.openemu.OpenEmu.debug";
-
-static BOOL OEIsAppIdentifier(NSString *identifier)
-{
-    return [identifier isEqual:OEReleaseAppIdentifier] || [identifier isEqual:OEDebugAppIdentifier];
-}
-
-+ (NSString *)oe_applicationIdentifierForMainIdentifier:(NSString *)mainIdentifier enclosingAppIdentifier:(NSString *)enclosingIdentifier
-{
-    if (OEIsAppIdentifier(mainIdentifier))
-        return mainIdentifier;
-    if (OEIsAppIdentifier(enclosingIdentifier))
-        return enclosingIdentifier;
-    return OEReleaseAppIdentifier;
-}
-
 + (instancetype)oe_applicationUserDefaults
 {
-    // The helper has its own identifier but lives in OpenEmu.app/Contents/MacOS, so the app around it says
-    // which settings to read: the debug app's own for debug builds, not the release app's.
-    // Read the app's Info.plist itself: +[NSBundle bundleWithURL:] hands back the helper's own main bundle here.
-    NSBundle *mainBundle = [NSBundle mainBundle];
-    NSURL *contentsURL = mainBundle.executableURL.URLByDeletingLastPathComponent.URLByDeletingLastPathComponent;
-    NSDictionary *enclosingInfo = contentsURL ? [NSDictionary dictionaryWithContentsOfURL:[contentsURL URLByAppendingPathComponent:@"Info.plist"]] : nil;
-    NSString *enclosingIdentifier = [enclosingInfo[@"CFBundleIdentifier"] isKindOfClass:[NSString class]] ? enclosingInfo[@"CFBundleIdentifier"] : nil;
-
-    NSString *identifier = [self oe_applicationIdentifierForMainIdentifier:mainBundle.bundleIdentifier
-                                                    enclosingAppIdentifier:enclosingIdentifier];
-    if ([identifier isEqual:mainBundle.bundleIdentifier])
+    NSBundle *thisBundle = [NSBundle mainBundle];
+    if ([[thisBundle bundleIdentifier] isEqual:@"org.openemu.OpenEmu"])
         return [[self class] standardUserDefaults];
-    return [[[self class] alloc] initWithSuiteName:identifier];
+    return [[[self class] alloc] initWithSuiteName:@"org.openemu.OpenEmu"];
 }
 
 + (NSUserDefaults *)oe_application
