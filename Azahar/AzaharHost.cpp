@@ -26,6 +26,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <fstream>
 #include <atomic>
 #include <deque>
 #include <memory>
@@ -330,6 +332,72 @@ bool RunFrame(std::string *error) {
         }
     }
     return true;
+}
+
+// A state saved while the kernel has asynchronous work in flight would lose that work, so let it
+// finish first. Same approach as Azahar's libretro frontend.
+static bool DrainAsyncOperations(Core::System &system) {
+    if (!system.KernelRunning()) return true;
+    const auto start = std::chrono::steady_clock::now();
+    while (system.Kernel().AreAsyncOperationsPending()) {
+        if (std::chrono::steady_clock::now() - start > std::chrono::seconds(5)) return false;
+        if (system.RunLoop() != Core::System::ResultStatus::Success) return false;
+    }
+    return true;
+}
+
+bool SaveState(const std::string &path, std::string *error) {
+    auto &system = Core::System::GetInstance();
+    if (!gLoaded || !system.IsPoweredOn()) {
+        if (error) *error = "No game is running";
+        return false;
+    }
+    if (!DrainAsyncOperations(system)) {
+        if (error) *error = "The game was busy and could not be saved right now";
+        return false;
+    }
+    try {
+        const std::vector<u8> buffer = system.SaveStateBuffer();
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        out.write(reinterpret_cast<const char *>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+        out.close();
+        if (!out) {
+            if (error) *error = "Could not write the state file";
+            return false;
+        }
+        return true;
+    } catch (const std::exception &e) {
+        if (error) *error = e.what();
+        return false;
+    }
+}
+
+bool LoadState(const std::string &path, std::string *error) {
+    auto &system = Core::System::GetInstance();
+    if (!gLoaded || !system.IsPoweredOn()) {
+        if (error) *error = "No game is running";
+        return false;
+    }
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        if (error) *error = "Could not read the state file";
+        return false;
+    }
+    std::vector<u8> buffer((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (!DrainAsyncOperations(system)) {
+        if (error) *error = "The game was busy and could not be loaded right now";
+        return false;
+    }
+    try {
+        if (!system.LoadStateBuffer(std::move(buffer))) {
+            if (error) *error = "The state does not match this game";
+            return false;
+        }
+        return true;
+    } catch (const std::exception &e) {
+        if (error) *error = e.what();
+        return false;
+    }
 }
 
 void Reset() {
