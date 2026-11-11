@@ -58,7 +58,8 @@ static const NSUInteger kFrameHeight = 480;
     _gameURL = [NSURL fileURLWithPath:path];
 
     NSFileManager *fm = NSFileManager.defaultManager;
-    NSURL *userDir = [self.supportDirectory URLByAppendingPathComponent:@"Azahar" isDirectory:YES];
+    // OpenEmu's support folder is already this core's (~/Library/Application Support/OpenEmu/Azahar).
+    NSURL *userDir = self.supportDirectory;
     [fm createDirectoryAtURL:userDir withIntermediateDirectories:YES attributes:nil error:NULL];
 
     NSBundle *bundle = [NSBundle bundleForClass:[self class]];
