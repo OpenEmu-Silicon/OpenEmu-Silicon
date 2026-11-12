@@ -62,3 +62,11 @@ Headless run of 2400 frames each, picture read back from the GPU at frame 2400, 
 | New Super Mario Bros. 2 | Boots to the "Welcome" dialog; top screen is black there | 6 s |
 
 Pictures: `compat/*.png`. Not covered: actual gameplay past menus, long sessions, stereo 3D.
+
+## long-session: 30 minutes of play (item 8) — NOT YET PROVEN
+
+Attempt on 2026-11-11: Ocarina of Time 3D in real gameplay (the cave scene), sampled once a minute.
+
+- First ~90 seconds: 59.8 fps, no gaps over 25 ms, helper at 200 to 265 MB.
+- From 19:24:52 the helper stopped logging frames, and its memory fell to 13 MB. The helper process stayed alive for the full 33 minutes (no crash), but the Mac's screen had locked, OpenEmu stops running a game that is not visible, so this was not 30 minutes of play.
+- Result: no crash or hang seen, but the 30-minute criterion is not met. Needs a re-run with the Mac kept awake and unlocked (for example `caffeinate -d` in a terminal).
