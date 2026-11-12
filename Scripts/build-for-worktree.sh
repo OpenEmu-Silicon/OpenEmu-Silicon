@@ -56,14 +56,40 @@ xcodebuild \
   -derivedDataPath "$BUILD_DIR" \
   build
 
-# Auto-resolve a stable Apple Development signing identity if available.
-# Falls back to ad-hoc (-) if no Developer cert is in the keychain.
-SIGN_ID=$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development/ {print $2; exit}')
-SIGN_ID="${SIGN_ID:--}"
+# Keep the signature stable across rebuilds. macOS ties the Input Monitoring grant (keyboard input)
+# to the app's code signature, so an ad-hoc signature makes every rebuild look like a new app and
+# the keyboard silently stops working. Prefer the local "OpenEmu Debug" certificate, then an
+# Apple Development one. If neither exists, keep whatever signature Xcode already produced and
+# only fall back to ad-hoc when the app has no real signature at all.
+# Capture output before grepping so an early-exiting grep cannot make the check fail (SIGPIPE).
+has_authority() { local out; out=$(codesign -dvv "$1" 2>&1); grep -q "^Authority=" <<<"$out"; }
+find_identity() { security find-identity -v -p codesigning 2>/dev/null | awk -F'"' -v pat="$1" '$0 ~ pat {print $2; exit}'; }
+SIGN_ID=$(find_identity "OpenEmu Debug")
+SIGN_ID="${SIGN_ID:-$(find_identity "Apple Development")}"
 
 APP_PATH="$BUILD_DIR/Build/Products/Debug/OpenEmu.app"
 if [ -d "$APP_PATH" ]; then
-  codesign --force --deep --sign "$SIGN_ID" "$APP_PATH" 2>/dev/null || true
+  if [ -n "$SIGN_ID" ]; then
+    codesign --force --deep --preserve-metadata=entitlements,requirements,flags --sign "$SIGN_ID" "$APP_PATH" \
+      || echo "warning: signing with '$SIGN_ID' failed; the app keeps Xcode's signature" >&2
+  elif ! has_authority "$APP_PATH"; then
+    SIGN_ID="-"
+    codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || true
+  else
+    SIGN_ID="(kept Xcode's signature)"
+  fi
+  # Guard: an ad-hoc signature silently kills keyboard input (macOS drops the Input Monitoring
+  # grant). Fail loudly if that is what we ended up with while a stable certificate was available.
+  if ! has_authority "$APP_PATH"; then
+    echo "" >&2
+    echo "WARNING: OpenEmu.app is signed ad-hoc. macOS will drop the Input Monitoring grant on every" >&2
+    echo "rebuild, so the keyboard will stop working in the game. Create/keep a local code-signing" >&2
+    echo "certificate named 'OpenEmu Debug' (Keychain Access > Certificate Assistant) and rebuild." >&2
+    if [ -n "$(find_identity "OpenEmu Debug")$(find_identity "Apple Development")" ]; then
+      echo "A stable certificate exists but signing with it failed. Not continuing." >&2
+      exit 1
+    fi
+  fi
   echo ""
   echo "===================="
   echo "Build complete."
