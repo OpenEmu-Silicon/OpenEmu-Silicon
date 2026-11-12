@@ -56,6 +56,8 @@ enum class Layout { Stacked, TopOnly, BottomOnly, SideBySide, LargeTop };
 /// Choose the screen layout and the render scale (1 to 4 times the 3DS's own resolution). Safe to
 /// call before Load (it is remembered) and while a game runs, from the thread that runs frames.
 void SetDisplay(Layout layout, unsigned scale);
+/// Picture size for the current layout and resolution, known before the first frame is drawn.
+void ExpectedFrameSize(uint32_t *width, uint32_t *height);
 
 void Reset();
 void Shutdown();

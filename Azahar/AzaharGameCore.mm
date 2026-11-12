@@ -329,7 +329,11 @@ static AzaharHost::Layout LayoutForName(NSString *name)
 - (OEIntSize)bufferSize
 {
     const int w = (int)AzaharHost::FrameWidth(), h = (int)AzaharHost::FrameHeight();
-    return w > 0 && h > 0 ? OEIntSizeMake(w, h) : OEIntSizeMake((int)kFrameWidth, (int)kFrameHeight);
+    if (w > 0 && h > 0) return OEIntSizeMake(w, h);
+    // No frame yet: use the size the chosen layout will draw, so the window opens the right shape.
+    uint32_t ew = 0, eh = 0;
+    AzaharHost::ExpectedFrameSize(&ew, &eh);
+    return ew > 0 && eh > 0 ? OEIntSizeMake((int)ew, (int)eh) : OEIntSizeMake((int)kFrameWidth, (int)kFrameHeight);
 }
 
 - (OEIntRect)screenRect

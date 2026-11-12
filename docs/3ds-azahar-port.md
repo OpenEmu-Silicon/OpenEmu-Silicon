@@ -27,7 +27,7 @@ The PlayStation 2 core ([#769](https://github.com/OpenEmu-Silicon/OpenEmu-Silico
 | Engine builds for arm64 as static libraries | Done: `Scripts/build-azahar-core.sh` builds from a clean clone. |
 | Core plugin runs games | Done on `feat/3ds-core`: picture (Metal texture), sound, buttons, touch, save states, in-game saves, screen layouts and 1x to 4x resolution. Evidence with pictures: [`docs/3ds-evidence`](3ds-evidence/README.md). |
 | Games tried | Super Mario 3D Land, New Super Mario Bros. 2, Ocarina of Time 3D, Majora's Mask 3D, A Link Between Worlds all boot and draw. Real-time speed measured at about 60 fps on menus and title screens only. |
-| Known gap | The game window does not resize to the shape of a wide layout; the picture is letterboxed. |
+| Window shape | The window opens and resizes to fit each layout (no letterbox). |
 | Heavy 3D games in play, stereo 3D, camera | Untested |
 
 Nothing in this port is released. The first release will be marked Experimental.
