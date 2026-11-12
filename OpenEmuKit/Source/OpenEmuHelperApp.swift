@@ -329,15 +329,19 @@ final class PresentationWatchdog: @unchecked Sendable {
         _filterChain.setSourceRect(sourceRect, aspect: aspectSize)
     }
     
-    private func setupRemoteLayer() {
+    /// Makes the remote layer context. `keepBounds` is for making a fresh one while a game runs, so
+    /// the size the window already gave the layer is not replaced by the game's frame size.
+    private func setupRemoteLayer(keepBounds: Bool = false) {
         CATransaction.begin()
         do {
             CATransaction.setDisableActions(true)
             defer { CATransaction.commit() }
             
-            // TODO: If there's a good default bounds, use that.
-            _videoLayer.bounds = .init(x: 0, y: 0, width: Int(gameCore.bufferSize.width), height: Int(gameCore.bufferSize.height))
-            _filterChain.drawableSize = _videoLayer.drawableSize
+            if !keepBounds {
+                // TODO: If there's a good default bounds, use that.
+                _videoLayer.bounds = .init(x: 0, y: 0, width: Int(gameCore.bufferSize.width), height: Int(gameCore.bufferSize.height))
+                _filterChain.drawableSize = _videoLayer.drawableSize
+            }
             
             let connectionID = CGSMainConnectionID()
             _gameVideoCAContext = CAContext(cgsConnection: connectionID, options: [kCAContextCIFilterBehavior: "ignore"])
@@ -1039,7 +1043,7 @@ final class PresentationWatchdog: @unchecked Sendable {
             }
             watchdog.didPresent()
             if watchdog.shouldRecover() {
-                DispatchQueue.main.async { [weak self] in self?.setupRemoteLayer() }
+                DispatchQueue.main.async { [weak self] in self?.setupRemoteLayer(keepBounds: true) }
             }
             
             if _adaptiveSyncEnabled {
