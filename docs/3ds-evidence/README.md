@@ -70,3 +70,7 @@ Attempt on 2026-11-11: Ocarina of Time 3D in real gameplay (the cave scene), sam
 - First ~90 seconds: 59.8 fps, no gaps over 25 ms, helper at 200 to 265 MB.
 - From 19:24:52 the helper stopped logging frames, and its memory fell to 13 MB. The helper process stayed alive for the full 33 minutes (no crash), but the Mac's screen had locked, OpenEmu stops running a game that is not visible, so this was not 30 minutes of play.
 - Result: no crash or hang seen, but the 30-minute criterion is not met. Needs a re-run with the Mac kept awake and unlocked (for example `caffeinate -d` in a terminal).
+
+## window-follows-layout
+
+Picking a layout from the menu or Next Display Mode now lets the game window resize once to the new shape (it used to keep its old shape, so wide layouts were letterboxed). Only a user-chosen display mode does this; other size reports from a core still never resize the window. Checked in the app with Ocarina of Time 3D: stacked, large-screen and side-by-side switches resize the window to fit. Known gap: the single-screen layout still shows black bars, and a layout restored at launch (not chosen in the session) still opens letterboxed.
