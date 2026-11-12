@@ -374,6 +374,13 @@ void SetDisplay(Layout layout, unsigned scale) {
     ApplyDisplay(gLoaded);
 }
 
+void ExpectedFrameSize(uint32_t *width, uint32_t *height) {
+    unsigned w, h;
+    LayoutSize(gLayout, &w, &h);
+    *width = w * gScale;
+    *height = h * gScale;
+}
+
 // A state saved while the kernel has asynchronous work in flight would lose that work, so let it
 // finish first. Same approach as Azahar's libretro frontend.
 static bool DrainAsyncOperations(Core::System &system) {
