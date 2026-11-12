@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenEmu-Silicon — Pre-release Test Build</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1d1d1f;
+    line-height: 1.6;
+  }
+  h1 {
+    font-size: 1.6em;
+    border-bottom: 2px solid #0071e3;
+    padding-bottom: 8px;
+  }
+  h2 {
+    font-size: 1.2em;
+    margin-top: 1.8em;
+    color: #333;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #d2d2d7;
+  }
+  th {
+    background: #f5f5f7;
+    font-weight: 600;
+  }
+  tr:nth-child(even) { background: #fafafa; }
+  code {
+    background: #f0f0f2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .build-identity {
+    background: #f5f5f7;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .build-identity p { margin: 4px 0; }
+  ol { padding-left: 20px; }
+  li { margin: 6px 0; }
+  a { color: #0071e3; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 6px;
+  }
+  ul { padding-left: 20px; }
+  ul li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>OpenEmu-Silicon — Pre-release Test Build</h1>
+
+<p>Thanks for testing! This disk image has the app and the new cores together. The full tester notes (what to try, how to report a problem) are on the GitHub release page this file came from.</p>
+
+<h2>Build Identity</h2>
+<div class="build-identity">
+  <p><strong>App version:</strong> 1.4.1 (release candidate)</p>
+  <p><strong>Source commit:</strong> <code>0000000</code></p>
+</div>
+
+<h2>Before you install</h2>
+<ul>
+  <li><strong>Back up your OpenEmu library first</strong> (<code>~/Library/Application Support/OpenEmu</code>). This build changes how artwork is stored, so going back to an older OpenEmu afterwards may not show your new artwork.</li>
+  <li>Installing <strong>replaces</strong> <code>/Applications/OpenEmu.app</code> with this build.</li>
+  <li>This is a test build. It does not update through Sparkle.</li>
+</ul>
+
+<h2>Install</h2>
+<ol>
+  <li>Double-click <strong>Install</strong> in this disk image. It copies the app to <code>/Applications</code> and the cores to <code>~/Library/Application Support/OpenEmu/Cores/</code>.</li>
+  <li>Open OpenEmu from <code>/Applications</code>.</li>
+</ol>
+
+<h2>Cores in this build</h2>
+<table>
+  <tr><th>System</th><th>Core</th></tr>
+  <tr><td>Nintendo 3DS</td><td>Azahar</td></tr>
+  <tr><td>PlayStation 2</td><td>PCSX2</td></tr>
+  <tr><td>Arcade (option)</td><td>FBNeo</td></tr>
+</table>
+
+<h2>What to try</h2>
+<ul>
+  <li><strong>Big Picture:</strong> Window menu, Big Picture (Spike), or Control-Command-B. Esc or the Home button leaves it.</li>
+  <li><strong>Nintendo 3DS</strong> and <strong>PlayStation 2:</strong> bring your own game files (and your own PS2 BIOS). We do not provide any.</li>
+  <li><strong>Artwork:</strong> right-click a game, then Choose Artwork… or Import Artwork from Folder…; Preferences has the new Artwork tab.</li>
+  <li><strong>FBNeo:</strong> choose it as the Arcade core in Preferences, Cores.</li>
+</ul>
+
+</body>
+</html>
