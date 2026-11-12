@@ -90,6 +90,11 @@ CGFloat OEScaledValueWithCalibration(OEAxisCalibration cal, NSInteger rawValue);
 - (BOOL)connect;
 - (void)disconnect;
 
+/// Runs the controller's motors, each from 0 (off) to 1 (full). Does nothing for devices
+/// that cannot rumble; subclasses that can (for example HID devices with force feedback)
+/// override it.
+- (void)forceFeedbackWithStrongIntensity:(CGFloat)strongIntensity weakIntensity:(CGFloat)weakIntensity;
+
 @property(readonly) BOOL isKeyboardDevice;
 @property(readonly) BOOL isFunctionKeyPressed;
 

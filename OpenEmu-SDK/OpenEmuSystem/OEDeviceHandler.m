@@ -81,6 +81,10 @@ CGFloat OEScaledValueWithCalibration(OEAxisCalibration cal, NSInteger rawValue)
 
 @implementation OEDeviceHandler
 
+- (void)forceFeedbackWithStrongIntensity:(CGFloat)strongIntensity weakIntensity:(CGFloat)weakIntensity
+{
+}
+
 - (instancetype)init
 {
     NSAssert(NO, @"Use designated initializer instead.");
