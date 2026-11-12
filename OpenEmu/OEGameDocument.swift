@@ -2736,6 +2736,7 @@ final class OEGameDocument: NSDocument {
         }
         
         gameCoreManager?.changeDisplay(withMode: modeName)
+        (gameWindowController as? GameWindowController)?.displayModeWasChangedByUser()
     }
     
     private func changeDisplayMode(directionReversed reverse: Bool) {
