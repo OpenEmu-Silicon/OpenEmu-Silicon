@@ -1,0 +1,118 @@
+diff --git a/src/video_core/renderer_vulkan/vk_instance.cpp b/src/video_core/renderer_vulkan/vk_instance.cpp
+index aea1cf5..2a410a7 100644
+--- a/src/video_core/renderer_vulkan/vk_instance.cpp
++++ b/src/video_core/renderer_vulkan/vk_instance.cpp
+@@ -2,6 +2,11 @@
+ // Licensed under GPLv2 or any later version
+ // Refer to the license.txt file included.
+ 
++#ifdef OE_HOST
++// OpenEmu: needed for VK_EXT_METAL_OBJECTS_EXTENSION_NAME (the same define vk_platform.cpp makes).
++#define VK_USE_PLATFORM_METAL_EXT
++#endif
++
+ #include <span>
+ #include <boost/container/static_vector.hpp>
+ #include <fmt/ranges.h>
+@@ -451,6 +456,10 @@ bool Instance::CreateDevice() {
+     image_format_list = add_extension(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
+     shader_stencil_export = add_extension(VK_EXT_SHADER_STENCIL_EXPORT_EXTENSION_NAME);
+     external_memory_host = add_extension(VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
++#ifdef OE_HOST
++    // OpenEmu: lets the host take each finished frame's MTLTexture straight from MoltenVK.
++    add_extension(VK_EXT_METAL_OBJECTS_EXTENSION_NAME);
++#endif
+     tooling_info = add_extension(VK_EXT_TOOLING_INFO_EXTENSION_NAME, is_moltenvk,
+                                  "function pointer is not exposed by MoltenVK");
+     const bool has_timeline_semaphores =
+diff --git a/src/video_core/renderer_vulkan/vk_present_window.cpp b/src/video_core/renderer_vulkan/vk_present_window.cpp
+index 2a56101..751dc6e 100644
+--- a/src/video_core/renderer_vulkan/vk_present_window.cpp
++++ b/src/video_core/renderer_vulkan/vk_present_window.cpp
+@@ -2,6 +2,11 @@
+ // Licensed under GPLv2 or any later version
+ // Refer to the license.txt file included.
+ 
++#ifdef OE_HOST
++// OpenEmu: needed for the Vulkan-Hpp Metal-objects types (the same define vk_platform.cpp makes).
++#define VK_USE_PLATFORM_METAL_EXT
++#endif
++
+ #include "common/microprofile.h"
+ #include "common/settings.h"
+ #include "common/thread.h"
+@@ -19,7 +24,7 @@ MICROPROFILE_DEFINE(Vulkan_WaitPresent, "Vulkan", "Wait For Present", MP_RGB(128
+ 
+ #ifdef OE_HOST
+ // Defined by the OpenEmu core (Azahar/AzaharHost.cpp).
+-extern "C" void OEHostFrameRendered(u32 width, u32 height);
++extern "C" void OEHostFrameRendered(u32 width, u32 height, void* metal_texture);
+ #endif
+ 
+ namespace Vulkan {
+@@ -191,7 +196,7 @@ void PresentWindow::RecreateFrame(Frame* frame, u32 width, u32 height) {
+     }
+ 
+     const vk::Format format = swapchain.GetSurfaceFormat().format;
+-    const vk::ImageCreateInfo image_info = {
++    vk::ImageCreateInfo image_info = {
+         .imageType = vk::ImageType::e2D,
+         .format = format,
+         .extent = {width, height, 1},
+@@ -200,6 +205,15 @@ void PresentWindow::RecreateFrame(Frame* frame, u32 width, u32 height) {
+         .samples = vk::SampleCountFlagBits::e1,
+         .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+     };
++#ifdef OE_HOST
++    // OpenEmu: the host shows this image as a Metal texture, so it needs shader-read usage and
++    // MoltenVK must be told up front that the texture will be exported.
++    const vk::ExportMetalObjectCreateInfoEXT export_info = {
++        .exportObjectType = vk::ExportMetalObjectTypeFlagBitsEXT::eMetalTexture,
++    };
++    image_info.pNext = &export_info;
++    image_info.usage |= vk::ImageUsageFlagBits::eSampled;
++#endif
+ 
+     const VmaAllocationCreateInfo alloc_info = {
+         .flags = VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT,
+@@ -290,10 +304,37 @@ Frame* PresentWindow::GetRenderFrame() {
+ void PresentWindow::Present(Frame* frame) {
+     if (!use_present_thread) {
+         scheduler.WaitWorker();
+-        CopyToSwapchain(frame);
+ #ifdef OE_HOST
+-        // OpenEmu: tell the host a frame has been drawn. It drives the engine one frame at a time.
+-        OEHostFrameRendered(frame->width, frame->height);
++        // OpenEmu: the frame is not copied to a swapchain. Wait for the GPU to finish it, take
++        // its MTLTexture straight from MoltenVK, and hand that to the host. The host drives the
++        // engine one frame at a time and shows the texture itself.
++        {
++            const vk::Device device = instance.GetDevice();
++            static constexpr vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eAllCommands;
++            const vk::SubmitInfo submit_info = {
++                .waitSemaphoreCount = 1,
++                .pWaitSemaphores = &frame->render_ready,
++                .pWaitDstStageMask = &wait_stage,
++            };
++            {
++                std::scoped_lock submit_lock{scheduler.submit_mutex};
++                graphics_queue.submit(submit_info, frame->present_done);
++            }
++            // The fence stays signaled; GetRenderFrame waits on it and resets it.
++            while (device.waitForFences(frame->present_done, false,
++                                        std::numeric_limits<u64>::max()) != vk::Result::eSuccess) {
++            }
++
++            vk::ExportMetalTextureInfoEXT texture_info = {
++                .image = frame->image,
++                .plane = vk::ImageAspectFlagBits::eColor,
++            };
++            vk::ExportMetalObjectsInfoEXT objects_info = {.pNext = &texture_info};
++            device.exportMetalObjectsEXT(&objects_info);
++            OEHostFrameRendered(frame->width, frame->height, texture_info.mtlTexture);
++        }
++#else
++        CopyToSwapchain(frame);
+ #endif
+         free_queue.push(frame);
+         return;

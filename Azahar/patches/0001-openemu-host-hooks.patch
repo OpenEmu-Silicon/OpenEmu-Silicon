@@ -1,0 +1,56 @@
+diff --git a/src/video_core/renderer_vulkan/vk_platform.cpp b/src/video_core/renderer_vulkan/vk_platform.cpp
+index b0a800e..70a7e2d 100644
+--- a/src/video_core/renderer_vulkan/vk_platform.cpp
++++ b/src/video_core/renderer_vulkan/vk_platform.cpp
+@@ -25,6 +25,11 @@
+ #include "core/frontend/emu_window.h"
+ #include "video_core/renderer_vulkan/vk_platform.h"
+ 
++#ifdef OE_HOST
++// Defined by the OpenEmu core (Azahar/AzaharHost.cpp). Path of the bundled libMoltenVK.dylib.
++extern "C" const char* OEHostMoltenVKPath();
++#endif
++
+ namespace Vulkan {
+ 
+ namespace {
+@@ -106,6 +111,12 @@ std::shared_ptr<Common::DynamicLibrary> OpenLibrary(
+ #endif
+     auto library = std::make_shared<Common::DynamicLibrary>();
+ #ifdef __APPLE__
++#ifdef OE_HOST
++    // OpenEmu: the host app ships MoltenVK inside the core plugin and tells us where it is.
++    if (const char* path = OEHostMoltenVKPath(); path && library->Load(path)) {
++        return library;
++    }
++#endif
+     const std::string filename = Common::DynamicLibrary::GetLibraryName("vulkan");
+     if (!library->Load(filename)) {
+         // Fall back to directly loading bundled MoltenVK library.
+diff --git a/src/video_core/renderer_vulkan/vk_present_window.cpp b/src/video_core/renderer_vulkan/vk_present_window.cpp
+index 91ceba7..2a56101 100644
+--- a/src/video_core/renderer_vulkan/vk_present_window.cpp
++++ b/src/video_core/renderer_vulkan/vk_present_window.cpp
+@@ -17,6 +17,11 @@
+ 
+ MICROPROFILE_DEFINE(Vulkan_WaitPresent, "Vulkan", "Wait For Present", MP_RGB(128, 128, 128));
+ 
++#ifdef OE_HOST
++// Defined by the OpenEmu core (Azahar/AzaharHost.cpp).
++extern "C" void OEHostFrameRendered(u32 width, u32 height);
++#endif
++
+ namespace Vulkan {
+ 
+ namespace {
+@@ -286,6 +291,10 @@ void PresentWindow::Present(Frame* frame) {
+     if (!use_present_thread) {
+         scheduler.WaitWorker();
+         CopyToSwapchain(frame);
++#ifdef OE_HOST
++        // OpenEmu: tell the host a frame has been drawn. It drives the engine one frame at a time.
++        OEHostFrameRendered(frame->width, frame->height);
++#endif
+         free_queue.push(frame);
+         return;
+     }

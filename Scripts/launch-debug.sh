@@ -121,12 +121,25 @@ fi
 # "OpenEmu Debug" in Keychain Access (or set OE_DEBUG_SIGN_IDENTITY); without one the build is launched as is.
 if [[ "$CONFIG" == "Debug" ]]; then
     SIGN_NAME="${OE_DEBUG_SIGN_IDENTITY:-OpenEmu Debug}"
-    if security find-identity -p codesigning 2>/dev/null | grep -qF "\"$SIGN_NAME\""; then
-        if ! codesign -dvv "$NEWEST" 2>&1 | grep -qxF "Authority=$SIGN_NAME"; then
+    # Capture command output before grepping: with pipefail, `cmd | grep -q` can report failure when grep
+    # exits early and cmd gets SIGPIPE, which made this check unreliable.
+    signed_by() { local out; out=$(codesign -dvv "$1" 2>&1); grep -qxF "Authority=$2" <<<"$out"; }
+    IDENTITIES=$(security find-identity -p codesigning 2>/dev/null)
+    if grep -qF "\"$SIGN_NAME\"" <<<"$IDENTITIES"; then
+        if ! signed_by "$NEWEST" "$SIGN_NAME"; then
             echo "launch-debug: signing with \"$SIGN_NAME\" so permissions survive rebuilds"
-            codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime \
-                --sign "$SIGN_NAME" "$NEWEST" >/dev/null 2>&1 \
-                || echo "launch-debug: warning: signing failed, launching the ad-hoc build" >&2
+            SIGN_ERR=$(codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime \
+                --sign "$SIGN_NAME" "$NEWEST" 2>&1 >/dev/null)
+            if ! signed_by "$NEWEST" "$SIGN_NAME"; then
+                # Launching an ad-hoc build silently kills keyboard input (macOS drops the Input Monitoring
+                # grant), so refuse instead of launching it. Usual causes: the login keychain is locked
+                # (unlock it: security unlock-keychain ~/Library/Keychains/login.keychain-db), or the app
+                # folder is not writable.
+                echo "launch-debug: could not sign with \"$SIGN_NAME\"; refusing to launch an ad-hoc build." >&2
+                echo "  codesign said: ${SIGN_ERR:-nothing}" >&2
+                echo "  (pass --force to launch it anyway; the keyboard will not work in games)" >&2
+                if [[ $FORCE -eq 0 ]]; then exit 1; fi
+            fi
         fi
     else
         echo "launch-debug: no \"$SIGN_NAME\" certificate found — Input Monitoring will need re-granting after each rebuild." >&2
