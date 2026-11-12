@@ -23,11 +23,12 @@ The PlayStation 2 core ([#769](https://github.com/OpenEmu-Silicon/OpenEmu-Silico
 |---|---|
 | Fork of the engine | Done: [`OpenEmu-Silicon/azahar`](https://github.com/OpenEmu-Silicon/azahar), a fork of `azahar-emu/azahar` (default branch `master`). The pinned commit below exists in the fork. |
 | Pinned commit | `219d743a1e698101fe1ab8bef43e6563126c3c27`, the Azahar 2126.2 release (stable, 2026-10-08). The fork does not carry upstream's tags, so pin the commit, not the tag. |
-| 3DS system plugin | Does not exist in this repo. A draft is in `OpenEmu/OpenEmu#5157` (unreviewed). |
-| Engine builds for arm64 as static libraries | Not proven by us. Azahar's own CI builds a Qt-free macOS arm64 build (libretro), so a Qt-free build is a supported shape. |
-| Engine runs a game on Apple Silicon | Official Azahar macOS builds exist. Not measured by us. |
-| OpenEmu core plugin | Not started in this repo. An outside contributor reports a working build; we have not seen it. |
-| Heavy 3D games, stereo 3D, camera | Untested |
+| 3DS system plugin | Done ([#831](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/pull/831), from the work in #830). |
+| Engine builds for arm64 as static libraries | Done: `Scripts/build-azahar-core.sh` builds from a clean clone. |
+| Core plugin runs games | Done on `feat/3ds-core`: picture (Metal texture), sound, buttons, touch, save states, in-game saves, screen layouts and 1x to 4x resolution. Evidence with pictures: [`docs/3ds-evidence`](3ds-evidence/README.md). |
+| Games tried | Super Mario 3D Land, New Super Mario Bros. 2, Ocarina of Time 3D, Majora's Mask 3D, A Link Between Worlds all boot and draw. Real-time speed measured at about 60 fps on menus and title screens only. |
+| Known gap | The game window does not resize to the shape of a wide layout; the picture is letterboxed. |
+| Heavy 3D games in play, stereo 3D, camera | Untested |
 
 Nothing in this port is released. The first release will be marked Experimental.
 
