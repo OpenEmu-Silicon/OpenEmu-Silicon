@@ -57,6 +57,13 @@ fi
 [ -n "$SIGN_UPDATE" ] || die "sign_update not found. Build the project in Xcode first to resolve the Sparkle package."
 echo "sign_update: $SIGN_UPDATE"
 
+# ── Credentials must be real ─────────────────────────────────────────────────
+# The gitignored credential files are copied from templates in CI and in new worktrees. A release built with the
+# placeholders compiles and runs, but ScreenScraper and CheatWorks refuse every request.
+source "$SCRIPT_DIR/lib/harness.sh"
+PLACEHOLDERS="$(cd "$REPO_ROOT" && harness_placeholder_credentials "$REPO_ROOT" | tr '\n' ' ')"
+[ -z "$PLACEHOLDERS" ] || die "OpenEmu/*.swift still holds placeholders for: $PLACEHOLDERS. A release built now could not sign in to those services. Copy the real files into OpenEmu/ first."
+
 # ── Preflight checks ─────────────────────────────────────────────────────────
 step "Preflight checks"
 

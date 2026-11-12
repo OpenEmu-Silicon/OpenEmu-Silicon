@@ -53,7 +53,7 @@ extension ScreenScraperFetchError: LocalizedError {
         case .networkUnavailable(let detail):
             return "Could not reach ScreenScraper — check your connection. (\(detail))"
         case .badCredentials:
-            return "ScreenScraper rejected your credentials. Check your username and password in Preferences → Cover Art."
+            return "ScreenScraper rejected your credentials. Check your username and password in Preferences → Artwork."
         case .rateLimited:
             return "ScreenScraper rate limit reached. Try again later."
         case .notFound:
@@ -61,6 +61,50 @@ extension ScreenScraperFetchError: LocalizedError {
         case .invalidResponse:
             return "ScreenScraper returned an unexpected response."
         }
+    }
+}
+
+/// ScreenScraper's media addresses carry the developer's and the user's login in their query string. They must work
+/// when used, but must never be written to disk, so the library keeps the address without them and signs it again
+/// when it is used.
+extension ScreenScraperClient {
+
+    private static let secretQueryNames: Set<String> = ["devid", "devpassword", "devdebugpassword", "ssid", "sspassword"]
+
+    /// ScreenScraper's own host, not a look-alike such as `evilscreenscraper.fr`.
+    static func isScreenScraperHost(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "screenscraper.fr" || host.hasSuffix(".screenscraper.fr")
+    }
+
+    /// ScreenScraper itself over https: the only address that may be given the login. Removing a login is safe for any
+    /// scheme, so `redacted` only checks the host.
+    static func isScreenScraperAddress(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https" && isScreenScraperHost(url)
+    }
+
+    /// The address with every login value removed. Any other address is returned as it is.
+    static func redacted(_ url: URL) -> URL {
+        guard isScreenScraperHost(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let items = parts.queryItems, items.contains(where: { secretQueryNames.contains($0.name.lowercased()) }) else { return url }
+        let kept = items.filter { !secretQueryNames.contains($0.name.lowercased()) }
+        parts.queryItems = kept.isEmpty ? nil : kept
+        return parts.url ?? url
+    }
+
+    /// The address with the app's developer login and the user's login added, ready to download. Another site's address,
+    /// or one that already has a login, is returned as it is.
+    static func signed(_ url: URL, username: String? = nil, password: String? = nil) -> URL {
+        guard isScreenScraperAddress(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        var items = parts.queryItems ?? []
+        let present = Set(items.map { $0.name.lowercased() })
+        func add(_ name: String, _ value: String?) { if let value = value, !value.isEmpty, !present.contains(name) { items.append(URLQueryItem(name: name, value: value)) } }
+        add("devid", devID); add("devpassword", devPassword)
+        let user = username ?? UserDefaults.standard.string(forKey: "ScreenScraperUsername")
+        let secret = password ?? OECredentialStore.shared.get(.screenScraperPassword)
+        add("ssid", user); add("sspassword", secret)
+        parts.queryItems = items
+        return parts.url ?? url
     }
 }
 

@@ -170,7 +170,6 @@ final class PreferencesTabViewController: NSTabViewController {
             PrefCoresController(),
             PrefBiosController(),
             PrefCloudSyncController(),
-            PrefScreenScraperController(),
             PrefArtworkProvidersController(),
             PrefRetroAchievementsController()
         ]

@@ -215,15 +215,30 @@ final class OEBigPictureArt: ObservableObject {
         let chain = OEBigPictureArtSource.providers()
         Task { [weak self] in
             // 1. What is already saved, which is nearly always everything: small files, decoded off the main thread.
-            let snapshot = await Task.detached(priority: .userInitiated) { store.read(md5: key.md5, providerIDs: chain.map { $0.id }) }.value
+            let pickedGame = key.artworkGame
+            let snapshot = await Task.detached(priority: .userInitiated) { () -> (stored: OEBigPictureArtStore.Stored, answered: Set<String>) in
+                store.syncPinned(pickedGame, md5: key.md5)
+                return store.read(md5: key.md5, providerIDs: chain.map { $0.id })
+            }.value
             guard let self = self else { return }
             self.apply(snapshot.stored, md5: key.md5)
             self.pending[key.md5] = nil
 
             // 2. Only a provider that has not answered for this game yet is asked, and only while something is missing.
+            // The artwork folder is read first: a picture saved there by the provider in use (or chosen by the person)
+            // is not downloaded again, for example after the small copies were cleared or the source was changed back.
             var gathered = OEBigPictureArtSet()
             var standard = snapshot.stored.standardPoster
             var square = snapshot.stored.squareIcon
+            let ids = chain.map { $0.id }, preferredID = OEBigPictureArtSource.preferredID, wantedFromFolder = key.artworkGame
+            let missing = (hero: snapshot.stored.backdrop == nil, poster: snapshot.stored.poster == nil,
+                           icon: snapshot.stored.icon == nil, logo: snapshot.stored.logo == nil)
+            let reused = await Task.detached(priority: .utility) {
+                OEArtworkFolderReuse.pictures(for: wantedFromFolder, providers: ids, preferred: preferredID, missing: missing)
+            }.value
+            gathered.fillGaps(from: reused.set)
+            if reused.set.grid != nil { standard = reused.standard }
+            if reused.set.icon != nil { square = reused.square }
             func hasEverything() -> Bool {
                 (snapshot.stored.backdrop != nil || gathered.hero != nil) && (snapshot.stored.poster != nil || gathered.grid != nil)
                     && (snapshot.stored.icon != nil || gathered.icon != nil) && (snapshot.stored.logo != nil || gathered.logo != nil)
@@ -236,6 +251,18 @@ final class OEBigPictureArt: ObservableObject {
                 if gathered.grid == nil, snapshot.stored.poster == nil, found.grid != nil, provider.providesStandardPosters { standard = true }
                 if gathered.icon == nil, snapshot.stored.icon == nil, found.icon != nil, provider.providesStandardPosters { square = true }
                 gathered.fillGaps(from: found)
+            }
+            // 3. Whatever the providers could not supply (offline, out of quota, art removed) comes from the artwork folder.
+            let artworkGame = key.artworkGame
+            let wanted = (hero: snapshot.stored.backdrop == nil && gathered.hero == nil, grid: snapshot.stored.poster == nil && gathered.grid == nil,
+                          icon: snapshot.stored.icon == nil && gathered.icon == nil, logo: snapshot.stored.logo == nil && gathered.logo == nil)
+            if wanted.hero || wanted.grid || wanted.icon || wanted.logo {
+                let kept = await Task.detached(priority: .utility) { () -> OEBigPictureArtSet in
+                    func image(_ slot: OEArtworkStore.Slot) -> NSImage? { OEArtworkStore.shared.active(artworkGame, slot).flatMap { NSImage(contentsOf: $0) } }
+                    return OEBigPictureArtSet(hero: wanted.hero ? image(.hero) : nil, grid: wanted.grid ? image(.poster) : nil,
+                                              icon: wanted.icon ? image(.icon) : nil, logo: wanted.logo ? image(.logo) : nil)
+                }.value
+                gathered.fillGaps(from: kept)
             }
             guard gathered.hasAny else { return }
             let isStandard = standard, isSquare = square
@@ -322,11 +349,21 @@ final class OEBigPictureArt: ObservableObject {
         /// The title with its region tag ("Super Mario Bros. (USA)"), the way libretro-thumbnails names its files.
         let fullName: String
 
+        /// How the artwork folder names this game.
+        var artworkGame: OEArtworkStore.Game {
+            OEArtworkStore.Game(md5: md5, system: systemIdentifier ?? "unknown", title: fullName)
+        }
+
         /// Region and revision tags such as "(USA)" or "[!]" make provider searches miss.
         static func searchName(_ name: String) -> String {
             let stripped = name.replacingOccurrences(of: "\\s*[\\(\\[][^\\)\\]]*[\\)\\]]", with: "", options: .regularExpression)
             let trimmed = stripped.trimmingCharacters(in: .whitespaces)
             return trimmed.isEmpty ? name : trimmed
+        }
+
+        init(md5: String, name: String, systemIdentifier: String?, romFileName: String? = nil, fileSize: Int = 0, fullName: String? = nil) {
+            self.md5 = md5; self.name = name; self.systemIdentifier = systemIdentifier
+            self.romFileName = romFileName; self.fileSize = fileSize; self.fullName = fullName ?? name
         }
 
         @MainActor
@@ -375,6 +412,24 @@ protocol OEBigPictureArtProvider: Sendable {
     /// True when the poster it supplies is always a portrait poster of the same shape.
     var providesStandardPosters: Bool { get }
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet
+    /// Pictures this provider has for one slot of one game, as the original bytes, for the artwork picker. Nothing is
+    /// saved: the picker stores one only when a person picks it.
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture]
+    /// True while the provider is holding back because its quota is used up. A bulk fetch stops instead of waiting.
+    func isOutOfQuota() async -> Bool
+}
+
+extension OEBigPictureArtProvider {
+    func isOutOfQuota() async -> Bool { false }
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] { [] }
+}
+
+/// One picture a provider offers for a slot, exactly as it was sent.
+struct OEProviderPicture: @unchecked Sendable {
+    let provider: String
+    let providerTitle: String
+    let data: Data
+    var image: NSImage? { NSImage(data: data) }
 }
 
 /// Which provider supplies big-picture art. Only these two: others need a developer key that large libraries would
@@ -428,19 +483,49 @@ enum OEBigPictureArtSource: String, CaseIterable {
         // `-OEBigPictureOnlyLibretro 1` runs the keyless provider alone, to see what a build with no keys gets.
         if UserDefaults.standard.bool(forKey: "OEBigPictureOnlyLibretro") { return [LibretroThumbnailsArtProvider.shared] }
         #endif
+        let available = automaticChain()
         switch chosen {
         case .libraryOnly: return []
-        case .steamGridDB: return steamGridDBAvailable ? [SteamGridDBArtProvider()] : []
-        case .screenScraper: return screenScraperAvailable ? [ScreenScraperArtProvider.shared] : []
-        case .libretro: return [LibretroThumbnailsArtProvider.shared]
-        case .automatic:
-            var chain = [OEBigPictureArtProvider]()
-            if steamGridDBAvailable { chain.append(SteamGridDBArtProvider()) }
-            if screenScraperAvailable { chain.append(ScreenScraperArtProvider.shared) }
-            chain.append(LibretroThumbnailsArtProvider.shared)
-            return chain
+        case .automatic: return available
+        case .steamGridDB, .screenScraper, .libretro:
+            guard let first = preferred(chosen) else { return fallbackEnabled ? available : [] }
+            // The preferred source is asked first. With the fallback on, the others follow in the automatic order.
+            return fallbackEnabled ? [first] + available.filter { $0.id != first.id } : [first]
         }
     }
+
+    /// The id of the provider chosen on its own, or nil for Automatic and library covers only. Its pictures replace
+    /// automatic ones from other providers; with nothing chosen, whichever provider answers first keeps the slot.
+    static var preferredID: String? {
+        switch chosen {
+        case .steamGridDB: return "steamgriddb"
+        case .screenScraper: return "screenscraper"
+        case .libretro: return "libretro"
+        case .automatic, .libraryOnly: return nil
+        }
+    }
+
+    /// The providers that are ready, in the automatic order.
+    private static func automaticChain() -> [OEBigPictureArtProvider] {
+        var chain = [OEBigPictureArtProvider]()
+        if steamGridDBAvailable { chain.append(SteamGridDBArtProvider()) }
+        if screenScraperAvailable { chain.append(ScreenScraperArtProvider.shared) }
+        chain.append(LibretroThumbnailsArtProvider.shared)
+        return chain
+    }
+
+    private static func preferred(_ source: OEBigPictureArtSource) -> OEBigPictureArtProvider? {
+        switch source {
+        case .steamGridDB: return steamGridDBAvailable ? SteamGridDBArtProvider() : nil
+        case .screenScraper: return screenScraperAvailable ? ScreenScraperArtProvider.shared : nil
+        case .libretro: return LibretroThumbnailsArtProvider.shared
+        case .automatic, .libraryOnly: return nil
+        }
+    }
+
+    /// Whether a source chosen on its own is followed by the others when it has nothing.
+    static let fallbackKey = "OEBigPictureArtFallback"
+    static var fallbackEnabled: Bool { UserDefaults.standard.bool(forKey: fallbackKey) }
 
     /// The providers' names for Preferences and the Settings screen.
     static var inUseTitle: String {
@@ -459,10 +544,10 @@ struct SteamGridDBArtProvider: OEBigPictureArtProvider {
     let providesStandardPosters = true
 
     func art(for key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
-        async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name)
-        async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name)
-        async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name)
-        async let logo = OEHeroArtFetcher.shared.logoArt(md5: key.md5, displayName: key.name)
+        async let hero = OEHeroArtFetcher.shared.heroArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
+        async let grid = OEHeroArtFetcher.shared.gridArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
+        async let icon = OEHeroArtFetcher.shared.iconArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
+        async let logo = OEHeroArtFetcher.shared.logoArt(md5: key.md5, displayName: key.name, game: key.artworkGame)
         return await OEBigPictureArtSet(hero: hero, grid: grid, icon: icon, logo: logo, isDefinitive: true)
     }
 }
@@ -515,18 +600,60 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         case .success(let found):
             var art = OEBigPictureArtSet(isDefinitive: true)
             guard let found = found else { return art }
-            art.grid = await download(found.boxImageURL)
-            art.hero = await download(found.heroImageURL)
-            art.logo = await download(found.logoImageURL)
+            art.grid = await download(found.boxImageURL, key: key, slot: "poster")
+            art.hero = await download(found.heroImageURL, key: key, slot: "hero")
+            art.logo = await download(found.logoImageURL, key: key, slot: "logo")
             // A cutout with no background (cartridge, disc, 3D box) is what the tiles want. Failing that, a square.
             for url in found.iconImageURLs {
-                if let image = await download(url, accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
+                if let image = await download(url, key: key, slot: "icon", accept: { OEBigPictureArtStore.hasTransparentCorners($0) || $0.isNearlySquare }) {
                     art.icon = image
                     break
                 }
             }
             return art
         }
+    }
+
+    func isOutOfQuota() async -> Bool { pausedUntil > Date() }
+
+    /// The picker asks once per slot tab, and a lookup costs a request, so a game's answer is kept for a few minutes.
+    private var pickerLookups = [String: (at: Date, found: ScreenScraperResult?)]()
+    /// What was downloaded for each game and slot, kept as long as the lookup, so opening a tab again costs nothing.
+    private var pickerPictures = [String: (at: Date, pictures: [OEProviderPicture])]()
+
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] {
+        guard !key.md5.isEmpty, let systemIdentifier = key.systemIdentifier else { return [] }
+        let cacheKey = "\(key.md5)|\(slot.rawValue)"
+        if let cached = pickerPictures[cacheKey], Date().timeIntervalSince(cached.at) < 600 { return cached.pictures }
+        let found: ScreenScraperResult?
+        if let cached = pickerLookups[key.md5], Date().timeIntervalSince(cached.at) < 600 {
+            found = cached.found
+        } else {
+            await waitForSlot()
+            let outcome = await Task.detached {
+                ScreenScraperClient.shared.fetchGameInfo(md5: key.md5, romName: key.romFileName, fileSize: key.fileSize, systemIdentifier: systemIdentifier)
+            }.value
+            switch outcome {
+            case .failure(.rateLimited): pausedUntil = Date().addingTimeInterval(pause); return []
+            case .failure: return []
+            case .success(let result): found = result; pickerLookups[key.md5] = (Date(), result)
+            }
+        }
+        guard let found = found else { return [] }
+        let addresses: [URL?]
+        switch slot {
+        case .cover, .poster: addresses = [found.boxImageURL]
+        case .hero: addresses = [found.heroImageURL]
+        case .logo: addresses = [found.logoImageURL]
+        case .icon: addresses = found.iconImageURLs.map { Optional($0) }
+        }
+        var pictures = [OEProviderPicture]()
+        for address in addresses.compactMap({ $0 }) {
+            guard let (data, _) = try? await URLSession.shared.data(from: address), NSImage(data: data) != nil else { continue }
+            pictures.append(OEProviderPicture(provider: id, providerTitle: title, data: data))
+        }
+        pickerPictures[cacheKey] = (Date(), pictures)
+        return pictures
     }
 
     /// Reserves the next free request time before waiting, so callers queue up in order.
@@ -538,9 +665,10 @@ actor ScreenScraperArtProvider: OEBigPictureArtProvider {
         if delay > 0 { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
     }
 
-    private func download(_ url: URL?, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
+    private func download(_ url: URL?, key: OEBigPictureArt.GameKey, slot: String, accept: (NSImage) -> Bool = { _ in true }) async -> NSImage? {
         guard let url = url, let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data),
               accept(image) else { return nil }
+        OEArtworkOriginals.save(data, provider: id, md5: key.md5, slot: slot, game: key.artworkGame)
         return image
     }
 }
@@ -568,6 +696,21 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
         return result
     }
 
+    func pictures(for key: OEBigPictureArt.GameKey, slot: OEArtworkStore.Slot) async -> [OEProviderPicture] {
+        guard slot == .cover || slot == .poster, let systemIdentifier = key.systemIdentifier else { return [] }
+        let tagged = key.fullName != key.name
+        let candidates = tagged ? [key.fullName] : [key.name + " (USA)", key.name + " (Europe)", key.name + " (World)", key.name + " (Japan)"]
+        for candidate in candidates {
+            let address = await Task.detached {
+                LibretroThumbnailsClient.shared.fetchBoxArtURL(gameName: candidate, systemIdentifier: systemIdentifier)
+            }.value
+            guard let address = address, let url = URL(string: address),
+                  let (data, _) = try? await URLSession.shared.data(from: url), NSImage(data: data) != nil else { continue }
+            return [OEProviderPicture(provider: id, providerTitle: title, data: data)]
+        }
+        return []
+    }
+
     private func load(_ key: OEBigPictureArt.GameKey) async -> OEBigPictureArtSet {
         guard let systemIdentifier = key.systemIdentifier else { return OEBigPictureArtSet(isDefinitive: true) }
 
@@ -580,6 +723,7 @@ actor LibretroThumbnailsArtProvider: OEBigPictureArtProvider {
             }.value
             guard let address = address, let url = URL(string: address),
                   let (data, _) = try? await URLSession.shared.data(from: url), let image = NSImage(data: data) else { continue }
+            OEArtworkOriginals.save(data, provider: id, md5: key.md5, slot: "poster", game: key.artworkGame)
             return OEBigPictureArtSet(grid: image, isDefinitive: true)
         }
         return OEBigPictureArtSet(isDefinitive: true)
@@ -641,8 +785,7 @@ final class OEBigPictureArtStore: @unchecked Sendable {
     // MARK: Reading (call off the main thread)
 
     private static func decode(_ url: URL) -> NSImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
+        guard let image = OEArtworkStore.largestImage(at: url) else { return nil }
         return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
     }
 
@@ -667,6 +810,19 @@ final class OEBigPictureArtStore: @unchecked Sendable {
         return (stored, answered)
     }
 
+    /// Which of these providers already answered for this game, without reading any picture.
+    func answered(md5: String, providerIDs: [String]) -> Set<String> {
+        var answered = Set<String>()
+        for id in providerIDs {
+            let url = marker(md5, "answered-\(id)")
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { continue }
+            let foundSomething = (try? String(contentsOf: url)) == "found"
+            let age = Date().timeIntervalSince((attributes[.modificationDate] as? Date) ?? .distantPast)
+            if foundSomething || age < Self.retryAfterNothing { answered.insert(id) }
+        }
+        return answered
+    }
+
     /// The large backdrop for the featured game's hero.
     func readHero(md5: String) -> NSImage? { existing(md5, .hero).flatMap(Self.decode) }
 
@@ -674,6 +830,30 @@ final class OEBigPictureArtStore: @unchecked Sendable {
 
     func recordAnswer(md5: String, providerID: String, found: Bool) {
         try? (found ? "found" : "empty").write(to: marker(md5, "answered-\(providerID)"), atomically: true, encoding: .utf8)
+    }
+
+    /// Makes the display copies match what a person pinned in the artwork folder, so a chosen picture shows here too
+    /// and wins over what a provider found. A small marker per slot records which pick the copy was made from, so
+    /// this costs one tiny read per slot once nothing has changed. These copies are a cache; the pick itself is kept
+    /// in the artwork folder.
+    func syncPinned(_ game: OEArtworkStore.Game, md5: String) {
+        let pairs: [(OEArtworkStore.Slot, Slot)] = [(.hero, .hero), (.poster, .poster), (.icon, .icon), (.logo, .logo)]
+        for (storeSlot, slot) in pairs {
+            guard let entry = OEArtworkStore.shared.entry(game, storeSlot), entry.pinned else { continue }
+            let token = "\(entry.file)|\(entry.added.timeIntervalSince1970)"
+            let tokenFile = marker(md5, "pinned-\(slot.rawValue)")
+            if (try? String(contentsOf: tokenFile)) == token { continue }
+            guard let url = OEArtworkStore.shared.active(game, storeSlot), let image = Self.decode(url) else { continue }
+            for slotToClear in slot == .hero ? [Slot.hero, .backdrop] : [slot] {
+                for ext in ["jpg", "png"] {
+                    try? FileManager.default.removeItem(at: directory.appendingPathComponent("\(md5)-\(slotToClear.rawValue).\(ext)"))
+                }
+            }
+            save(image, md5, slot)
+            if slot == .poster { try? Data().write(to: marker(md5, "standard")) }
+            if slot == .icon { try? Data().write(to: marker(md5, "squareicon")) }
+            try? token.write(to: tokenFile, atomically: true, encoding: .utf8)
+        }
     }
 
     /// Saves the pictures a provider found, each scaled to its slot. A picture already saved is kept.

@@ -480,6 +480,9 @@ extension GameCollectionViewController: CollectionViewExtendedDelegate, NSMenuIt
             menu.addItem(withTitle: NSLocalizedString("Add Cover Art from File…", comment: ""),
                          action: #selector(addCoverArtFromFile(_:)),
                          keyEquivalent: "")
+            menu.addItem(withTitle: NSLocalizedString("Choose Artwork…", comment: ""),
+                         action: #selector(chooseArtwork(_:)),
+                         keyEquivalent: "")
             menu.addItem(withTitle: NSLocalizedString("Import Artwork from Folder…", comment: ""),
                          action: #selector(importArtworkFromFolder(_:)),
                          keyEquivalent: "")
@@ -731,37 +734,6 @@ extension GameCollectionViewController: CollectionViewExtendedDelegate, NSMenuIt
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
     
-    @objc func importArtworkFromFolder(_ sender: Any?) {
-        let openPanel = NSOpenPanel()
-        openPanel.allowsMultipleSelection = false
-        openPanel.canChooseDirectories = true
-        openPanel.canChooseFiles = false
-        openPanel.prompt = NSLocalizedString("Choose", comment: "")
-        openPanel.message = NSLocalizedString("Choose a folder of artwork images. Files are matched to games by exact name.", comment: "")
-        
-        openPanel.begin { [weak self] result in
-            guard result == .OK, let url = openPanel.url, let self else { return }
-            
-            let games = self.selectedGames
-            let matchResult = ArtworkFolderMatcher.match(folderURL: url, games: games)
-            let reviewController = ArtworkImportReviewViewController(matches: matchResult.matches,
-                                                                     unmatchedFileCount: matchResult.unmatchedFileURLs.count,
-                                                                     selectedGameCount: games.count)
-            reviewController.onApply = { [weak self] confirmedMatches in
-                guard let self, !confirmedMatches.isEmpty else { return }
-                
-                var context: NSManagedObjectContext?
-                for match in confirmedMatches {
-                    match.game.setBoxImage(url: match.fileURL)
-                    context = match.game.managedObjectContext
-                }
-                try? context?.save()
-                
-                self.reloadData()
-            }
-            self.presentAsSheet(reviewController)
-        }
-    }
     
     @objc override func deleteBackward(_ sender: Any?) {
         deleteSelectedItems(sender)
@@ -867,6 +839,36 @@ extension GameCollectionViewController: CollectionViewExtendedDelegate, NSMenuIt
             try? context?.save()
             
             self.reloadData()
+        }
+    }
+    
+    @objc func chooseArtwork(_ sender: Any?) {
+        guard selectedGames.count == 1, let game = selectedGames.first else { return }
+        OEArtworkPickerController.show(for: game)
+    }
+    
+    @objc func importArtworkFromFolder(_ sender: Any?) {
+        let openPanel = NSOpenPanel()
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = true
+        openPanel.canChooseFiles = false
+        openPanel.prompt = NSLocalizedString("Choose", comment: "")
+        openPanel.message = NSLocalizedString("Choose a folder of artwork images. Files are matched to games by name. Add -poster, -hero, -icon or -logo to a name to pick the kind. Your folder is never changed.", comment: "")
+        
+        openPanel.begin { [weak self] result in
+            guard result == .OK, let url = openPanel.url, let self = self else { return }
+            
+            let games = self.selectedGames
+            let matchResult = ArtworkFolderMatcher.match(folderURL: url, games: games)
+            let review = ArtworkImportReviewViewController(matches: matchResult.matches,
+                                                           unmatchedFileCount: matchResult.unmatchedFileURLs.count,
+                                                           selectedGameCount: games.count)
+            review.onApply = { [weak self] confirmed in
+                guard !confirmed.isEmpty else { return }
+                ArtworkFolderMatcher.apply(confirmed)
+                self?.reloadData()
+            }
+            self.presentAsSheet(review)
         }
     }
     

@@ -180,7 +180,9 @@ extension ArtworkImportReviewViewController: NSTableViewDelegate {
             return imageView
 
         case "match":
-            let label = NSTextField(labelWithString: "\(match.game.displayName)  \u{2190}  \(match.fileURL.lastPathComponent)")
+            var text = "\(match.game.displayName) (\(match.slotName))  \u{2190}  \(match.fileURL.lastPathComponent)"
+            if let warning = match.warning { text += "\n\u{26A0}\u{FE0E} \(warning)" }
+            let label = NSTextField(labelWithString: text)
             label.lineBreakMode = .byTruncatingMiddle
             return label
 

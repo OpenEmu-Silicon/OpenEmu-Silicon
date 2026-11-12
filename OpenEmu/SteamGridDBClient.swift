@@ -41,13 +41,53 @@ extension SteamGridDBItem: Identifiable {
 }
 
 enum SteamGridDBItemType: String, Codable {
-    case hero, grid, icon
+    case hero, grid, icon, logo
     var displayLabel: String {
         switch self {
         case .hero: return "HERO ART"
         case .grid: return "COVER ART"
         case .icon: return "ICON"
+        case .logo: return "LOGO"
         }
+    }
+}
+
+/// What the artwork picker asks SteamGridDB to leave out. Each value is one of the API's own names; nil means any.
+/// Adult content is always left out.
+struct SteamGridDBFilter: Equatable {
+    var style: String?
+    var dimensions: String?
+    var mime: String?
+
+    static let mimes = ["image/png", "image/jpeg", "image/webp"]
+
+    /// The styles SteamGridDB offers for a kind of picture.
+    static func styles(for slot: OEArtworkStore.Slot) -> [String] {
+        switch slot {
+        case .cover, .poster: return ["alternate", "blurred", "white_logo", "material", "no_logo"]
+        case .hero: return ["alternate", "blurred", "material"]
+        case .logo: return ["official", "white", "black", "custom"]
+        case .icon: return ["official", "custom"]
+        }
+    }
+
+    /// The sizes SteamGridDB can filter on for a kind of picture. Logos cannot be filtered by size.
+    static func dimensions(for slot: OEArtworkStore.Slot) -> [String] {
+        switch slot {
+        case .cover, .poster: return ["600x900", "342x482", "660x930", "460x215", "920x430", "512x512", "1024x1024"]
+        case .hero: return ["1920x620", "3840x1240", "1600x650"]
+        case .icon: return ["64x64", "128x128", "256x256", "512x512", "1024x1024"]
+        case .logo: return []
+        }
+    }
+
+    /// The query for one kind of picture. Only still pictures, and never adult content.
+    func queryItems(for type: SteamGridDBItemType) -> [URLQueryItem] {
+        var items = [URLQueryItem(name: "types", value: "static"), URLQueryItem(name: "nsfw", value: "false")]
+        if let style = style { items.append(URLQueryItem(name: "styles", value: style)) }
+        if let dimensions = dimensions, type != .logo { items.append(URLQueryItem(name: "dimensions", value: dimensions)) }
+        items.append(URLQueryItem(name: "mimes", value: mime ?? SteamGridDBFilter.mimes.joined(separator: ",")))
+        return items
     }
 }
 
@@ -163,6 +203,18 @@ actor SteamGridDBClient {
         }
     }
 
+    /// Every still picture SteamGridDB has for a game and slot, best score first, for the artwork picker. Needs a key.
+    func candidates(gameID: Int, slot: OEArtworkStore.Slot, filter: SteamGridDBFilter = SteamGridDBFilter(), limit: Int = 30) async -> [SteamGridDBItem] {
+        let type: SteamGridDBItemType
+        switch slot {
+        case .cover, .poster: type = .grid
+        case .hero: type = .hero
+        case .icon: type = .icon
+        case .logo: type = .logo
+        }
+        return await fetchArtItems(type: type, gameID: gameID, limit: limit, dimensions: nil, filter: filter)
+    }
+
     func fetchArtMedia(gameID: Int) async -> [SteamGridDBItem] {
         async let heroes = fetchArtItems(type: .hero, gameID: gameID)
         async let grids  = fetchArtItems(type: .grid, gameID: gameID)
@@ -170,16 +222,18 @@ actor SteamGridDBClient {
         return await heroes + grids + icons
     }
 
-    private func fetchArtItems(type: SteamGridDBItemType, gameID: Int) async -> [SteamGridDBItem] {
+    private func fetchArtItems(type: SteamGridDBItemType, gameID: Int, limit: Int = 6, dimensions: String? = "600x900", filter: SteamGridDBFilter? = nil) async -> [SteamGridDBItem] {
         guard SteamGridDBClient.isConfigured else { return [] }
         let segment: String
         var queryItems: [URLQueryItem] = []
         switch type {
         case .hero: segment = "heroes"
-        case .grid: segment = "grids"; queryItems.append(URLQueryItem(name: "dimensions", value: "600x900"))
+        case .grid: segment = "grids"; if let dimensions = dimensions { queryItems.append(URLQueryItem(name: "dimensions", value: dimensions)) }
         case .icon: segment = "icons"
+        case .logo: segment = "logos"
         }
         var components = URLComponents(string: "\(base)/\(segment)/game/\(gameID)")!
+        if let filter = filter { queryItems = filter.queryItems(for: type) }
         if !queryItems.isEmpty { components.queryItems = queryItems }
         guard let url = components.url else { return [] }
 
@@ -193,7 +247,7 @@ actor SteamGridDBClient {
         return dataArray
             .filter { $0["animated"] as? Bool != true }
             .sorted { ($0["score"] as? Int ?? 0) > ($1["score"] as? Int ?? 0) }
-            .prefix(6)
+            .prefix(limit)
             .compactMap { item -> SteamGridDBItem? in
                 guard let id       = item["id"] as? Int,
                       let urlStr   = item["url"] as? String,

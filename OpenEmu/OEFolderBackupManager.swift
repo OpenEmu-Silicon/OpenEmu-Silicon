@@ -565,6 +565,32 @@ enum OEExtraSaveLocations {
         }
         for (game, copied) in games { finishSync(ofGame: game, wroteBackup: copied, backupFolder: backupFolder) }
         os_log(.info, log: log, "Initial sync complete.")
+        backUpArtwork()
+    }
+
+    // MARK: - Artwork
+
+    private var machineName: String { Host.current().localizedName ?? "this Mac" }
+
+    /// Copies the artwork folder to the backup folder, adding only. See `OEArtworkBackup`.
+    @discardableResult
+    func backUpArtwork() -> Result<OEArtworkBackup.Report, OEArtworkBackup.Problem>? {
+        guard let backupFolder = backupFolderURL else { return nil }
+        let result = OEArtworkBackup.backUp(root: OEArtworkStore.shared.root, to: backupFolder, scope: OEArtworkBackup.configuredScope,
+                                            machineID: machineID, machineName: machineName)
+        if case .failure(let problem) = result { os_log(.error, log: log, "Artwork backup did not run: %{public}@", String(describing: problem)) }
+        return result
+    }
+
+    /// Brings backed-up artwork into this Mac's artwork folder. Nothing here is replaced. The result arrives on the main queue.
+    func restoreArtwork(completion: @escaping (Result<OEArtworkBackup.Report, OEArtworkBackup.Problem>) -> Void) {
+        guard let backupFolder = backupFolderURL else { return completion(.failure(.nothingToRestore)) }
+        let name = machineName
+        copyQueue.async {
+            let store = OEArtworkStore.shared
+            let result = OEArtworkBackup.restore(from: backupFolder, into: store.root, store: store, machineName: name)
+            DispatchQueue.main.async { completion(result) }
+        }
     }
 
     // MARK: - File copy helpers

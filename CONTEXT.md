@@ -61,6 +61,14 @@ This file is the source of truth for what each term means *in this codebase*. If
 | **Play With…** | The library context-menu submenu that lets the user pick which core to launch a given ROM with. Only an autosave from the selected core is offered for resuming; an autosave from another core is skipped so it cannot override the selection. Normal launches can still resume with the autosave's core. |
 | **RetroAchievements (RA)** | Third-party achievement system. Phase 1 covers the cores listed in the v1.0.7 release notes. The pref pane and HUD live in the host app; the rcheevos C library lives in the helper. |
 | **hardcore mode** | A RetroAchievements concept (no save states or rewind) — *not currently supported* in this repo. Do not claim it in release notes or documentation. |
+| **artwork folder** | The durable place every picture is kept: `Application Support/OpenEmu/Artwork` by default, movable in Preferences → Artwork. Layout is `<System>/<slot>/<Title>.<ext>`, plus an `index.json`. It is the source of truth; Big Picture's small display copies in `Caches` are rebuilt from it. Code: `OEArtworkStore`, `OEArtworkLocation`. |
+| **slot** | One kind of picture for a game: `cover` (the library's box art), `poster` (2:3), `hero` (wide backdrop), `icon` (square tile) or `logo`. Each slot holds one active picture. |
+| **pinned** | A slot whose picture a person chose (Choose Artwork, a file, or an imported folder). Automatic fetching never replaces a pinned picture. "Reset to Automatic" unpins and keeps the file. |
+| **origin** | Where a picture came from, recorded in the index: a provider (`provider:steamgriddb`), `user`, `library`, or `unknown`. Decides what a change of provider may replace. |
+| **History** | A `History` folder inside each slot folder. A picture that is replaced is moved here, never deleted. |
+| **chosen source** | The provider picked on its own in Preferences → Artwork (SteamGridDB, ScreenScraper or libretro-thumbnails). Its pictures replace another provider's *automatic* ones, and "Download Cover Art" asks it first. Automatic and "Library covers only" keep the old behavior. Code: `OEBigPictureArtSource`. |
+| **Cleaned folder** | `Cleaned <time>` inside the artwork folder, where "Clean Up Unused Artwork…" moves automatic pictures of games no longer in the library. Nothing is deleted. |
+| **artwork backup** | Add-only copy of pinned art and History (or everything) to `{backup folder}/Artwork`, run with the folder backup. Two Macs that changed the same picture keep both (`Name (from <Mac>).png`). Code: `OEArtworkBackup`. |
 | **rewind** | The host-side save-state ring buffer that lets the player step backward. Implemented in the helper, controlled from the host. |
 
 ## What this file is not
