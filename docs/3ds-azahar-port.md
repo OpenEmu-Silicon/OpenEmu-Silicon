@@ -23,11 +23,12 @@ The PlayStation 2 core ([#769](https://github.com/OpenEmu-Silicon/OpenEmu-Silico
 |---|---|
 | Fork of the engine | Done: [`OpenEmu-Silicon/azahar`](https://github.com/OpenEmu-Silicon/azahar), a fork of `azahar-emu/azahar` (default branch `master`). The pinned commit below exists in the fork. |
 | Pinned commit | `219d743a1e698101fe1ab8bef43e6563126c3c27`, the Azahar 2126.2 release (stable, 2026-10-08). The fork does not carry upstream's tags, so pin the commit, not the tag. |
-| 3DS system plugin | Does not exist in this repo. A draft is in `OpenEmu/OpenEmu#5157` (unreviewed). |
-| Engine builds for arm64 as static libraries | Not proven by us. Azahar's own CI builds a Qt-free macOS arm64 build (libretro), so a Qt-free build is a supported shape. |
-| Engine runs a game on Apple Silicon | Official Azahar macOS builds exist. Not measured by us. |
-| OpenEmu core plugin | Not started in this repo. An outside contributor reports a working build; we have not seen it. |
-| Heavy 3D games, stereo 3D, camera | Untested |
+| 3DS system plugin | Done ([#831](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/pull/831), from the work in #830). |
+| Engine builds for arm64 as static libraries | Done: `Scripts/build-azahar-core.sh` builds from a clean clone. |
+| Core plugin runs games | Done on `feat/3ds-core`: picture (Metal texture), sound, buttons, touch, save states, in-game saves, screen layouts and 1x to 4x resolution. Evidence with pictures: [`docs/3ds-evidence`](3ds-evidence/README.md). |
+| Games tried | Super Mario 3D Land, New Super Mario Bros. 2, Ocarina of Time 3D, Majora's Mask 3D, A Link Between Worlds all boot and draw. Real-time speed measured at about 60 fps on menus and title screens only. |
+| Window shape | The window opens and resizes to fit each layout (no letterbox). |
+| Heavy 3D games in play, stereo 3D, camera | Untested |
 
 Nothing in this port is released. The first release will be marked Experimental.
 
@@ -120,7 +121,7 @@ Where our code touches Azahar, found by reading the pinned source. Keep each cha
 
 Forking `azahar` into the org snapshots Azahar's own source. It does **not** snapshot its submodules: they are separate repositories that the fork still points at on their original hosts. At the pinned commit there are 52 submodule entries (nested ones included), among them boost, dynarmic, oaknut, glslang, spirv-tools, vulkan-headers, sirit, cryptopp, libressl, fmt, soundtouch, faad2, teakra, zstd, enet, xxHash, SDL2, openal-soft, cubeb, libusb and more. A fresh shallow fetch of all of them is about 560 MB. Desktop-only ones (SDL2, openal-soft, cubeb, libusb, discord-rpc, catch2, libadrenotools, dllwalker, the compatibility list, libretro-common) are not compiled into a core, **but they cannot simply be skipped**: at the pin, the top-level `CMakeLists.txt` runs `check_submodules_present()`, which raises a hard error for every entry in `.gitmodules` whatever the build options are (found by running a configure with all frontends off). Either fetch all of them, or carry a small patch that skips that check (it only runs when `.git/objects` exists). Decide in item 2.
 
-- A network hiccup failed one submodule (`teakra`) in a trial fetch; a second run succeeded. The prepare script must retry.
+- The `teakra` submodule failed in an early trial fetch with "remote end hung up". That message was misleading: teakra marks one test file for Git LFS, and a global git setting that requires LFS on a Mac without `git-lfs` makes the checkout fail and leave the folder half-filled. `Scripts/prepare-azahar-core.sh` runs git without the user's global config, restores every submodule's files, and fails if any is empty. It also retries real network drops.
 - If a submodule host removes or rewrites a commit, the pin breaks. To make the snapshot real, mirror the submodules we use into the org and point the fork's `.gitmodules` at the mirrors. This is open decision 7 in the ADR.
 - Pin by commit, never by branch. Record every submodule commit by letting the fork's gitlinks do it; do not run `git submodule update --remote`.
 

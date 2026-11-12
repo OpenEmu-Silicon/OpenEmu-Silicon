@@ -875,8 +875,42 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             #endif
             // Re-enumerate keyboards in case permission was granted after init.
             dm.rescanKeyboardDevices()
+            #if DEBUG
+            logInputMonitoringProbe(dm)
+            #endif
         }
     }
+
+    #if DEBUG
+    /// Debug builds only: records whether keyboard input can reach the app, and which code signature
+    /// macOS sees. The Input Monitoring grant is tied to that signature, so if the keyboard dies after
+    /// a rebuild this line shows whether the grant (access) or the signature (requirement) changed.
+    /// Read it with: log show --last 2m --predicate 'eventMessage CONTAINS "OEInputProbe"'
+    fileprivate func logInputMonitoringProbe(_ dm: OEDeviceManager) {
+        var requirement = "unknown"
+        var code: SecCode?
+        var staticCode: SecStaticCode?
+        var req: SecRequirement?
+        var reqString: CFString?
+        if SecCodeCopySelf([], &code) == errSecSuccess, let code,
+           SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
+           SecCodeCopyDesignatedRequirement(staticCode, [], &req) == errSecSuccess, let req,
+           SecRequirementCopyString(req, [], &reqString) == errSecSuccess, let reqString {
+            requirement = reqString as String
+        }
+        let access: String
+        switch dm.accessType {
+        case .granted: access = "granted"
+        case .denied: access = "denied"
+        default: access = "unknown"
+        }
+        // Keyboards are enumerated asynchronously, so look again after a moment.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            os_log(.default, log: .default, "OEInputProbe access=%{public}@ keyboards=%d requirement=%{public}@",
+                   access, dm.keyboardDeviceHandlers.count, requirement)
+        }
+    }
+    #endif
 
     fileprivate func showInputMonitoringPermissionsAlert() {
         #if DEBUG
