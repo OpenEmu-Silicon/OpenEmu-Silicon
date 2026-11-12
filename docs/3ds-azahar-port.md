@@ -33,7 +33,7 @@ Nothing in this port is released. The first release will be marked Experimental.
 
 ## Why Azahar
 
-[Azahar](https://github.com/azahar-emu/azahar) (GPL-3.0) is the maintained successor to Citra. The other candidate, Panda3DS, runs far fewer games (its README says "many don't boot") and its OpenEmu plugin is an unreviewed upstream PR. See the ADR for the comparison.
+[Azahar](https://github.com/azahar-emu/azahar) (GPL-2.0-or-later; the root `license.txt` is GPLv2 and file headers say "GPLv2 or any later version") is the maintained successor to Citra. The other candidate, Panda3DS, runs far fewer games (its README says "many don't boot") and its OpenEmu plugin is an unreviewed upstream PR. See the ADR for the comparison.
 
 ## Follow the PS2 pattern
 
@@ -43,7 +43,7 @@ Everything that connects the core to this repo goes through the fork, the way PS
 |---|---|---|
 | Engine fork | `OpenEmu-Silicon/armsx2` | `OpenEmu-Silicon/azahar` (exists) |
 | Pin | `PCSX2/deps-armsx2-revision.txt` and `REVISION=` in the prepare script | `Azahar/deps-azahar-revision.txt` and `REVISION=` in `Scripts/prepare-azahar-core.sh` |
-| Fetch | `Scripts/prepare-armsx2-core.sh`: shallow fetch of the pinned commit into `PCSX2/deps/armsx2` (gitignored), check the commit, apply `PCSX2/patches/*.patch` with `git apply` | Same, into `Azahar/deps/azahar`, **plus** `git submodule update --init --recursive --depth 1` (Azahar has 52 submodule entries). See [Submodules](#submodules-and-the-snapshot). |
+| Fetch | `Scripts/prepare-armsx2-core.sh`: shallow fetch of the pinned commit into `PCSX2/deps/armsx2` (gitignored), check the commit, apply `PCSX2/patches/*.patch` with `git apply` | Same, into `Azahar/deps/azahar`, **plus** `git submodule update --init --recursive --depth 1` (Azahar has 36 top-level submodules, 52 counting nested ones). See [Submodules](#submodules-and-the-snapshot). |
 | Our changes to the engine | Small flagged patches in `PCSX2/patches/`, for example `0001-openemu-metal-output.patch` behind `OE_METAL_OUTPUT` | Same: `Azahar/patches/0001-openemu-vulkan-output.patch` behind an `OE_OUTPUT` flag. The fork stays an untouched snapshot of the pinned release. |
 | Third-party libraries | `Scripts/build-armsx2-deps.sh` builds each library from a pinned archive with a SHA-256, as static libraries for macOS 13, so the plugin needs no Homebrew | Same idea. Azahar's CMake downloads MoltenVK at configure time (see below), so fetch and verify it ourselves instead. |
 | Engine build | `Scripts/build-armsx2-core.sh`: CMake to static libraries, then compile Metal shaders, then generate Xcode inputs | `Scripts/build-azahar-core.sh`: the same stages. Azahar appears to build its shaders at run time (it bundles glslang, SPIR-V tools and sirit), so there may be no separate shader step. Check this in item 2. |
@@ -60,7 +60,7 @@ Read these in this repo before writing anything. Each shows one part of the job 
 | Need | Look at | What it shows |
 |---|---|---|
 | A big engine kept in a fork, pinned by commit, built by script, wrapped by a thin Xcode plugin | `FBNeo/`, `Scripts/prepare-fbneo-core.sh`, `Scripts/build-fbneo-core.sh`, `FBNeo/deps-fbneo-revision.txt` | The fork-and-pin pattern, the two-stage build, the empty appcast until first release, the CI job for a core that is not in the matrix |
-| The same pattern with CMake, bundled libraries and a small engine patch | the PS2 core on `feat/ps2-core` (`PCSX2/`, `Scripts/*armsx2*`, `PCSX2/patches/`), [PS2 port doc](ps2-armsx2-port.md), [ADR-0006](adr/0006-ps2-core-from-armsx2.md), tracker #769 | The work breakdown and branching to copy. Its game core is the closest model for 3DS. |
+| The same pattern with CMake, bundled libraries and a small engine patch | the PS2 core on `feat/ps2-core` (`PCSX2/`, `Scripts/*armsx2*`, `PCSX2/patches/`), PS2 port doc and ADR-0006 (`docs/ps2-armsx2-port.md` and `docs/adr/0006-ps2-core-from-armsx2.md`, on `feat/ps2-core` until it merges to `main`), tracker #769 | The work breakdown and branching to copy. Its game core is the closest model for 3DS. |
 | A core that draws into OpenEmu's Metal texture | `Dolphin/DolphinGameCore.mm`, `Dolphin/DolHost.mm`, and the PS2 core's `createMetalTextureWithDevice:` | `gameCoreRendering` returns `OEGameCoreRenderingMetal2`. The core makes a sizing `CAMetalLayer` or view for the engine and hands OpenEmu a texture. PS2 alternates two textures and tells OpenEmu which one is ready. |
 | A two-screen system with touch and display modes | `OpenEmu/SystemPlugins/NDS/` and `DeSmuME/src/frontend/cocoa/openemu/NDSGameCore.h` | `didTouchScreenPoint:` / `didReleaseTouch`, mouse-to-touch mapping, "Display Modes" for layouts |
 | The host hooks a Citra-family engine needs | Azahar's own `src/citra_libretro/` (about 4,300 lines) | Every callback the engine needs, worked out once. Read it. Do not build or ship it (see Ground rules). |
@@ -103,7 +103,7 @@ The architecture the core must supply. For each row, the Azahar side is from rea
 | Saves | `SaveStateBuffer()` and `LoadStateBuffer()`; in-game saves on a virtual SD card and NAND under the user directory | `saveStateToFileAtURL`, `batterySavesDirectory`, `supportDirectory` | Wait for pending asynchronous kernel work before saving. |
 | Settings | A `Settings::values` struct filled before `System::Load`, then `ApplySettings()` | `Info.plist` options and display modes | Fill the struct in code. Do not read a user's standalone Azahar config. |
 | Games | NCCH (`.3ds`, `.cci`, `.cxi`, `.app`), `.3dsx`, `.elf`, and a network "artic" source (do not enable) | The system plugin's file suffixes, import and hashing | Encrypted dumps need keys (open decision 3). |
-| JIT | Dynarmic ARM64 recompiler (`use_cpu_jit` is on by default) | The helper app carries `allow-jit` and `disable-library-validation` (per ADR-0006) | Prove it in the helper. A slower interpreter is the fallback. |
+| JIT | Dynarmic ARM64 recompiler (`use_cpu_jit` is on by default) | The helper app carries `allow-jit` and `disable-library-validation` (`OpenEmu/OpenEmuHelperApp/OpenEmuHelperApp.entitlements`, also noted in ADR-0006 on `feat/ps2-core`) | Prove it in the helper. A slower interpreter is the fallback. |
 
 ## The patch points in Azahar
 
@@ -118,7 +118,7 @@ Where our code touches Azahar, found by reading the pinned source. Keep each cha
 
 ## Submodules and the snapshot
 
-Forking `azahar` into the org snapshots Azahar's own source. It does **not** snapshot its submodules: they are separate repositories that the fork still points at on their original hosts. At the pinned commit there are 52 submodule entries (nested ones included), among them boost, dynarmic, oaknut, glslang, spirv-tools, vulkan-headers, sirit, cryptopp, libressl, fmt, soundtouch, faad2, teakra, zstd, enet, xxHash, SDL2, openal-soft, cubeb, libusb and more. A fresh shallow fetch of all of them is about 560 MB. Desktop-only ones (SDL2, openal-soft, cubeb, libusb, discord-rpc, Qt-related) are not needed for a core and can be skipped.
+Forking `azahar` into the org snapshots Azahar's own source. It does **not** snapshot its submodules: they are separate repositories that the fork still points at on their original hosts. At the pinned commit there are 52 submodule entries (nested ones included), among them boost, dynarmic, oaknut, glslang, spirv-tools, vulkan-headers, sirit, cryptopp, libressl, fmt, soundtouch, faad2, teakra, zstd, enet, xxHash, SDL2, openal-soft, cubeb, libusb and more. A fresh shallow fetch of all of them is about 560 MB. Desktop-only ones (SDL2, openal-soft, cubeb, libusb, discord-rpc, catch2, libadrenotools, dllwalker, the compatibility list, libretro-common) are not compiled into a core, **but they cannot simply be skipped**: at the pin, the top-level `CMakeLists.txt` runs `check_submodules_present()`, which raises a hard error for every entry in `.gitmodules` whatever the build options are (found by running a configure with all frontends off). Either fetch all of them, or carry a small patch that skips that check (it only runs when `.git/objects` exists). Decide in item 2.
 
 - A network hiccup failed one submodule (`teakra`) in a trial fetch; a second run succeeded. The prepare script must retry.
 - If a submodule host removes or rewrites a commit, the pin breaks. To make the snapshot real, mirror the submodules we use into the org and point the fork's `.gitmodules` at the mirrors. This is open decision 7 in the ADR.
@@ -126,7 +126,7 @@ Forking `azahar` into the org snapshots Azahar's own source. It does **not** sna
 
 ## MoltenVK
 
-Azahar's CMake downloads `MoltenVK-all.tar` (v1.4.1) from the Khronos GitHub release during configure, unless `USE_SYSTEM_MOLTENVK` is set. A build that fetches an unpinned binary at configure time breaks reproducibility and the supply-chain rule used for the PS2 libraries. Do what `build-armsx2-deps.sh` does: fetch it once from a pinned URL, check a SHA-256, and point CMake at it. The dynamic library then ships inside the plugin.
+Azahar's CMake (`download_moltenvk()` in `CMakeModules/DownloadExternals.cmake`) downloads `MoltenVK-all.tar` from a fixed Khronos release tag (v1.4.1) during configure, with no hash check, unless `USE_SYSTEM_MOLTENVK` is set. This only happens with `ENABLE_LIBRETRO` off, which is the path we use. A build that fetches a binary with no checked hash at configure time breaks reproducibility and the supply-chain rule used for the PS2 libraries. Do what `build-armsx2-deps.sh` does: fetch it once from a pinned URL, check a SHA-256, and point CMake at it. The dynamic library then ships inside the plugin.
 
 ## Everything a new core and a new system touch
 
@@ -195,7 +195,7 @@ Official Azahar macOS builds are a good baseline for speed on your machine befor
 All items live as checkboxes in one tracker issue, [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814). To take one, comment with the item number. Items 1 to 3 come first. Items 4 to 9 can run in parallel once item 3 boots a game.
 
 1. **3DS system plugin.** Add the files above. Done when: the 3DS system appears in the app with controls configurable and no core installed.
-2. **Pin the fork and build the engine.** In `OpenEmu-Silicon/azahar`, pin `219d743a`. Write `prepare-azahar-core.sh` (fetch the commit and submodules, retry on network errors, apply patches) and `build-azahar-core.sh`. Build the engine libraries with the switches above, with MoltenVK and other downloads pinned and checked. Generate the Xcode inputs from CMake. Settle the submodule mirror question. Done when: the engine builds from a clean clone with one script and the pinned commit is recorded.
+2. **Pin the fork and build the engine.** In `OpenEmu-Silicon/azahar`, pin `219d743a`. Write `prepare-azahar-core.sh` (fetch the commit and submodules, retry on network errors, apply patches) and `build-azahar-core.sh`. Build the engine libraries with the switches above, with MoltenVK and other downloads pinned and checked. Generate the Xcode inputs from CMake. Settle the submodule mirror question, and whether to fetch every submodule or patch out `check_submodules_present()`. Done when: the engine builds from a clean clone with one script and the pinned commit is recorded.
 3. **Core plugin skeleton and headless boot.** `AzaharGameCore`, an `EmuWindow` subclass with a `CAMetalLayer`, `System::Load`, the run model (frame-driven or free-running, with the reason written down), pause, reset, stop, user directory into OpenEmu's folders, `Info.plist`, `Azahar.xcodeproj` and its scheme. Done when: `Scripts/core.sh Azahar` ends in ALL PASS and a game's code runs, with no video or sound required.
 4. **Vulkan output into OpenEmu's Metal texture.** The output patch in `PresentWindow::CopyToSwapchain`, texture creation and resizing, and the Metal pacing workaround. Done when: the picture shows in the OpenEmu window, the window resizes correctly, and the engine is not waiting on OpenEmu.
 5. **Audio.** An OpenEmu sink writing to the ring buffer. Done when: audio plays without crackle at full speed and across pause, resume and speed changes.

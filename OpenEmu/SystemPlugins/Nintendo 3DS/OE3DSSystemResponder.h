@@ -1,5 +1,6 @@
 /*
- Copyright (c) 2014, OpenEmu Team
+ Copyright (c) 2026, OpenEmu Team
+ Based on the Nintendo 3DS system plugin by Derek Hugger (OpenEmu-Silicon #830).
 
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions are met:
@@ -24,30 +25,11 @@
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "OECollectionViewController.h"
+#import <Foundation/Foundation.h>
+#import <OpenEmuSystem/OpenEmuSystem.h>
+#import "OE3DSSystemResponderClient.h"
 
-NS_ASSUME_NONNULL_BEGIN
-
-extern NSNotificationName const OEGameCollectionViewControllerDidSetSelectionIndexesNotification;
-
-@interface OEGameCollectionViewController : OECollectionViewController <NSMenuItemValidation, NSViewToolTipOwner>
-- (IBAction)showInFinder:(nullable id)sender;
-
-- (void)performSearch:(NSString *)text;
-
-- (void)deleteSaveState:(nullable id)stateItem;
-- (void)deleteSelectedItems:(nullable id)sender;
-- (void)addSelectedGamesToCollection:(nullable id)sender;
-- (void)downloadCoverArt:(nullable id)sender;
-- (void)cancelCoverArtDownload:(nullable id)sender;
-- (void)addCoverArtFromFile:(nullable id)sender;
-- (void)importArtworkFromFolder:(nullable id)sender;
-- (void)addSaveStateFromFile:(nullable id)sender;
-- (void)consolidateFiles:(nullable id)sender;
-
-/// The search term of the currently applied filter.
-@property (copy, nullable) NSString *currentSearchTerm;
-
+OE_EXPORTED_CLASS
+@interface OE3DSSystemResponder : OESystemResponder
+@property (nonatomic, weak) id<OE3DSSystemResponderClient> client;
 @end
-
-NS_ASSUME_NONNULL_END

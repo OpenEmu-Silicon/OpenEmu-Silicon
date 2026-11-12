@@ -59,8 +59,6 @@ final class PrefDebugController: NSViewController {
         Checkbox(key: OEImportManualSystems, label: "Manually choose system on import"),
         Checkbox(key: OEDBSaveStatesMedia.showsAutoSavesKey, label: "Show autosave states in save state category"),
         Checkbox(key: OEDBSaveStatesMedia.showsQuickSavesKey, label: "Show quicksave states in save state category"),
-        Checkbox(key: Key.useNewSaveStatesViewController.rawValue, label: "Use new save states view"),
-        Checkbox(key: Key.useNewScreenshotsViewController.rawValue, label: "Use new screenshots view"),
         Button(label: "Reset main window size", action: #selector(resetMainWindow(_:))),
         Button(label: "Toggle game scanner view", action: #selector(toggleGameScannerView(_:))),
         
@@ -406,7 +404,7 @@ final class PrefDebugController: NSViewController {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: "NSWindow Frame LibraryWindow")
         defaults.removeObject(forKey: "NSSplitView Subview Frames OELibraryGamesSplitView")
-        defaults.removeObject(forKey: OELastGridSizeKey)
+        defaults.removeObject(forKey: Key.lastGridSize.rawValue)
         
         let mainWindow = NSApp.windows.first(where: { $0.windowController is MainWindowController })
         

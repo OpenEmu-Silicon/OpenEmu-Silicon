@@ -23,6 +23,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import QuickLookUI
 
 class ImageCollectionViewItem: CollectionViewItem {
     

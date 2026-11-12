@@ -30,6 +30,7 @@ import OpenEmuKit
 import OpenEmuBase
 import UserNotifications
 import IOKit.hid
+import UniformTypeIdentifiers
 import os.log
 
 private var appearancePrefChangedKVOContext = 0
@@ -332,7 +333,7 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             let openPanel = NSOpenPanel()
             
             openPanel.canChooseFiles = true
-            openPanel.allowedFileTypes = [OELibraryDatabase.databaseFileExtension]
+            openPanel.allowedContentTypes = [UTType(filenameExtension: OELibraryDatabase.databaseFileExtension)].compactMap { $0 }
             openPanel.canChooseDirectories = false
             openPanel.allowsMultipleSelection = false
             
@@ -692,7 +693,7 @@ class AppDelegate: NSObject, UNUserNotificationCenterDelegate {
             "openemu.system.gba", "openemu.system.c64",  "openemu.system.arcade",
             "openemu.system.n64", "openemu.system.dc",   "openemu.system.saturn",
             "openemu.system.nds", "openemu.system.gc",   "openemu.system.wii",
-            "openemu.system.ps2",
+            "openemu.system.ps2", "openemu.system.3ds",
         ]
         out += "\n--- Per-system rollup ---\n"
         for sysID in systemsOfInterest {

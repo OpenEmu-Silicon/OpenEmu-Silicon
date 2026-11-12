@@ -1,4 +1,5 @@
 // Copyright (c) 2026, OpenEmu Team
+// Based on the Nintendo 3DS system plugin by Derek Hugger (OpenEmu-Silicon #830).
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -17,31 +18,15 @@
 // DISCLAIMED. IN NO EVENT SHALL OpenEmu Team BE LIABLE FOR ANY
 // DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
 // (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+//  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 // ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import Cocoa
-import OpenEmuKit
+import Foundation
+import OpenEmuSystem
 
-extension OEGameCollectionViewController {
-
-    /// Builds a sorted "Play With…" submenu listing every installed core for the game's system.
-    /// Returns nil when fewer than two cores are available (menu item is hidden in that case).
-    @objc func oe_coreMenu(for game: OEDBGame) -> NSMenu? {
-        guard let systemID = game.system?.systemIdentifier else { return nil }
-        var plugins = OECorePlugin.corePlugins(forSystemIdentifier: systemID)
-        guard plugins.count > 1 else { return nil }
-        plugins.sort { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-        let menu = NSMenu()
-        for plugin in plugins {
-            let item = NSMenuItem(title: plugin.displayName,
-                                  action: #selector(LibraryController.startSelectedGame(withCore:)),
-                                  keyEquivalent: "")
-            item.representedObject = plugin
-            menu.addItem(item)
-        }
-        return menu
-    }
+/// OpenEmu's system registration entry point. Key handling lives in the
+/// Objective-C OE3DSSystemResponder. The Azahar core does the emulation.
+class OE3DSSystemController: OESystemController {
 }
