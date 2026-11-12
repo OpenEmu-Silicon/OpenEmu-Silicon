@@ -36,3 +36,29 @@ Notes from the work:
 - The game window keeps its shape when the layout changes, so a wide layout is letterboxed. Resizing the window to the new shape is not done yet.
 - OpenEmu saves the choice but the core must read it back on load (`displayModeInfo`); the first build forgot it on relaunch.
 - The headless harness gained `--display-mode-at FRAME:NAME`.
+
+- Found later: after relaunching with Side by side remembered, the picture was drawn too big and offset. Cause: the black-window recovery (see below) made a new layer context and reset the layer's size to the game's frame size, replacing the size the window had given it. The recovery now keeps the existing size. `display-modes/app-oot-layout-remembered-correct.jpg` is Ocarina of Time 3D after that fix, same relaunch.
+
+## in-game-saves: saving inside a game
+
+Ocarina of Time 3D, driven entirely by touch (the keyboard does not reach the game in this build).
+
+| File | What it shows |
+|---|---|
+| `in-game-saves/1-oot-name-entry-by-touch.jpg` | File select, empty slot chosen, name keyboard on the bottom screen (side by side layout). |
+| `in-game-saves/2-oot-save-completed.jpg` | The game says "Save completed." The files appear under `~/Library/Application Support/OpenEmu/Azahar/sdmc/Nintendo 3DS/.../title/00040000/00033500/data/00000001/`. |
+| `in-game-saves/3-oot-save-still-there-after-relaunch.jpg` | App quit and reopened, game started again: slot 1 holds "Link" with hearts. In-game saves persist. |
+
+## compat: which games boot
+
+Headless run of 2400 frames each, picture read back from the GPU at frame 2400, stacked layout, 1x. Speed is not paced (no frame limiter), so seconds are the engine's own speed on an Apple A18 Pro class GPU, not a real-time measure; real-time was checked separately for Ocarina in the app (about 60 fps at the title screen).
+
+| Game | Result | Headless time for 2400 frames |
+|---|---|---|
+| Super Mario 3D Land | Boots, dialogs, title, touch works, sound | (earlier runs) |
+| The Legend of Zelda: A Link Between Worlds | Boots to title screen, picture correct | 35 s |
+| The Legend of Zelda: Majora's Mask 3D | Boots to the in-game scene and shows the "Return to HOME Menu" bottom screen; sound | 23 s |
+| The Legend of Zelda: Ocarina of Time 3D | Title, file select, creating a save by touch works; sound | 15 s |
+| New Super Mario Bros. 2 | Boots to the "Welcome" dialog; top screen is black there | 6 s |
+
+Pictures: `compat/*.png`. Not covered: actual gameplay past menus, long sessions, stereo 3D.
