@@ -1,0 +1,5 @@
+Core plugin versions built from commit 0000000
+
+Azahar 0.1.0.0
+PCSX2 0.1.0.0
+FBNeo 1.0.0.0
