@@ -1,0 +1,23 @@
+Big picture UI sounds
+=====================
+
+Sound effects from CONSOLE_MODE_UI_SOUNDS_KAGE by Brian Kage (briankage.com).
+
+Used with the author's terms: free for non-commercial use. Anyone who wants to use
+these sounds in a commercial project needs the author's permission first
+(michiganderrecords@gmail.com).
+
+Files, and the original sample each one came from:
+  move.wav    NAV_1
+  key.wav     NAV_5
+  enter.wav   A CONFIRM_6
+  select.wav  A CONFIRM_9
+  back.wav    BACK_4
+  tab.wav     Z BONUS NAV
+  launch.wav  A CONFIRM_7
+  pause.wav   A CONFIRM_3
+  resume.wav  Z BONUS BACK
+  quit.wav    BACK_7
+
+Every sample in the pack is kept, under their original names, in OpenEmu/BigPictureSoundPack/ (not bundled)
+so other sounds can be tried by copying one over the matching file here.
