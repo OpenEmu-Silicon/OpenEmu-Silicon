@@ -27,6 +27,7 @@ import IOKit.pwr_mgt
 import OpenEmuBase
 import OpenEmuSystem
 import OpenEmuKit
+import UniformTypeIdentifiers
 import UserNotifications
 import os.log
 
@@ -1413,8 +1414,18 @@ final class OEGameDocument: NSDocument {
         gameCoreHelper?.setAdaptiveSyncEnabled(enabled)
     }
     
+    /// Set when the player has already chosen Quit Game somewhere that cannot show the usual "Are you sure?" alert
+    /// (big picture's pause menu, driven by a controller). The auto save is still written on the way out.
+    private var skipsStopConfirmation = false
+
+    /// Closes the game like Controls > Quit Game, without asking again.
+    func stopEmulationWithoutConfirmation() {
+        skipsStopConfirmation = true
+        stopEmulation(self)
+    }
+
     private var shouldTerminateEmulation: Bool {
-        if coreDidTerminateSuddenly {
+        if coreDidTerminateSuddenly || skipsStopConfirmation {
             return true
         }
         
@@ -2650,7 +2661,7 @@ final class OEGameDocument: NSDocument {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
-        panel.allowedFileTypes = validExtensions
+        panel.allowedContentTypes = validExtensions.compactMap { UTType(filenameExtension: $0) }
         
         panel.beginSheetModal(for: gameWindowController!.window!) { result in
             guard
@@ -2738,6 +2749,7 @@ final class OEGameDocument: NSDocument {
         }
         
         gameCoreManager?.changeDisplay(withMode: modeName)
+        (gameWindowController as? GameWindowController)?.displayModeWasChangedByUser()
     }
     
     private func changeDisplayMode(directionReversed reverse: Bool) {

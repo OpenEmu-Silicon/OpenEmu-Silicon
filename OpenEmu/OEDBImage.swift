@@ -57,13 +57,14 @@ final class OEDBImage: OEDBItem {
     // MARK: -
     
     class func prepareImage(with url: URL) -> [String : Any]? {
-        guard let image = NSImage(contentsOf: url)
+        // A ScreenScraper address is signed with the login to download it, and stored without it.
+        guard let image = NSImage(contentsOf: ScreenScraperClient.signed(url))
         else {
-            NSLog("File at \(url.absoluteString) is not a valid image.")
+            NSLog("File at \(ScreenScraperClient.redacted(url).absoluteString) is not a valid image.")
             return nil
         }
         
-        var result: [String : Any] = ["URL" : url]
+        var result: [String : Any] = ["URL" : ScreenScraperClient.redacted(url)]
         
         let tempInfo = prepareImage(with: image)
         result.merge(tempInfo) { (old, _) in old }
@@ -227,6 +228,8 @@ final class OEDBImage: OEDBItem {
     override func prepareForDeletion() {
         if managedObjectContext?.parent == nil,
            let url = imageURL {
+            // The artwork folder keeps a copy first, so replacing or removing a cover never loses the picture.
+            OEArtworkStore.keepCover(self)
             try? FileManager.default.removeItem(at: url)
         }
     }
@@ -292,6 +295,25 @@ final class OEDBImage: OEDBItem {
         return url
     }
     
+    /// Removes any login from the stored source address of every cover. An older library holds ScreenScraper addresses
+    /// that include the user's password. Only the address text changes; no picture is touched. Returns how many changed.
+    @discardableResult
+    class func scrubStoredCredentials(in context: NSManagedObjectContext) -> Int {
+        let request = OEDBImage.fetchRequest()
+        request.predicate = NSPredicate(format: "source CONTAINS[c] 'sspassword' OR source CONTAINS[c] 'devpassword'")
+        var scrubbed = 0
+        context.performAndWait {
+            guard let images = (try? context.fetch(request)) as? [OEDBImage] else { return }
+            for image in images {
+                guard let source = image.source, let url = URL(string: source) else { continue }
+                let clean = ScreenScraperClient.redacted(url).absoluteString
+                if clean != source { image.source = clean; scrubbed += 1 }
+            }
+            if scrubbed > 0 { try? context.save() }
+        }
+        return scrubbed
+    }
+    
     var sourceURL: URL? {
         get {
             if let source = source {
@@ -301,7 +323,8 @@ final class OEDBImage: OEDBItem {
             }
         }
         set {
-            source = newValue?.absoluteString
+            // Never keep a ScreenScraper login in the library.
+            source = newValue.map { ScreenScraperClient.redacted($0).absoluteString }
         }
     }
     
@@ -310,17 +333,11 @@ final class OEDBImage: OEDBItem {
 
     /// A cheap on-disk existence check (a single stat() call), answered
     /// synchronously and cached per relativePath. This intentionally does NOT
-    /// defer to a background check the way `image` does: imageUID() reflects
-    /// identity, not availability, but imageRepresentationType()/
-    /// imageRepresentation() still key off this to choose between the
-    /// placeholder and the real artwork — and IKImageBrowserView caches
-    /// representations by UID, so if this answer changed *after* the browser
-    /// already asked for a representation under a given UID, the browser
-    /// would be told to swap representation kind (placeholder image -> URL)
-    /// for an identity it considers unchanged. It doesn't handle that
-    /// gracefully — cells go blank/black instead of updating. A stat() call
-    /// is cheap enough to answer up front; the actual decode in `image` is
-    /// what needed to move off the main thread.
+    /// defer to a background check the way `image` does: the library grid
+    /// uses it to choose between the placeholder and the real artwork, and
+    /// an answer that changed after the item was made would leave the wrong
+    /// one showing. A stat() call is cheap enough to answer up front; the
+    /// actual decode in `image` is what needed to move off the main thread.
     var isLocalImageAvailable: Bool {
         let currentRelativePath = relativePath
         if let cached = _cachedIsLocalImageAvailable,

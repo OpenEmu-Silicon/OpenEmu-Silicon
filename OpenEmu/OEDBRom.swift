@@ -27,7 +27,7 @@ import OpenEmuSystem
 
 extension OEDBRom {
     
-    // OEGameCollectionViewController
+    // old games controller
     @objc(consolidateFilesWithError:)
     func _consolidateFiles(error: NSErrorPointer) -> Bool {
         do {

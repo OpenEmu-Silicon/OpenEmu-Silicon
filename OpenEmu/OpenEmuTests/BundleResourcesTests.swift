@@ -23,6 +23,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import XCTest
+import Quartz
 @testable import OpenEmu
 
 class BundleResourcesTests: XCTestCase {

@@ -84,6 +84,17 @@ final class GameWindowController: NSWindowController {
     /// ever auto-resized this one time.
     private var hasSettledInitialWindowSize = false
 
+    /// Set when the user picks a display mode. The next size report whose aspect
+    /// ratio differs from the previous one may resize the frame once, so a layout
+    /// with a different shape (for example side by side) is not letterboxed.
+    /// Other later reports still never resize the frame.
+    private var resizeOnNextAspectChange = false
+    private var lastReportedAspect = CGSize.zero
+
+    func displayModeWasChangedByUser() {
+        resizeOnNextAspectChange = true
+    }
+
     override init(window: NSWindow?) {
         snapDelegate = OEIntegralWindowResizingDelegate()
         
@@ -545,8 +556,16 @@ extension GameWindowController: GameIntegralScalingDelegate {
     func gameScreenSizeDidChange() {
         guard let window else { return }
 
-        window.contentAspectRatio = gameDocument.gameViewController.defaultScreenSize
+        let newAspect = gameDocument.gameViewController.defaultScreenSize
+        let aspectChanged = abs(newAspect.width * lastReportedAspect.height - lastReportedAspect.width * newAspect.height) > 1
+        lastReportedAspect = newAspect
+        window.contentAspectRatio = newAspect
         updateContentSizeConstraints()
+
+        if isPlaying, hasSettledInitialWindowSize, resizeOnNextAspectChange, aspectChanged {
+            resizeOnNextAspectChange = false
+            hasSettledInitialWindowSize = false
+        }
 
         // Only the very first eligible call (once actually playing) is allowed
         // to move/resize the frame — see hasSettledInitialWindowSize and

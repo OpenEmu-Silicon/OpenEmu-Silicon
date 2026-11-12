@@ -8,8 +8,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 MAME_DIR="$REPO_ROOT/MAME"
 DEPS_DIR="$MAME_DIR/deps"
 SRC_DIR="$DEPS_DIR/mame"
-PATCH_FILE="$MAME_DIR/patches/mame-headless-clang21-apple.patch"
-REVISION="fac13e827b7b8cfa4ee4f5760198d31241e2a544"
+REVISION="c59be59b887e7317c3a7838f83ea3137ca31b0c3"
 REMOTE="https://github.com/OpenEmu-Silicon/mame.git"
 
 mkdir -p "$DEPS_DIR"
@@ -26,17 +25,38 @@ cd "$SRC_DIR"
 git remote set-url origin "$REMOTE"
 
 git fetch --no-tags origin "$REVISION"
-git checkout --detach "$REVISION"
 
-if git apply --check "$PATCH_FILE" >/dev/null 2>&1; then
-  echo "Applying Apple Silicon / Clang 21 patch..."
-  git apply "$PATCH_FILE"
-elif git apply --reverse --check "$PATCH_FILE" >/dev/null 2>&1; then
-  echo "Patch already applied."
-else
-  echo "error: patch does not apply cleanly and is not already applied: $PATCH_FILE" >&2
-  git status --short >&2 || true
-  exit 1
+# Checkouts prepared for MAME 0.250 still carry the old local patch
+# (patches/mame-headless-clang21-apple.patch). Its fixes are upstream in the
+# pinned revision, so drop those edits, but only on a revision that patch was
+# applied to. Any other local change, staged or not, is left alone.
+LEGACY_REVISIONS=(
+  # stuartcarnie/mame mame0250-headless, "feat: updates for mame250": pinned
+  # from the first MAME integration (88d8126e5) until #687.
+  4fc1f9f16b0dfba6be670367330028635613b04b
+  # OpenEmu-Silicon/mame mame0250-headless, "Expose cheat option as settable
+  # property": pinned by #687 until the 0.289 update.
+  fac13e827b7b8cfa4ee4f5760198d31241e2a544
+)
+LEGACY_PATCHED=(
+  3rdparty/sol2/sol/sol.hpp
+  3rdparty/zlib/zutil.h
+  src/devices/cpu/v60/op2.hxx
+)
+CHANGED="$(git diff --name-only HEAD)"
+if [ -n "$CHANGED" ]; then
+  HEAD_REVISION="$(git rev-parse HEAD)"
+  OTHER_CHANGES="$(printf '%s\n' "$CHANGED" | grep -vxF -f <(printf '%s\n' "${LEGACY_PATCHED[@]}") || true)"
+  if printf '%s\n' "${LEGACY_REVISIONS[@]}" | grep -qxF "$HEAD_REVISION" && [ -z "$OTHER_CHANGES" ]; then
+    echo "Dropping the old 0.250 local patch..."
+    git checkout HEAD -- "${LEGACY_PATCHED[@]}"
+  else
+    echo "error: $SRC_DIR has local changes; commit, stash, or discard them first:" >&2
+    git status --short --untracked-files=no >&2
+    exit 1
+  fi
 fi
+
+git checkout --detach "$REVISION"
 
 echo "MAME source ready at $SRC_DIR"

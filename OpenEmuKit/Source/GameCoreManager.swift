@@ -24,6 +24,7 @@
 
 import Foundation
 import AudioToolbox
+internal import os.log
 import OpenEmuBase
 import OpenEmuSystem
 
@@ -134,7 +135,19 @@ extension GameCoreManager: OEGameCoreHelper {
                       let data = dict["data"] as? Data
                 else { return nil }
                 let minDataBytes = dict["minDataBytes"] as? UInt8 ?? 1
-                return OEMemoryRegionDescriptor(name: name, address: address, addressBytes: addressBytes, minDataBytes: minDataBytes, data: data)
+                // A missing value means one address per byte; only an unreadable one is worth reporting.
+                let addressShift: Int8
+                if let rawShift = dict["addressShift"], !(rawShift is NSNull) {
+                    if let shift = rawShift as? Int8 {
+                        addressShift = shift
+                    } else {
+                        os_log(.error, log: .default, "Memory region %{public}@ has an unreadable addressShift (%{public}@); using 0, so cheat search addresses may be wrong", name, String(describing: rawShift))
+                        addressShift = 0
+                    }
+                } else {
+                    addressShift = 0
+                }
+                return OEMemoryRegionDescriptor(name: name, address: address, addressBytes: addressBytes, minDataBytes: minDataBytes, addressShift: addressShift, data: data)
             }
             block(regions)
         }

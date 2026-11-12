@@ -97,6 +97,37 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     }
 }
 
+/// Notices a game layer that the window server never composites: frames are presented but none is
+/// ever shown. A fresh remote layer context fixes it, so the helper recreates one when this trips.
+final class PresentationWatchdog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var presentsSinceShown = 0
+    private var attempts = 0
+    
+    private static let presentLimit = 90
+    private static let maxAttempts = 3
+    
+    func didPresent() {
+        lock.lock(); defer { lock.unlock() }
+        presentsSinceShown += 1
+    }
+    
+    func didShow() {
+        lock.lock(); defer { lock.unlock() }
+        presentsSinceShown = 0
+        attempts = 0
+    }
+    
+    /// True when the caller should recreate the remote layer context.
+    func shouldRecover() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard presentsSinceShown >= Self.presentLimit, attempts < Self.maxAttempts else { return false }
+        attempts += 1
+        presentsSinceShown = 0
+        return true
+    }
+}
+
 @objc public class OpenEmuHelperApp: NSResponder, NSApplicationDelegate {
     @objc public var gameCoreOwner: OEGameCoreOwner!
     @objc public private(set) var gameCore: OEGameCore!
@@ -140,6 +171,7 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
     
     var _clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
     var _skippedFrames: UInt = 0
+    let _presentationWatchdog = PresentationWatchdog()
     var _effectsMode: OEGameCoreEffectsMode = .reflectPaused
     
     var _unhandledEventsMonitor: Any?
@@ -298,15 +330,19 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
         _filterChain.setSourceRect(sourceRect, aspect: aspectSize)
     }
     
-    private func setupRemoteLayer() {
+    /// Makes the remote layer context. `keepBounds` is for making a fresh one while a game runs, so
+    /// the size the window already gave the layer is not replaced by the game's frame size.
+    private func setupRemoteLayer(keepBounds: Bool = false) {
         CATransaction.begin()
         do {
             CATransaction.setDisableActions(true)
             defer { CATransaction.commit() }
             
-            // TODO: If there's a good default bounds, use that.
-            _videoLayer.bounds = .init(x: 0, y: 0, width: Int(gameCore.bufferSize.width), height: Int(gameCore.bufferSize.height))
-            _filterChain.drawableSize = _videoLayer.drawableSize
+            if !keepBounds {
+                // TODO: If there's a good default bounds, use that.
+                _videoLayer.bounds = .init(x: 0, y: 0, width: Int(gameCore.bufferSize.width), height: Int(gameCore.bufferSize.height))
+                _filterChain.drawableSize = _videoLayer.drawableSize
+            }
             
             let connectionID = CGSMainConnectionID()
             _gameVideoCAContext = CAContext(cgsConnection: connectionID, options: [kCAContextCIFilterBehavior: "ignore"])
@@ -752,6 +788,7 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
                     "address": region.address,
                     "addressBytes": region.addressBytes,
                     "minDataBytes": region.minDataBytes,
+                    "addressShift": region.addressShift,
                     "data": region.data,
                 ]
             }
@@ -1020,6 +1057,14 @@ final class DrawableProvider<Drawable>: @unchecked Sendable {
             let inflight = _inflightSemaphore
             finalCB.addCompletedHandler { _ in
                 inflight.signal()
+            }
+            let watchdog = _presentationWatchdog
+            drawable.addPresentedHandler { d in
+                if d.presentedTime > 0 { watchdog.didShow() }
+            }
+            watchdog.didPresent()
+            if watchdog.shouldRecover() {
+                DispatchQueue.main.async { [weak self] in self?.setupRemoteLayer(keepBounds: true) }
             }
             
             if _adaptiveSyncEnabled {

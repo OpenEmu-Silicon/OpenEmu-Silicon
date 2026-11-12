@@ -33,7 +33,7 @@ class OEDBCollection: OEDBItem {
     @NSManaged var games: Set<OEDBGame>
     
     // MARK: - Data Model Relationships
-    @objc // OEGameCollectionViewController
+    @objc // old games controller
     var mutableGames: NSMutableSet {
         mutableSetValue(forKeyPath: #keyPath(games))
     }

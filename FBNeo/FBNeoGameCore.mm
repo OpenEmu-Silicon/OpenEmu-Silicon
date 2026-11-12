@@ -40,6 +40,28 @@
 
 static os_log_t OE_CORE_LOG;
 
+// FBNeo's support folders are exported globals in fbneo_headless.dylib
+// (char[MAX_PATH], MAX_PATH = 260). Their defaults are relative paths such as
+// "config/games/", which resolve against the helper's working directory and
+// point nowhere, so EEPROM and per-game config saves were silently dropped.
+#define FBNEO_MAX_PATH 260
+extern char szAppEEPROMPath[FBNEO_MAX_PATH];
+extern char szAppSamplesPath[FBNEO_MAX_PATH];
+extern char szAppHiscorePath[FBNEO_MAX_PATH];
+extern char szAppBlendPath[FBNEO_MAX_PATH];
+extern char szAppHDDPath[FBNEO_MAX_PATH];
+
+static void fbneo_set_support_path(char *dest, NSString *path)
+{
+    // FBNeo appends file names directly, so the path must end with a slash.
+    const char *fs = [path stringByAppendingString:@"/"].fileSystemRepresentation;
+    if (strlen(fs) >= FBNEO_MAX_PATH) {
+        os_log_error(OE_CORE_LOG, "FBNeo support path too long, keeping default: %{public}s", fs);
+        return;
+    }
+    strlcpy(dest, fs, FBNEO_MAX_PATH);
+}
+
 // FBNeo arcade achievement sets are authored against the flat main-RAM buffer
 // (CpsRamFF for CPS, "68K RAM" for Neo Geo, etc.) that FBHeadlessReadAchievementMemory
 // exposes — not the CPU hardware address space. The bridge gates this for
@@ -81,12 +103,36 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
 #pragma mark - Lifecycle
 
+// Mirrors the MAME core's setBasePath: everything lives under
+// ~/Library/Application Support/OpenEmu/FBNeo/<subfolder>.
+- (void)setupSupportPaths
+{
+    NSString *base = self.supportDirectoryPath;
+    if (base.length == 0)
+        return;
+
+    // EEPROM (.nv), per-game config (.ini), hiscore saves (.hi) and HDD diffs
+    // all go to szAppEEPROMPath. FBNeo never creates it and fails silently
+    // when it is missing, so create it here.
+    NSString *nvram = [base stringByAppendingPathComponent:@"nvram"];
+    NSError *dirError = nil;
+    if (![NSFileManager.defaultManager createDirectoryAtPath:nvram withIntermediateDirectories:YES attributes:nil error:&dirError])
+        os_log_error(OE_CORE_LOG, "could not create %{public}@: %{public}@", nvram, dirError.localizedDescription);
+
+    fbneo_set_support_path(szAppEEPROMPath, nvram);
+    fbneo_set_support_path(szAppSamplesPath, [base stringByAppendingPathComponent:@"samples"]);
+    fbneo_set_support_path(szAppHiscorePath, [base stringByAppendingPathComponent:@"hiscore"]);
+    fbneo_set_support_path(szAppBlendPath, [base stringByAppendingPathComponent:@"blend"]);
+    fbneo_set_support_path(szAppHDDPath, [base stringByAppendingPathComponent:@"hdd"]);
+}
+
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     FBHeadlessInit();
 
     NSString *romDir = [path stringByDeletingLastPathComponent];
     FBHeadlessSetRomPath(romDir.fileSystemRepresentation);
+    [self setupSupportPaths];
 
     // FBNeo identifies a set by its short name (the zip filename without extension).
     NSString *shortName = [[path lastPathComponent] stringByDeletingPathExtension];
@@ -261,15 +307,19 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
 #pragma mark - Input
 
-// OEArcadeButton values (Up..Service) align with FBHeadlessButton; the fork maps
-// them to the active driver's inputs.
+// OEArcadeButton values (Up..Service, Configure) align with FBHeadlessButton; the
+// fork maps them to the active driver's inputs. Service drives the test switch
+// (settings menu) and Configure the separate service-credit input.
+static_assert((int)OEArcadeButtonService == (int)FBHeadlessButtonService &&
+              (int)OEArcadeUIConfigure == (int)FBHeadlessButtonConfigure,
+              "OEArcadeButton and FBHeadlessButton must stay aligned");
 - (void)setState:(BOOL)pressed ofButton:(OEArcadeButton)button forPlayer:(NSUInteger)player
 {
     if (player == 0 || player > 4) {
         return;
     }
-    if (button >= OEArcadeUIConfigure) {
-        return; // UI command, not a game input
+    if (button > OEArcadeUIConfigure) {
+        return;
     }
     FBHeadlessSetInput((int)(player - 1), (int)button, pressed ? 1 : 0);
 }

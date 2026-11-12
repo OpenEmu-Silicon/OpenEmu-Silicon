@@ -69,6 +69,7 @@ jobs:
       cores: ${{ steps.detect.outputs.cores }}
       fbneo: ${{ steps.detect.outputs.fbneo }}
       pcsx2: ${{ steps.detect.outputs.pcsx2 }}
+      azahar: ${{ steps.detect.outputs.azahar }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
@@ -108,6 +109,9 @@ jobs:
           # isn't vendored and it's not a slot in the xcodebuild matrix — same
           # situation as MAME). Track it with a separate flag.
           fbneo=false
+          # Azahar (Nintendo 3DS) builds the same way: a pinned engine fork cloned by
+          # its own script, so it also gets its own flag and job.
+          azahar=false
 
           # PCSX2 (PlayStation 2) builds the pinned ARMSX2 engine with CMake through
           # its own script, so it is not in the xcodebuild matrix either.
@@ -118,6 +122,7 @@ jobs:
             cores="$all_cores"
             fbneo=true
             pcsx2=true
+            azahar=true
           else
             # --no-renames lists both the old and new path of a move; quotePath=false
             # keeps non-ASCII file names readable instead of octal-escaped.
@@ -177,6 +182,12 @@ jobs:
             if echo "$changed" | grep -qE '^(PCSX2/|Scripts/(prepare|build)-armsx2-core\.sh|Scripts/gen-armsx2-xcconfig\.py|OpenEmu-SDK/)'; then
               pcsx2=true
             fi
+
+            # Azahar depends on Azahar/, its scripts, the frameworks it links
+            # (OpenEmu-SDK / OpenEmuBase) and the 3DS system plugin header it includes.
+            if echo "$changed" | grep -qE '^(Azahar/|Scripts/[a-z-]*azahar[a-z-]*\.(sh|py)|OpenEmu-SDK/|OpenEmu/SystemPlugins/Nintendo 3DS/)'; then
+              azahar=true
+            fi
           fi
 
           echo "Core schemes to build: $cores"
@@ -185,6 +196,8 @@ jobs:
           echo "fbneo=$fbneo" >> "$GITHUB_OUTPUT"
           echo "Build PCSX2: $pcsx2"
           echo "pcsx2=$pcsx2" >> "$GITHUB_OUTPUT"
+          echo "Build Azahar: $azahar"
+          echo "azahar=$azahar" >> "$GITHUB_OUTPUT"
 
   build-cores:
     name: Build core (${{ matrix.core }})
@@ -302,6 +315,44 @@ jobs:
 
       - name: Build PCSX2 (fetch pinned engine, build engine + plugin)
         run: ./Scripts/build-armsx2-core.sh
+
+  build-azahar:
+    # Azahar (Nintendo 3DS) isn't a slot in the core matrix either: its deps/azahar source
+    # isn't vendored (pulled from the OpenEmu-Silicon/azahar fork at a pinned commit, with all
+    # its submodules) and it builds the engine libraries with CMake, then the plugin, through
+    # its own script. The engine compile is long, so it only runs when Azahar-relevant files change.
+    name: Build Azahar core
+    needs: detect-core-changes
+    if: needs.detect-core-changes.outputs.azahar == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.3.0
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1.6.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Clear SPM binary artifact cache
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm/artifacts/
+
+      - name: Generate credentials stubs
+        run: |
+          cp OpenEmu/ScreenScraperDevCredentials.template.swift OpenEmu/ScreenScraperDevCredentials.swift
+          cp OpenEmu/CheatWorksSecrets.template.swift OpenEmu/CheatWorksSecrets.swift
+
+      - name: Install CMake
+        run: command -v cmake >/dev/null || brew install cmake
+
+      - name: Build Azahar (clone pinned fork, build engine libraries + plugin)
+        run: |
+          # build-azahar-core.sh runs prepare-azahar-core.sh (clones the pinned fork commit and
+          # its submodules into Azahar/deps/azahar), builds the engine libraries with CMake, then
+          # OpenEmuBase + Azahar.oecoreplugin (adhoc-signed, no identity needed).
+          ./Scripts/build-azahar-core.sh
 
   build:
     name: Build (arm64)

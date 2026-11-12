@@ -97,7 +97,7 @@
     </systems>
   </core>
 
-  <!-- ⚠️ WIP ARM64 native MAME core; see issue #500 for polygon-rendering follow-up. -->
+  <!-- ARM64 native MAME core (MAME 0.289); Model 1 3D rendering from issue #500 is fixed. -->
   <core
     id="org.openemu.MAME"
     name="MAME"

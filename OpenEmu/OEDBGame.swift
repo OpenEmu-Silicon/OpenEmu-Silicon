@@ -282,7 +282,11 @@ final class OEDBGame: OEDBItem {
         if status == .alert || status == .ok {
             status = .processing
             save()
-            libraryDatabase.startOpenVGDBSync()
+            // A provider chosen on its own in Preferences → Artwork supplies the cover; the library's lookup takes over
+            // when it has none.
+            let library: () -> Void = { [weak self] in self?.libraryDatabase.startOpenVGDBSync() }
+            if Thread.isMainThread, MainActor.assumeIsolated({ requestCoverFromChosenSource(onMiss: library) }) { return }
+            library()
         }
     }
     
@@ -365,10 +369,12 @@ final class OEDBGame: OEDBItem {
         let context = managedObjectContext
         context?.performAndWait {
             if let currentImage = boxImage {
+                OEArtworkStore.keepCover(currentImage, of: self)   // before the delete, while the game is still known
                 context?.delete(currentImage)
             }
             
             boxImage = OEDBImage.createImage(with: dictionary)
+            OEArtworkStore.recordNewCover(of: self)
         }
     }
     
@@ -381,10 +387,12 @@ final class OEDBGame: OEDBItem {
         let context = managedObjectContext
         context?.performAndWait {
             if let currentImage = boxImage {
+                OEArtworkStore.keepCover(currentImage, of: self)   // before the delete, while the game is still known
                 context?.delete(currentImage)
             }
             
             boxImage = OEDBImage.createImage(with: dictionary)
+            OEArtworkStore.recordNewCover(of: self, source: url)
         }
     }
     
@@ -457,97 +465,6 @@ extension OEDBGame: NSPasteboardReading {
     }
 }
 */
-// MARK: - OECoverGridDataSourceItem
-
-extension OEDBGame: OECoverGridDataSourceItem {
-    
-    func gridStatus() -> Int {
-        return Int(status.rawValue)
-    }
-    
-    func gridRating() -> UInt {
-        return rating?.uintValue ?? 0
-    }
-    
-    func setGridRating(_ newRating: UInt) {
-        rating = newRating as NSNumber
-        try? managedObjectContext?.save()
-    }
-    
-    func setGridTitle(_ title: String!) {
-        displayName = title
-        try? managedObjectContext?.save()
-    }
-    
-    var hasImage: Bool {
-        return boxImage != nil
-    }
-}
-
-// MARK: - IKImageBrowserItem
-
-extension OEDBGame {
-    
-    private static let artworkPlaceholderCache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>()
-        cache.countLimit = 20
-        return cache
-    }()
-    
-    private class func artworkPlaceholder(aspectRatio ratio: CGFloat) -> NSImage {
-        let key = "\(ratio)" as NSString
-        if let image = artworkPlaceholderCache.object(forKey: key) {
-            return image
-        } else {
-            let image = NSImage()
-            image.size = NSSize(width: 300, height: 300 * ratio)
-            artworkPlaceholderCache.setObject(image, forKey: key)
-            image.cacheMode = .bySize
-            return image
-        }
-    }
-    
-    override func imageUID() -> String! {
-        // Deliberately does NOT gate on isLocalImageAvailable. That check is
-        // synchronous-on-cache-hit / async-resolved-on-miss (see OEDBImage),
-        // so gating identity on it means the UID changes the moment the disk
-        // check resolves from unconfirmed to available — IKImageBrowserView
-        // caches by this UID, so a UID change reads as a brand new image
-        // rather than an update to the same one, forcing a full reload and
-        // flashing the placeholder back in every time. Identity only needs
-        // to reflect whether we have an image record with a path at all.
-        if let image = boxImage, image.relativePath != nil {
-            return image.uuid
-        } else {
-            return ":MissingArtwork(\(system?.coverAspectRatio ?? 0))"
-        }
-    }
-    
-    override func imageRepresentationType() -> String! {
-        if let image = boxImage, image.isLocalImageAvailable, image.relativePath != nil {
-            return IKImageBrowserNSURLRepresentationType
-        } else {
-            return IKImageBrowserNSImageRepresentationType
-        }
-    }
-    
-    override func imageRepresentation() -> Any! {
-        if let image = boxImage, image.isLocalImageAvailable, image.relativePath != nil {
-            return image.imageURL
-        } else {
-            return Self.artworkPlaceholder(aspectRatio: system?.coverAspectRatio ?? 0)
-        }
-    }
-    
-    override func imageTitle() -> String! {
-        return displayName
-    }
-    
-    override func imageSubtitle() -> String! {
-        return nil
-    }
-}
-
 // MARK: - OEListViewDataSourceItem
 
 extension OEDBGame: OEListViewDataSourceItem {

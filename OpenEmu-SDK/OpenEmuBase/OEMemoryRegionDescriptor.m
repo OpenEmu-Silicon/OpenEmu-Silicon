@@ -29,16 +29,27 @@
 
 @implementation OEMemoryRegionDescriptor
 
-- (instancetype)initWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes data:(NSData *)data
+- (instancetype)initWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes addressShift:(int8_t)addressShift data:(NSData *)data
 {
     if ((self = [super init])) {
         _name = [name copy];
         _address = address;
         _addressBytes = addressBytes;
         _minDataBytes = minDataBytes;
+        _addressShift = addressShift;
         _data = [data copy];
     }
     return self;
+}
+
++ (instancetype)descriptorWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes addressShift:(int8_t)addressShift data:(NSData *)data
+{
+    return [[self alloc] initWithName:name address:address addressBytes:addressBytes minDataBytes:minDataBytes addressShift:addressShift data:data];
+}
+
+- (instancetype)initWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes data:(NSData *)data
+{
+    return [self initWithName:name address:address addressBytes:addressBytes minDataBytes:minDataBytes addressShift:0 data:data];
 }
 
 + (instancetype)descriptorWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes minDataBytes:(uint8_t)minDataBytes data:(NSData *)data
@@ -54,6 +65,26 @@
 + (instancetype)descriptorWithName:(NSString *)name address:(uint32_t)address addressBytes:(uint8_t)addressBytes data:(NSData *)data
 {
     return [[self alloc] initWithName:name address:address addressBytes:addressBytes data:data];
+}
+
+- (uint32_t)addressForOffset:(NSInteger)offset
+{
+    uint64_t units = _addressShift >= 0 ? ((uint64_t)offset << _addressShift) : ((uint64_t)offset >> -_addressShift);
+    return _address + (uint32_t)units;
+}
+
+- (NSInteger)offsetForAddress:(uint32_t)address
+{
+    if (address < _address) return NSNotFound;
+    uint64_t delta = address - _address;
+    uint64_t offset;
+    if (_addressShift >= 0) {
+        if (delta & ((1ULL << _addressShift) - 1)) return NSNotFound;
+        offset = delta >> _addressShift;
+    } else {
+        offset = delta << -_addressShift;
+    }
+    return offset < _data.length ? (NSInteger)offset : NSNotFound;
 }
 
 @end

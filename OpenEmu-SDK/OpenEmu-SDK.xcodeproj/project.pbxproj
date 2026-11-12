@@ -22,6 +22,7 @@
 		01F306FB20AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.h in Headers */ = {isa = PBXBuildFile; fileRef = 01F306F920AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		01F306FC20AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.m in Sources */ = {isa = PBXBuildFile; fileRef = 01F306FA20AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.m */; };
 		0442B0011A2F4E6C00442001 /* OEGameCoreHardcoreTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0001A2F4E6C00442001 /* OEGameCoreHardcoreTests.m */; };
+		0442B0031A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */; };
 		0442B0021A2F4E6C00442002 /* HardcoreModePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */; };
 		0442B0041A2F4E6C00442004 /* HardcoreModePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */; };
 		0518D6DD24F17C6E0037101D /* OEGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 0518D6DC24F17C6E0037101D /* OEGeometry.m */; };
@@ -166,6 +167,7 @@
 		01F306F920AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSUserDefaults+OpenEmuSDK.h"; sourceTree = "<group>"; };
 		01F306FA20AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSUserDefaults+OpenEmuSDK.m"; sourceTree = "<group>"; };
 		0442B0001A2F4E6C00442001 /* OEGameCoreHardcoreTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEGameCoreHardcoreTests.m; sourceTree = "<group>"; };
+		0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEMemoryRegionDescriptorTests.m; sourceTree = "<group>"; };
 		0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardcoreModePolicy.swift; sourceTree = "<group>"; };
 		0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardcoreModePolicyTests.swift; sourceTree = "<group>"; };
 		0518D6DC24F17C6E0037101D /* OEGeometry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEGeometry.m; sourceTree = "<group>"; };
@@ -315,6 +317,7 @@
 			children = (
 				0109BBA4209F25EB002419C1 /* OEDiffQueueTests.m */,
 				0442B0001A2F4E6C00442001 /* OEGameCoreHardcoreTests.m */,
+				0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */,
 				0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */,
 			);
 			path = OpenEmuBaseTests;
@@ -778,6 +781,7 @@
 			files = (
 				0109BBA5209F25EB002419C1 /* OEDiffQueueTests.m in Sources */,
 				0442B0011A2F4E6C00442001 /* OEGameCoreHardcoreTests.m in Sources */,
+				0442B0031A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m in Sources */,
 				0442B0041A2F4E6C00442004 /* HardcoreModePolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

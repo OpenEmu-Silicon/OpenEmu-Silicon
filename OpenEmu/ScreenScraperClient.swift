@@ -30,6 +30,13 @@ struct ScreenScraperResult {
     var gameTitle: String?
     var boxImageURL: URL?
     var gameDescription: String?
+    /// Big-picture art from the same lookup: a wide backdrop (fan art, else a screenshot) and the title logo.
+    var heroImageURL: URL?
+    var logoImageURL: URL?
+    /// For the small tiles, best first: the cartridge or disc, the 3D box, then a square screenshot-and-box mix.
+    /// The first two are cutouts with no background; the mix is the last resort.
+    var iconImageURLs = [URL]()
+    var iconImageURL: URL? { iconImageURLs.first }
 }
 
 enum ScreenScraperFetchError: Error, Equatable {
@@ -46,7 +53,7 @@ extension ScreenScraperFetchError: LocalizedError {
         case .networkUnavailable(let detail):
             return "Could not reach ScreenScraper — check your connection. (\(detail))"
         case .badCredentials:
-            return "ScreenScraper rejected your credentials. Check your username and password in Preferences → Cover Art."
+            return "ScreenScraper rejected your credentials. Check your username and password in Preferences → Artwork."
         case .rateLimited:
             return "ScreenScraper rate limit reached. Try again later."
         case .notFound:
@@ -54,6 +61,50 @@ extension ScreenScraperFetchError: LocalizedError {
         case .invalidResponse:
             return "ScreenScraper returned an unexpected response."
         }
+    }
+}
+
+/// ScreenScraper's media addresses carry the developer's and the user's login in their query string. They must work
+/// when used, but must never be written to disk, so the library keeps the address without them and signs it again
+/// when it is used.
+extension ScreenScraperClient {
+
+    private static let secretQueryNames: Set<String> = ["devid", "devpassword", "devdebugpassword", "ssid", "sspassword"]
+
+    /// ScreenScraper's own host, not a look-alike such as `evilscreenscraper.fr`.
+    static func isScreenScraperHost(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "screenscraper.fr" || host.hasSuffix(".screenscraper.fr")
+    }
+
+    /// ScreenScraper itself over https: the only address that may be given the login. Removing a login is safe for any
+    /// scheme, so `redacted` only checks the host.
+    static func isScreenScraperAddress(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https" && isScreenScraperHost(url)
+    }
+
+    /// The address with every login value removed. Any other address is returned as it is.
+    static func redacted(_ url: URL) -> URL {
+        guard isScreenScraperHost(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let items = parts.queryItems, items.contains(where: { secretQueryNames.contains($0.name.lowercased()) }) else { return url }
+        let kept = items.filter { !secretQueryNames.contains($0.name.lowercased()) }
+        parts.queryItems = kept.isEmpty ? nil : kept
+        return parts.url ?? url
+    }
+
+    /// The address with the app's developer login and the user's login added, ready to download. Another site's address,
+    /// or one that already has a login, is returned as it is.
+    static func signed(_ url: URL, username: String? = nil, password: String? = nil) -> URL {
+        guard isScreenScraperAddress(url), var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        var items = parts.queryItems ?? []
+        let present = Set(items.map { $0.name.lowercased() })
+        func add(_ name: String, _ value: String?) { if let value = value, !value.isEmpty, !present.contains(name) { items.append(URLQueryItem(name: name, value: value)) } }
+        add("devid", devID); add("devpassword", devPassword)
+        let user = username ?? UserDefaults.standard.string(forKey: "ScreenScraperUsername")
+        let secret = password ?? OECredentialStore.shared.get(.screenScraperPassword)
+        add("ssid", user); add("sspassword", secret)
+        parts.queryItems = items
+        return parts.url ?? url
     }
 }
 
@@ -115,6 +166,7 @@ final class ScreenScraperClient {
         "openemu.system.gb":            9,   // Game Boy — .gbc routes to 10 via resolveSystemID
         "openemu.system.gba":          12,
         "openemu.system.nds":          15,
+        "openemu.system.3ds":          17,
         "openemu.system.vb":           11,   // Virtual Boy
         "openemu.system.pokemonmini": 211,
 
@@ -189,16 +241,18 @@ final class ScreenScraperClient {
 
     // Preferred region tags in priority order, per OELocalizationHelper region
     private func preferredRegions() -> [String] {
-        let region = OELocalizationHelper.shared.regionName
-        switch region {
+        switch OELocalizationHelper.shared.regionName {
         case "North America":
-            return ["us", "wor", "eu", "jp"]
+            return ["us", "wor", "eu", "uk"]
         case "Europe":
-            return ["eu", "wor", "us", "jp"]
+            // ScreenScraper has a version for each language of Europe; take the player's before the general one.
+            let own: [String: String] = ["fr": "fr", "de": "de", "es": "sp", "it": "it"]
+            let language = Locale.current.languageCode ?? ""
+            return (own[language].map { [$0] } ?? []) + ["eu", "uk", "wor", "us"]
         case "Japan":
-            return ["jp", "wor", "us", "eu"]
+            return ["jp", "wor", "us", "eu", "uk"]
         default:
-            return ["wor", "us", "eu", "jp"]
+            return ["wor", "us", "eu", "uk"]
         }
     }
 
@@ -375,7 +429,38 @@ final class ScreenScraperClient {
 
     // MARK: - JSON Parsing
 
-    private func parseGameInfo(jeu: [String: Any]) -> ScreenScraperResult? {
+    /// The best media for this player. With `regionFirst` false, `types` are tried in order and the player's region only
+    /// picks among the same type: fan art always beats a screenshot, whatever the screenshot's region. With it true the
+    /// region comes first across all the types: a Japanese HD logo is no use to a player in the US when the plain logo
+    /// has a US version. Regions with their own script (Japan, China, Korea) are used only when nothing else exists.
+    private func pickMedia(_ medias: [[String: Any]], types: [String], regionFirst: Bool = false) -> URL? {
+        func region(_ media: [String: Any]) -> String { (media["region"] as? String) ?? "" }
+        func type(_ media: [String: Any]) -> String { (media["type"] as? String) ?? "" }
+        func address(_ media: [String: Any]) -> URL? { (media["url"] as? String).flatMap { URL(string: $0) } }
+        let ownScript: Set<String> = ["jp", "cn", "asi", "kr", "tw"]
+
+        func best(among tier: [String]) -> URL? {
+            let wanted = medias.filter { tier.contains(type($0)) }
+            for preferred in preferredRegions() {
+                for wantedType in tier {
+                    if let match = wanted.first(where: { type($0) == wantedType && region($0) == preferred }), let url = address(match) { return url }
+                }
+            }
+            for includeOwnScript in [false, true] {
+                for wantedType in tier {
+                    if let match = wanted.first(where: { type($0) == wantedType && (includeOwnScript || !ownScript.contains(region($0))) }),
+                       let url = address(match) { return url }
+                }
+            }
+            return nil
+        }
+
+        let tiers = regionFirst ? [types] : types.map { [$0] }
+        for tier in tiers { if let url = best(among: tier) { return url } }
+        return nil
+    }
+
+    func parseGameInfo(jeu: [String: Any]) -> ScreenScraperResult? {
         var result = ScreenScraperResult()
 
         // Game title — prefer regional name
@@ -412,25 +497,11 @@ final class ScreenScraperClient {
             result.gameDescription = picked
         }
 
-        // Box art URL — medias array, type "box-2D", prefer regional
         if let medias = jeu["medias"] as? [[String: Any]] {
-            let boxMedias = medias.filter { ($0["type"] as? String) == "box-2D" }
-            let preferred = preferredRegions()
-            var pickedURL: URL?
-            for region in preferred {
-                if let match = boxMedias.first(where: { ($0["region"] as? String) == region }),
-                   let urlStr = match["url"] as? String,
-                   let url = URL(string: urlStr) {
-                    pickedURL = url
-                    break
-                }
-            }
-            if pickedURL == nil {
-                if let urlStr = boxMedias.first?["url"] as? String {
-                    pickedURL = URL(string: urlStr)
-                }
-            }
-            result.boxImageURL = pickedURL
+            result.boxImageURL = pickMedia(medias, types: ["box-2D"])
+            result.heroImageURL = pickMedia(medias, types: ["fanart", "ss"])
+            result.logoImageURL = pickMedia(medias, types: ["wheel-hd", "wheel"], regionFirst: true)
+            result.iconImageURLs = ["support-2D", "box-3D", "mixrbv2", "mixrbv1"].compactMap { pickMedia(medias, types: [$0]) }
         }
 
         guard result.gameTitle != nil || result.boxImageURL != nil else { return nil }

@@ -14,6 +14,8 @@
 # the real app uses, but its code signature can stop it loading in a plain process, and testing a stale
 # install is the mistake this repo's docs warn about. Output lines are described in oe-headless.m.
 # Set OE_HEADLESS_NO_BUILD=1 to reuse what is already built.
+# Set OE_HEADLESS_SHOT_DIR=<dir> to also write each --hash-at picture of a Metal core as a PNG there.
+# Set OE_HEADLESS_SANDBOX=<dir> to keep the core's support folder between runs (to test saves that persist).
 
 set -uo pipefail
 
@@ -23,7 +25,7 @@ BUILD="${OE_HEADLESS_BUILD:-$HOME/Builds/openemu/headless}"
 PRODUCTS="$BUILD/Build/Products/Debug"
 TOOL="$BUILD/oe-headless"
 
-[ $# -ge 1 ] || { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 CORE="$1"; shift
 BUILD_ONLY=0
 ARGS=()
@@ -50,7 +52,7 @@ build() {
   fi || { echo "FAIL  $CORE build failed, see $log" >&2; tail -20 "$log" >&2; exit 1; }
 
   echo "----  building oe-headless" >&2
-  xcrun clang -fobjc-arc -arch arm64 -F "$PRODUCTS" -framework OpenEmuBase -framework Foundation -framework Cocoa \
+  xcrun clang -fobjc-arc -arch arm64 -F "$PRODUCTS" -framework OpenEmuBase -framework Foundation -framework Cocoa -framework Metal -framework ImageIO -framework CoreGraphics \
     -Wl,-rpath,"$PRODUCTS" "$HERE/oe-headless.m" -o "$TOOL" >> "$log" 2>&1 \
     || { echo "FAIL  oe-headless would not compile, see $log" >&2; tail -20 "$log" >&2; exit 1; }
   codesign -f -s - "$TOOL" >> "$log" 2>&1

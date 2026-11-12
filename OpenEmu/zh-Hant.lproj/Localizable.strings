@@ -37,7 +37,7 @@
 	<key>A name is required.</key>
 	<string>名稱為必填。</string>
 	<key>ALERT_CORE_GLITCHES_FEEDBACK_HTML</key>
-	<string>&lt;b&gt;若此問題仍然存在時&lt;/b&gt;，請提交包括以下內容的回饋（以英文）：&lt;br&gt;&lt;br&gt;&lt;ul&gt;&lt;li&gt;The model of Mac you are using &lt;b&gt;and&lt;/b&gt; the version of macOS you have installed&lt;ul&gt;&lt;li&gt;This information is found in  &gt; About this Mac&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;li&gt;The &lt;b&gt;exact name&lt;/b&gt; of the game you were playing&lt;/li&gt;&lt;li&gt;The crash report of OpenEmuHelperApp&lt;ul&gt;&lt;li&gt;Open Console.app, click on "Crash Reports" or "User Reports" in the sidebar, then look for the latest document with OpenEmuHelperApp in the name&lt;/ul&gt;&lt;/li&gt;&lt;/li&gt;&lt;/ul&gt;&lt;br&gt;&lt;b&gt;總是先搜索其他使用者之前報告的類似反饋！&lt;/b&gt;&lt;br&gt;如果遺漏了其中任何資訊，或者已經發佈了類似的反饋，則你的問題回報可能會被關閉。</string>
+	<string>&lt;b&gt;若此問題仍然存在時&lt;/b&gt;，請提交包括以下內容的回饋（以英文）：&lt;br&gt;&lt;br&gt;&lt;ul&gt;&lt;li&gt;The model of Mac you are using &lt;b&gt;and&lt;/b&gt; the version of macOS you have installed&lt;ul&gt;&lt;li&gt;This information is found in  &gt; About this Mac&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;li&gt;The &lt;b&gt;exact name&lt;/b&gt; of the game you were playing&lt;/li&gt;&lt;li&gt;The crash report of OpenEmuHelperApp&lt;ul&gt;&lt;li&gt;Open Console.app, click on "Crash Reports" in the sidebar, then look for the latest document with OpenEmuHelperApp in the name&lt;/ul&gt;&lt;/li&gt;&lt;/li&gt;&lt;/ul&gt;&lt;br&gt;&lt;b&gt;總是先搜索其他使用者之前報告的類似反饋！&lt;/b&gt;&lt;br&gt;如果遺漏了其中任何資訊，或者已經發佈了類似的反饋，則你的問題回報可能會被關閉。</string>
 	<key>ALERT_INPUT_MONITORING_HEADLINE</key>
 	<string>OpenEmu 需要額外的許可權</string>
 	<key>ALERT_INPUT_MONITORING_PART1</key>

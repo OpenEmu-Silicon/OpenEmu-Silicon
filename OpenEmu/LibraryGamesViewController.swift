@@ -39,7 +39,7 @@ final class LibraryGamesViewController: NSSplitViewController {
     private let collectionViewMinWidth: CGFloat = 495
     
     private var sidebarController: SidebarController!
-    private var collectionController: OEGameCollectionViewController!
+    private var collectionController: GameCollectionViewController!
     private var toolbar: LibraryToolbar? {
         view.window?.toolbar as? LibraryToolbar
     }
@@ -50,7 +50,7 @@ final class LibraryGamesViewController: NSSplitViewController {
         super.viewDidLoad()
         
         sidebarController = SidebarController()
-        collectionController = OEGameCollectionViewController()
+        collectionController = GameCollectionViewController()
         
         setUpSplitView()
         assignDatabase()
@@ -193,19 +193,19 @@ final class LibraryGamesViewController: NSSplitViewController {
     
     @IBAction func changeGridSize(_ sender: NSSlider?) {
         guard let slider = toolbar?.gridSizeSlider else { return }
-        collectionController.zoomGridView(withValue: CGFloat(slider.doubleValue))
+        collectionController.zoomGridView(zoomValue: CGFloat(slider.doubleValue))
     }
     
     @IBAction func decreaseGridSize(_ sender: AnyObject?) {
         guard let slider = toolbar?.gridSizeSlider else { return }
         slider.doubleValue -= sender?.tag == 199 ? 0.25 : 0.5
-        collectionController.zoomGridView(withValue: CGFloat(slider.doubleValue))
+        collectionController.zoomGridView(zoomValue: CGFloat(slider.doubleValue))
     }
     
     @IBAction func increaseGridSize(_ sender: AnyObject?) {
         guard let slider = toolbar?.gridSizeSlider else { return }
         slider.doubleValue += sender?.tag == 199 ? 0.25 : 0.5
-        collectionController.zoomGridView(withValue: CGFloat(slider.doubleValue))
+        collectionController.zoomGridView(zoomValue: CGFloat(slider.doubleValue))
     }
     
     @objc func updateCollectionContentsFromSidebar() {
@@ -262,8 +262,8 @@ extension LibraryGamesViewController: LibrarySubviewControllerGameSelection {
 extension LibraryGamesViewController: NSMenuItemValidation {
     
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        let isGridView = collectionController.selectedViewTag == .gridViewTag
-        let isBlankSlate = collectionController.shouldShowBlankSlate()
+        let isGridView = collectionController.viewMode == .grid
+        let isBlankSlate = collectionController.shouldShowBlankSlate
         
         switch menuItem.action {
         case #selector(switchToGridView):
