@@ -37,7 +37,7 @@
 	<key>A name is required.</key>
 	<string>名称为必填。</string>
 	<key>ALERT_CORE_GLITCHES_FEEDBACK_HTML</key>
-	<string>&lt;b&gt;如果问题仍然存在&lt;/b&gt;，请提交反馈，包括：&lt;br&gt;&lt;br&gt;&lt;ul&gt;&lt;li&gt;你使用的 Mac 型号 &lt;b&gt;和&lt;/b&gt; 安装的 macOS 版本&lt;ul&gt;&lt;li&gt;此信息可在  &gt; 关于本机中找到&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;li&gt;您正在玩的游戏的&lt;b&gt;确切名称&lt;/b&gt;&lt;/li&gt;&lt;li&gt;OpenEmuHelperApp 的崩溃报告&lt;ul&gt;&lt;li&gt;打开 Console.app，点击侧边栏中的“崩溃报告”或“用户报告”，然后查找名称中带有 OpenEmuHelperApp 的最新文档&lt;/ul&gt;&lt;/li&gt;&lt;/li&gt;&lt;/ul&gt;&lt;br&gt;&lt;b&gt;始终搜索其他用户先前报告的类似反馈！&lt;/b&gt;&lt;br&gt;如果省略了任何此信息，或者已经发布了类似的反馈，您的问题报告可能会被关闭。</string>
+	<string>&lt;b&gt;如果问题仍然存在&lt;/b&gt;，请提交反馈，包括：&lt;br&gt;&lt;br&gt;&lt;ul&gt;&lt;li&gt;你使用的 Mac 型号 &lt;b&gt;和&lt;/b&gt; 安装的 macOS 版本&lt;ul&gt;&lt;li&gt;此信息可在  &gt; 关于本机中找到&lt;/li&gt;&lt;/ul&gt;&lt;/li&gt;&lt;li&gt;您正在玩的游戏的&lt;b&gt;确切名称&lt;/b&gt;&lt;/li&gt;&lt;li&gt;OpenEmuHelperApp 的崩溃报告&lt;ul&gt;&lt;li&gt;打开 Console.app，点击侧边栏中的“崩溃报告”，然后查找名称中带有 OpenEmuHelperApp 的最新文档&lt;/ul&gt;&lt;/li&gt;&lt;/li&gt;&lt;/ul&gt;&lt;br&gt;&lt;b&gt;始终搜索其他用户先前报告的类似反馈！&lt;/b&gt;&lt;br&gt;如果省略了任何此信息，或者已经发布了类似的反馈，您的问题报告可能会被关闭。</string>
 	<key>ALERT_INPUT_MONITORING_HEADLINE</key>
 	<string>OpenEmu 需要额外的权限</string>
 	<key>ALERT_INPUT_MONITORING_PART1</key>

@@ -33,6 +33,7 @@
 #include "mednafen/psx/psx.h"
 #include "mednafen/pce/pce.h"
 #include "mednafen/mempatcher-driver.h"
+#include "mednafen/cheat_formats/psx.h"
 #include "mednafen/ss/ss.h"
 
 #import "MednafenGameCore.h"
@@ -4404,6 +4405,10 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
     for (NSString *key in [_cheatList.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
         if (![_cheatList[key] boolValue]) continue;
         NSArray<NSString *> *parts = [key componentsSeparatedByString:@"+"];
+        if ([_mednafenCoreModule isEqualToString:@"psx"] && ![key containsString:@":"]) {
+            [self addPSXGameSharkCheatWithParts:parts];
+            continue;
+        }
         for (NSString *singleCode in parts) {
             Mednafen::MemoryPatch patch;
             patch.status = true;
@@ -4489,6 +4494,48 @@ namespace Mednafen { void MDFN_FlushGameCheats(int nosave); }
             }
         }
     }
+}
+
+// PSX GameShark codes go through Mednafen's own decoder so conditional (D0-D3/E0-E3), slide (50),
+// increment/decrement (10/11/20/21) and copy (C2) lines keep their meaning. A line that needs a
+// following line feeds the same patch into the next decode, the way Mednafen's own frontend chains
+// multi-part codes. A malformed code or one left waiting for its next line is dropped whole, so a
+// half-decoded condition can never turn into an unconditional write.
+- (void)addPSXGameSharkCheatWithParts:(NSArray<NSString *> *)parts
+{
+    std::vector<Mednafen::MemoryPatch> decoded;
+    Mednafen::MemoryPatch patch;
+    bool needsNextLine = false;
+
+    try {
+        for (NSString *part in parts) {
+            if (part.length == 0) continue;
+            needsNextLine = Mednafen::CheatFormats_PSX[0].DecodeCheat(std::string(part.UTF8String), &patch);
+            // Mednafen keeps only the low byte of a slide code's value step (5000XXYY ZZZZ), but
+            // GameShark steps the value by the whole 16-bit ZZZZ (e.g. SOTN "Have all Spells").
+            if (part.length == 12 && [part hasPrefix:@"50"]) {
+                unsigned int valueStep = 0;
+                [[NSScanner scannerWithString:[part substringFromIndex:8]] scanHexInt:&valueStep];
+                patch.mltpl_val_inc = valueStep & 0xFFFF;
+            }
+            if (!needsNextLine) {
+                patch.status = true;
+                decoded.push_back(patch);
+                patch = Mednafen::MemoryPatch();
+            }
+        }
+    } catch (const std::exception &e) {
+        NSLog(@"[Mednafen] Skipping PSX cheat %@: %s", [parts componentsJoinedByString:@"+"], e.what());
+        return;
+    }
+
+    if (needsNextLine) {
+        NSLog(@"[Mednafen] Skipping PSX cheat %@: last line needs a following line", [parts componentsJoinedByString:@"+"]);
+        return;
+    }
+
+    for (const auto &decodedPatch : decoded)
+        Mednafen::MDFNI_AddCheat(decodedPatch);
 }
 
 #pragma mark - Cheat Search

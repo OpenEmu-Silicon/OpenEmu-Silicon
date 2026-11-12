@@ -122,6 +122,7 @@ final class ScreenScraperClient {
         "openemu.system.gb":            9,   // Game Boy — .gbc routes to 10 via resolveSystemID
         "openemu.system.gba":          12,
         "openemu.system.nds":          15,
+        "openemu.system.3ds":          17,
         "openemu.system.vb":           11,   // Virtual Boy
         "openemu.system.pokemonmini": 211,
 

@@ -37,6 +37,16 @@ class ImageCollectionViewController: NSViewController {
     var currentSearchTerm = ""
     var itemSize = CGSize(width: 168, height: 143)
     
+    /// Identifier of the nib that makes the items of this collection.
+    var itemIdentifier: NSUserInterfaceItemIdentifier { .imageCollectionViewItem }
+    var sectionHeaderHeight: CGFloat { 46 }
+    /// Scales the slider value to the item size. The default matches the zoom level of the old grid.
+    var gridZoomMultiplier: CGFloat { 1.07 }
+    /// Like `gridZoomMultiplier`, but for the width of an item only.
+    var gridWidthMultiplier: CGFloat { gridZoomMultiplier }
+    /// Key in user defaults that remembers the selection.
+    var selectionDefaultsKey: String { "\(dataSourceDelegate.entityName)_OESelectedMediaKey" }
+    
     private var isSelected: Bool {
         return view.superview != nil
     }
@@ -171,6 +181,41 @@ class ImageCollectionViewController: NSViewController {
         restoreSelectionFromDefaults()
     }
     
+    func reloadData() {
+        precondition(Thread.isMainThread, "should only be called on main thread")
+        
+        dataSourceDelegate.fetchItems()
+        shouldShowBlankSlate = dataSourceDelegate.isEmpty
+        
+        var selectedItemIDs = Set<NSManagedObjectID>()
+        for indexPath in collectionView.selectionIndexPaths {
+            if let item = dataSourceDelegate.item(at: indexPath) as? OEDBItem {
+                selectedItemIDs.insert(item.objectID)
+            }
+        }
+        
+        collectionView.reloadData()
+        
+        var indexPaths = Set<IndexPath>()
+        for s in 0..<collectionView.numberOfSections {
+            for i in 0..<collectionView.numberOfItems(inSection: s) {
+                indexPaths.insert(IndexPath(item: i, section: s))
+            }
+        }
+        
+        var selectedIndexPaths = Set<IndexPath>()
+        for indexPath in indexPaths {
+            if let item = dataSourceDelegate.item(at: indexPath) as? OEDBItem,
+               selectedItemIDs.contains(item.objectID) {
+                selectedIndexPaths.insert(indexPath)
+            }
+        }
+        
+        collectionView.selectItems(at: selectedIndexPaths, scrollPosition: [])
+        
+        updateBlankSlate()
+    }
+
     // MARK: - Toolbar
     
     @IBAction func changeGridSize(_ sender: NSSlider?) {
@@ -195,6 +240,7 @@ class ImageCollectionViewController: NSViewController {
     
     enum ViewTag {
         case collection
+        case list
         case blankSlate
     }
     
@@ -216,13 +262,7 @@ class ImageCollectionViewController: NSViewController {
     }
     
     func show(tag: ViewTag) {
-        var newView: NSView!
-        switch tag {
-        case .collection:
-            newView = collectionView.enclosingScrollView
-        case .blankSlate:
-            newView = blankSlateView
-        }
+        guard let newView = contentView(for: tag) else { return }
         
         if newView.superview == view {
             return
@@ -243,9 +283,25 @@ class ImageCollectionViewController: NSViewController {
         }
     }
     
+    /// The view that shows the content for `tag`. Subclasses that offer a list override this for `.list`.
+    func contentView(for tag: ViewTag) -> NSView? {
+        switch tag {
+        case .collection:
+            return collectionView.enclosingScrollView
+        case .list:
+            return nil
+        case .blankSlate:
+            return blankSlateView
+        }
+    }
+    
+    /// Imports files that were dropped on the view or the blank slate.
+    func importDroppedFiles(_ files: [URL]) {
+        database.importer.importItems(at: files)
+    }
+    
     func zoomGridView(zoomValue: CGFloat) {
-        let finalZoom = zoomValue * 1.07 // multiplier replicates zoom level of IKImageBrowserView
-        flowLayout.itemSize = itemSize.applying(CGAffineTransform(scaleX: finalZoom, y: finalZoom))
+        flowLayout.itemSize = itemSize.applying(CGAffineTransform(scaleX: zoomValue * gridWidthMultiplier, y: zoomValue * gridZoomMultiplier))
         Self.lastGridSize = Float(zoomValue)
         // required if implementing NSCollectionViewDelegateFlowLayout methods
         flowLayout.invalidateLayout()
@@ -366,7 +422,7 @@ extension ImageCollectionViewController: NSCollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
-        let itemView = collectionView.makeItem(withIdentifier: .imageCollectionViewItem, for: indexPath) as! ImageCollectionViewItem
+        let itemView = collectionView.makeItem(withIdentifier: itemIdentifier, for: indexPath) as! ImageCollectionViewItem
         dataSourceDelegate.loadItemView(itemView, at: indexPath)
         return itemView
     }
@@ -390,47 +446,11 @@ extension ImageCollectionViewController: NSCollectionViewDataSource {
         return view
     }
     
-    func reloadData() {
-        precondition(Thread.isMainThread, "should only be called on main thread")
-        
-        dataSourceDelegate.fetchItems()
-        shouldShowBlankSlate = dataSourceDelegate.isEmpty
-        
-        var selectedItemIDs = Set<NSManagedObjectID>()
-        for indexPath in collectionView.selectionIndexPaths {
-            if let item = dataSourceDelegate.item(at: indexPath) as? OEDBItem {
-                selectedItemIDs.insert(item.objectID)
-            }
-        }
-        
-        collectionView.reloadData()
-        
-        var indexPaths = Set<IndexPath>()
-        for s in 0..<collectionView.numberOfSections {
-            for i in 0..<collectionView.numberOfItems(inSection: s) {
-                indexPaths.insert(IndexPath(item: i, section: s))
-            }
-        }
-        
-        var selectedIndexPaths = Set<IndexPath>()
-        for indexPath in indexPaths {
-            if let item = dataSourceDelegate.item(at: indexPath) as? OEDBItem,
-               selectedItemIDs.contains(item.objectID) {
-                selectedIndexPaths.insert(indexPath)
-            }
-        }
-        
-        collectionView.selectItems(at: selectedIndexPaths, scrollPosition: [])
-        
-        updateBlankSlate()
-    }
 }
 
 extension ImageCollectionViewController: NSCollectionViewDelegate {
     // MARK: - Handle selection
 
-    private static let mediaKey = "_OESelectedMediaKey"
-    
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
         saveSelectionToDefaults()
         selectionDidChange()
@@ -444,7 +464,7 @@ extension ImageCollectionViewController: NSCollectionViewDelegate {
     
     @objc func selectionDidChange() {}
     
-    private func saveSelectionToDefaults() {
+    @objc func saveSelectionToDefaults() {
         var archivable = [Data]()
         
         for url in dataSourceDelegate.permanentIDURIs(forItemsAt: collectionView.selectionIndexPaths) {
@@ -453,18 +473,18 @@ extension ImageCollectionViewController: NSCollectionViewDelegate {
             }
         }
         
-        let defaultsKey = "\(dataSourceDelegate.entityName)\(Self.mediaKey)"
+        let defaultsKey = selectionDefaultsKey
         UserDefaults.standard.set(archivable, forKey: defaultsKey)
         
         collectionView.refreshPreviewPanelIfNeeded()
     }
     
-    private func restoreSelectionFromDefaults() {
+    @objc func restoreSelectionFromDefaults() {
         let context = database.mainThreadContext
         guard let coordinator = context.persistentStoreCoordinator else { return }
         
         var set = Set<IndexPath>()
-        let defaultsKey = "\(dataSourceDelegate.entityName)\(Self.mediaKey)"
+        let defaultsKey = selectionDefaultsKey
         guard let archival = UserDefaults.standard.object(forKey: defaultsKey) as? [Data] else { return }
         
         for data in archival {
@@ -508,8 +528,7 @@ extension ImageCollectionViewController: NSCollectionViewDelegate {
         let pboard = draggingInfo.draggingPasteboard
         if pboard.canReadObject(forClasses: [NSURL.self], options: nil) {
             guard let files = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else { return false }
-            let romImporter = database.importer
-            romImporter.importItems(at: files)
+            importDroppedFiles(files)
             return true
         }
         return false
@@ -538,7 +557,7 @@ extension ImageCollectionViewController: NSCollectionViewDelegateFlowLayout {
     }
     
     func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> NSSize {
-        return NSSize(width: 0, height: 46)
+        return NSSize(width: 0, height: sectionHeaderHeight)
     }
 }
 
@@ -557,8 +576,7 @@ extension ImageCollectionViewController: BlankSlateViewDelegate {
         let pboard = sender.draggingPasteboard
         if pboard.canReadObject(forClasses: [NSURL.self], options: nil) {
             guard let files = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else { return false }
-            let romImporter = database.importer
-            romImporter.importItems(at: files)
+            importDroppedFiles(files)
             return true
         }
         return false

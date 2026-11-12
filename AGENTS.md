@@ -37,7 +37,11 @@ The maintainer is not a professional developer. Write commit messages, PR descri
 
 ## Build and Verify
 
-CI (`build-check.yml`) builds every PR, including every core the PR touches, and the test scripts below build the app themselves. A separate local build-and-analyze pass is not a step any more. Use the script that fits the change:
+CI (`build-check.yml`) builds every PR, including every core the PR touches, and the test scripts below build the app themselves. A separate local build-and-analyze pass is not a step any more.
+
+**To check anything you can see in the app (windows, menus, preferences, the library, import), drive the real debug app with the computer-use tools first.** Follow [`docs/computer-use-testing.md`](docs/computer-use-testing.md). It has no password prompt and does not stall. `check.sh` goes through Apple's UI test runner, which makes macOS ask for a password each run, so it is not the first choice. If your agent has no computer-use tools, use the scripts below.
+
+Use the script that fits the change:
 
 ```bash
 ./Scripts/check.sh                  # build, then drive the real app (windows, panes, Cores) against your real library
@@ -97,12 +101,14 @@ Pick the cheapest check that can really see the bug:
 |------------------|-----|
 | A pure function, parser, or data rule | A unit test in the matching `*Tests` target (`./Scripts/unit-tests.sh`) |
 | A core: loading, picture, sound, button input, save states | `./Scripts/headless/gb-checks.sh` for Game Boy, or `./Scripts/headless/run.sh <Core> --rom <file> ...` for any core. It runs the core with no window, so no one has to play the game |
-| The app window, menus, preferences, import, quick save | `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
+| The app window, menus, preferences, import, quick save | Drive the debug app with computer use ([`docs/computer-use-testing.md`](docs/computer-use-testing.md)). Without those tools: `./Scripts/check.sh` (UI tests; leave the mouse and keyboard alone while it runs) |
 | A crash | The crash report plus `./Scripts/collect-diagnostics.sh`. Write the check that triggers it, then fix |
 
 `./Scripts/prove.sh` chains the build, tests, headless checks, and diagnostics and prints one pass or fail line. A change is proven only when it ends with `PROVEN`.
 
 **One-time setup on a Mac (the maintainer does this once).** Debug builds are signed ad hoc, so the signature changes on every rebuild and macOS forgets what the debug app was allowed to do. That shows up two ways: the keyboard dies (Input Monitoring) and unit tests hang until someone clicks Allow on a "read your Documents folder" prompt. Run `./Scripts/setup-debug-signing.sh` once (it asks for the login password), then click Allow once. `./Scripts/prove.sh` tells you when the certificate is missing. An agent must not run that script, because it changes the keychain.
+
+**If the keyboard still dies.** Debug builds log one line a few seconds after launch: `log show --last 2m --predicate 'eventMessage CONTAINS "OEInputProbe access"'`. `access=granted keyboards=1` and a `certificate leaf` requirement is healthy. `access=denied` with a `cdhash` requirement means the running build is signed ad hoc (the grant is tied to the signature, so macOS ignored it). `build-for-worktree.sh` and `launch-debug.sh` now re-sign with the "OpenEmu Debug" certificate and refuse to continue (launch-debug) or fail (build) when they cannot, instead of quietly launching an ad-hoc build. If they report a signing failure, the usual cause is a locked login keychain; unlock it and retry. Do not read the build's last output line only: the signing error is above it.
 
 Known gap: `OpenEmuKitTests` does not compile in the workspace today (`OpenEmuKitPrivate` cannot be resolved), so shader-preset tests are not run anywhere.
 
@@ -149,6 +155,7 @@ Before you report any in-game result, make sure the thing you ran is the thing y
 | MSX | blueMSX |
 | Neo Geo Pocket | Mednafen |
 | Nintendo (NES) | Nestopia (default), FCEU |
+| Nintendo 3DS | (system only; native Azahar core in progress, tracked in [#814](https://github.com/OpenEmu-Silicon/OpenEmu-Silicon/issues/814)) |
 | Nintendo 64 | Mupen64Plus |
 | Nintendo DS | DeSmuME |
 | Odyssey² / Videopac+ | O2EM |

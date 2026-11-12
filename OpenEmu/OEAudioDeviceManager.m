@@ -58,7 +58,7 @@ static OSStatus _OEAOPropertyListenerProc(AudioObjectID inObjectID, UInt32 inNum
         };
 
         const int numSelectors = sizeof(propSelectors) / sizeof(propSelectors[0]);
-        AudioObjectPropertyAddress propAddr = {0, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster};
+        AudioObjectPropertyAddress propAddr = {0, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
         for(int i = 0; i < numSelectors; i++)
         {
             propAddr.mSelector = propSelectors[i];
@@ -96,7 +96,7 @@ static OSStatus _OEAOPropertyListenerProc(AudioObjectID inObjectID, UInt32 inNum
     AudioDeviceID              deviceID;
     OSStatus                   err      = 0;
     UInt32                     dataSize = sizeof(AudioDeviceID);
-    AudioObjectPropertyAddress propAddr = {propertySelector, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster};
+    AudioObjectPropertyAddress propAddr = {propertySelector, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
 
     err = AudioObjectGetPropertyData(kAudioObjectSystemObject, &propAddr, 0, NULL, &dataSize, &deviceID);
     if(err != noErr)
@@ -132,11 +132,11 @@ static OSStatus _OEAOPropertyListenerProc(AudioObjectID inObjectID, UInt32 inNum
     static const AudioObjectPropertyAddress propAddr = {
         kAudioHardwarePropertyDevices,
         kAudioObjectPropertyScopeGlobal,
-        kAudioObjectPropertyElementMaster };
+        kAudioObjectPropertyElementMain };
     static const AudioObjectPropertyAddress aggDevCompositionPropAddr = {
         kAudioAggregateDevicePropertyComposition,
         kAudioObjectPropertyScopeGlobal,
-        kAudioObjectPropertyElementMaster,
+        kAudioObjectPropertyElementMain,
     };
 
     err = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &propAddr, 0, NULL, &dataSize);
@@ -303,7 +303,7 @@ OSStatus _OEAOPropertyListenerProc(AudioObjectID inObjectID, UInt32 inNumberAddr
     {
         kAudioObjectPropertyName,
         kAudioObjectPropertyScopeGlobal,
-        kAudioObjectPropertyElementMaster
+        kAudioObjectPropertyElementMain
     };
 
     err = AudioObjectGetPropertyData(_deviceID, &propAddr, 0, NULL, &ioSize, &tempString);

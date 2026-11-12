@@ -28,12 +28,6 @@ protocol GameTableViewMenuSource {
     func tableView(_ tableView: GameTableView, menuForItemsAt indexes: IndexSet) -> NSMenu?
 }
 
-extension OEGameCollectionViewController: GameTableViewMenuSource {
-    func tableView(_ tableView: GameTableView, menuForItemsAt indexes: IndexSet) -> NSMenu? {
-        return menuForItems(at: indexes)
-    }
-}
-
 extension NSUserInterfaceItemIdentifier {
     static let gameTableViewStatusColumn = NSUserInterfaceItemIdentifier.statusColumn
     static let gameTableViewTitleColumn  = NSUserInterfaceItemIdentifier.titleColumn
@@ -206,5 +200,30 @@ final class GameTableHeaderView: NSTableHeaderView {
         newState.toggle()
         newHeaderState[column.identifier.rawValue] = newState
         tableView.headerState = newHeaderState
+    }
+}
+
+extension NSDate {
+    /// The sort selector used by the "Last Played" column in `GameTableView.xib`. It compares day, month and
+    /// year only, and treats a missing date as the distant past.
+    @objc(OE_compareDMYTranslatingNilToDistantPast:)
+    func compareDMYTranslatingNilToDistantPast(_ other: NSDate?) -> ComparisonResult {
+        guard let other = other else {
+            return compare(.distantPast)
+        }
+        
+        let calendar = Calendar(identifier: .gregorian)
+        let components: Set<Calendar.Component> = [.year, .month, .day]
+        let mine = calendar.dateComponents(components, from: self as Date)
+        let theirs = calendar.dateComponents(components, from: other as Date)
+        
+        if mine.year != theirs.year {
+            return mine.year! > theirs.year! ? .orderedDescending : .orderedAscending
+        } else if mine.month != theirs.month {
+            return mine.month! > theirs.month! ? .orderedDescending : .orderedAscending
+        } else if mine.day != theirs.day {
+            return mine.day! > theirs.day! ? .orderedDescending : .orderedAscending
+        }
+        return .orderedSame
     }
 }

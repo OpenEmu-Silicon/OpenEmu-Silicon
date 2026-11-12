@@ -1,0 +1,3 @@
+# Prepared locally by Scripts/prepare-azahar-core.sh and Scripts/build-azahar-core.sh; too large to commit.
+deps/
+build/

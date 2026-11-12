@@ -8,6 +8,7 @@
 # Steps: core feed-URL check, build, plist lint, codesign the build, install with install-core.sh,
 # codesign the installed plugin, then verify-core-installed.sh (the installed binary matches the build).
 # Each step prints one PASS/FAIL line. Exit code is the number of failed steps; 0 means all passed.
+# If the build fails, the script stops before installing, so the installed core is left as it was.
 #
 # OpenEmu loads cores from ~/Library/Application Support/OpenEmu/Cores/, not from the build folder, so a
 # successful build alone proves nothing about what the app runs. Do not report an in-game core result
@@ -35,12 +36,13 @@ INSTALLED_CORES="$HOME/Library/Application Support/OpenEmu/Cores"
 CORE=""
 CONFIG="Debug"
 FAILURES=0
+BUILD_OK=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --release) CONFIG="Release"; shift ;;
     --debug) CONFIG="Debug"; shift ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "unknown flag: $1" >&2; exit 2 ;;
     *) CORE="$1"; shift ;;
   esac
@@ -113,6 +115,7 @@ if [ -n "$CORE_BUILD_SCRIPT" ]; then
   wait_for_build_db
   if "$CORE_BUILD_SCRIPT" > "$BUILD_LOG" 2>&1; then
     pass "build ($CORE_BUILD_SCRIPT)"
+    BUILD_OK=1
   else
     fail "build ($CORE_BUILD_SCRIPT) — see $BUILD_LOG (last 30 lines below)"
     tail -30 "$BUILD_LOG"
@@ -136,6 +139,7 @@ else
   wait_for_build_db
   if xcodebuild "${XCODEBUILD_ARGS[@]}" build > "$BUILD_LOG" 2>&1; then
     pass "build ($SCHEME)"
+    BUILD_OK=1
   else
     fail "build ($SCHEME) — see $BUILD_LOG (last 30 lines below)"
     tail -30 "$BUILD_LOG"
@@ -173,7 +177,9 @@ else
     -path "*OpenEmu-metal-*/Build/Products/${CONFIG}/${CORE}.oecoreplugin" -print -quit 2>/dev/null)
 fi
 
-if [ -z "$ARTIFACT" ] || [ ! -e "$ARTIFACT" ]; then
+if [ "$BUILD_OK" -ne 1 ]; then
+  info "build failed, so skipping codesign, install and verify; the installed core was not changed"
+elif [ -z "$ARTIFACT" ] || [ ! -e "$ARTIFACT" ]; then
   fail "locate built plugin (expected in DerivedData or the worktree build folder)"
 else
   info "plugin: $ARTIFACT"
@@ -188,10 +194,11 @@ else
 
   CONFIG_FLAG="--$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
   info "installing core via Scripts/install-core.sh ($CONFIG)"
-  if ./Scripts/install-core.sh "$CORE" "$CONFIG_FLAG" >/dev/null 2>&1; then
+  if INSTALL_OUTPUT=$(./Scripts/install-core.sh "$CORE" "$CONFIG_FLAG" 2>&1); then
     pass "install-core.sh $CORE $CONFIG_FLAG"
   else
     fail "install-core.sh $CORE $CONFIG_FLAG"
+    echo "$INSTALL_OUTPUT"
   fi
 
   INSTALL_DEST="$INSTALLED_CORES/${CORE}.oecoreplugin"
