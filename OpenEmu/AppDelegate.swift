@@ -1341,13 +1341,12 @@ extension AppDelegate: NSMenuDelegate {
         // Keep each game's latest RetroAchievements session, so big picture can show achievements without a running game.
         MainActor.assumeIsolated { OEBigPictureAchievements.shared.start() }
 
-        #if DEBUG
-        // Big-picture mode spike (#789): debug builds only, until it has a proper entry point.
+        // Big-picture mode spike (#789). On main this is debug builds only. This pre-release branch shows it in
+        // release builds too, so testers can reach it. Keep this change out of main.
         let bigPictureItem = NSMenuItem(title: "Big Picture (Spike)", action: #selector(toggleBigPicture(_:)), keyEquivalent: "b")
         bigPictureItem.keyEquivalentModifierMask = [.command, .control]
         NSApp.windowsMenu?.insertItem(.separator(), at: 0)
         NSApp.windowsMenu?.insertItem(bigPictureItem, at: 0)
-        #endif
 
         let notificationCenter = NotificationCenter.default
         
