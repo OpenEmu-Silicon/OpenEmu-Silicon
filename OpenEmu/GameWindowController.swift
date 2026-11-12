@@ -558,7 +558,6 @@ extension GameWindowController: GameIntegralScalingDelegate {
 
         let newAspect = gameDocument.gameViewController.defaultScreenSize
         let aspectChanged = abs(newAspect.width * lastReportedAspect.height - lastReportedAspect.width * newAspect.height) > 1
-        NSLog("WINDBG size report aspect=%@ changed=%d settled=%d playing=%d pending=%d", NSStringFromSize(newAspect), aspectChanged ? 1 : 0, hasSettledInitialWindowSize ? 1 : 0, isPlaying ? 1 : 0, resizeOnNextAspectChange ? 1 : 0)
         lastReportedAspect = newAspect
         window.contentAspectRatio = newAspect
         updateContentSizeConstraints()
