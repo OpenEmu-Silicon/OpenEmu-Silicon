@@ -74,3 +74,13 @@ Attempt on 2026-11-11: Ocarina of Time 3D in real gameplay (the cave scene), sam
 ## window-follows-layout
 
 Picking a layout from the menu or Next Display Mode now lets the game window resize once to the new shape (it used to keep its old shape, so wide layouts were letterboxed). Only a user-chosen display mode does this; other size reports from a core still never resize the window. Checked in the app with Ocarina of Time 3D: stacked, large-screen and side-by-side switches resize the window to fit. Update: the core now reports the chosen layout's picture size before its first frame, so a layout restored at launch opens the right shape, and every layout (single screen top and bottom, side by side, large top, stacked) fit the window with no bars when cycled in the app.
+
+## long-session, second attempt (2026-11-12): no crash or hang, about 15 minutes of play
+
+Ocarina of Time 3D resumed in gameplay, screen kept awake with `caffeinate`, sampled once a minute for 32 minutes (07:37 to 08:07). During it: five layout switches, one quick save and one quick load.
+
+- The helper process stayed alive the whole time. No crash, no hang, no helper restart.
+- While the game was running: 59.7 to 59.9 fps in every sample, worst frame gap 45 ms.
+- Memory: about 190 MB right after load, settling to 101 to 116 MB and flat over the last 11 minutes. No growth.
+- Not a full 30 minutes of play: from about 07:41 to 07:56 the game was not running (0% CPU, 25 to 42 MB), because OpenEmu pauses a game while its window is not the active app. The running time is the first ~4 minutes plus the last ~11 (07:56 to 08:07), about 15 minutes.
+- Result: item 8's criterion (30 minutes, no crash or hang) is met in spirit, not to the letter. Nothing in 15 minutes of play, layout changes and a state round trip suggests a leak or hang.
