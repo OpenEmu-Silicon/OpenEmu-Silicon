@@ -32,11 +32,18 @@ VERSION="$2"
 # ── 1. Locate the Release artifact ───────────────────────────────────────────
 step "Locating Release artifact"
 
-DERIVED_DATA=$(find ~/Library/Developer/Xcode/DerivedData -maxdepth 1 \
-  -name "OpenEmu-metal-*" -type d 2>/dev/null | head -1)
-[ -n "$DERIVED_DATA" ] || die "DerivedData for OpenEmu-metal not found. Build via: ./Scripts/core.sh $CORE --release"
-
-PLUGIN="$DERIVED_DATA/Build/Products/Release/${CORE}.oecoreplugin"
+# Cores built by their own script (Azahar, PS2, FBNeo, MAME) put the plugin in <Core>/build/XcodeDerived.
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_BUILT="$REPO_ROOT/$CORE/build/XcodeDerived/Build/Products/Release/${CORE}.oecoreplugin"
+if [ -d "$SCRIPT_BUILT" ]; then
+  PLUGIN="$SCRIPT_BUILT"
+  DERIVED_DATA="$REPO_ROOT/$CORE/build/XcodeDerived"
+else
+  DERIVED_DATA=$(find ~/Library/Developer/Xcode/DerivedData -maxdepth 1 \
+    -name "OpenEmu-metal-*" -type d 2>/dev/null | head -1)
+  [ -n "$DERIVED_DATA" ] || die "DerivedData for OpenEmu-metal not found. Build via: ./Scripts/core.sh $CORE --release"
+  PLUGIN="$DERIVED_DATA/Build/Products/Release/${CORE}.oecoreplugin"
+fi
 [ -d "$PLUGIN" ] || die "Plugin not found: $PLUGIN — run ./Scripts/core.sh $CORE --release first."
 ok "Found: $PLUGIN"
 
