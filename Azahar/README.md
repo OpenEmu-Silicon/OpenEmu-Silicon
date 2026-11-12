@@ -44,3 +44,11 @@ This fetches the source, installs a MoltenVK copy checked against a pinned SHA-2
 | `../Scripts/prepare-azahar-core.sh` | Fetches the pinned commit, all submodules, applies patches |
 | `../Scripts/build-azahar-deps.sh` | Installs the pinned MoltenVK |
 | `../Scripts/build-azahar-core.sh` | Configures and builds the engine libraries |
+
+## Game files and keys
+
+- Accepted file types (set by the 3DS system plugin): `.3ds`, `.cci`, `.cxi`, `.3dsx`.
+- Tested: decrypted `.cci` dumps of five games (see `docs/3ds-evidence/README.md`). They need no keys and no system files.
+- Encrypted dumps: Azahar reads the keys from `keys.txt` in the core's `sysdata` folder, `~/Library/Application Support/OpenEmu/Azahar/sysdata/keys.txt`. Not tested here (no encrypted dump or key file was available). If a game is encrypted and the keys are missing, loading fails with "This game is encrypted. Azahar needs a decrypted dump or the matching keys."
+- We do not ship keys or system files, and do not help find them.
+- Save data (in-game saves, the virtual SD card and NAND) lives under `~/Library/Application Support/OpenEmu/Azahar/`. Save states go to OpenEmu's usual Save States folder.
