@@ -28,6 +28,7 @@
 #include "pcsx2/IopThread/OwnerAsserts.h"
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
+#include "pcsx2/MemoryTypes.h"
 #include "pcsx2/PerformanceMetrics.h"
 #include "pcsx2/SIO/Pad/Pad.h"
 
@@ -131,6 +132,10 @@ bool OEHost::Initialize(const Folders& folders, std::string* error)
 		si.SetBoolValue("EmuCore", "EnablePatches", true);
 		si.SetBoolValue("EmuCore", "EnableCheats", false);
 		si.SetBoolValue("EmuCore", "EnablePerGameSettings", true);
+
+		// RetroAchievements runs through OpenEmu's own client (PCSX2GameCore), so the
+		// engine's built-in one must never start a second session.
+		si.SetBoolValue("Achievements", "Enabled", false);
 	}
 
 	Error save_error;
@@ -416,6 +421,41 @@ void Host::SetPadVibration(u32 pad_index, float large_or_single_motor_intensity,
 		s_vibration_callback(pad_index, large_or_single_motor_intensity, small_motor_intensity);
 }
 
+static std::function<void()> s_frame_callback;
+
+void OEHost::SetFrameCallback(std::function<void()> callback)
+{
+	s_frame_callback = std::move(callback);
+}
+
+u32 OEHost::ReadAchievementsMemory(u32 address, u8* buffer, u32 num_bytes)
+{
+	// The same map as the engine's Achievements::ClientReadMemory. RetroAchievements' PS2 sets
+	// see only the first 32 MB of RAM, even when the engine exposes the 128 MB devkit RAM.
+	constexpr u32 scratch_start = Ps2MemSize::MainRam;
+	constexpr u32 map_end = scratch_start + Ps2MemSize::Scratch;
+	if (!eeMem || address >= map_end)
+		return 0;
+
+	const u32 count = std::min(num_bytes, map_end - address);
+	if (address + count <= scratch_start)
+	{
+		std::memcpy(buffer, &eeMem->Main[address], count);
+	}
+	else if (address >= scratch_start)
+	{
+		std::memcpy(buffer, &eeMem->Scratch[address - scratch_start], count);
+	}
+	else
+	{
+		// Straddles the end of RAM and the start of the scratchpad.
+		const u32 from_ram = scratch_start - address;
+		std::memcpy(buffer, &eeMem->Main[address], from_ram);
+		std::memcpy(buffer + from_ram, &eeMem->Scratch[0], count - from_ram);
+	}
+	return count;
+}
+
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 {
 	return BuildWindowInfo();
@@ -480,6 +520,11 @@ void Host::PumpMessagesOnCPUThread()
 {
 	if (s_shutdown_requested.load(std::memory_order_acquire) && VMManager::HasValidVM())
 		VMManager::SetState(VMState::Stopping);
+
+	// The engine calls this once per vsync while the machine runs, which is exactly the
+	// once-per-frame point RetroAchievements needs.
+	if (s_frame_callback)
+		s_frame_callback();
 
 	DrainCPUThreadQueue();
 }

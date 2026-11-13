@@ -48,6 +48,9 @@
 #import <Metal/Metal.h>
 #import <OpenEmuBase/OEAudioBuffer.h>
 
+#import "OERetroAchievementsBridge.h"
+#include <rc_consoles.h>
+
 // Defined by the engine patch PCSX2/patches/0001-openemu-metal-output.patch.
 void GSDeviceMTLSetOutputTextures(void *texture0, void *texture1);
 int GSDeviceMTLReadyOutputIndex();
@@ -63,6 +66,12 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	return @[@"scph39001.bin", @"scph70004.bin", @"scph10000.bin", @"scph50000.bin", @"scph30004r.bin"];
 }
 
+// rcheevos reads PS2 memory during -doFrame, which runs on the engine's CPU thread.
+static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t num_bytes, rc_client_t *client)
+{
+	return OEHost::ReadAchievementsMemory(address, buffer, num_bytes);
+}
+
 @implementation PCSX2GameCore {
 	NSURL *_gameURL;
 	NSString *_biosFilename;
@@ -73,6 +82,7 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	id<MTLTexture> _outputTextures[2];  // the engine draws into one while OpenEmu shows the other
 	NSArray<NSURL *> *_discURLs;        // the discs of an .m3u playlist; one entry for a single disc
 	NSView *_renderView;            // the engine attaches its Metal layer here
+	OERetroAchievementsBridge *_raBridge;
 }
 
 - (BOOL)loadFileAtURL:(NSURL *)url error:(NSError **)error
@@ -134,6 +144,14 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 		}
 		return NO;
 	}
+
+	// Start RetroAchievements now: login and identifying the disc run off the disc path, apart
+	// from the engine. rcheevos reads .iso, .bin and .cue images itself. markROMReady waits
+	// until the engine has booted (see startEmulation).
+	_raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
+													   memoryReader:pcsx2_rc_read_memory
+														  consoleID:(uint32_t)RC_CONSOLE_PLAYSTATION_2];
+	[_raBridge startWithROMPath:_gameURL.path];
 	return YES;
 }
 
@@ -198,6 +216,13 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 																   @"weakMotor": @(small)}];
 	});
 
+	// RetroAchievements checks its conditions once per emulated frame, on the CPU thread, where
+	// PS2 memory is stable. OpenEmu's own loop (executeFrame) does not follow the engine's frames.
+	__weak OERetroAchievementsBridge *raBridge = _raBridge;
+	OEHost::SetFrameCallback([raBridge]() {
+		[raBridge doFrame];
+	});
+
 	VMBootParameters params;
 	params.filename = _gameURL.fileSystemRepresentation;
 	params.source_type = CDVD_SourceType::Iso;
@@ -205,9 +230,12 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	params.fullscreen = false;
 
 	_engineStarted = YES;
-	OEHost::StartCPUThread(std::move(params), [](bool ok, const std::string &error) {
+	OEHost::StartCPUThread(std::move(params), [raBridge](bool ok, const std::string &error) {
 		if (!ok) {
 			NSLog(@"[PCSX2] Boot failed: %s", error.c_str());
+		} else {
+			// PS2 memory exists now; let rcheevos read it.
+			[raBridge markROMReady];
 		}
 	});
 
@@ -225,14 +253,20 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (void)stopEmulation
 {
+	// Shut RetroAchievements down first, so it stops reading memory before the machine goes away.
+	[_raBridge shutdown];
+	_raBridge = nil;
+
 	_engineStarted = NO;  // stops executeFrame touching the stream while it is torn down
 	OEHost::StopCPUThread();
+	OEHost::SetFrameCallback(nullptr);
 	[super stopEmulation];
 }
 
 - (void)resetEmulation
 {
 	Host::RunOnCPUThread([]() { VMManager::Reset(); }, false);
+	[_raBridge reset];
 }
 
 - (void)setPauseEmulation:(BOOL)pauseEmulation
@@ -282,9 +316,32 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 
 - (void)dealloc
 {
+	[_raBridge shutdown];
 	if (_ownsVideoBuffer) {
 		free(_videoBuffer);
 	}
+}
+
+#pragma mark - RetroAchievements
+
+- (void)retroAchievementsIdle
+{
+	[_raBridge idle];
+}
+
+- (BOOL)canPauseRetroAchievementsHardcoreWithFramesRemaining:(uint32_t *)framesRemaining
+{
+	return _raBridge ? [_raBridge canPauseWithFramesRemaining:framesRemaining] : YES;
+}
+
+- (NSData *)retroAchievementsSerializedProgress
+{
+	return [_raBridge serializeProgress];
+}
+
+- (void)retroAchievementsDeserializeProgress:(NSData *)data
+{
+	[_raBridge deserializeProgress:data];
 }
 
 #pragma mark - Speed and frame step
@@ -313,7 +370,9 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 - (void)stepFrameForward
 {
 	[super stepFrameForward];
-	if (!_engineStarted) {
+	// Frame advance is not allowed in RetroAchievements hardcore mode. The base class only
+	// skips its own part, so the engine's frame advance has to check too.
+	if (!_engineStarted || self.hardcoreEnabled) {
 		return;
 	}
 	Host::RunOnCPUThread([]() {

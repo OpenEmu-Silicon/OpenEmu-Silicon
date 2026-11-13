@@ -13,6 +13,10 @@ OpenEmu wrapper around the [ARMSX2](https://github.com/ARMSX2/ARMSX2) engine, a 
 
 Not yet checked: D-pad and right stick, rumble on a real controller, saving a state and loading it in the same session, disc swap and display modes, heavy 3D games, long sessions (item 7), or any game other than Dragon Quest VIII (items 7 and 8). There is a single short hitch of about 3 seconds just after Start on the Dragon Quest VIII title screen, probably the game loading; it has not been traced.
 
+## RetroAchievements
+
+In progress. The core uses the shared `OERetroAchievementsBridge` with the repo's `Vendor/rcheevos`; the engine's own rcheevos library is left off the link line (`Scripts/gen-armsx2-xcconfig.py`) and its built-in achievements are turned off. Achievements are checked once per PS2 frame on the engine's CPU thread (`OEHost::SetFrameCallback`). Games are identified from `.iso`, `.bin` and `.cue` images only so far; `.chd`, `.cso` and `.gz` images, and disc swaps, are not handled yet.
+
 ## Source dependency
 
 The engine source is not committed here (about 560 MB). It is fetched from a fork at the commit pinned in `deps-armsx2-revision.txt`:

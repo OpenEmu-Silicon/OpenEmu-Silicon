@@ -40,6 +40,16 @@ namespace OEHost
 	/// and small motor strength (0 to 1). Set before StartCPUThread.
 	void SetVibrationCallback(std::function<void(u32 pad, float large, float small)> callback);
 
+	/// Called on the CPU thread once per emulated frame (every vsync), while the machine runs.
+	/// RetroAchievements checks its conditions here. Set before StartCPUThread.
+	void SetFrameCallback(std::function<void()> callback);
+
+	/// Copies PS2 memory for RetroAchievements, in its memory map: the 32 MB of main RAM,
+	/// then the 16 KB scratchpad directly above it. Returns the number of bytes copied, which
+	/// is less than `num_bytes` at the end of the map and 0 when no machine is running.
+	/// Call on the CPU thread.
+	u32 ReadAchievementsMemory(u32 address, u8* buffer, u32 num_bytes);
+
 	/// The base settings layer, for the game core to change values and then call
 	/// VMManager::ApplySettings() on the CPU thread. Valid after Initialize().
 	INISettingsInterface& Settings();
