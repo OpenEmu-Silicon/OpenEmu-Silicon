@@ -15,7 +15,9 @@ Not yet checked: D-pad and right stick, rumble on a real controller, saving a st
 
 ## RetroAchievements
 
-In progress. The core uses the shared `OERetroAchievementsBridge` with the repo's `Vendor/rcheevos`; the engine's own rcheevos library is left off the link line (`Scripts/gen-armsx2-xcconfig.py`) and its built-in achievements are turned off. Achievements are checked once per PS2 frame on the engine's CPU thread (`OEHost::SetFrameCallback`). Games are identified from `.iso`, `.bin` and `.cue` images only so far; `.chd`, `.cso` and `.gz` images, and disc swaps, are not handled yet.
+In progress. The core uses the shared `OERetroAchievementsBridge` with the repo's `Vendor/rcheevos`; the engine's own rcheevos library is left off the link line (`Scripts/gen-armsx2-xcconfig.py`) and its built-in achievements are turned off. Achievements are checked once per PS2 frame on the engine's CPU thread (`OEHost::SetFrameCallback`), and reset only once the engine has really reset (`OEHost::SetResetCallback`). Games are identified from `.iso`, `.bin` and `.cue` images only so far; `.chd`, `.cso` and `.gz` images, and disc swaps, are not handled yet.
+
+Hardcore mode: OpenEmu blocks state loading, rewind, slow motion and frame advance itself. The engine normally adds its own restrictions (no EE underclocking, including auto-tune's governor; normal frame rates; no cheats or cheat-like patch files), but only when its built-in achievements run. `PCSX2/patches/0002-openemu-host-hardcore.patch` (built with `OE_HOST_HARDCORE`) makes the engine ask OpenEmu instead (`OEHost::SetHardcoreMode`), so those apply too.
 
 ## Source dependency
 

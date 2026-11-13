@@ -54,6 +54,13 @@ namespace OEHost
 	/// reset callback rather than assuming it is done.
 	void RequestReset();
 
+	/// Turns RetroAchievements hardcore mode on or off for the engine. The engine keeps its built-in
+	/// achievements off, so it asks here instead (PCSX2/patches/0002-openemu-host-hardcore.patch) and
+	/// then applies its own hardcore restrictions: no EE underclocking (including auto-tune's
+	/// governor), normal frame rates and speed, no cheats or cheat-like patches, no state loading
+	/// or frame advance. Safe to call from any thread, before or after StartCPUThread.
+	void SetHardcoreMode(bool enabled);
+
 	/// Copies PS2 memory for RetroAchievements, in its memory map: the 32 MB of main RAM,
 	/// then the 16 KB scratchpad directly above it. Returns the number of bytes copied, which
 	/// is less than `num_bytes` at the end of the map and 0 when no machine is running.
@@ -74,3 +81,10 @@ namespace OEHost
 	/// Whether the CPU thread is alive.
 	bool IsCPUThreadRunning();
 } // namespace OEHost
+
+namespace Host
+{
+	/// Whether OpenEmu's RetroAchievements hardcore mode is on (see OEHost::SetHardcoreMode).
+	/// Read by the engine (PCSX2/patches/0002-openemu-host-hardcore.patch); defined in OEHost.cpp.
+	bool IsHostHardcoreModeActive();
+} // namespace Host

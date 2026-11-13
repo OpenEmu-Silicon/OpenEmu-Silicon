@@ -1,0 +1,29 @@
+diff --git a/pcsx2/Achievements.cpp b/pcsx2/Achievements.cpp
+index 57af59b..2e4333f 100644
+--- a/pcsx2/Achievements.cpp
++++ b/pcsx2/Achievements.cpp
+@@ -407,8 +407,24 @@ bool Achievements::IsActive()
+ #endif
+ }
+ 
++#ifdef OE_HOST_HARDCORE
++// OpenEmu runs RetroAchievements itself and keeps this module off, so its hardcore flag never turns
++// on. The host (OpenEmu's OEHost.cpp) defines this to say when its own hardcore mode is on, so every
++// engine-side hardcore restriction (settings clamps, patch filtering, auto-tune, state loading)
++// still applies. Internal code here keeps reading s_hardcore_mode, which stays about this module.
++namespace Host
++{
++	bool IsHostHardcoreModeActive();
++}
++#endif
++
+ bool Achievements::IsHardcoreModeActive()
+ {
++#ifdef OE_HOST_HARDCORE
++	if (Host::IsHostHardcoreModeActive())
++		return true;
++#endif
++
+ #ifdef ENABLE_RAINTEGRATION
+ 	if (IsUsingRAIntegration())
+ 		return RA_HardcoreModeIsActive() != 0;

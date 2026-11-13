@@ -309,6 +309,31 @@ void OEHost::RequestReset()
 	}, false);
 }
 
+// OpenEmu's RetroAchievements hardcore mode, read by the engine through Host::IsHostHardcoreModeActive
+// (PCSX2/patches/0002-openemu-host-hardcore.patch), from the CPU thread and others.
+static std::atomic<bool> s_hardcore_mode{false};
+
+bool Host::IsHostHardcoreModeActive()
+{
+	return s_hardcore_mode.load(std::memory_order_acquire);
+}
+
+void OEHost::SetHardcoreMode(bool enabled)
+{
+	if (s_hardcore_mode.exchange(enabled, std::memory_order_acq_rel) == enabled)
+		return;
+
+	// The engine applies its hardcore restrictions when it loads settings and when it picks the
+	// active patches. A running machine does both again only when told to; before boot, the CPU
+	// thread does them as it starts the machine.
+	Host::RunOnCPUThread([]() {
+		if (!VMManager::HasValidVM())
+			return;
+		VMManager::ApplySettings();
+		VMManager::ReloadPatches(false, true, false, false);
+	}, false);
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Host:: callbacks
 //////////////////////////////////////////////////////////////////////////

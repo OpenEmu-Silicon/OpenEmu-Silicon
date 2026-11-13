@@ -337,6 +337,14 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
 #pragma mark - RetroAchievements
 
+// The engine applies its own hardcore restrictions too (underclocking, including auto-tune's
+// governor, frame rates, cheats and cheat-like patches). See OEHost::SetHardcoreMode.
+- (void)setHardcoreEnabled:(BOOL)hardcoreEnabled
+{
+	[super setHardcoreEnabled:hardcoreEnabled];
+	OEHost::SetHardcoreMode(hardcoreEnabled);
+}
+
 - (void)retroAchievementsIdle
 {
 	[_raBridge idle];
