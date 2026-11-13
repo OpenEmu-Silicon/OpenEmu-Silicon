@@ -22,6 +22,9 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0PPSP0BUILDFILE000000004 /* OEChdFileLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = OE0PPSP0FILEREF000000005 /* OEChdFileLoader.cpp */; };
+		OE0PPSP0BUILDFILE000000005 /* OECHDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0PPSP0FILEREF000000007 /* OECHDReader.c */; };
+		OE0PPSP0BUILDFILE000000006 /* libchdr_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0PPSP0FILEREF000000008 /* libchdr_build.c */; settings = {COMPILER_FLAGS = "-w"; }; };
 		3DFCE410186F64170046C035 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DFCE40F186F64170046C035 /* libz.tbd */; };
 		3E3044401F2144E300B06252 /* MemArenaDarwin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3E30443F1F2144E300B06252 /* MemArenaDarwin.cpp */; };
 		3E3044751F21531300B06252 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CAFC18C1785C48600647A96 /* OpenGL.framework */; };
@@ -1056,6 +1059,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		OE0PPSP0FILEREF000000005 /* OEChdFileLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OEChdFileLoader.cpp; sourceTree = "<group>"; };
+		OE0PPSP0FILEREF000000006 /* OEChdFileLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEChdFileLoader.h; sourceTree = "<group>"; };
+		OE0PPSP0FILEREF000000007 /* OECHDReader.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = OECHDReader.c; path = ../../OpenEmu-SDK/OpenEmuSystem/OECHDReader.c; sourceTree = SOURCE_ROOT; };
+		OE0PPSP0FILEREF000000008 /* libchdr_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = libchdr_build.c; path = ../../Vendor/libchdr/libchdr_build.c; sourceTree = SOURCE_ROOT; };
 		3DFCE40F186F64170046C035 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		3E30443E1F2144E300B06252 /* DbgNew.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DbgNew.h; sourceTree = "<group>"; };
 		3E30443F1F2144E300B06252 /* MemArenaDarwin.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MemArenaDarwin.cpp; sourceTree = "<group>"; };
@@ -6255,6 +6262,10 @@
 				8CAFC1241785B6F700647A96 /* PPSSPPGameCore.h */,
 				8CAFC1251785B6F700647A96 /* PPSSPPGameCore.mm */,
 				OE0PPSP0FILEREF000000001 /* rcheevos_build.c */,
+				OE0PPSP0FILEREF000000005 /* OEChdFileLoader.cpp */,
+				OE0PPSP0FILEREF000000006 /* OEChdFileLoader.h */,
+				OE0PPSP0FILEREF000000007 /* OECHDReader.c */,
+				OE0PPSP0FILEREF000000008 /* libchdr_build.c */,
 				OE0PPSP0FILEREF000000002 /* OERetroAchievementsTransport.m */,
 				OE0PPSP0FILEREF000000003 /* OERetroAchievementsBridge.m */,
 				OE0PPSP0FILEREF000000004 /* OERetroAchievementsBridge.h */,
@@ -9265,6 +9276,9 @@
 				EE76806720C892F9006470A2 /* OpenEmuGLContext.cpp in Sources */,
 				8CAFC1261785B6F700647A96 /* PPSSPPGameCore.mm in Sources */,
 				OE0PPSP0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0PPSP0BUILDFILE000000004 /* OEChdFileLoader.cpp in Sources */,
+				OE0PPSP0BUILDFILE000000005 /* OECHDReader.c in Sources */,
+				OE0PPSP0BUILDFILE000000006 /* libchdr_build.c in Sources */,
 				OE0PPSP0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
 				OE0PPSP0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 			);
@@ -10385,6 +10399,8 @@
 					"\"$(SRCROOT)/../../OpenEmu/SystemPlugins/PSP\"",
 					"\"$(SRCROOT)/../../Vendor/rcheevos/include\"",
 					"\"$(SRCROOT)/../../Vendor/rcheevos/src\"",
+					"\"$(SRCROOT)/../../Vendor/libchdr/include\"",
+					"\"$(SRCROOT)/../../Vendor/libchdr/deps/lzma-24.05/include\"",
 					"\"$(SRCROOT)/../../OpenEmuKit/Source\"",
 				);
 				INFOPLIST_FILE = Info.plist;
@@ -10440,6 +10456,8 @@
 					"\"$(SRCROOT)/../../OpenEmu/SystemPlugins/PSP\"",
 					"\"$(SRCROOT)/../../Vendor/rcheevos/include\"",
 					"\"$(SRCROOT)/../../Vendor/rcheevos/src\"",
+					"\"$(SRCROOT)/../../Vendor/libchdr/include\"",
+					"\"$(SRCROOT)/../../Vendor/libchdr/deps/lzma-24.05/include\"",
 					"\"$(SRCROOT)/../../OpenEmuKit/Source\"",
 				);
 				INFOPLIST_FILE = Info.plist;

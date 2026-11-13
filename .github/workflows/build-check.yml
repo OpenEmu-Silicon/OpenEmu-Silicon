@@ -141,7 +141,9 @@ jobs:
             # compiles its Swift, imports its Swift header, or links the
             # framework. Scripts/detect-core-changes.py picks the affected cores
             # from the cores' Xcode projects (see below).
-            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/)'; then
+            # Vendor/ is on the list: cores compile Vendor/rcheevos and
+            # Vendor/libchdr straight from there (as detect-core-changes.py assumes).
+            if echo "$changed" | grep -qE '^(OpenEmu-SDK/|OpenEmu-metal\.xcworkspace/|Vendor/)'; then
               echo "Shared code changed — building all core schemes"
               cores="$all_cores"
             else
@@ -383,6 +385,9 @@ jobs:
             OpenEmu-SDK/OpenEmuSystemTests/OEDualSenseBluetoothReportTests.c \
             -lz -o "$RUNNER_TEMP/dualsense-report-tests"
           "$RUNNER_TEMP/dualsense-report-tests"
+
+      - name: Test CHD disc image reading
+        run: ./Scripts/test-chd-reader.sh
 
       - name: Build OpenEmu (Debug, arm64)
         run: |

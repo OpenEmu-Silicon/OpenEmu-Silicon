@@ -31,7 +31,7 @@ CISO_H ciso;
 
 @implementation OEPSPSystemController
 
-// read header to detect PSP ISO & CSO
+// read header to detect PSP ISO & CSO, and CHD (OECHDFile reads a DVD-type CHD as the ISO inside it)
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
     // Handle cso file and return early

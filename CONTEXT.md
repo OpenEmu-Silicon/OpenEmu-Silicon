@@ -51,7 +51,7 @@ This file is the source of truth for what each term means *in this codebase*. If
 | **OpenEmu-SDK** | Shared protocols and types that both the host app and core plugins import. Treat as a public ABI — breaking changes ripple to every core. |
 | **OpenEmuKit** | UI components shared across the host app. |
 | **OpenEmu-Shaders** | The Metal shader library used by the renderer. |
-| **Vendor/** | Third-party C libraries the host app links directly (XADMaster, UniversalDetector). |
+| **Vendor/** | Third-party C libraries the host app links directly (XADMaster, UniversalDetector), and ones compiled straight into the frameworks and cores that use them (rcheevos, libchdr). |
 | **flattened submodule** | A core directory that used to be a git submodule but has been committed as plain tracked files. Do not try to `git submodule init` these — they are flat on purpose. |
 
 ## Features
@@ -70,6 +70,7 @@ This file is the source of truth for what each term means *in this codebase*. If
 | **Cleaned folder** | `Cleaned <time>` inside the artwork folder, where "Clean Up Unused Artwork…" moves automatic pictures of games no longer in the library. Nothing is deleted. |
 | **artwork backup** | Add-only copy of pinned art and History (or everything) to `{backup folder}/Artwork`, run with the folder backup. Two Macs that changed the same picture keep both (`Name (from <Mac>).png`). Code: `OEArtworkBackup`. |
 | **rewind** | The host-side save-state ring buffer that lets the player step backward. Implemented in the helper, controlled from the host. |
+| **CHD** | MAME's compressed disc image format (`.chd`), read with libchdr. A **DVD-type CHD** (`chdman createdvd`) holds a DVD image such as a PSP ISO; a **CD-type CHD** (`chdman createcd`) holds CD tracks. Today the app reads DVD-type CHDs for PSP: `OECHDFile` at import, `OECHDReader` in the PPSSPP core (which cannot read CHD itself). For Arcade, MAME uses a CHD as an extra file next to a game's zip. |
 
 ## What this file is not
 

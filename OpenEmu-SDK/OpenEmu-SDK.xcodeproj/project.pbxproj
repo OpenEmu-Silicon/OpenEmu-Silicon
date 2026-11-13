@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0EC0CD000000000000000001 /* OECHDFile.h in Headers */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000B /* OECHDFile.h */; };
+		0EC0CD000000000000000002 /* OECHDFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000C /* OECHDFile.m */; };
+		0EC0CD000000000000000003 /* OECHDReader.h in Headers */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000D /* OECHDReader.h */; };
+		0EC0CD000000000000000004 /* OECHDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000E /* OECHDReader.c */; settings = {COMPILER_FLAGS = "-fvisibility=hidden"; }; };
+		0EC0CD000000000000000005 /* libchdr_build.c in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000F /* libchdr_build.c */; settings = {COMPILER_FLAGS = "-std=gnu11 -w -fvisibility=hidden"; }; };
+		0EC0CD000000000000000006 /* libchdr_zstd_build.c in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD000000000000000010 /* libchdr_zstd_build.c */; settings = {COMPILER_FLAGS = "-std=gnu11 -w -fvisibility=hidden"; }; };
+		0EC0CD000000000000000007 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EC0CD000000000000000011 /* libz.tbd */; };
 		0109BBA5209F25EB002419C1 /* OEDiffQueueTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0109BBA4209F25EB002419C1 /* OEDiffQueueTests.m */; };
 		0109BBA7209F25EB002419C1 /* OpenEmuBase.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C6772A261710A4BA00ED580A /* OpenEmuBase.framework */; };
 		011829A720ACA8AA0030B347 /* OEAudioBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 011829A620ACA8AA0030B347 /* OEAudioBuffer.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -152,6 +159,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0EC0CD00000000000000000B /* OECHDFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OECHDFile.h; sourceTree = "<group>"; };
+		0EC0CD00000000000000000C /* OECHDFile.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OECHDFile.m; sourceTree = "<group>"; };
+		0EC0CD00000000000000000D /* OECHDReader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OECHDReader.h; sourceTree = "<group>"; };
+		0EC0CD00000000000000000E /* OECHDReader.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = OECHDReader.c; sourceTree = "<group>"; };
+		0EC0CD00000000000000000F /* libchdr_build.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = libchdr_build.c; path = ../Vendor/libchdr/libchdr_build.c; sourceTree = SOURCE_ROOT; };
+		0EC0CD000000000000000010 /* libchdr_zstd_build.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = libchdr_zstd_build.c; path = ../Vendor/libchdr/libchdr_zstd_build.c; sourceTree = SOURCE_ROOT; };
+		0EC0CD000000000000000011 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		0109BBA2209F25EB002419C1 /* OpenEmuBaseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenEmuBaseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0109BBA4209F25EB002419C1 /* OEDiffQueueTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEDiffQueueTests.m; sourceTree = "<group>"; };
 		011829A620ACA8AA0030B347 /* OEAudioBuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OEAudioBuffer.h; sourceTree = "<group>"; };
@@ -306,6 +320,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C6772BE11710E72A00ED580A /* OpenEmuBase.framework in Frameworks */,
+				0EC0CD000000000000000007 /* libz.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -429,6 +444,9 @@
 		C6772A8F1710CD7E00ED580A /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				0EC0CD00000000000000000F /* libchdr_build.c */,
+				0EC0CD000000000000000010 /* libchdr_zstd_build.c */,
+				0EC0CD000000000000000011 /* libz.tbd */,
 				C6772A941710CD7E00ED580A /* OpenEmuSystem-Prefix.pch */,
 				05F2F90724EA029900BFAF18 /* Controller-Database.plist */,
 			);
@@ -542,6 +560,10 @@
 				878203E921C4A09800C1C2C9 /* OEDreamcastGDI.m */,
 				C6605B821D725B0D009C7E91 /* OEM3UFile.h */,
 				C6605B831D725B0D009C7E91 /* OEM3UFile.m */,
+				0EC0CD00000000000000000B /* OECHDFile.h */,
+				0EC0CD00000000000000000C /* OECHDFile.m */,
+				0EC0CD00000000000000000D /* OECHDReader.h */,
+				0EC0CD00000000000000000E /* OECHDReader.c */,
 				C6772BDE1710E41C00ED580A /* OELocalizationHelper.swift */,
 				01AFC70B2364E327005EEB08 /* DataProtocol+HexString.swift */,
 			);
@@ -608,6 +630,8 @@
 				C6772B7B1710E21900ED580A /* OESystemResponder.h in Headers */,
 				01A9FD2523187747007CD1E7 /* OESwitchProControllerHIDDeviceHandler.h in Headers */,
 				C6605B841D725B0D009C7E91 /* OEM3UFile.h in Headers */,
+				0EC0CD000000000000000001 /* OECHDFile.h in Headers */,
+				0EC0CD000000000000000003 /* OECHDReader.h in Headers */,
 				C6772B971710E25300ED580A /* OEBindingsController_Internal.h in Headers */,
 				C6772BD31710E29C00ED580A /* OEControllerDescription_Internal.h in Headers */,
 				C6772BBA1710E28900ED580A /* OEHIDDeviceHandler.h in Headers */,
@@ -853,6 +877,10 @@
 				0166211320D8522700D0368A /* OETouchbarHIDDeviceHandler.m in Sources */,
 				94FDE6AF1AC35BA60003D247 /* OECloneCD.m in Sources */,
 				C6605B851D725B0D009C7E91 /* OEM3UFile.m in Sources */,
+				0EC0CD000000000000000002 /* OECHDFile.m in Sources */,
+				0EC0CD000000000000000004 /* OECHDReader.c in Sources */,
+				0EC0CD000000000000000005 /* libchdr_build.c in Sources */,
+				0EC0CD000000000000000006 /* libchdr_zstd_build.c in Sources */,
 				C6772BD61710E29C00ED580A /* OEControlDescription.m in Sources */,
 				C6772BD81710E29C00ED580A /* OEDeviceDescription.m in Sources */,
 				C6772BE01710E41C00ED580A /* OELocalizationHelper.swift in Sources */,
@@ -1293,6 +1321,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/libchdr/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/lzma-24.05/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/zstd-1.5.6/lib",
+				);
 				INSTALL_PATH = "@executable_path/../Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1300,6 +1333,10 @@
 					"@loader_path/Frameworks",
 				);
 				MODULEMAP_PRIVATE_FILE = "$(SRCROOT)/OpenEmuSystem/OpenEmuSystem.private.modulemap";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-unexported_symbol,_chd_*",
+				);
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1342,6 +1379,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../Vendor/libchdr/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/lzma-24.05/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/zstd-1.5.6/lib",
+				);
 				INSTALL_PATH = "@executable_path/../Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1349,6 +1391,10 @@
 					"@loader_path/Frameworks",
 				);
 				MODULEMAP_PRIVATE_FILE = "$(SRCROOT)/OpenEmuSystem/OpenEmuSystem.private.modulemap";
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-Wl,-unexported_symbol,_chd_*",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

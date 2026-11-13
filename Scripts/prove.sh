@@ -106,6 +106,13 @@ dualsense() {
 }
 step "dualsense-decoding" dualsense
 
+# 4b. CHD disc image reading (plain C with libchdr, sanitizers on), same as CI.
+if touches '^(OpenEmu-SDK/OpenEmuSystem/OECHD|OpenEmu-SDK/OpenEmuSystemTests/(OECHDReaderTests\.c|Fixtures/CHD/)|Vendor/libchdr/|Scripts/test-chd-reader\.sh)'; then
+  step "chd-reader" ./Scripts/test-chd-reader.sh
+else
+  SKIPPED+=("CHD reader tests (no change to OECHDReader, its tests or Vendor/libchdr; --all runs them)")
+fi
+
 # 5. Headless: the Gambatte core loads, draws, takes button presses and round-trips save states, with no window.
 if touches '^(OpenEmu-SDK/|OpenEmuKit/|Gambatte/|Scripts/headless/|Scripts/prove\.sh)'; then
   step "headless-gameboy" ./Scripts/headless/gb-checks.sh
