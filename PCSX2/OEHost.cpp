@@ -61,6 +61,10 @@ static std::condition_variable s_cpu_queue_cv;
 
 static std::function<void()> s_reset_callback;
 
+// A pause or resume that arrived while a reset was pending (VMState::Resetting), applied by
+// CPUThreadMain once the reset is done. CPU thread only.
+static std::optional<VMState> s_state_after_reset;
+
 static void NotifyResetDone()
 {
 	if (s_reset_callback)
@@ -198,6 +202,7 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 	VMManager::ApplySettings();
 
 	std::optional<VMBootParameters> pending_boot = std::move(initial_params);
+	s_state_after_reset.reset();
 
 	while (!s_shutdown_requested.load(std::memory_order_acquire))
 	{
@@ -216,6 +221,11 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 			case VMState::Resetting:
 				VMManager::Reset();
 				NotifyResetDone();
+				if (s_state_after_reset.has_value())
+				{
+					VMManager::SetState(s_state_after_reset.value());
+					s_state_after_reset.reset();
+				}
 				continue;
 
 			case VMState::Stopping:
@@ -301,11 +311,41 @@ void OEHost::RequestReset()
 	Host::RunOnCPUThread([]() {
 		if (!VMManager::HasValidVM())
 			return;
+		// Already pending: CPUThreadMain will do it. Calling Reset again here would reset at once,
+		// possibly in the middle of a frame, which the engine warns breaks some games.
+		if (VMManager::GetState() == VMState::Resetting)
+			return;
 		VMManager::Reset();
 		// While running, the engine only marks the machine Resetting here and CPUThreadMain
 		// finishes the reset (and notifies) on its next turn. Paused, the reset is already done.
 		if (VMManager::GetState() != VMState::Resetting)
 			NotifyResetDone();
+	}, false);
+}
+
+void OEHost::SetPaused(bool paused)
+{
+	Host::RunOnCPUThread([paused]() {
+		if (!VMManager::HasValidVM())
+			return;
+		const VMState state = paused ? VMState::Paused : VMState::Running;
+		// OpenEmu resumes right after every reset, usually before the CPU thread has finished it.
+		// Setting the state now would replace Resetting and the reset would never happen.
+		if (VMManager::GetState() == VMState::Resetting)
+		{
+			s_state_after_reset = state;
+			return;
+		}
+		VMManager::SetState(state);
+	}, false);
+}
+
+void OEHost::FrameAdvance()
+{
+	Host::RunOnCPUThread([]() {
+		// FrameAdvance sets the state to Running, which would cancel a pending reset.
+		if (VMManager::HasValidVM() && VMManager::GetState() != VMState::Resetting)
+			VMManager::FrameAdvance(1);
 	}, false);
 }
 

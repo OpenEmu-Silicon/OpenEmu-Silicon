@@ -54,6 +54,16 @@ namespace OEHost
 	/// reset callback rather than assuming it is done.
 	void RequestReset();
 
+	/// Pauses or resumes the machine on the CPU thread. Use this instead of VMManager::SetState: a
+	/// reset asked for while running is only pending until the CPU thread finishes it, and setting
+	/// the state directly would cancel it. During a pending reset the new state is applied right
+	/// after the reset.
+	void SetPaused(bool paused);
+
+	/// Runs exactly one frame while paused, on the CPU thread. Dropped during a pending reset,
+	/// which a frame advance would otherwise cancel.
+	void FrameAdvance();
+
 	/// Turns RetroAchievements hardcore mode on or off for the engine. The engine keeps its built-in
 	/// achievements off, so it asks here instead (PCSX2/patches/0002-openemu-host-hardcore.patch) and
 	/// then applies its own hardcore restrictions: no EE underclocking (including auto-tune's

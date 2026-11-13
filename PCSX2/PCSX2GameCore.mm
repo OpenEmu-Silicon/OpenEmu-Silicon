@@ -285,11 +285,7 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 - (void)setPauseEmulation:(BOOL)pauseEmulation
 {
 	if (_engineStarted) {
-		Host::RunOnCPUThread([pauseEmulation]() {
-			if (VMManager::HasValidVM()) {
-				VMManager::SetState(pauseEmulation ? VMState::Paused : VMState::Running);
-			}
-		}, false);
+		OEHost::SetPaused(pauseEmulation);
 	}
 	[super setPauseEmulation:pauseEmulation];
 }
@@ -396,11 +392,7 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 	if (!_engineStarted || self.hardcoreEnabled) {
 		return;
 	}
-	Host::RunOnCPUThread([]() {
-		if (VMManager::HasValidVM()) {
-			VMManager::FrameAdvance(1);
-		}
-	}, false);
+	OEHost::FrameAdvance();
 }
 
 #pragma mark - Video
