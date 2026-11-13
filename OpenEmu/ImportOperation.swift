@@ -597,7 +597,7 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
         
         // Get extensions from all enabled systems.
         for system in enabledSystems {
-            // Ignore Arcade file extensions (zip, 7z, chd).
+            // Ignore Arcade file extensions (zip, 7z, bin, rom).
             if system.systemIdentifier == "openemu.system.arcade" {
                 continue
             }

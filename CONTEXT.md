@@ -70,7 +70,7 @@ This file is the source of truth for what each term means *in this codebase*. If
 | **Cleaned folder** | `Cleaned <time>` inside the artwork folder, where "Clean Up Unused Artwork…" moves automatic pictures of games no longer in the library. Nothing is deleted. |
 | **artwork backup** | Add-only copy of pinned art and History (or everything) to `{backup folder}/Artwork`, run with the folder backup. Two Macs that changed the same picture keep both (`Name (from <Mac>).png`). Code: `OEArtworkBackup`. |
 | **rewind** | The host-side save-state ring buffer that lets the player step backward. Implemented in the helper, controlled from the host. |
-| **CHD** | MAME's compressed disc image format (`.chd`), read with libchdr. A **DVD-type CHD** (`chdman createdvd`) holds a DVD image such as a PSP ISO; a **CD-type CHD** (`chdman createcd`) holds CD tracks. Today the app reads DVD-type CHDs for PSP: `OECHDFile` at import, `OECHDReader` in the PPSSPP core (which cannot read CHD itself). For Arcade, MAME uses a CHD as an extra file next to a game's zip. |
+| **CHD** | MAME's compressed disc image format (`.chd`), read with libchdr. A **DVD-type CHD** (`chdman createdvd`) holds a DVD image such as a PSP ISO; a **CD-type CHD** (`chdman createcd`) holds CD tracks. Today the app reads DVD-type CHDs for PSP: `OECHDFile` at import, `OECHDReader` in the PPSSPP core (which cannot read CHD itself). Arcade does not accept CHDs: MAME looks for a game's CHD in a folder named after the game, which the library's flat Arcade folder does not provide, so any CHD that is not a PSP disc is refused at import. |
 
 ## What this file is not
 
