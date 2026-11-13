@@ -218,9 +218,19 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
 	// RetroAchievements checks its conditions once per emulated frame, on the CPU thread, where
 	// PS2 memory is stable. OpenEmu's own loop (executeFrame) does not follow the engine's frames.
+	// The CPU thread has no autorelease pool of its own, so drain the objects each check makes
+	// (event notifications, unlock payloads) every frame instead of keeping them until the game closes.
 	__weak OERetroAchievementsBridge *raBridge = _raBridge;
 	OEHost::SetFrameCallback([raBridge]() {
-		[raBridge doFrame];
+		@autoreleasepool {
+			[raBridge doFrame];
+		}
+	});
+	// Reset RetroAchievements only once the engine has really reset (see resetEmulation).
+	OEHost::SetResetCallback([raBridge]() {
+		@autoreleasepool {
+			[raBridge reset];
+		}
 	});
 
 	VMBootParameters params;
@@ -260,13 +270,16 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 	_engineStarted = NO;  // stops executeFrame touching the stream while it is torn down
 	OEHost::StopCPUThread();
 	OEHost::SetFrameCallback(nullptr);
+	OEHost::SetResetCallback(nullptr);
 	[super stopEmulation];
 }
 
+// The engine finishes a reset on its CPU thread, possibly a frame or more later. RetroAchievements
+// is reset from OEHost's reset callback after that, not here: resetting it first would let it check
+// the old game's memory once more and use up the "must be false before it can unlock" guard.
 - (void)resetEmulation
 {
-	Host::RunOnCPUThread([]() { VMManager::Reset(); }, false);
-	[_raBridge reset];
+	OEHost::RequestReset();
 }
 
 - (void)setPauseEmulation:(BOOL)pauseEmulation

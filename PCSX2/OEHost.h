@@ -44,6 +44,16 @@ namespace OEHost
 	/// RetroAchievements checks its conditions here. Set before StartCPUThread.
 	void SetFrameCallback(std::function<void()> callback);
 
+	/// Called on the CPU thread right after the machine has really been reset, by RequestReset or
+	/// any other reset. RetroAchievements resets its state here, so it never checks the old
+	/// game's memory after its own reset. Set before StartCPUThread.
+	void SetResetCallback(std::function<void()> callback);
+
+	/// Resets the machine. Returns at once; the reset runs on the CPU thread. While the machine
+	/// runs, the engine only finishes a reset on the CPU thread's next loop turn, so wait for the
+	/// reset callback rather than assuming it is done.
+	void RequestReset();
+
 	/// Copies PS2 memory for RetroAchievements, in its memory map: the 32 MB of main RAM,
 	/// then the 16 KB scratchpad directly above it. Returns the number of bytes copied, which
 	/// is less than `num_bytes` at the end of the map and 0 when no machine is running.

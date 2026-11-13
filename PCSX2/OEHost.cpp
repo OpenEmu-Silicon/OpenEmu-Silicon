@@ -59,6 +59,14 @@ static std::mutex s_cpu_queue_lock;
 static std::deque<std::function<void()>> s_cpu_queue;
 static std::condition_variable s_cpu_queue_cv;
 
+static std::function<void()> s_reset_callback;
+
+static void NotifyResetDone()
+{
+	if (s_reset_callback)
+		s_reset_callback();
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Setup
 //////////////////////////////////////////////////////////////////////////
@@ -207,6 +215,7 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 
 			case VMState::Resetting:
 				VMManager::Reset();
+				NotifyResetDone();
 				continue;
 
 			case VMState::Stopping:
@@ -280,6 +289,24 @@ void OEHost::StopCPUThread()
 bool OEHost::IsCPUThreadRunning()
 {
 	return s_cpu_thread_running.load(std::memory_order_acquire);
+}
+
+void OEHost::SetResetCallback(std::function<void()> callback)
+{
+	s_reset_callback = std::move(callback);
+}
+
+void OEHost::RequestReset()
+{
+	Host::RunOnCPUThread([]() {
+		if (!VMManager::HasValidVM())
+			return;
+		VMManager::Reset();
+		// While running, the engine only marks the machine Resetting here and CPUThreadMain
+		// finishes the reset (and notifies) on its next turn. Paused, the reset is already done.
+		if (VMManager::GetState() != VMState::Resetting)
+			NotifyResetDone();
+	}, false);
 }
 
 //////////////////////////////////////////////////////////////////////////
