@@ -48,7 +48,7 @@ Open it from **Window → Big Picture (Spike)** or press **Control-Command-B**.
 - Put your own PS2 BIOS file (for example `scph39001.bin`) in OpenEmu's BIOS folder (`~/Library/Application Support/OpenEmu/BIOS`).
 - Add a PS2 game and play. In our testing Dragon Quest VIII ran at about 57 frames a second with picture and sound, with one pause of about 3 seconds.
 - **RetroAchievements now works on PS2** (contributed by Leonardo Kasperavičius), including Hardcore mode. If you have an account, sign in and tell us whether achievements unlock, and whether save, load and reset behave in Hardcore.
-- **Expect a black screen at the start:** a fresh PS2 boot can show a black window for roughly 10 seconds before the game's first picture, and the game's own screens can fade to black too. If it stays black for more than about 30 seconds, please report it (with the game name and whether you started fresh or resumed a save state).
+- **Expect a black screen at the start:** the PS2 BIOS start-up animation is skipped, so the game shows black while it loads. In our tests the first picture appeared after about 6 seconds (Katamari Damacy) to about 10 seconds (Dragon Quest VIII) on a fresh start, and after about 2 seconds when resuming a save state. If it stays black for more than about 30 seconds, please report it (with the game name and whether you started fresh or resumed a save state).
 - Try: keyboard and controller, saving to a memory card in the game, save states, other games. Heavy 3D games may be slow. **Not tested yet:** D-pad and right stick, rumble, disc swap, long sessions.
 
 ### Artwork providers
@@ -66,7 +66,7 @@ Open it from **Window → Big Picture (Spike)** or press **Control-Command-B**.
 - Big Picture, 3DS and PS2 are experimental. Expect rough edges.
 - 3DS: no stereo 3D, camera, or microphone yet.
 - PS2: one known pause of about 3 seconds in the game we tested.
-- PS2: a long black screen at the start is still being investigated. In our own tests the picture always came up, but we could not yet measure why it takes so long.
+- PS2: a black screen for the first 6 to 10 seconds of a fresh start is the game itself loading (we checked the emulator's own output: it is truly black until the game draws), not a display fault. Resuming a save state is much quicker.
 - Keyboard input in 3DS and PS2 games has not been confirmed on this release-signed build yet. If keys do nothing in a game, tell us your macOS version.
 - Some automatic checks on this release's code did not finish because the build servers were short of Macs. We tested the app and cores by hand instead, but the automatic checks should be re-run before a wide release.
 
