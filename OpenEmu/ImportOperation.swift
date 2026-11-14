@@ -208,9 +208,9 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
             return nil
         }
 
-        // For multi-disc .cue/.ccd inputs whose siblings live in the same folder, auto-create
-        // an .m3u and import that instead, so the whole multi-disc set lands in one library
-        // entry / subfolder. See `tryMultiDiscM3UAutoCreate(at:)` for the full rationale.
+        // For a disc of a multi-disc set (.cue/.ccd/.chd/.gdi) whose siblings live in the same folder
+        // and whose system loads playlists, auto-create an .m3u and import that instead, so the whole
+        // set lands in one library entry / subfolder. See `tryMultiDiscM3UAutoCreate(at:)`.
         let importURL = Self.tryMultiDiscM3UAutoCreate(at: url) ?? url
 
         self.init(url: importURL, sourceURL: url)
@@ -396,12 +396,14 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
     // filename-based ("(Disc 1)", "[CD2]", etc.) so it works for any disc-based system without
     // needing per-game serial knowledge in the importer. Mednafen requires .m3u for multi-disc
     // PSX games to keep saves and disc-swap state coherent (#294); doing this at import time
-    // (rather than at launch) ensures the m3u and its referenced .cue/.bin files end up in a
-    // single library subfolder via OEM3UFile.copyToURL: instead of being split into per-disc
-    // subfolders by performImportStepOrganize.
+    // (rather than at launch) ensures the m3u and its referenced .cue/.bin (or .chd) files end up
+    // in a single library subfolder via OEM3UFile.copyToURL: instead of being split into per-disc
+    // subfolders by performImportStepOrganize. Only discs of the same format are grouped (CUE and
+    // CCD count as one), so a CUE/BIN set and a CHD or GDI set of one game in the same folder stay apart.
     private static func tryMultiDiscM3UAutoCreate(at url: URL) -> URL? {
         let pathExtension = url.pathExtension.lowercased()
-        guard pathExtension == "cue" || pathExtension == "ccd" else {
+        let sameFormat: Set<String> = pathExtension == "cue" || pathExtension == "ccd" ? ["cue", "ccd"] : [pathExtension]
+        guard ["cue", "ccd", "chd", "gdi"].contains(pathExtension) else {
             return nil
         }
 
@@ -434,7 +436,7 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
         var discFiles: [(disc: Int, name: String)] = []
         for fileURL in folderContents {
             let ext = fileURL.pathExtension.lowercased()
-            guard ext == "cue" || ext == "ccd" else { continue }
+            guard sameFormat.contains(ext) else { continue }
             let candidate = (fileURL.lastPathComponent as NSString).deletingPathExtension
             let candidateRange = NSRange(location: 0, length: (candidate as NSString).length)
             guard let candidateMatch = regex.firstMatch(in: candidate, options: [], range: candidateRange) else { continue }
@@ -453,12 +455,27 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
             return nil // single disc, or siblings missing — fall back to single-disc import
         }
 
+        // Only a system that loads playlists can take one. A set whose system does not list m3u
+        // (Sega CD, PSP) is imported disc by disc; redirecting it would leave an .m3u no system accepts.
+        guard Self.systemsClaimingDiscLoadPlaylists(at: url) else {
+            DLog("Multi-disc set at \(url.path) belongs to a system without .m3u support; importing the disc alone")
+            return nil
+        }
+
         discFiles.sort { $0.disc < $1.disc }
 
-        let m3uURL = folderURL.appendingPathComponent("\(strippedBaseName).m3u", isDirectory: false)
-
-        // Reuse a pre-existing .m3u so re-imports are idempotent and dedupe via hash.
+        // Reuse a pre-existing .m3u so re-imports are idempotent and dedupe via hash, but only one
+        // that lists this disc: "Game.m3u" may belong to the game's other format in the same folder,
+        // in which case this set gets "Game (CHD).m3u" (or "(CUE)", "(CCD)").
+        var m3uURL = folderURL.appendingPathComponent("\(strippedBaseName).m3u", isDirectory: false)
+        if fileManager.fileExists(atPath: m3uURL.path) && !Self.m3u(at: m3uURL, lists: url.lastPathComponent) {
+            m3uURL = folderURL.appendingPathComponent("\(strippedBaseName) (\(pathExtension.uppercased())).m3u", isDirectory: false)
+        }
         if fileManager.fileExists(atPath: m3uURL.path) {
+            guard Self.m3u(at: m3uURL, lists: url.lastPathComponent) else {
+                DLog("Multi-disc .m3u \(m3uURL.path) exists but does not list \(url.lastPathComponent); importing the disc alone")
+                return nil
+            }
             DLog("Multi-disc .m3u already exists, reusing: \(m3uURL.path)")
             return m3uURL
         }
@@ -473,6 +490,39 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
 
         os_log(.info, log: .import, "Auto-created %d-disc .m3u: %{public}@", discFiles.count, m3uURL.path)
         return m3uURL
+    }
+
+    // Whether the system that would claim the disc at `url` loads .m3u playlists. The system is picked
+    // the way OEDBSystem.systems(for:) picks it: the first plugin sure of the disc, otherwise every
+    // plugin that might take it (all of which must then load playlists).
+    private static func systemsClaimingDiscLoadPlaylists(at url: URL) -> Bool {
+        guard let file = try? OEFile(url: url) else { return false }
+
+        var uncertainControllers: [OESystemController] = []
+        for plugin in OESystemPlugin.allPlugins {
+            guard let controller = plugin.controller,
+                  controller.canHandleFileExtension(file.fileExtension)
+            else { continue }
+
+            switch controller.canHandle(file) {
+            case .yes:
+                return controller.canHandleFileExtension("m3u")
+            case .uncertain:
+                uncertainControllers.append(controller)
+            default:
+                break
+            }
+        }
+        return !uncertainControllers.isEmpty && uncertainControllers.allSatisfy { $0.canHandleFileExtension("m3u") }
+    }
+
+    // Whether the .m3u at `m3uURL` lists a disc file named `fileName` (compared by file name).
+    private static func m3u(at m3uURL: URL, lists fileName: String) -> Bool {
+        guard let content = try? String(contentsOf: m3uURL, encoding: .utf8) else { return false }
+        return content.components(separatedBy: .newlines).contains { line in
+            let entry = line.trimmingCharacters(in: .whitespaces)
+            return !entry.hasPrefix("#") && (entry as NSString).lastPathComponent.caseInsensitiveCompare(fileName) == .orderedSame
+        }
     }
 
     // MARK: -
@@ -597,7 +647,7 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
         
         // Get extensions from all enabled systems.
         for system in enabledSystems {
-            // Ignore Arcade file extensions (zip, 7z, chd).
+            // Ignore Arcade file extensions (zip, 7z, bin, rom).
             if system.systemIdentifier == "openemu.system.arcade" {
                 continue
             }

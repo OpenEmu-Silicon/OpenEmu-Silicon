@@ -27,10 +27,14 @@
 #import "OEM3UFile.h"
 
 #import "OEDiscDescriptor_Internal.h"
+#import "OECHDFile.h"
 
 NSString *const OEM3UFileErrorDomain = @"org.openemu.OEM3UFile.ErrorDomain";
 
-@implementation OEM3UFile
+@implementation OEM3UFile {
+    // The first disc, when it is a CHD: detection reads it through OECHDFile, not as a raw file.
+    OECHDFile *_firstCHD;
+}
 
 - (BOOL)_setUpFileReferencesWithError:(NSError **)error
 {
@@ -53,6 +57,22 @@ NSString *const OEM3UFileErrorDomain = @"org.openemu.OEM3UFile.ErrorDomain";
         NSURL *url = [NSURL fileURLWithPath:line isDirectory:NO relativeToURL:directoryURL].absoluteURL;
 
         __kindof OEFile *referencedFile = [OEFile fileWithURL:url error:&localError];
+
+        // A CHD is a whole disc in one file: it is both the disc and its only data file. OEFile does not
+        // open it, so a missing one is caught here, as a missing .cue is when its sheet cannot be read.
+        if ([referencedFile isKindOfClass:[OECHDFile class]]) {
+            if (![url checkResourceIsReachableAndReturnError:&localError]) {
+                failedToValidateContainedFiles = YES;
+                return;
+            }
+            if (referencedFileURLs.count == 0)
+                self->_firstCHD = referencedFile;
+            [referencedFileURLs addObject:url];
+            [allReferencedFileURLs addObject:url];
+            [referencedBinaryFileURLs addObject:url];
+            return;
+        }
+
         if (![referencedFile isKindOfClass:[OEDiscDescriptor class]]) {
             // Don't import the m3u if it contains invalid referenced files (unreachable or non-OEDiscDescriptor).
             failedToValidateContainedFiles = YES;
@@ -102,6 +122,13 @@ NSString *const OEM3UFileErrorDomain = @"org.openemu.OEM3UFile.ErrorDomain";
         return NO;
 
     return [self copyReferencedFilesToDirectoryAtURL:destinationURL.URLByDeletingLastPathComponent error:error];
+}
+
+- (NSData *)readDataInRange:(NSRange)dataRange
+{
+    if (_firstCHD != nil)
+        return [_firstCHD readDataInRange:dataRange];
+    return [super readDataInRange:dataRange];
 }
 
 - (NSString *)fileContentWithRelativeFilePaths

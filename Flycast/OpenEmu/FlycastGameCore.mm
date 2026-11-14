@@ -55,10 +55,12 @@
 #include <rc_consoles.h>
 #import "OERetroAchievementsTransport.h"
 #import "OERetroAchievementsBridge.h"
+#include "OEChdHashCDReader.h"
 
 #include <OpenGL/gl3.h>
 #include <mach/mach_time.h>
 #include <sys/stat.h>
+#include <atomic>
 
 #define SAMPLERATE 44100
 #define SIZESOUNDBUFFER (44100 / 60 * 4)
@@ -144,6 +146,12 @@ static OpenEmuAudioBackend openEmuAudioBackend;
     double _frameInterval;
     OERetroAchievementsBridge *_raBridge;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
+
+    // Multi-disc games come as a .m3u; Flycast boots the first disc and -setDisc: swaps the others in.
+    NSArray<NSString *> *_discPaths;
+    std::atomic<NSUInteger> _requestedDisc; // set by -setDisc: (any thread), taken by -executeFrame
+    NSUInteger _discToInsert;               // the lid is open; insert this disc when the countdown ends
+    int _framesUntilInsert;
 }
 @end
 
@@ -194,7 +202,17 @@ static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
-    _romPath = [path copy];
+    // A .m3u lists the discs of a multi-disc game; Flycast cannot read it, so boot the first disc.
+    _discPaths = [path.pathExtension.lowercaseString isEqualToString:@"m3u"] ? [self discsInPlaylistAtPath:path] : @[ path ];
+    if (_discPaths.count == 0) {
+        if (error != nil)
+            *error = [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadROMError userInfo:@{
+                NSLocalizedDescriptionKey : @"Unable to load ROM.",
+                NSLocalizedRecoverySuggestionErrorKey : @"The .m3u playlist does not list any discs.",
+            }];
+        return NO;
+    }
+    _romPath = [_discPaths.firstObject copy];
 
     // Start the RA bridge now (login + disc hashing run off the ROM path, independent of
     // emulation state). markROMReady is deferred to -executeFrame, once the game has loaded
@@ -202,9 +220,25 @@ static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
     _raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
                                                        memoryReader:flycast_rc_read_memory
                                                           consoleID:(uint32_t)RC_CONSOLE_DREAMCAST];
-    [_raBridge startWithROMPath:path];
+    [_raBridge startWithROMPath:path]; // rcheevos hashes a playlist's first disc itself
+    [_raBridge setHashCDReader:&OEChdHashCDReader]; // rcheevos cannot open a CHD on its own
 
     return YES;
+}
+
+// The discs a .m3u lists, one path per line (relative to the playlist), as absolute paths.
+- (NSArray<NSString *> *)discsInPlaylistAtPath:(NSString *)path
+{
+    NSString *playlist = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    NSString *folder = path.stringByDeletingLastPathComponent;
+    NSMutableArray<NSString *> *discs = [NSMutableArray array];
+    for (NSString *line in [playlist componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+        NSString *entry = [line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        if (entry.length == 0 || [entry hasPrefix:@"#"])
+            continue;
+        [discs addObject:entry.isAbsolutePath ? entry : [folder stringByAppendingPathComponent:entry]];
+    }
+    return discs;
 }
 
 - (void)setupEmulation
@@ -386,13 +420,7 @@ static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
             gui_init();
             theGLContext.init();
             emu.loadGame(_romPath.fileSystemRepresentation);
-            // loadGame calls reset()+load() which clears all settings — re-apply after it returns.
-            config::DynarecEnabled.override(true);  // JIT race was non-threaded-rendering only; threaded is always active
-            config::AudioBackend.set("openemu");    // reset() clears this to "auto"; restore before InitAudio()
-            // loadGameSpecificSettings() runs load(true) which can flip UseReios=false from a per-game
-            // config. Without HLE BIOS the VBL-driven GD-ROM server is inert and games freeze on a
-            // black screen. Force HLE on for any user without a real Dreamcast BIOS installed.
-            config::UseReios.override(true);
+            [self restoreSettings];
             rend_init_renderer();
             emu.start();
             gui_setState(GuiState::Closed);
@@ -413,9 +441,72 @@ static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
         }
     }
 
+    [self swapDiscIfRequested];
+
     emu.render();
 
     [_raBridge doFrame];
+}
+
+// loadGame and a disc change both reset Flycast's settings and reload them; put back the ones
+// OpenEmu depends on, before emu.start() initialises audio.
+- (void)restoreSettings
+{
+    config::DynarecEnabled.override(true);  // JIT race was non-threaded-rendering only; threaded is always active
+    config::AudioBackend.set("openemu");    // reset() clears this to "auto"; restore before InitAudio()
+    // loadGameSpecificSettings() runs load(true) which can flip UseReios=false from a per-game
+    // config. Without HLE BIOS the VBL-driven GD-ROM server is inert and games freeze on a
+    // black screen. Force HLE on for any user without a real Dreamcast BIOS installed.
+    config::UseReios.override(true);
+}
+
+#pragma mark - Discs
+
+- (NSUInteger)discCount
+{
+    return MAX(_discPaths.count, (NSUInteger)1);
+}
+
+- (void)setDisc:(NSUInteger)discNumber
+{
+    if (discNumber >= 1 && discNumber <= _discPaths.count)
+        _requestedDisc = discNumber;
+}
+
+// Runs on the emulation thread between frames, with the emulator stopped while the drive changes,
+// as Flycast's own menu does: open the lid, give the game about a second to see it open, then
+// insert the new disc. A disc change resets Flycast's settings and its cheat list.
+- (void)swapDiscIfRequested
+{
+    const NSUInteger requested = _requestedDisc.exchange(0);
+    if (requested > 0) {
+        try {
+            emu.stop();
+            emu.openGdrom();
+        } catch (const std::exception &e) {
+            NSLog(@"[Flycast] Could not open the disc lid: %s", e.what());
+        }
+        [self restoreSettings];
+        emu.start();
+        _discToInsert = requested;
+        _framesUntilInsert = 60;
+        return;
+    }
+
+    if (_discToInsert == 0 || --_framesUntilInsert > 0)
+        return;
+
+    NSString *disc = _discPaths[_discToInsert - 1];
+    _discToInsert = 0;
+    try {
+        emu.stop();
+        emu.insertGdrom(disc.fileSystemRepresentation);
+    } catch (const std::exception &e) {
+        NSLog(@"[Flycast] Could not insert %@: %s", disc.lastPathComponent, e.what());
+    }
+    [self restoreSettings];
+    emu.start();
+    [self applyCheats];
 }
 
 #pragma mark - Video

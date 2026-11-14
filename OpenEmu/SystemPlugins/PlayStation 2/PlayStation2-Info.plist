@@ -246,6 +246,9 @@
 		<string>cue</string>
 		<string>ccd</string>
 		<string>m3u</string>
+		<string>chd</string>
+		<string>cso</string>
+		<string>zso</string>
 	</array>
 	<key>OEGenericControlNamesKey</key>
 	<array>

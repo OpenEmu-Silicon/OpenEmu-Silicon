@@ -38,6 +38,9 @@
 
 #include "Common/GPU/OpenGL/OpenEmuGLContext.h"
 
+#include "OEChdFileLoader.h"
+#include "../../OpenEmu-SDK/OpenEmuSystem/OECHDReader.h"
+
 #include "System/NativeApp.h"
 
 #define ExceptionInfo PPSSPPExceptionInfo
@@ -129,17 +132,19 @@ static uint32_t ppsspp_rc_read_memory(uint32_t address, uint8_t *buffer,
     return readable;
 }
 
-#pragma mark - CSO hash file reader (RetroAchievements identification)
+#pragma mark - CSO / CHD hash file reader (RetroAchievements identification)
 
 // rcheevos identifies a PSP game by reading PSP_GAME/PARAM.SFO + SYSDIR/EBOOT.BIN out of the
 // disc's ISO 9660 filesystem. Its default file reader can't parse a .cso (CISO-compressed ISO),
 // so we install this reader, which transparently inflates CISO frames on demand and presents the
-// decompressed ISO to rcheevos — producing the same hash a plain .iso would. Non-CISO inputs
-// (.iso, .pbp) fall through to raw file I/O. CISO layout matches PPSSPP's own CISOFileBlockDevice.
+// decompressed ISO to rcheevos — producing the same hash a plain .iso would. A .chd is served the
+// same way through OECHDReader, the reader the core loads it with. Other inputs (.iso, .pbp) fall
+// through to raw file I/O. CISO layout matches PPSSPP's own CISOFileBlockDevice.
 typedef struct {
     FILE     *fp;
     bool      isCSO;
-    int64_t   logicalPos;   // position in the decompressed stream (CSO mode)
+    OECHDReader *chd;       // set instead of fp for a CHD
+    int64_t   logicalPos;   // position in the decompressed stream (CSO and CHD mode)
     uint64_t  totalBytes;   // decompressed size
     uint32_t  frameSize;    // CISO block_size
     uint8_t   indexShift;   // CISO align
@@ -163,6 +168,7 @@ static void ppsspp_cso_close(void *handle) {
     oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
     if (!f) return;
     if (f->fp) fclose(f->fp);
+    OECHDReaderClose(f->chd);
     free(f->index);
     free(f->frameBuf);
     free(f->readBuf);
@@ -224,7 +230,19 @@ static void *ppsspp_cso_open(const char *path) {
     f->cachedFrame = -1;
 
     uint8_t hdr[24];
-    if (fread(hdr, 1, sizeof(hdr), fp) == sizeof(hdr) && memcmp(hdr, "CISO", 4) == 0) {
+    const size_t hdrRead = fread(hdr, 1, sizeof(hdr), fp);
+    if (hdrRead >= 8 && memcmp(hdr, "MComprHD", 8) == 0) {
+        fclose(fp);
+        f->fp = NULL;
+        if (OECHDReaderOpenDVD(path, &f->chd) != OECHDReaderStatusOK) {
+            ppsspp_cso_close(f);
+            return NULL;
+        }
+        f->totalBytes = OECHDReaderSize(f->chd);
+        f->logicalPos = 0;
+        return f;
+    }
+    if (hdrRead == sizeof(hdr) && memcmp(hdr, "CISO", 4) == 0) {
         f->isCSO      = true;
         f->totalBytes = oe_read_u64le(hdr + 8);
         f->frameSize  = oe_read_u32le(hdr + 16);
@@ -285,7 +303,7 @@ static void *ppsspp_cso_open(const char *path) {
 static void ppsspp_cso_seek(void *handle, int64_t offset, int origin) {
     oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
     if (!f) return;
-    if (!f->isCSO) { fseeko(f->fp, (off_t)offset, origin); return; }
+    if (!f->isCSO && !f->chd) { fseeko(f->fp, (off_t)offset, origin); return; }
 
     int64_t base = 0;
     switch (origin) {
@@ -300,18 +318,24 @@ static void ppsspp_cso_seek(void *handle, int64_t offset, int origin) {
 static int64_t ppsspp_cso_tell(void *handle) {
     oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
     if (!f) return -1;
-    if (!f->isCSO) return (int64_t)ftello(f->fp);
+    if (!f->isCSO && !f->chd) return (int64_t)ftello(f->fp);
     return f->logicalPos;
 }
 
 static size_t ppsspp_cso_read(void *handle, void *buffer, size_t requested) {
     oe_psp_cso_file *f = (oe_psp_cso_file *)handle;
     if (!f) return 0;
-    if (!f->isCSO) return fread(buffer, 1, requested, f->fp);
+    if (!f->isCSO && !f->chd) return fread(buffer, 1, requested, f->fp);
 
     if (f->logicalPos < 0 || (uint64_t)f->logicalPos >= f->totalBytes) return 0;
     const uint64_t remain = f->totalBytes - (uint64_t)f->logicalPos;
     if (requested > remain) requested = (size_t)remain;
+
+    if (f->chd) {
+        const size_t got = OECHDReaderRead(f->chd, (uint64_t)f->logicalPos, buffer, requested);
+        f->logicalPos += (int64_t)got;
+        return got;
+    }
 
     uint8_t *out = (uint8_t *)buffer;
     size_t copied = 0;
@@ -326,6 +350,30 @@ static size_t ppsspp_cso_read(void *handle, void *buffer, size_t requested) {
         f->logicalPos += (int64_t)n;
     }
     return copied;
+}
+
+// Why a .chd cannot be played, in words for the player.
+static NSError *OEPSPCHDLoadError(OECHDReaderStatus status)
+{
+    NSString *reason;
+    switch (status) {
+        case OECHDReaderStatusNotDVD:
+            reason = @"This CHD holds a CD or another kind of image. PSP games need a DVD-type CHD: make it again from the ISO with \"chdman createdvd\".";
+            break;
+        case OECHDReaderStatusNeedsParent:
+            reason = @"This CHD only stores the differences from another CHD (its parent), which OpenEmu does not support. Make it again from the ISO with \"chdman createdvd\".";
+            break;
+        case OECHDReaderStatusUnsupported:
+            reason = @"This CHD uses a CHD version or a compression method OpenEmu does not support. Make it again from the ISO with \"chdman createdvd\".";
+            break;
+        default:
+            reason = @"The CHD file could not be read. It may be damaged or incomplete.";
+            break;
+    }
+    return [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadROMError userInfo:@{
+        NSLocalizedDescriptionKey : @"Unable to load ROM.",
+        NSLocalizedRecoverySuggestionErrorKey : reason,
+    }];
 }
 
 @implementation PPSSPPGameCore
@@ -372,6 +420,22 @@ static size_t ppsspp_cso_read(void *handle, void *buffer, size_t requested) {
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     NSURL *romURL = [NSURL fileURLWithPath:path];
+
+    // PPSSPP 1.14 cannot read CHD: it gets a made-up .iso path that OEChdFileLoader serves from the
+    // CHD. Check the CHD first, because PPSSPP only logs a disc it cannot open.
+    const bool isCHD = [romURL.pathExtension caseInsensitiveCompare:@"chd"] == NSOrderedSame;
+    if (isCHD) {
+        OECHDReader *reader = NULL;
+        const OECHDReaderStatus status = OECHDReaderOpenDVD(romURL.fileSystemRepresentation, &reader);
+        OECHDReaderClose(reader);
+        if (status != OECHDReaderStatusOK) {
+            if (error != nil)
+                *error = OEPSPCHDLoadError(status);
+            return NO;
+        }
+        OERegisterChdFileLoader();
+    }
+
     _cheats = [NSMutableDictionary dictionary];
     _cheatsDirty = NO;
     NSURL *resourceURL = self.owner.bundle.resourceURL;
@@ -437,7 +501,8 @@ static size_t ppsspp_cso_read(void *handle, void *buffer, size_t requested) {
     _coreParam.cpuCore      = CPUCore::JIT;
     _coreParam.gpuCore      = GPUCORE_GLES;
     _coreParam.enableSound  = true;
-    _coreParam.fileToStart  = Path(romURL.fileSystemRepresentation);
+    _coreParam.fileToStart  = isCHD ? OEChdFileLoaderPath(romURL.fileSystemRepresentation) : Path(romURL.fileSystemRepresentation);
+    _coreParam.updateRecent = !isCHD; // keep the made-up CHD path out of PPSSPP's recent-games list
     _coreParam.mountIso     = Path();
     _coreParam.startBreak  = false;
     _coreParam.printfEmuLog = false;

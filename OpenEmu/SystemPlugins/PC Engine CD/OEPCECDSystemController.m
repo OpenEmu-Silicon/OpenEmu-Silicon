@@ -46,7 +46,52 @@
 
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
-    OEDiscDescriptor *descriptor = file;
+    // A .m3u is a PC Engine CD game when its first disc is. Only that disc is scanned: the scan reads
+    // whole data tracks, and every other system's playlists come through here too.
+    if ([file.fileExtension isEqualToString:@"m3u"] && [file isKindOfClass:[OEDiscDescriptor class]]) {
+        NSURL *firstDiscURL = [(OEDiscDescriptor *)file referencedFileURLs].firstObject;
+        OEFile *firstDisc = firstDiscURL != nil ? [OEFile fileWithURL:firstDiscURL error:nil] : nil;
+        return firstDisc != nil ? [self canHandleDisc:firstDisc] : OEFileSupportNo;
+    }
+
+    return [self canHandleDisc:file];
+}
+
+// Whether a data track holds the PC Engine CD boot header.
+static BOOL OEPCECDHasHeader(NSData *dataTrackBuffer, NSURL *dataTrackURL)
+{
+    NSString *dataTrackString = @"PC Engine CD-ROM SYSTEM";
+    NSData *dataSearch = [dataTrackString dataUsingEncoding:NSUTF8StringEncoding];
+    // this still slows import down but we need to scan the disc as there's no common offset
+    NSRange indexOfData = [dataTrackBuffer rangeOfData: dataSearch options:0 range:NSMakeRange(0, [dataTrackBuffer length])];
+
+    if(indexOfData.length == 0)
+        return NO;
+
+    // "Battle Heat" for PC-FX is falsely identified as PCE CD. This should be the only game that needs this.
+    if(indexOfData.location + 74 + 11 <= dataTrackBuffer.length)
+    {
+        NSData *subData = [dataTrackBuffer subdataWithRange:NSMakeRange(indexOfData.location + 74, 11)];
+        NSData *subDataString = [NSData dataWithBytes:"Battle Heat" length:11];
+
+        if([subData isEqualToData:subDataString])
+            return NO;
+    }
+
+    NSLog(@"PCE-CD data track: %@", dataTrackURL);
+    NSLog (@"'%@' at offset = 0x%lX", dataTrackString, indexOfData.location);
+    return YES;
+}
+
+- (OEFileSupport)canHandleDisc:(OEFile *)file
+{
+    // A CHD reads as its first data track's .bin. The header is in the track's second sector, after
+    // the pregap Redump dumps keep at the start of the track (usually 3 seconds, 225 sectors), so the
+    // first 2 MB hold it without decompressing the whole track.
+    if ([file.fileExtension isEqualToString:@"chd"])
+        return OEPCECDHasHeader([file readDataInRange:NSMakeRange(0, 2 * 1024 * 1024)], file.fileURL) ? OEFileSupportYes : OEFileSupportNo;
+
+    OEDiscDescriptor *descriptor = (OEDiscDescriptor *)file;
     if (![descriptor isKindOfClass:[OECloneCD class]] && ![descriptor isKindOfClass:[OECUESheet class]])
         return OEFileSupportNo;
 
@@ -55,24 +100,8 @@
         NSError *error = nil;
         NSData *dataTrackBuffer = [NSData dataWithContentsOfURL:dataTrackURL options:NSDataReadingMappedIfSafe | NSDataReadingUncached error:&error];
 
-        NSString *dataTrackString = @"PC Engine CD-ROM SYSTEM";
-        NSData *dataSearch = [dataTrackString dataUsingEncoding:NSUTF8StringEncoding];
-        // this still slows import down but we need to scan the disc as there's no common offset
-        NSRange indexOfData = [dataTrackBuffer rangeOfData: dataSearch options:0 range:NSMakeRange(0, [dataTrackBuffer length])];
-
-        if(indexOfData.length == 0)
-            continue;
-
-        // "Battle Heat" for PC-FX is falsely identified as PCE CD. This should be the only game that needs this.
-        NSData *subData = [dataTrackBuffer subdataWithRange:NSMakeRange(indexOfData.location + 74, 11)];
-        NSData *subDataString = [NSData dataWithBytes:"Battle Heat" length:11];
-
-        if([subData isEqualToData:subDataString])
-            return OEFileSupportNo;
-
-        NSLog(@"PCE-CD data track: %@", dataTrackURL);
-        NSLog (@"'%@' at offset = 0x%lX", dataTrackString, indexOfData.location);
-        return OEFileSupportYes;
+        if(OEPCECDHasHeader(dataTrackBuffer, dataTrackURL))
+            return OEFileSupportYes;
     }
 
     return OEFileSupportNo;

@@ -26,6 +26,10 @@ static NSMutableDictionary<NSString *, Class> *extensionToSubclassDictionary;
     [self registerClass:NSClassFromString(@"OECloneCD") forFileExtension:@"ccd"];
     [self registerClass:NSClassFromString(@"OEDreamcastGDI") forFileExtension:@"gdi"];
     [self registerClass:NSClassFromString(@"OEM3UFile") forFileExtension:@"m3u"];
+    [self registerClass:NSClassFromString(@"OECHDFile") forFileExtension:@"chd"];
+    [self registerClass:NSClassFromString(@"OEGCZFile") forFileExtension:@"gcz"];
+    [self registerClass:NSClassFromString(@"OECSOFile") forFileExtension:@"cso"];
+    [self registerClass:NSClassFromString(@"OECSOFile") forFileExtension:@"zso"];
 }
 
 + (__kindof OEFile *)fileWithURL:(NSURL *)fileURL error:(NSError **)error

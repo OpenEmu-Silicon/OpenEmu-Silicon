@@ -30,7 +30,8 @@
 
 @implementation OEWiiSystemController
 
-// Read header to detect Wii ISO, WBFS & CISO
+// Read header to detect Wii ISO, WBFS, CISO, RVZ, WIA & GCZ. A GCZ reads as the disc inside it
+// (OEGCZFile), like an ISO.
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
         // wbfs/wad are Wii-only container formats.
@@ -45,7 +46,7 @@
     // RVZ/WIA keep the disc's first 0x80 bytes uncompressed in WIAHeader2 (file 0x58), so the
     // Wii magic sits at disc offset 0x18 -> file 0x70. Reading it tells a Wii .rvz apart from a
     // GameCube .rvz, which the old blanket extension match could not.
-    else if ([file.fileExtension isEqualToString:@"rvz"])
+    else if ([file.fileExtension isEqualToString:@"rvz"] || [file.fileExtension isEqualToString:@"wia"])
         dataRange.location = 0x70;
 
     // Wii Magicword 0x5D1C9EA3

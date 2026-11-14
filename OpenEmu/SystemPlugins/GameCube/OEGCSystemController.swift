@@ -26,10 +26,11 @@ import Foundation
 import OpenEmuSystem
 
 class OEGCSystemController: OESystemController {
-    // Read header to detect GameCube ISO, GCM & CISO.
+    // Read header to detect GameCube ISO, GCM, GCZ, CISO, RVZ & WIA. A GCZ reads as the disc inside
+    // it (OEGCZFile), like an ISO; Wii discs come as GCZ too, so it is checked, not trusted.
     override func canHandle(_ file: OEFile) -> OEFileSupport {
-        // gcm/gcz are GameCube-only container formats.
-        if ["gcm", "gcz"].contains(file.fileExtension) {
+        // gcm is a GameCube-only container format.
+        if file.fileExtension == "gcm" {
             return .yes
         }
 
@@ -42,7 +43,7 @@ class OEGCSystemController: OESystemController {
         // RVZ/WIA keep the disc's first 0x80 bytes uncompressed in WIAHeader2 (file 0x58), so the
         // GameCube magic sits at disc offset 0x1C -> file 0x74. Reading it tells a GameCube .rvz
         // apart from a Wii .rvz, which the old blanket extension match could not.
-        else if file.fileExtension == "rvz" {
+        else if ["rvz", "wia"].contains(file.fileExtension) {
             dataRange.location = 0x74
         }
 
