@@ -134,7 +134,7 @@ static const uint32_t kLynxRAWarmupFrames = 150;
     OERetroAchievementsBridge *_raBridge;
     NSString *_romPath;
 
-    // A PlayStation, Saturn or PC Engine CD game on CHD discs: the VirtualFS Mednafen loads it through (OEChdVirtualFS.h).
+    // A PlayStation, Saturn, PC Engine CD or PC-FX game on CHD discs: the VirtualFS Mednafen loads it through (OEChdVirtualFS.h).
     OEChdVirtualFS *_chdVFS;
     int _rcConsole;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
@@ -3432,8 +3432,8 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
     _mednafenCoreModule = mednafenCoreModules[self.systemIdentifier];
     _isSystemPCECD = [self.systemIdentifier isEqualToString:@"openemu.system.pcecd"];
 
-    // PlayStation, Saturn and PC Engine CD discs as CHD files: a .chd, or a .m3u listing .chd files, is
-    // loaded through OEChdVirtualFS, which serves each CHD as a CUE sheet and track files (OEChdVirtualFS.h).
+    // PlayStation, Saturn, PC Engine CD and PC-FX discs as CHD files: a .chd, or a .m3u listing .chd files,
+    // is loaded through OEChdVirtualFS, which serves each CHD as a CUE sheet and track files (OEChdVirtualFS.h).
     // Every CHD is opened first, so an unusable one gets a clear error.
     const BOOL isCHD = [path.pathExtension.lowercaseString isEqualToString:@"chd"];
     NSArray<NSString *> *chdDiscs = isCHD ? @[ path ] : [self chdDiscsInPlaylistAtPath:path];
@@ -3443,7 +3443,8 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
         for(NSString *disc in chdDiscs)
         {
             OECHDReaderStatus status = OECHDReaderStatusUnsupported;
-            if([_mednafenCoreModule isEqualToString:@"psx"] || [_mednafenCoreModule isEqualToString:@"ss"] || _isSystemPCECD)
+            if([_mednafenCoreModule isEqualToString:@"psx"] || [_mednafenCoreModule isEqualToString:@"ss"] || _isSystemPCECD
+               || [_mednafenCoreModule isEqualToString:@"pcfx"])
                 status = _chdVFS->addDisc(disc.fileSystemRepresentation);
             if(status == OECHDReaderStatusOK)
                 continue;
