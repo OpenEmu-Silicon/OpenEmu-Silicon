@@ -56,6 +56,25 @@ else
   SIGN_ID="-"
 fi
 
+# Notarization is what lets Gatekeeper open the DMG contents on the reviewer's
+# Mac — check it now rather than after a full core build. `history` surfaces
+# missing credentials and expired Apple Developer agreements alike.
+NOTARIZE=0
+if [ "$SIGN_ID" != "-" ]; then
+  if NOTARY_CHECK=$(xcrun notarytool history --keychain-profile "OpenEmu" 2>&1); then
+    NOTARIZE=1
+  else
+    echo ""
+    echo "WARNING: notarytool is not usable — the DMG will be signed but NOT notarized,"
+    echo "         and Gatekeeper on the reviewer's Mac will block it."
+    echo "$NOTARY_CHECK" | head -3 | sed 's/^/         /'
+    echo "         Credentials: xcrun notarytool store-credentials OpenEmu"
+    echo "         HTTP 403:    accept the pending agreement at developer.apple.com/account"
+    read -r -p "Continue without notarization? [y/N] " CONFIRM
+    [[ "$CONFIRM" =~ ^[Yy]$ ]] || die "Aborted."
+  fi
+fi
+
 # ── 1. Determine version and commit ──────────────────────────────────────────
 step "1/8  Determining build identity"
 
@@ -354,23 +373,35 @@ done < <(tail -n +3 "$VERSIONS_FILE")
 cp "$VERSIONS_FILE" "$STAGING_DIR/core-versions.txt"
 cp "$ASSETS_DIR/install.command" "$STAGING_DIR/Install.command"
 chmod +x "$STAGING_DIR/Install.command"
+# Don't ship the asset's quarantine/provenance flags inside the DMG
+xattr -c "$STAGING_DIR/Install.command" 2>/dev/null || true
 
-# Set custom icon and hide extension on the .command file
-INSTALL_ICON="$ASSETS_DIR/icon.png"
-if [ -f "$INSTALL_ICON" ]; then
-  osascript -e "
-    use framework \"AppKit\"
-    set iconImage to current application's NSImage's alloc()'s initWithContentsOfFile:\"$INSTALL_ICON\"
-    current application's NSWorkspace's sharedWorkspace()'s setIcon:iconImage forFile:\"$STAGING_DIR/Install.command\" options:0
-  " 2>/dev/null || true
-fi
-SetFile -a CE "$STAGING_DIR/Install.command"
-# Reinforce extension-hidden via URL resource value (most reliable across DMG tools)
-python3 -c "
+if [ "$SIGN_ID" != "-" ]; then
+  # Gatekeeper refuses to open an unsigned script from a downloaded DMG. Sign it
+  # (signature lives in xattrs, kept by ditto/HFS+) so notarization covers it.
+  # No custom icon or hidden extension: the resource fork / Finder info they add
+  # fail strict signature validation ("detritus not allowed").
+  codesign --force --sign "$SIGN_ID" --timestamp \
+    --identifier "org.openemu.silicon.ra-review.install" "$STAGING_DIR/Install.command"
+  info "Signed Install.command"
+else
+  # Set custom icon and hide extension on the .command file
+  INSTALL_ICON="$ASSETS_DIR/icon.png"
+  if [ -f "$INSTALL_ICON" ]; then
+    osascript -e "
+      use framework \"AppKit\"
+      set iconImage to current application's NSImage's alloc()'s initWithContentsOfFile:\"$INSTALL_ICON\"
+      current application's NSWorkspace's sharedWorkspace()'s setIcon:iconImage forFile:\"$STAGING_DIR/Install.command\" options:0
+    " 2>/dev/null || true
+  fi
+  SetFile -a CE "$STAGING_DIR/Install.command"
+  # Reinforce extension-hidden via URL resource value (most reliable across DMG tools)
+  python3 -c "
 from Foundation import NSURL, NSURLHasHiddenExtensionKey
 url = NSURL.fileURLWithPath_('$STAGING_DIR/Install.command')
 url.setResourceValue_forKey_error_(True, NSURLHasHiddenExtensionKey, None)
 " 2>/dev/null || true
+fi
 
 # Hide everything except Install.command and readme.txt
 for item in "$STAGING_DIR"/*; do
@@ -453,6 +484,12 @@ ASCRIPT
 # Let Finder flush .DS_Store
 sync
 
+# Strict validation, as Gatekeeper does — after Finder's layout pass, which could
+# otherwise leave Finder info on the file
+if [ "$SIGN_ID" != "-" ]; then
+  codesign --verify --strict "$MOUNT_POINT/Install.command" || die "Install.command signature is invalid in the DMG volume"
+fi
+
 # Eject via Finder first (releases its file handles), fall back to force detach
 osascript -e "tell application \"Finder\" to eject disk \"$VOLNAME\"" 2>/dev/null || true
 sleep 1
@@ -468,20 +505,19 @@ if [ "$SIGN_ID" != "-" ]; then
   info "Signing DMG..."
   codesign --force --sign "$SIGN_ID" --timestamp "$DMG_PATH"
 
-  if xcrun notarytool history --keychain-profile "OpenEmu" &>/dev/null 2>&1; then
+  if [ "$NOTARIZE" = 1 ]; then
     info "Submitting DMG for notarization..."
-    if xcrun notarytool submit "$DMG_PATH" --keychain-profile "OpenEmu" --wait 2>&1 | tee /tmp/ra-review-notarize.log; then
-      if grep -q "status: Accepted" /tmp/ra-review-notarize.log; then
-        xcrun stapler staple "$DMG_PATH"
-        info "Notarization: accepted and stapled"
-      else
-        echo "  WARNING: Notarization was not accepted. DMG is signed but not notarized."
-      fi
+    if xcrun notarytool submit "$DMG_PATH" --keychain-profile "OpenEmu" --wait 2>&1 | tee /tmp/ra-review-notarize.log \
+        && grep -q "status: Accepted" /tmp/ra-review-notarize.log; then
+      xcrun stapler staple "$DMG_PATH"
+      info "Notarization: accepted and stapled"
+    else
+      echo "  WARNING: Notarization was not accepted. DMG is signed but not notarized —"
+      echo "           Gatekeeper will block it. Check: xcrun notarytool log <id> --keychain-profile OpenEmu"
     fi
     rm -f /tmp/ra-review-notarize.log
   else
-    echo "  WARNING: No notarytool credentials found. DMG is signed but not notarized."
-    echo "           Run: xcrun notarytool store-credentials OpenEmu"
+    echo "  WARNING: DMG is signed but not notarized — Gatekeeper will block it on the reviewer's Mac."
   fi
 fi
 
