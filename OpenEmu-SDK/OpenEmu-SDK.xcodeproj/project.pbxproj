@@ -11,6 +11,8 @@
 		0EC0CD000000000000000002 /* OECHDFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000C /* OECHDFile.m */; };
 		0EC0CD000000000000000012 /* OEGCZFile.h in Headers */ = {isa = PBXBuildFile; fileRef = 0EC0CD000000000000000014 /* OEGCZFile.h */; };
 		0EC0CD000000000000000013 /* OEGCZFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD000000000000000015 /* OEGCZFile.m */; };
+		0EC0CD000000000000000016 /* OECSOFile.h in Headers */ = {isa = PBXBuildFile; fileRef = 0EC0CD000000000000000018 /* OECSOFile.h */; };
+		0EC0CD000000000000000017 /* OECSOFile.m in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD000000000000000019 /* OECSOFile.m */; };
 		0EC0CD000000000000000003 /* OECHDReader.h in Headers */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000D /* OECHDReader.h */; };
 		0EC0CD000000000000000004 /* OECHDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000E /* OECHDReader.c */; settings = {COMPILER_FLAGS = "-fvisibility=hidden"; }; };
 		0EC0CD000000000000000005 /* libchdr_build.c in Sources */ = {isa = PBXBuildFile; fileRef = 0EC0CD00000000000000000F /* libchdr_build.c */; settings = {COMPILER_FLAGS = "-std=gnu11 -w -fvisibility=hidden"; }; };
@@ -165,6 +167,8 @@
 		0EC0CD00000000000000000C /* OECHDFile.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OECHDFile.m; sourceTree = "<group>"; };
 		0EC0CD000000000000000014 /* OEGCZFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEGCZFile.h; sourceTree = "<group>"; };
 		0EC0CD000000000000000015 /* OEGCZFile.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEGCZFile.m; sourceTree = "<group>"; };
+		0EC0CD000000000000000018 /* OECSOFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OECSOFile.h; sourceTree = "<group>"; };
+		0EC0CD000000000000000019 /* OECSOFile.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OECSOFile.m; sourceTree = "<group>"; };
 		0EC0CD00000000000000000D /* OECHDReader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OECHDReader.h; sourceTree = "<group>"; };
 		0EC0CD00000000000000000E /* OECHDReader.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = OECHDReader.c; sourceTree = "<group>"; };
 		0EC0CD00000000000000000F /* libchdr_build.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = libchdr_build.c; path = ../Vendor/libchdr/libchdr_build.c; sourceTree = SOURCE_ROOT; };
@@ -568,6 +572,8 @@
 				0EC0CD00000000000000000C /* OECHDFile.m */,
 				0EC0CD000000000000000014 /* OEGCZFile.h */,
 				0EC0CD000000000000000015 /* OEGCZFile.m */,
+				0EC0CD000000000000000018 /* OECSOFile.h */,
+				0EC0CD000000000000000019 /* OECSOFile.m */,
 				0EC0CD00000000000000000D /* OECHDReader.h */,
 				0EC0CD00000000000000000E /* OECHDReader.c */,
 				C6772BDE1710E41C00ED580A /* OELocalizationHelper.swift */,
@@ -638,6 +644,7 @@
 				C6605B841D725B0D009C7E91 /* OEM3UFile.h in Headers */,
 				0EC0CD000000000000000001 /* OECHDFile.h in Headers */,
 				0EC0CD000000000000000012 /* OEGCZFile.h in Headers */,
+				0EC0CD000000000000000016 /* OECSOFile.h in Headers */,
 				0EC0CD000000000000000003 /* OECHDReader.h in Headers */,
 				C6772B971710E25300ED580A /* OEBindingsController_Internal.h in Headers */,
 				C6772BD31710E29C00ED580A /* OEControllerDescription_Internal.h in Headers */,
@@ -886,6 +893,7 @@
 				C6605B851D725B0D009C7E91 /* OEM3UFile.m in Sources */,
 				0EC0CD000000000000000002 /* OECHDFile.m in Sources */,
 				0EC0CD000000000000000013 /* OEGCZFile.m in Sources */,
+				0EC0CD000000000000000017 /* OECSOFile.m in Sources */,
 				0EC0CD000000000000000004 /* OECHDReader.c in Sources */,
 				0EC0CD000000000000000005 /* libchdr_build.c in Sources */,
 				0EC0CD000000000000000006 /* libchdr_zstd_build.c in Sources */,

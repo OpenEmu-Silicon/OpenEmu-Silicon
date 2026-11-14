@@ -28,6 +28,7 @@
 		D00A068E1763763000C99008 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D00A068D1763763000C99008 /* Cocoa.framework */; };
 		D00A06A617637E9100C99008 /* PCSX2GameCore.mm in Sources */ = {isa = PBXBuildFile; fileRef = D00A06A517637E9100C99008 /* PCSX2GameCore.mm */; };
 		A1B2C3D4E5F600000000A002 /* OEHost.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A001 /* OEHost.cpp */; };
+		A1B2C3D4E5F600000000A017 /* OEPS2HashFileReader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A018 /* OEPS2HashFileReader.cpp */; };
 		A1B2C3D4E5F600000000A00C /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A00B /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1 -Dmd5_init=rc_md5_init -Dmd5_append=rc_md5_append -Dmd5_finish=rc_md5_finish -Dmd5_process=rc_md5_process"; }; };
 		A1B2C3D4E5F600000000A00E /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A00D /* OERetroAchievementsTransport.m */; };
 		A1B2C3D4E5F600000000A010 /* OERetroAchievementsBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000A00F /* OERetroAchievementsBridge.m */; };
@@ -61,6 +62,8 @@
 		D00A06A517637E9100C99008 /* PCSX2GameCore.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = PCSX2GameCore.mm; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000A001 /* OEHost.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OEHost.cpp; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000A003 /* OEHost.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEHost.h; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000A018 /* OEPS2HashFileReader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OEPS2HashFileReader.cpp; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000A019 /* OEPS2HashFileReader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEPS2HashFileReader.h; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000A00B /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F600000000A00D /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
 		A1B2C3D4E5F600000000A00F /* OERetroAchievementsBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsBridge.m; path = ../OpenEmuKit/Source/OERetroAchievementsBridge.m; sourceTree = SOURCE_ROOT; };
@@ -148,6 +151,8 @@
 				D00A06A517637E9100C99008 /* PCSX2GameCore.mm */,
 				A1B2C3D4E5F600000000A001 /* OEHost.cpp */,
 				A1B2C3D4E5F600000000A003 /* OEHost.h */,
+				A1B2C3D4E5F600000000A018 /* OEPS2HashFileReader.cpp */,
+				A1B2C3D4E5F600000000A019 /* OEPS2HashFileReader.h */,
 				D0BA5A9517645D630033A910 /* osd */,
 			);
 			name = Classes;
@@ -269,6 +274,7 @@
 			files = (
 				D00A06A617637E9100C99008 /* PCSX2GameCore.mm in Sources */,
 				A1B2C3D4E5F600000000A002 /* OEHost.cpp in Sources */,
+				A1B2C3D4E5F600000000A017 /* OEPS2HashFileReader.cpp in Sources */,
 				A1B2C3D4E5F600000000A00C /* rcheevos_build.c in Sources */,
 				A1B2C3D4E5F600000000A00E /* OERetroAchievementsTransport.m in Sources */,
 				A1B2C3D4E5F600000000A010 /* OERetroAchievementsBridge.m in Sources */,
