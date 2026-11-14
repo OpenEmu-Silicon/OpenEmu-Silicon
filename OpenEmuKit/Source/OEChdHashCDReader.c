@@ -33,6 +33,7 @@
 typedef struct {
     void *defaultTrack;     // a track rcheevos's own cdreader opened,
     OECHDReader *reader;    // or a track of a CHD:
+    int dvd;                // a DVD-type CHD, read as the ISO it was made from
     unsigned index;
     int64_t firstSector;    // the sector the track's .bin starts at on the disc
     uint32_t pregapSectors; // stored pregap sectors at the start of the .bin
@@ -99,6 +100,8 @@ static int OEChdHashTrackIndex(const OECHDReader *reader, int gdrom, uint32_t tr
 
 static size_t OEChdHashReadBin(OEChdHashTrack *track, uint64_t offset, void *buffer, size_t length)
 {
+    if(track->dvd)
+        return OECHDReaderRead(track->reader, offset, buffer, length);
     return OECHDReaderReadTrack(track->reader, track->index, offset, buffer, length);
 }
 
@@ -158,14 +161,48 @@ static void OEChdHashAssumeSectorLayout(OEChdHashTrack *track, const OECHDTrack 
     }
 }
 
+// A DVD-type CHD, as rcheevos's own cdreader opens the ISO it was made from (cdreader_open_bin_track):
+// one track, which only "track 1" names, starting at sector 0. When sector 16 does not say how big a
+// sector is, the image size does.
+static void *OEChdHashOpenDVDTrack(OECHDReader *reader, uint32_t track)
+{
+    if(track != 1) {
+        OECHDReaderClose(reader);
+        return NULL;
+    }
+
+    OEChdHashTrack *handle = calloc(1, sizeof(OEChdHashTrack));
+    if(handle == NULL) {
+        OECHDReaderClose(reader);
+        return NULL;
+    }
+    handle->reader = reader;
+    handle->dvd = 1;
+    handle->dataSize = 2048;
+    if(!OEChdHashFindSectorLayout(handle)) {
+        const uint64_t size = OECHDReaderSize(reader);
+        handle->sectorSize = size % 2352 == 0 ? 2352 : size % 2048 == 0 ? 2048 : 2336;
+        handle->headerSize = handle->sectorSize == 2352 ? 24 : handle->sectorSize == 2048 ? 0 : 8;
+        if(size % handle->sectorSize != 0) {
+            OECHDReaderClose(reader);
+            free(handle);
+            return NULL;
+        }
+    }
+    return handle;
+}
+
 static void *OEChdHashOpenCHDTrack(const char *path, uint32_t track)
 {
     OECHDReader *reader = NULL;
     int gdrom = 1;
     if(OECHDReaderOpenGDROM(path, &reader) != OECHDReaderStatusOK) {
         gdrom = 0;
-        if(OECHDReaderOpenCD(path, &reader) != OECHDReaderStatusOK)
-            return NULL;
+        if(OECHDReaderOpenCD(path, &reader) != OECHDReaderStatusOK) {
+            if(OECHDReaderOpenDVD(path, &reader) != OECHDReaderStatusOK)
+                return NULL;
+            return OEChdHashOpenDVDTrack(reader, track);
+        }
     }
 
     OEChdHashTrack *handle = calloc(1, sizeof(OEChdHashTrack));

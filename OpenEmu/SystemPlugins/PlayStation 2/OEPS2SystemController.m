@@ -28,9 +28,18 @@
 
 @implementation OEPS2SystemController
 
+// A disc comes as a CUE/CCD/M3U descriptor, an ISO, or a CHD, which reads as the ISO it was made from
+// (DVD-type) or as its first data track's .bin (CD-type).
+static BOOL OEPS2IsDisc(OEFile *file)
+{
+    return [file isKindOfClass:[OEDiscDescriptor class]]
+        || [file.fileExtension caseInsensitiveCompare:@"iso"] == NSOrderedSame
+        || [file.fileExtension caseInsensitiveCompare:@"chd"] == NSOrderedSame;
+}
+
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
-    if (!([file isKindOfClass:[OEDiscDescriptor class]] || [file.fileExtension caseInsensitiveCompare:@"iso"] == NSOrderedSame))
+    if (!OEPS2IsDisc(file))
         return OEFileSupportNo;
 
     NSString *dataTrackString = [file readASCIIStringInRange:NSMakeRange(0x8008, 11)];
@@ -132,7 +141,7 @@
 
 - (NSString *)serialLookupForFile:(__kindof OEFile *)file
 {
-    if(!([file isKindOfClass:[OEDiscDescriptor class]] || [file.fileExtension caseInsensitiveCompare:@"iso"] == NSOrderedSame))
+    if(!OEPS2IsDisc(file))
         return nil;
 
     // ISO 9660 CD001, check for MODE1 or MODE2

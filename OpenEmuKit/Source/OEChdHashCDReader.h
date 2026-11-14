@@ -22,11 +22,12 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 
-// The rcheevos cdreader the cores whose discs come as CHD hash them with (the Flycast and Mednafen
-// wrappers, which compile this file next to OECHDReader.c). rcheevos's own cdreader only opens CUE
+// The rcheevos cdreader the cores whose discs come as CHD hash them with (the Flycast, Mednafen,
+// Genesis Plus GX and PCSX2 wrappers, which compile this file next to OECHDReader.c). rcheevos's own cdreader only opens CUE
 // and GDI sheets, so a CHD is read here, track by track through OECHDReader, as the files it was
-// made from: a CD-type CHD as its CUE sheet and .bin files, a GD-ROM CHD as its GDI. The tracks
-// start at the same sectors rcheevos's own reader would give them, so the hash is the original's.
+// made from: a CD-type CHD as its CUE sheet and .bin files, a GD-ROM CHD as its GDI, a DVD-type CHD
+// as its ISO. The tracks start at the same sectors rcheevos's own reader would give them, so the hash
+// is the original's.
 // Any other disc goes to rcheevos's own cdreader.
 
 #ifndef OEChdHashCDReader_h

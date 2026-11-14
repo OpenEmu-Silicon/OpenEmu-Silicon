@@ -49,6 +49,7 @@
 #import <OpenEmuBase/OEAudioBuffer.h>
 
 #import "OERetroAchievementsBridge.h"
+#include "OEChdHashCDReader.h"
 #include <rc_consoles.h>
 
 // Defined by the engine patch PCSX2/patches/0001-openemu-metal-output.patch.
@@ -146,12 +147,13 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 	}
 
 	// Start RetroAchievements now: login and identifying the disc run off the disc path, apart
-	// from the engine. rcheevos reads .iso, .bin and .cue images itself. markROMReady waits
-	// until the engine has booted (see startEmulation).
+	// from the engine. rcheevos reads .iso, .bin and .cue images itself, and CHD through
+	// OEChdHashCDReader. markROMReady waits until the engine has booted (see startEmulation).
 	_raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
 													   memoryReader:pcsx2_rc_read_memory
 														  consoleID:(uint32_t)RC_CONSOLE_PLAYSTATION_2];
 	[_raBridge startWithROMPath:_gameURL.path];
+	[_raBridge setHashCDReader:&OEChdHashCDReader]; // rcheevos cannot open a CHD on its own
 	return YES;
 }
 
