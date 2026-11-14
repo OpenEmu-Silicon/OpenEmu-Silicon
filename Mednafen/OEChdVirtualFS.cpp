@@ -343,7 +343,7 @@ std::string OEChdLoadErrorReason(OECHDReaderStatus status)
 {
     switch (status) {
         case OECHDReaderStatusNotCD:
-            return "This CHD holds a DVD or another kind of image. PlayStation games need a CD-type CHD: make it again from the CUE/BIN with \"chdman createcd\".";
+            return "This CHD holds a DVD or another kind of image. These games need a CD-type CHD: make it again from the CUE/BIN with \"chdman createcd\".";
         case OECHDReaderStatusNeedsParent:
             return "This CHD only stores the differences from another CHD (its parent), which OpenEmu does not support. Make it again from the CUE/BIN with \"chdman createcd\".";
         case OECHDReaderStatusUnsupported:

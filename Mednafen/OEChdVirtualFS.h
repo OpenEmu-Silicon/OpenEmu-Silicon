@@ -34,7 +34,7 @@
 // Mednafen knows; the CUE sheet keeps the CHD's name, so saves are named as for the CUE/BIN version.
 //
 // RetroAchievements reads the CHDs through OEChdHashFileReader: a .chd reads as its first track's
-// .bin, which is what rcheevos hashes for a PlayStation disc.
+// .bin, which is what rcheevos hashes for a PlayStation or Saturn disc.
 
 #pragma once
 
@@ -113,5 +113,5 @@ private:
 /// other path from disk.
 extern const rc_hash_filereader_t OEChdHashFileReader;
 
-/// Why a CHD cannot be played on PlayStation, in words for the player.
+/// Why a CHD cannot be played, in words for the player.
 std::string OEChdLoadErrorReason(OECHDReaderStatus status);
