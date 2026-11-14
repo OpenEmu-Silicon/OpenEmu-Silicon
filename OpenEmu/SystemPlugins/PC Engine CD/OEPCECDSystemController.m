@@ -46,7 +46,20 @@
 
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
-    OEDiscDescriptor *descriptor = file;
+    // A .m3u is a PC Engine CD game when its first disc is. Only that disc is scanned: the scan reads
+    // whole data tracks, and every other system's playlists come through here too.
+    if ([file.fileExtension isEqualToString:@"m3u"] && [file isKindOfClass:[OEDiscDescriptor class]]) {
+        NSURL *firstDiscURL = [(OEDiscDescriptor *)file referencedFileURLs].firstObject;
+        OEFile *firstDisc = firstDiscURL != nil ? [OEFile fileWithURL:firstDiscURL error:nil] : nil;
+        return firstDisc != nil ? [self canHandleDisc:firstDisc] : OEFileSupportNo;
+    }
+
+    return [self canHandleDisc:file];
+}
+
+- (OEFileSupport)canHandleDisc:(OEFile *)file
+{
+    OEDiscDescriptor *descriptor = (OEDiscDescriptor *)file;
     if (![descriptor isKindOfClass:[OECloneCD class]] && ![descriptor isKindOfClass:[OECUESheet class]])
         return OEFileSupportNo;
 
