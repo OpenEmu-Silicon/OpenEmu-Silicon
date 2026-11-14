@@ -30,9 +30,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// A CSO image (a compressed ISO, for PSP and PlayStation 2 games). -readDataInRange: returns the
-/// bytes of the ISO inside, so a system plugin checks the disc exactly as it does for the ISO. A file
-/// that is not a CSO, or is damaged, reads as empty; no system takes it.
+/// A CSO or ZSO image (a compressed ISO, for PSP and PlayStation 2 games; a ZSO uses LZ4). Its
+/// -readDataInRange: returns the bytes of the ISO inside, so a system plugin checks the disc exactly as
+/// it does for the ISO. A file that is not a CSO or ZSO, or is damaged, reads as empty; no system takes it.
 @interface OECSOFile : OEFile
 @end
 

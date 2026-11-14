@@ -27,6 +27,7 @@
 
 #import "OECSOFile.h"
 
+#include <compression.h>
 #include <zlib.h>
 
 // CSO (https://github.com/unknownbrackets/maxcso/blob/master/README_CSO.md), read the way the cores
@@ -35,8 +36,8 @@
 // alignment is where the frame starts; the next entry is where it ends. A frame is raw deflate, or
 // stored as it is: in version 1 when its entry has the top bit set, in version 2 when it did not
 // shrink. In version 2 the top bit marks an LZ4 frame instead, which no core here decodes (PPSSPP
-// reads version 2 without LZ4, PCSX2 only version 1), so a file with one is refused. Every number is
-// little-endian.
+// reads version 2 without LZ4, PCSX2 only version 1), so a file with one is refused. A ZSO ("ZISO",
+// version 1 only) is the same with LZ4 frames instead of deflate. Every number is little-endian.
 enum {
     OECSOHeaderSize = 24,
     OECSOMinFrameSize = 2048,
@@ -59,6 +60,7 @@ static uint32_t OECSORead32(const uint8_t *bytes)
     uint32_t _frameCount;
     uint8_t _alignment;
     uint8_t _version;
+    BOOL _lz4; // a ZSO
     NSData *_index; // _frameCount + 1 entries
     uint64_t _cachedFrame; // UINT64_MAX when the cache holds nothing
     NSMutableData *_cache;
@@ -75,15 +77,16 @@ static uint32_t OECSORead32(const uint8_t *bytes)
     if(header.length != OECSOHeaderSize)
         return NO;
     const uint8_t *bytes = header.bytes;
-    if(memcmp(bytes, "CISO", 4) != 0)
+    if(memcmp(bytes, "CISO", 4) != 0 && memcmp(bytes, "ZISO", 4) != 0)
         return NO;
+    _lz4 = bytes[0] == 'Z';
     const uint32_t headerSize = OECSORead32(bytes + 4);
     _imageSize = (uint64_t)OECSORead32(bytes + 8) | (uint64_t)OECSORead32(bytes + 12) << 32;
     _frameSize = OECSORead32(bytes + 16);
     _version = bytes[20];
     _alignment = bytes[21];
 
-    if(_version > 2 || _frameSize < OECSOMinFrameSize || _frameSize > OECSOMaxFrameSize
+    if(_version > (_lz4 ? 1 : 2) || _frameSize < OECSOMinFrameSize || _frameSize > OECSOMaxFrameSize
        || (_frameSize & (_frameSize - 1)) != 0 || _alignment > OECSOMaxAlignment
        || _imageSize == 0 || _imageSize > OECSOMaxImageSize)
         return NO;
@@ -155,6 +158,19 @@ static uint32_t OECSORead32(const uint8_t *bytes)
         NSData *data = [_handle readDataUpToLength:(NSUInteger)size error:&error];
         if(data.length != size)
             return NULL;
+        if(_lz4) {
+            // An LZ4 block with no frame around it. Alignment can leave up to one alignment unit of
+            // padding after it, which the engine's lenient LZ4_decompress_safe_partial skips but this
+            // stricter decoder refuses, so the padding is trimmed until the block decodes.
+            size_t produced = 0;
+            for(size_t padding = 0; produced == 0 && padding < (1u << _alignment) && padding < data.length; padding++)
+                produced = compression_decode_buffer(output, _frameSize, data.bytes, data.length - padding, NULL, COMPRESSION_LZ4_RAW);
+            if(produced == 0)
+                return NULL;
+            memset(output + produced, 0, _frameSize - produced);
+            _cachedFrame = frame;
+            return output;
+        }
         z_stream stream = { 0 };
         if(inflateInit2(&stream, -15) != Z_OK)
             return NULL;

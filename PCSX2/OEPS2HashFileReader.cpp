@@ -46,16 +46,17 @@ struct OEPS2HashFile {
 	std::vector<uint8_t> sectors;
 };
 
-bool OEPS2HashIsCSO(const char *path)
+// CsoFileReader reads both: a CSO (deflate) and a ZSO (LZ4).
+bool OEPS2HashIsCompressed(const char *path)
 {
 	const size_t length = strlen(path);
-	return length > 4 && strcasecmp(path + length - 4, ".cso") == 0;
+	return length > 4 && (strcasecmp(path + length - 4, ".cso") == 0 || strcasecmp(path + length - 4, ".zso") == 0);
 }
 
 void *OEPS2HashOpen(const char *path)
 {
 	auto handle = std::make_unique<OEPS2HashFile>();
-	if (OEPS2HashIsCSO(path)) {
+	if (OEPS2HashIsCompressed(path)) {
 		handle->cso = std::make_unique<CsoFileReader>();
 		Error error;
 		if (!handle->cso->Open(path, &error)) {

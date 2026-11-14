@@ -23,8 +23,8 @@
 
 
 // The rcheevos file reader the PCSX2 wrapper hashes discs with. rcheevos opens a disc image as a plain
-// file, so it is given a .cso as the ISO inside it, read with the engine's own CsoFileReader (what the
-// engine plays). Any other file is read as it is; CHDs go through OEChdHashCDReader instead.
+// file, so it is given a .cso or .zso as the ISO inside it, read with the engine's own CsoFileReader
+// (what the engine plays). Any other file is read as it is; CHDs go through OEChdHashCDReader instead.
 
 #pragma once
 

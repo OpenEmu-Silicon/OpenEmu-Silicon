@@ -149,14 +149,14 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 
 	// Start RetroAchievements now: login and identifying the disc run off the disc path, apart
 	// from the engine. rcheevos reads .iso, .bin and .cue images itself, CHD through
-	// OEChdHashCDReader and CSO through OEPS2HashFileReader. markROMReady waits until the engine
-	// has booted (see startEmulation).
+	// OEChdHashCDReader and CSO and ZSO through OEPS2HashFileReader. markROMReady waits until the
+	// engine has booted (see startEmulation).
 	_raBridge = [[OERetroAchievementsBridge alloc] initWithGameCore:self
 													   memoryReader:pcsx2_rc_read_memory
 														  consoleID:(uint32_t)RC_CONSOLE_PLAYSTATION_2];
 	[_raBridge startWithROMPath:_gameURL.path];
 	[_raBridge setHashCDReader:&OEChdHashCDReader]; // rcheevos cannot open a CHD on its own
-	[_raBridge setHashFileReader:&OEPS2HashFileReader]; // nor a CSO
+	[_raBridge setHashFileReader:&OEPS2HashFileReader]; // nor a CSO or ZSO
 	return YES;
 }
 
