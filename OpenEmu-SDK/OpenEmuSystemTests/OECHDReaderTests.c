@@ -22,9 +22,10 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 // Checks OECHDReader against small CHDs made from made-up images (no game data): a PSP DVD image,
-// and a two-track CD (a data track and an audio track with a pregap).
+// a two-track CD (a data track and an audio track with a pregap), and a three-track GD-ROM.
 // Run by Scripts/test-chd-reader.sh. The fixtures come from Fixtures/CHD/make-fixtures.sh, which
-// runs this program with --write-iso and --write-cd to get the images and converts them with chdman.
+// runs this program with --write-iso, --write-cd and --write-gd to get the images and converts them
+// with chdman.
 
 #include "../OpenEmuSystem/OECHDReader.h"
 #ifdef NDEBUG
@@ -77,6 +78,32 @@ static const char *const CDCueSheet =
     "  TRACK 02 AUDIO\n"
     "    INDEX 00 00:00:00\n"
     "    INDEX 01 00:02:00\n";
+
+// The GD-ROM, as a GDI: data, audio, data. Each track ends before the next one starts, as on a real
+// disc (where the third track starts the high-density area at sector 45000), and no track is a
+// multiple of the 4 sectors CHD pads tracks to.
+enum { GDTrackCount = 3 };
+static const struct { uint32_t lba; uint32_t sectors; OECHDTrackType type; } GDTracks[GDTrackCount] = {
+    { 0, 150, OECHDTrackTypeMode1Raw },
+    { 301, 77, OECHDTrackTypeAudio },
+    { 1003, 41, OECHDTrackTypeMode1Raw },
+};
+
+static const char *const GDISheet =
+    "3\n"
+    "1 0 4 2352 \"Game (Track 01).bin\" 0\n"
+    "2 301 0 2352 \"Game (Track 02).bin\" 0\n"
+    "3 1003 4 2352 \"Game (Track 03).bin\" 0\n";
+
+static uint8_t *makeGDTrack(unsigned index)
+{
+    const size_t size = (size_t)GDTracks[index].sectors * RawSectorSize;
+    uint8_t *track = malloc(size);
+    assert(track != NULL);
+    for(size_t i = 0; i < size; i++)
+        track[i] = (uint8_t)((index + 1) * 11 + (i / RawSectorSize) * 5 + i % RawSectorSize);
+    return track;
+}
 
 static char fixtureDirectory[1024];
 
@@ -243,6 +270,26 @@ static void checkCDFromISO(const uint8_t *image)
     OECHDReaderClose(reader);
 }
 
+static void checkGDROM(void)
+{
+    OECHDReader *reader = NULL;
+    assert(OECHDReaderOpenGDROM(fixture("gd.chd"), &reader) == OECHDReaderStatusOK);
+    assert(OECHDReaderTrackCount(reader) == GDTrackCount);
+    for(unsigned index = 0; index < GDTrackCount; index++) {
+        const OECHDTrack *track = OECHDReaderTrackAtIndex(reader, index);
+        assert(track->number == index + 1 && track->type == GDTracks[index].type && track->sectorSize == RawSectorSize);
+        assert(track->sectors == GDTracks[index].sectors && track->lba == GDTracks[index].lba);
+        assert(track->pregap == 0 && !track->pregapStored && track->postgap == 0);
+
+        // The gap after a track is in the CHD but not in its .bin, and audio is byte-swapped in the CHD.
+        uint8_t *expected = makeGDTrack(index);
+        checkTrack(reader, index, expected, (size_t)GDTracks[index].sectors * RawSectorSize);
+        free(expected);
+    }
+    assert(OECHDReaderTrackAtIndex(reader, GDTrackCount) == NULL);
+    OECHDReaderClose(reader);
+}
+
 int main(int argc, char **argv)
 {
     static uint8_t image[ImageSize];
@@ -266,8 +313,21 @@ int main(int argc, char **argv)
         writeFile(path, CDCueSheet, strlen(CDCueSheet));
         return 0;
     }
+    if(argc == 3 && strcmp(argv[1], "--write-gd") == 0) {
+        // The three tracks and their GDI, in the given folder.
+        char path[2048];
+        for(unsigned index = 0; index < GDTrackCount; index++) {
+            uint8_t *track = makeGDTrack(index);
+            snprintf(path, sizeof(path), "%s/Game (Track %02u).bin", argv[2], index + 1);
+            writeFile(path, track, (size_t)GDTracks[index].sectors * RawSectorSize);
+            free(track);
+        }
+        snprintf(path, sizeof(path), "%s/Game.gdi", argv[2]);
+        writeFile(path, GDISheet, strlen(GDISheet));
+        return 0;
+    }
     if(argc != 3) {
-        fprintf(stderr, "usage: %s <fixture folder> <temporary folder>\n       %s --write-iso <path>\n       %s --write-cd <folder>\n", argv[0], argv[0], argv[0]);
+        fprintf(stderr, "usage: %s <fixture folder> <temporary folder>\n       %s --write-iso <path>\n       %s --write-cd <folder>\n       %s --write-gd <folder>\n", argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
     snprintf(fixtureDirectory, sizeof(fixtureDirectory), "%s", argv[1]);
@@ -278,6 +338,7 @@ int main(int argc, char **argv)
 
     checkRejected(OECHDReaderOpenDVD, fixture("cd.chd"), OECHDReaderStatusNotDVD);         // chdman createcd
     checkRejected(OECHDReaderOpenDVD, fixture("cd-mixed.chd"), OECHDReaderStatusNotDVD);
+    checkRejected(OECHDReaderOpenDVD, fixture("gd.chd"), OECHDReaderStatusNotDVD);         // chdman createcd of a GDI
     checkRejected(OECHDReaderOpenDVD, fixture("hd.chd"), OECHDReaderStatusNotDVD);         // chdman createhd
     checkRejected(OECHDReaderOpenDVD, fixture("child.chd"), OECHDReaderStatusNeedsParent); // createdvd with a parent
     checkRejected(OECHDReaderOpenDVD, fixture("make-fixtures.sh"), OECHDReaderStatusCouldNotOpen);
@@ -290,9 +351,17 @@ int main(int argc, char **argv)
     checkCDFromISO(image);
     checkRejected(OECHDReaderOpenCD, fixture("dvd.chd"), OECHDReaderStatusNotCD);
     checkRejected(OECHDReaderOpenCD, fixture("hd.chd"), OECHDReaderStatusNotCD);
+    checkRejected(OECHDReaderOpenCD, fixture("gd.chd"), OECHDReaderStatusNotCD);
     checkRejected(OECHDReaderOpenCD, fixture("child.chd"), OECHDReaderStatusNeedsParent);
     checkRejected(OECHDReaderOpenCD, fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
     checkVersion(OECHDReaderOpenCD, temporaryDirectory, 4, OECHDReaderStatusUnsupported);
+
+    checkGDROM();
+    checkRejected(OECHDReaderOpenGDROM, fixture("dvd.chd"), OECHDReaderStatusNotGDROM);
+    checkRejected(OECHDReaderOpenGDROM, fixture("cd-mixed.chd"), OECHDReaderStatusNotGDROM);
+    checkRejected(OECHDReaderOpenGDROM, fixture("hd.chd"), OECHDReaderStatusNotGDROM);
+    checkRejected(OECHDReaderOpenGDROM, fixture("child.chd"), OECHDReaderStatusNeedsParent);
+    checkRejected(OECHDReaderOpenGDROM, fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
 
     puts("OECHDReader tests passed");
     return 0;

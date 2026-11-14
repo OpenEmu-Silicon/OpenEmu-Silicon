@@ -30,7 +30,7 @@
 
 @implementation OECHDFile {
     OECHDReader *_reader;
-    BOOL _isCD;
+    BOOL _hasTracks;
     BOOL _triedToOpen;
 }
 
@@ -47,7 +47,8 @@
             _triedToOpen = YES;
             const char *path = self.fileURL.fileSystemRepresentation;
             if(OECHDReaderOpenDVD(path, &_reader) != OECHDReaderStatusOK)
-                _isCD = OECHDReaderOpenCD(path, &_reader) == OECHDReaderStatusOK;
+                _hasTracks = OECHDReaderOpenCD(path, &_reader) == OECHDReaderStatusOK
+                          || OECHDReaderOpenGDROM(path, &_reader) == OECHDReaderStatusOK;
         }
 
         if(_reader == NULL || dataRange.length == 0)
@@ -56,8 +57,8 @@
         NSMutableData *data = [NSMutableData dataWithLength:dataRange.length];
         if(data == nil)
             return [NSData data];
-        // A CD reads as its first track's .bin, the file a CUE sheet's data track would be.
-        data.length = _isCD ? OECHDReaderReadTrack(_reader, 0, dataRange.location, data.mutableBytes, dataRange.length)
+        // A CD or GD-ROM reads as its first track's .bin, the file the CUE sheet or GDI starts with.
+        data.length = _hasTracks ? OECHDReaderReadTrack(_reader, 0, dataRange.location, data.mutableBytes, dataRange.length)
                             : OECHDReaderRead(_reader, dataRange.location, data.mutableBytes, dataRange.length);
         return data;
     }

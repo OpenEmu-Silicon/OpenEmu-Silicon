@@ -55,6 +55,7 @@
 #include <rc_consoles.h>
 #import "OERetroAchievementsTransport.h"
 #import "OERetroAchievementsBridge.h"
+#include "OEChdHashCDReader.h"
 
 #include <OpenGL/gl3.h>
 #include <mach/mach_time.h>
@@ -220,6 +221,7 @@ static uint32_t flycast_rc_read_memory(uint32_t address, uint8_t *buffer,
                                                        memoryReader:flycast_rc_read_memory
                                                           consoleID:(uint32_t)RC_CONSOLE_DREAMCAST];
     [_raBridge startWithROMPath:path]; // rcheevos hashes a playlist's first disc itself
+    [_raBridge setHashCDReader:&OEChdHashCDReader]; // rcheevos cannot open a CHD on its own
 
     return YES;
 }

@@ -32,8 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// A CHD image (MAME's compressed format). -readDataInRange: returns the bytes of the file the CHD
 /// was made from, so a system plugin checks the disc exactly as it does for that file: the ISO of a
-/// DVD-type CHD (`chdman createdvd`), or the first track's .bin of a CD-type CHD (`chdman createcd`).
-/// Any other CHD (GD-ROM, hard disk) reads as empty; no system takes it.
+/// DVD-type CHD (`chdman createdvd`), or the first track's .bin of a CD-type or GD-ROM CHD
+/// (`chdman createcd`). Any other CHD (hard disk) reads as empty; no system takes it.
 @interface OECHDFile : OEFile
 @end
 

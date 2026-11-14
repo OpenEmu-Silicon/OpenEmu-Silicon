@@ -49,7 +49,7 @@ struct OECHDReader {
     uint32_t cachedHunk[OECHDCacheSlots];  // UINT32_MAX marks an empty slot
     unsigned nextSlot;
 
-    // CD only
+    // CD and GD-ROM
     unsigned trackCount;
     OECHDTrack tracks[OECHDMaxTracks];
     uint32_t trackFirstFrame[OECHDMaxTracks]; // where each track starts among the CHD's frames
@@ -246,7 +246,7 @@ size_t OECHDReaderRead(OECHDReader *reader, uint64_t offset, void *buffer, size_
     return copied;
 }
 
-#pragma mark - CD
+#pragma mark - CD and GD-ROM
 
 static int OECHDTrackTypeFromName(const char *name, OECHDTrackType *type, uint32_t *sectorSize)
 {
@@ -267,12 +267,14 @@ static int OECHDTrackTypeFromName(const char *name, OECHDTrackType *type, uint32
     return 0;
 }
 
-// Reads the track list from the CHD's text metadata: CHT2 (with gaps) or the older CHTR (without).
-static OECHDReaderStatus OECHDReaderReadTracks(OECHDReader *reader)
+// Reads the track list from the CHD's text metadata: for a CD, CHT2 (with gaps) or the older CHTR
+// (without); for a GD-ROM, CHGD.
+static OECHDReaderStatus OECHDReaderReadTracks(OECHDReader *reader, int gdrom)
 {
-    const int hasGaps = OECHDHasMetadata(reader->chd, CDROM_TRACK_METADATA2_TAG);
-    const uint32_t tag = hasGaps ? CDROM_TRACK_METADATA2_TAG : CDROM_TRACK_METADATA_TAG;
-    uint32_t frame = 0;
+    const int hasGaps = !gdrom && OECHDHasMetadata(reader->chd, CDROM_TRACK_METADATA2_TAG);
+    const uint32_t tag = gdrom ? GDROM_TRACK_METADATA_TAG : hasGaps ? CDROM_TRACK_METADATA2_TAG : CDROM_TRACK_METADATA_TAG;
+    const int fields = gdrom ? 9 : hasGaps ? 8 : 4;
+    uint32_t frame = 0, lba = 0;
 
     for(unsigned index = 0; index < OECHDMaxTracks; index++) {
         char metadata[256] = { 0 };
@@ -281,23 +283,34 @@ static OECHDReaderStatus OECHDReaderReadTracks(OECHDReader *reader)
             break;
         metadata[length < sizeof(metadata) ? length : sizeof(metadata) - 1] = 0;
 
-        int number = 0, frames = 0, pregap = 0, postgap = 0;
+        int number = 0, frames = 0, padding = 0, pregap = 0, postgap = 0;
         char type[32] = { 0 }, subtype[32] = { 0 }, pregapType[32] = { 0 }, pregapSubtype[32] = { 0 };
-        const int parsed = hasGaps
+        const int parsed = gdrom
+            ? sscanf(metadata, "TRACK:%d TYPE:%31s SUBTYPE:%31s FRAMES:%d PAD:%d PREGAP:%d PGTYPE:%31s PGSUB:%31s POSTGAP:%d",
+                     &number, type, subtype, &frames, &padding, &pregap, pregapType, pregapSubtype, &postgap)
+            : hasGaps
             ? sscanf(metadata, "TRACK:%d TYPE:%31s SUBTYPE:%31s FRAMES:%d PREGAP:%d PGTYPE:%31s PGSUB:%31s POSTGAP:%d",
                      &number, type, subtype, &frames, &pregap, pregapType, pregapSubtype, &postgap)
             : sscanf(metadata, "TRACK:%d TYPE:%31s SUBTYPE:%31s FRAMES:%d", &number, type, subtype, &frames);
-        if(parsed != (hasGaps ? 8 : 4) || number != (int)index + 1 || frames <= 0 || pregap < 0 || postgap < 0)
+        if(parsed != fields || number != (int)index + 1 || frames <= 0 || padding < 0 || padding >= frames || pregap < 0 || postgap < 0)
             return OECHDReaderStatusCouldNotOpen;
+        // chdman moves a GD-ROM's gaps into the tracks before them; one with gaps left is not a layout
+        // a GDI can describe (Flycast refuses it too).
+        if(gdrom && (pregap != 0 || postgap != 0))
+            return OECHDReaderStatusUnsupported;
 
         OECHDTrack *track = &reader->tracks[index];
         if(!OECHDTrackTypeFromName(type, &track->type, &track->sectorSize))
             return OECHDReaderStatusUnsupported;
         track->number = (unsigned)number;
-        track->sectors = (uint32_t)frames;
+        track->sectors = (uint32_t)(frames - padding);
         track->pregap = (uint32_t)pregap;
         track->pregapStored = pregap > 0 && pregapType[0] == 'V'; // "V…": the pregap's sectors are in the data
         track->postgap = (uint32_t)postgap;
+        // GD-ROM: PAD is the empty sectors up to the next track's start (45000 for the high-density
+        // area); they are part of FRAMES but not of the track's .bin.
+        track->lba = gdrom ? lba : 0;
+        lba += (uint32_t)frames;
 
         // Each track's frames are padded to a multiple of OECHDCDTrackPadding in the CHD.
         reader->trackFirstFrame[index] = frame;
@@ -310,27 +323,28 @@ static OECHDReaderStatus OECHDReaderReadTracks(OECHDReader *reader)
     return OECHDReaderStatusOK;
 }
 
-OECHDReaderStatus OECHDReaderOpenCD(const char *path, OECHDReader **reader)
+// CD and GD-ROM images both use CD frames; the kind of track list tells them apart.
+static OECHDReaderStatus OECHDReaderOpenDisc(const char *path, int gdrom, OECHDReader **reader)
 {
     *reader = NULL;
+    const OECHDReaderStatus wrongKind = gdrom ? OECHDReaderStatusNotGDROM : OECHDReaderStatusNotCD;
 
     chd_header header;
     OECHDReaderStatus status = OECHDReadHeader(path, OECHDReaderStatusUnsupported, &header);
     if(status != OECHDReaderStatusOK)
         return status;
     if(header.unitbytes != OECHDCDFrameSize || header.hunkbytes == 0 || header.hunkbytes % OECHDCDFrameSize != 0)
-        return OECHDReaderStatusNotCD;
+        return wrongKind;
 
     OECHDReader *result = NULL;
     status = OECHDReaderCreate(path, &result);
     if(status != OECHDReaderStatusOK)
         return status;
 
-    // GD-ROM (Dreamcast) images also use CD frames; only a CD track list describes a CD.
-    if(!OECHDHasMetadata(result->chd, CDROM_TRACK_METADATA2_TAG) && !OECHDHasMetadata(result->chd, CDROM_TRACK_METADATA_TAG))
-        status = OECHDReaderStatusNotCD;
-    else
-        status = OECHDReaderReadTracks(result);
+    const int hasTrackList = gdrom
+        ? OECHDHasMetadata(result->chd, GDROM_TRACK_METADATA_TAG)
+        : OECHDHasMetadata(result->chd, CDROM_TRACK_METADATA2_TAG) || OECHDHasMetadata(result->chd, CDROM_TRACK_METADATA_TAG);
+    status = hasTrackList ? OECHDReaderReadTracks(result, gdrom) : wrongKind;
 
     if(status != OECHDReaderStatusOK) {
         OECHDReaderClose(result);
@@ -338,6 +352,16 @@ OECHDReaderStatus OECHDReaderOpenCD(const char *path, OECHDReader **reader)
     }
     *reader = result;
     return OECHDReaderStatusOK;
+}
+
+OECHDReaderStatus OECHDReaderOpenCD(const char *path, OECHDReader **reader)
+{
+    return OECHDReaderOpenDisc(path, 0, reader);
+}
+
+OECHDReaderStatus OECHDReaderOpenGDROM(const char *path, OECHDReader **reader)
+{
+    return OECHDReaderOpenDisc(path, 1, reader);
 }
 
 unsigned OECHDReaderTrackCount(const OECHDReader *reader)
