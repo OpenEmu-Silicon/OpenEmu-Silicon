@@ -47,8 +47,9 @@
 #endif
 
 #if defined(USE_LIBCHDR)
-#include "libchdr/src/chd.h"
-#include "libchdr/src/cdrom.h"
+/* OpenEmu: built against Vendor/libchdr, not the older copy in cd_hw/libchdr */
+#include <libchdr/chd.h>
+#include <libchdr/cdrom.h>
 #endif
 
 #define cdd scd.cdd_hw

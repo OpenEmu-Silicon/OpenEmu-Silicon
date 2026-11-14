@@ -28,18 +28,22 @@
 
 @implementation OESegaCDSystemController
 
+// A disc comes as a CUE sheet, or as a CHD, which reads as its first data track's .bin.
+static BOOL OESCDIsDisc(OEFile *file)
+{
+    return [file isKindOfClass:[OECUESheet class]] || [file.fileExtension isEqualToString:@"chd"];
+}
+
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
-    if (![file isKindOfClass:[OECUESheet class]])
+    if (!OESCDIsDisc(file))
         return OEFileSupportNo;
 
-    OECUESheet *cueSheet = file;
-    NSURL *dataTrackURL = cueSheet.dataTrackFileURL;
+    if ([file isKindOfClass:[OECUESheet class]])
+        NSLog(@"SCD data track: %@", [(OECUESheet *)file dataTrackFileURL]);
 
-    NSLog(@"SCD data track: %@", dataTrackURL);
-
-    NSString *dataTrackString = [cueSheet readASCIIStringInRange:NSMakeRange(0, 16)];
-    NSString *otherDataTrackString = [cueSheet readASCIIStringInRange:NSMakeRange(0x10, 16)];
+    NSString *dataTrackString = [file readASCIIStringInRange:NSMakeRange(0, 16)];
+    NSString *otherDataTrackString = [file readASCIIStringInRange:NSMakeRange(0x10, 16)];
     NSLog(@"'%@'", dataTrackString);
     NSLog(@"'%@'", otherDataTrackString);
     NSArray *dataTrackList = @[ @"SEGADISCSYSTEM  ", @"SEGABOOTDISC    ", @"SEGADISC        ", @"SEGADATADISC    " ];
@@ -72,7 +76,7 @@
 
 - (NSString *)headerLookupForFile:(__kindof OEFile *)file
 {
-    if (![file isKindOfClass:[OECUESheet class]])
+    if (!OESCDIsDisc(file))
         return nil;
 
     unsigned long long offsetFound = [self _headerOffsetForFile:file];
@@ -85,7 +89,7 @@
 
 - (NSString *)serialLookupForFile:(__kindof OEFile *)file
 {
-    if (![file isKindOfClass:[OECUESheet class]])
+    if (!OESCDIsDisc(file))
         return nil;
 
     unsigned long long offsetFound = [self _headerOffsetForFile:file];
