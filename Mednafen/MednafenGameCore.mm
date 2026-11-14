@@ -56,6 +56,7 @@
 #define RC_CLIENT_SUPPORTS_HASH 1
 #include <rc_client.h>
 #import "OERetroAchievementsBridge.h"
+#include "OEChdHashCDReader.h"
 #include <rc_consoles.h>
 #import "OERetroAchievementsTransport.h"
 
@@ -133,7 +134,7 @@ static const uint32_t kLynxRAWarmupFrames = 150;
     OERetroAchievementsBridge *_raBridge;
     NSString *_romPath;
 
-    // A PlayStation or Saturn game on CHD discs: the VirtualFS Mednafen loads it through (OEChdVirtualFS.h).
+    // A PlayStation, Saturn or PC Engine CD game on CHD discs: the VirtualFS Mednafen loads it through (OEChdVirtualFS.h).
     OEChdVirtualFS *_chdVFS;
     int _rcConsole;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
@@ -3431,8 +3432,8 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
     _mednafenCoreModule = mednafenCoreModules[self.systemIdentifier];
     _isSystemPCECD = [self.systemIdentifier isEqualToString:@"openemu.system.pcecd"];
 
-    // PlayStation and Saturn discs as CHD files: a .chd, or a .m3u listing .chd files, is loaded through
-    // OEChdVirtualFS, which serves each CHD as a CUE sheet and track files (OEChdVirtualFS.h).
+    // PlayStation, Saturn and PC Engine CD discs as CHD files: a .chd, or a .m3u listing .chd files, is
+    // loaded through OEChdVirtualFS, which serves each CHD as a CUE sheet and track files (OEChdVirtualFS.h).
     // Every CHD is opened first, so an unusable one gets a clear error.
     const BOOL isCHD = [path.pathExtension.lowercaseString isEqualToString:@"chd"];
     NSArray<NSString *> *chdDiscs = isCHD ? @[ path ] : [self chdDiscsInPlaylistAtPath:path];
@@ -3442,7 +3443,7 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
         for(NSString *disc in chdDiscs)
         {
             OECHDReaderStatus status = OECHDReaderStatusUnsupported;
-            if([_mednafenCoreModule isEqualToString:@"psx"] || [_mednafenCoreModule isEqualToString:@"ss"])
+            if([_mednafenCoreModule isEqualToString:@"psx"] || [_mednafenCoreModule isEqualToString:@"ss"] || _isSystemPCECD)
                 status = _chdVFS->addDisc(disc.fileSystemRepresentation);
             if(status == OECHDReaderStatusOK)
                 continue;
@@ -3455,7 +3456,6 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
             [self closeCHD];
             return NO;
         }
-        OEChdVirtualFS::setCurrent(_chdVFS);
     }
 
     // Create battery save dir
@@ -3760,7 +3760,7 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
                                                                consoleID:(uint32_t)_rcConsole];
         [_raBridge startWithROMPath:path];
         if (_chdVFS)
-            [_raBridge setHashFileReader:&OEChdHashFileReader];
+            [_raBridge setHashCDReader:&OEChdHashCDReader]; // rcheevos cannot open a CHD on its own
         [_raBridge markROMReady];
     }
 
@@ -3842,7 +3842,6 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
 {
     if (!_chdVFS)
         return;
-    OEChdVirtualFS::setCurrent(nullptr);
     delete _chdVFS;
     _chdVFS = nullptr;
 }

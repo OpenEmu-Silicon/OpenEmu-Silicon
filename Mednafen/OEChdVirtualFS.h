@@ -33,8 +33,8 @@
 // CHDs. A single CHD is loaded as a CD (MDFNI_LoadGame's force_cd), since its extension is not one
 // Mednafen knows; the CUE sheet keeps the CHD's name, so saves are named as for the CUE/BIN version.
 //
-// RetroAchievements reads the CHDs through OEChdHashFileReader: a .chd reads as its first track's
-// .bin, which is what rcheevos hashes for a PlayStation or Saturn disc.
+// RetroAchievements does not go through this VirtualFS: rcheevos hashes the CHDs with
+// OEChdHashCDReader (OpenEmuKit/Source), which reads them itself.
 
 #pragma once
 
@@ -46,7 +46,6 @@
 #include <string>
 #include <vector>
 
-#include <rc_hash.h>
 #include "../OpenEmu-SDK/OpenEmuSystem/OECHDReader.h"
 
 /// One open CD-type CHD, and the CUE sheet and track files it is presented as.
@@ -67,7 +66,7 @@ private:
     OEChdDisc() = default;
 
     OECHDReader *_reader = nullptr;
-    std::mutex _lock; // Mednafen reads the disc on its own thread, RetroAchievements on another
+    std::mutex _lock; // an OECHDReader is not thread safe
     std::string _cueSheet;
     std::vector<std::string> _trackPaths;
 };
@@ -95,23 +94,15 @@ public:
     // by their bare names instead of next to the CUE sheet.
     bool is_absolute_path(const std::string &path) override;
 
-    /// The VirtualFS of the game being played, for RetroAchievements. Set by the wrapper, nullptr when none.
-    static void setCurrent(OEChdVirtualFS *vfs);
-    static OEChdVirtualFS *current();
-
 private:
     struct Track { std::shared_ptr<OEChdDisc> disc; int index; };
     bool trackAtPath(const std::string &path, Track *track);
 
     Mednafen::VirtualFS *_fallback;
-    std::mutex _lock; // the disc lists, used from Mednafen's thread and RetroAchievements'
+    std::mutex _lock; // the disc lists
     std::map<std::string, std::shared_ptr<OEChdDisc>> _discs;
     std::map<std::string, Track> _tracks;
 };
-
-/// A file reader for rcheevos that reads the current game's CHDs as their first track's .bin and any
-/// other path from disk.
-extern const rc_hash_filereader_t OEChdHashFileReader;
 
 /// Why a CHD cannot be played, in words for the player.
 std::string OEChdLoadErrorReason(OECHDReaderStatus status);

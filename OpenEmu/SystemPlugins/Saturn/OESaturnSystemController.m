@@ -28,7 +28,7 @@
 
 @implementation OESaturnSystemController
 
-// A disc comes as a CUE/CCD/M3U descriptor, or as a CHD, which reads as its first track's .bin.
+// A disc comes as a CUE/CCD/M3U descriptor, or as a CHD, which reads as its first data track's .bin.
 static BOOL OESaturnIsDisc(OEFile *file)
 {
     return [file isKindOfClass:[OEDiscDescriptor class]] || [file.fileExtension isEqualToString:@"chd"];

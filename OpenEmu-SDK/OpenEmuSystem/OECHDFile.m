@@ -31,6 +31,7 @@
 @implementation OECHDFile {
     OECHDReader *_reader;
     BOOL _hasTracks;
+    unsigned _dataTrack;
     BOOL _triedToOpen;
 }
 
@@ -49,6 +50,10 @@
             if(OECHDReaderOpenDVD(path, &_reader) != OECHDReaderStatusOK)
                 _hasTracks = OECHDReaderOpenCD(path, &_reader) == OECHDReaderStatusOK
                           || OECHDReaderOpenGDROM(path, &_reader) == OECHDReaderStatusOK;
+            // PC Engine CDs start with an audio track; their data is on track 2.
+            while(_hasTracks && _dataTrack + 1 < OECHDReaderTrackCount(_reader)
+                  && OECHDReaderTrackAtIndex(_reader, _dataTrack)->type == OECHDTrackTypeAudio)
+                _dataTrack++;
         }
 
         if(_reader == NULL || dataRange.length == 0)
@@ -57,8 +62,8 @@
         NSMutableData *data = [NSMutableData dataWithLength:dataRange.length];
         if(data == nil)
             return [NSData data];
-        // A CD or GD-ROM reads as its first track's .bin, the file the CUE sheet or GDI starts with.
-        data.length = _hasTracks ? OECHDReaderReadTrack(_reader, 0, dataRange.location, data.mutableBytes, dataRange.length)
+        // A CD or GD-ROM reads as its first data track's .bin.
+        data.length = _hasTracks ? OECHDReaderReadTrack(_reader, _dataTrack, dataRange.location, data.mutableBytes, dataRange.length)
                             : OECHDReaderRead(_reader, dataRange.location, data.mutableBytes, dataRange.length);
         return data;
     }
