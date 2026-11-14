@@ -28,6 +28,7 @@
 #include "pcsx2/IopThread/OwnerAsserts.h"
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
+#include "pcsx2/MemoryTypes.h"
 #include "pcsx2/PerformanceMetrics.h"
 #include "pcsx2/SIO/Pad/Pad.h"
 
@@ -57,6 +58,18 @@ static std::atomic<bool> s_shutdown_requested{false};
 static std::mutex s_cpu_queue_lock;
 static std::deque<std::function<void()>> s_cpu_queue;
 static std::condition_variable s_cpu_queue_cv;
+
+static std::function<void()> s_reset_callback;
+
+// A pause or resume that arrived while a reset was pending (VMState::Resetting), applied by
+// CPUThreadMain once the reset is done. CPU thread only.
+static std::optional<VMState> s_state_after_reset;
+
+static void NotifyResetDone()
+{
+	if (s_reset_callback)
+		s_reset_callback();
+}
 
 //////////////////////////////////////////////////////////////////////////
 // Setup
@@ -131,6 +144,10 @@ bool OEHost::Initialize(const Folders& folders, std::string* error)
 		si.SetBoolValue("EmuCore", "EnablePatches", true);
 		si.SetBoolValue("EmuCore", "EnableCheats", false);
 		si.SetBoolValue("EmuCore", "EnablePerGameSettings", true);
+
+		// RetroAchievements runs through OpenEmu's own client (PCSX2GameCore), so the
+		// engine's built-in one must never start a second session.
+		si.SetBoolValue("Achievements", "Enabled", false);
 	}
 
 	Error save_error;
@@ -185,6 +202,7 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 	VMManager::ApplySettings();
 
 	std::optional<VMBootParameters> pending_boot = std::move(initial_params);
+	s_state_after_reset.reset();
 
 	while (!s_shutdown_requested.load(std::memory_order_acquire))
 	{
@@ -202,6 +220,12 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 
 			case VMState::Resetting:
 				VMManager::Reset();
+				NotifyResetDone();
+				if (s_state_after_reset.has_value())
+				{
+					VMManager::SetState(s_state_after_reset.value());
+					s_state_after_reset.reset();
+				}
 				continue;
 
 			case VMState::Stopping:
@@ -275,6 +299,79 @@ void OEHost::StopCPUThread()
 bool OEHost::IsCPUThreadRunning()
 {
 	return s_cpu_thread_running.load(std::memory_order_acquire);
+}
+
+void OEHost::SetResetCallback(std::function<void()> callback)
+{
+	s_reset_callback = std::move(callback);
+}
+
+void OEHost::RequestReset()
+{
+	Host::RunOnCPUThread([]() {
+		if (!VMManager::HasValidVM())
+			return;
+		// Already pending: CPUThreadMain will do it. Calling Reset again here would reset at once,
+		// possibly in the middle of a frame, which the engine warns breaks some games.
+		if (VMManager::GetState() == VMState::Resetting)
+			return;
+		VMManager::Reset();
+		// While running, the engine only marks the machine Resetting here and CPUThreadMain
+		// finishes the reset (and notifies) on its next turn. Paused, the reset is already done.
+		if (VMManager::GetState() != VMState::Resetting)
+			NotifyResetDone();
+	}, false);
+}
+
+void OEHost::SetPaused(bool paused)
+{
+	Host::RunOnCPUThread([paused]() {
+		if (!VMManager::HasValidVM())
+			return;
+		const VMState state = paused ? VMState::Paused : VMState::Running;
+		// OpenEmu resumes right after every reset, usually before the CPU thread has finished it.
+		// Setting the state now would replace Resetting and the reset would never happen.
+		if (VMManager::GetState() == VMState::Resetting)
+		{
+			s_state_after_reset = state;
+			return;
+		}
+		VMManager::SetState(state);
+	}, false);
+}
+
+void OEHost::FrameAdvance()
+{
+	Host::RunOnCPUThread([]() {
+		// FrameAdvance sets the state to Running, which would cancel a pending reset.
+		if (VMManager::HasValidVM() && VMManager::GetState() != VMState::Resetting)
+			VMManager::FrameAdvance(1);
+	}, false);
+}
+
+// OpenEmu's RetroAchievements hardcore mode, read by the engine through Host::IsHostHardcoreModeActive
+// (PCSX2/patches/0002-openemu-host-hardcore.patch), from the CPU thread and others.
+static std::atomic<bool> s_hardcore_mode{false};
+
+bool Host::IsHostHardcoreModeActive()
+{
+	return s_hardcore_mode.load(std::memory_order_acquire);
+}
+
+void OEHost::SetHardcoreMode(bool enabled)
+{
+	if (s_hardcore_mode.exchange(enabled, std::memory_order_acq_rel) == enabled)
+		return;
+
+	// The engine applies its hardcore restrictions when it loads settings and when it picks the
+	// active patches. A running machine does both again only when told to; before boot, the CPU
+	// thread does them as it starts the machine.
+	Host::RunOnCPUThread([]() {
+		if (!VMManager::HasValidVM())
+			return;
+		VMManager::ApplySettings();
+		VMManager::ReloadPatches(false, true, false, false);
+	}, false);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -416,6 +513,41 @@ void Host::SetPadVibration(u32 pad_index, float large_or_single_motor_intensity,
 		s_vibration_callback(pad_index, large_or_single_motor_intensity, small_motor_intensity);
 }
 
+static std::function<void()> s_frame_callback;
+
+void OEHost::SetFrameCallback(std::function<void()> callback)
+{
+	s_frame_callback = std::move(callback);
+}
+
+u32 OEHost::ReadAchievementsMemory(u32 address, u8* buffer, u32 num_bytes)
+{
+	// The same map as the engine's Achievements::ClientReadMemory. RetroAchievements' PS2 sets
+	// see only the first 32 MB of RAM, even when the engine exposes the 128 MB devkit RAM.
+	constexpr u32 scratch_start = Ps2MemSize::MainRam;
+	constexpr u32 map_end = scratch_start + Ps2MemSize::Scratch;
+	if (!eeMem || address >= map_end)
+		return 0;
+
+	const u32 count = std::min(num_bytes, map_end - address);
+	if (address + count <= scratch_start)
+	{
+		std::memcpy(buffer, &eeMem->Main[address], count);
+	}
+	else if (address >= scratch_start)
+	{
+		std::memcpy(buffer, &eeMem->Scratch[address - scratch_start], count);
+	}
+	else
+	{
+		// Straddles the end of RAM and the start of the scratchpad.
+		const u32 from_ram = scratch_start - address;
+		std::memcpy(buffer, &eeMem->Main[address], from_ram);
+		std::memcpy(buffer + from_ram, &eeMem->Scratch[0], count - from_ram);
+	}
+	return count;
+}
+
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 {
 	return BuildWindowInfo();
@@ -480,6 +612,11 @@ void Host::PumpMessagesOnCPUThread()
 {
 	if (s_shutdown_requested.load(std::memory_order_acquire) && VMManager::HasValidVM())
 		VMManager::SetState(VMState::Stopping);
+
+	// The engine calls this once per vsync while the machine runs, which is exactly the
+	// once-per-frame point RetroAchievements needs.
+	if (s_frame_callback)
+		s_frame_callback();
 
 	DrainCPUThreadQueue();
 }

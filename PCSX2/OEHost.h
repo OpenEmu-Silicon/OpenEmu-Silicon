@@ -40,6 +40,43 @@ namespace OEHost
 	/// and small motor strength (0 to 1). Set before StartCPUThread.
 	void SetVibrationCallback(std::function<void(u32 pad, float large, float small)> callback);
 
+	/// Called on the CPU thread once per emulated frame (every vsync), while the machine runs.
+	/// RetroAchievements checks its conditions here. Set before StartCPUThread.
+	void SetFrameCallback(std::function<void()> callback);
+
+	/// Called on the CPU thread right after the machine has really been reset, by RequestReset or
+	/// any other reset. RetroAchievements resets its state here, so it never checks the old
+	/// game's memory after its own reset. Set before StartCPUThread.
+	void SetResetCallback(std::function<void()> callback);
+
+	/// Resets the machine. Returns at once; the reset runs on the CPU thread. While the machine
+	/// runs, the engine only finishes a reset on the CPU thread's next loop turn, so wait for the
+	/// reset callback rather than assuming it is done.
+	void RequestReset();
+
+	/// Pauses or resumes the machine on the CPU thread. Use this instead of VMManager::SetState: a
+	/// reset asked for while running is only pending until the CPU thread finishes it, and setting
+	/// the state directly would cancel it. During a pending reset the new state is applied right
+	/// after the reset.
+	void SetPaused(bool paused);
+
+	/// Runs exactly one frame while paused, on the CPU thread. Dropped during a pending reset,
+	/// which a frame advance would otherwise cancel.
+	void FrameAdvance();
+
+	/// Turns RetroAchievements hardcore mode on or off for the engine. The engine keeps its built-in
+	/// achievements off, so it asks here instead (PCSX2/patches/0002-openemu-host-hardcore.patch) and
+	/// then applies its own hardcore restrictions: no EE underclocking (including auto-tune's
+	/// governor), normal frame rates and speed, no cheats or cheat-like patches, no state loading
+	/// or frame advance. Safe to call from any thread, before or after StartCPUThread.
+	void SetHardcoreMode(bool enabled);
+
+	/// Copies PS2 memory for RetroAchievements, in its memory map: the 32 MB of main RAM,
+	/// then the 16 KB scratchpad directly above it. Returns the number of bytes copied, which
+	/// is less than `num_bytes` at the end of the map and 0 when no machine is running.
+	/// Call on the CPU thread.
+	u32 ReadAchievementsMemory(u32 address, u8* buffer, u32 num_bytes);
+
 	/// The base settings layer, for the game core to change values and then call
 	/// VMManager::ApplySettings() on the CPU thread. Valid after Initialize().
 	INISettingsInterface& Settings();
@@ -54,3 +91,10 @@ namespace OEHost
 	/// Whether the CPU thread is alive.
 	bool IsCPUThreadRunning();
 } // namespace OEHost
+
+namespace Host
+{
+	/// Whether OpenEmu's RetroAchievements hardcore mode is on (see OEHost::SetHardcoreMode).
+	/// Read by the engine (PCSX2/patches/0002-openemu-host-hardcore.patch); defined in OEHost.cpp.
+	bool IsHostHardcoreModeActive();
+} // namespace Host

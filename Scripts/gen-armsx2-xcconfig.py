@@ -80,6 +80,12 @@ def link_args(build_dir):
         if t.endswith("Main.cpp.o"):
             i += 1
             continue
+        # The plugin compiles the repo's Vendor/rcheevos (12.4, with disc hashing) for
+        # RetroAchievements, like every other core. A second copy from the engine would
+        # clash with it, so the engine's is left out. Its public headers match 12.4.
+        if t.replace("\\", "/").endswith("3rdparty/rcheevos/librcheevos.a"):
+            i += 1
+            continue
         if not t.startswith("-") and not os.path.isabs(t) and t.endswith((".a", ".o", ".dylib", ".tbd")):
             t = os.path.normpath(os.path.join(cwd, t))
         out.append(t)

@@ -38,6 +38,9 @@ fi
 
 # OE_METAL_OUTPUT turns on PCSX2/patches/0001-openemu-metal-output.patch: the final
 # picture is drawn into a Metal texture that OpenEmu owns instead of a window.
+# OE_HOST_HARDCORE turns on PCSX2/patches/0002-openemu-host-hardcore.patch: the engine asks
+# OpenEmu (PCSX2/OEHost.cpp) whether RetroAchievements hardcore mode is on, so its own
+# hardcore restrictions apply while its built-in achievements stay off.
 #
 # No Qt and no frontends. Metal only: Vulkan off drops shaderc and MoltenVK (OpenGL is
 # already off on macOS).
@@ -57,7 +60,8 @@ cmake -S "$SRC_DIR" -B "$BUILD_DIR/engine" \
   -DENABLE_GSRUNNER=OFF -DENABLE_EERUNNER=OFF -DENABLE_VURUNNER=OFF \
   -DENABLE_TESTS=OFF -DENABLE_RECOMPILER_TEST_HOOKS=OFF \
   -DUSE_VULKAN=OFF \
-  -DCMAKE_CXX_FLAGS=-DOE_METAL_OUTPUT -DCMAKE_OBJCXX_FLAGS=-DOE_METAL_OUTPUT \
+  -DCMAKE_CXX_FLAGS="-DOE_METAL_OUTPUT -DOE_HOST_HARDCORE" \
+  -DCMAKE_OBJCXX_FLAGS="-DOE_METAL_OUTPUT -DOE_HOST_HARDCORE" \
   -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
   ${PCSX2_EXTRA_CMAKE_ARGS:-}
 
