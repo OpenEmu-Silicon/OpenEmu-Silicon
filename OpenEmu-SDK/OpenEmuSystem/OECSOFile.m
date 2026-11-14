@@ -64,6 +64,10 @@ static uint32_t OECSORead32(const uint8_t *bytes)
     NSData *_index; // _frameCount + 1 entries
     uint64_t _cachedFrame; // UINT64_MAX when the cache holds nothing
     NSMutableData *_cache;
+    // Frames whose data does not decode. A damaged LZ4 frame costs up to one decode per alignment byte
+    // (see -_frame:), so it is tried once, not on every read. Read errors are not kept: the file may
+    // read again later.
+    NSMutableIndexSet *_undecodableFrames;
 }
 
 - (BOOL)_open
@@ -119,6 +123,7 @@ static uint32_t OECSORead32(const uint8_t *bytes)
 
     _cache = [NSMutableData dataWithLength:_frameSize];
     _cachedFrame = UINT64_MAX;
+    _undecodableFrames = [NSMutableIndexSet indexSet];
     _handle = handle;
     return YES;
 }
@@ -128,6 +133,8 @@ static uint32_t OECSORead32(const uint8_t *bytes)
 {
     if(frame == _cachedFrame)
         return _cache.bytes;
+    if([_undecodableFrames containsIndex:(NSUInteger)frame])
+        return NULL;
     _cachedFrame = UINT64_MAX;
 
     const uint8_t *index = _index.bytes;
@@ -165,8 +172,10 @@ static uint32_t OECSORead32(const uint8_t *bytes)
             size_t produced = 0;
             for(size_t padding = 0; produced == 0 && padding < (1u << _alignment) && padding < data.length; padding++)
                 produced = compression_decode_buffer(output, _frameSize, data.bytes, data.length - padding, NULL, COMPRESSION_LZ4_RAW);
-            if(produced == 0)
+            if(produced == 0) {
+                [_undecodableFrames addIndex:(NSUInteger)frame];
                 return NULL;
+            }
             memset(output + produced, 0, _frameSize - produced);
             _cachedFrame = frame;
             return output;
@@ -181,8 +190,10 @@ static uint32_t OECSORead32(const uint8_t *bytes)
         const int status = inflate(&stream, Z_FINISH);
         const uLong produced = stream.total_out;
         inflateEnd(&stream);
-        if(status != Z_STREAM_END)
+        if(status != Z_STREAM_END) {
+            [_undecodableFrames addIndex:(NSUInteger)frame];
             return NULL;
+        }
         memset(output + produced, 0, _frameSize - produced);
     }
 

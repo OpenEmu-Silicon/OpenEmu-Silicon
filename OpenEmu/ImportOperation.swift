@@ -208,9 +208,9 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
             return nil
         }
 
-        // For multi-disc .cue/.ccd inputs whose siblings live in the same folder, auto-create
-        // an .m3u and import that instead, so the whole multi-disc set lands in one library
-        // entry / subfolder. See `tryMultiDiscM3UAutoCreate(at:)` for the full rationale.
+        // For a disc of a multi-disc set (.cue/.ccd/.chd/.gdi) whose siblings live in the same folder
+        // and whose system loads playlists, auto-create an .m3u and import that instead, so the whole
+        // set lands in one library entry / subfolder. See `tryMultiDiscM3UAutoCreate(at:)`.
         let importURL = Self.tryMultiDiscM3UAutoCreate(at: url) ?? url
 
         self.init(url: importURL, sourceURL: url)
@@ -455,6 +455,13 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
             return nil // single disc, or siblings missing — fall back to single-disc import
         }
 
+        // Only a system that loads playlists can take one. A set whose system does not list m3u
+        // (Sega CD, PSP) is imported disc by disc; redirecting it would leave an .m3u no system accepts.
+        guard Self.systemsClaimingDiscLoadPlaylists(at: url) else {
+            DLog("Multi-disc set at \(url.path) belongs to a system without .m3u support; importing the disc alone")
+            return nil
+        }
+
         discFiles.sort { $0.disc < $1.disc }
 
         // Reuse a pre-existing .m3u so re-imports are idempotent and dedupe via hash, but only one
@@ -483,6 +490,30 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
 
         os_log(.info, log: .import, "Auto-created %d-disc .m3u: %{public}@", discFiles.count, m3uURL.path)
         return m3uURL
+    }
+
+    // Whether the system that would claim the disc at `url` loads .m3u playlists. The system is picked
+    // the way OEDBSystem.systems(for:) picks it: the first plugin sure of the disc, otherwise every
+    // plugin that might take it (all of which must then load playlists).
+    private static func systemsClaimingDiscLoadPlaylists(at url: URL) -> Bool {
+        guard let file = try? OEFile(url: url) else { return false }
+
+        var uncertainControllers: [OESystemController] = []
+        for plugin in OESystemPlugin.allPlugins {
+            guard let controller = plugin.controller,
+                  controller.canHandleFileExtension(file.fileExtension)
+            else { continue }
+
+            switch controller.canHandle(file) {
+            case .yes:
+                return controller.canHandleFileExtension("m3u")
+            case .uncertain:
+                uncertainControllers.append(controller)
+            default:
+                break
+            }
+        }
+        return !uncertainControllers.isEmpty && uncertainControllers.allSatisfy { $0.canHandleFileExtension("m3u") }
     }
 
     // Whether the .m3u at `m3uURL` lists a disc file named `fileName` (compared by file name).

@@ -58,8 +58,13 @@ NSString *const OEM3UFileErrorDomain = @"org.openemu.OEM3UFile.ErrorDomain";
 
         __kindof OEFile *referencedFile = [OEFile fileWithURL:url error:&localError];
 
-        // A CHD is a whole disc in one file: it is both the disc and its only data file.
+        // A CHD is a whole disc in one file: it is both the disc and its only data file. OEFile does not
+        // open it, so a missing one is caught here, as a missing .cue is when its sheet cannot be read.
         if ([referencedFile isKindOfClass:[OECHDFile class]]) {
+            if (![url checkResourceIsReachableAndReturnError:&localError]) {
+                failedToValidateContainedFiles = YES;
+                return;
+            }
             if (referencedFileURLs.count == 0)
                 self->_firstCHD = referencedFile;
             [referencedFileURLs addObject:url];

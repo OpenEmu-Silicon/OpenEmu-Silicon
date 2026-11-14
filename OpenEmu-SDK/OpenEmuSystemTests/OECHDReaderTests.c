@@ -187,6 +187,23 @@ static void checkVersion(Opener open, const char *temporaryDirectory, uint8_t ve
     checkRejected(open, path, expected);
 }
 
+// A track list claiming more frames than the CHD holds must be refused. The metadata is plain text in
+// the file, so a same-length edit of one FRAMES value makes such a CHD.
+static void checkTrackListTooLong(Opener open, const char *name, const char *frames, const char *bigger, const char *temporaryDirectory)
+{
+    uint8_t *bytes = NULL;
+    const size_t length = readFile(fixture(name), &bytes);
+    assert(strlen(frames) == strlen(bigger));
+    uint8_t *found = memmem(bytes, length, frames, strlen(frames));
+    assert(found != NULL);
+    memcpy(found, bigger, strlen(bigger));
+    char path[2048];
+    snprintf(path, sizeof(path), "%s/too-long-%s", temporaryDirectory, name);
+    writeFile(path, bytes, length);
+    free(bytes);
+    checkRejected(open, path, OECHDReaderStatusCouldNotOpen);
+}
+
 // Damaged compressed data must give a short read, never wrong bytes reported as good.
 static void checkDamaged(const char *temporaryDirectory, const uint8_t *expected)
 {
@@ -355,6 +372,7 @@ int main(int argc, char **argv)
     checkRejected(OECHDReaderOpenCD, fixture("child.chd"), OECHDReaderStatusNeedsParent);
     checkRejected(OECHDReaderOpenCD, fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
     checkVersion(OECHDReaderOpenCD, temporaryDirectory, 4, OECHDReaderStatusUnsupported);
+    checkTrackListTooLong(OECHDReaderOpenCD, "cd-mixed.chd", "FRAMES:157", "FRAMES:999", temporaryDirectory);
 
     checkGDROM();
     checkRejected(OECHDReaderOpenGDROM, fixture("dvd.chd"), OECHDReaderStatusNotGDROM);
@@ -362,6 +380,7 @@ int main(int argc, char **argv)
     checkRejected(OECHDReaderOpenGDROM, fixture("hd.chd"), OECHDReaderStatusNotGDROM);
     checkRejected(OECHDReaderOpenGDROM, fixture("child.chd"), OECHDReaderStatusNeedsParent);
     checkRejected(OECHDReaderOpenGDROM, fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
+    checkTrackListTooLong(OECHDReaderOpenGDROM, "gd.chd", "FRAMES:702", "FRAMES:999", temporaryDirectory);
 
     puts("OECHDReader tests passed");
     return 0;

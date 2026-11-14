@@ -22,7 +22,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-# test-chd-reader.sh — Build and run the OECHDReader tests (CHD disc images), with sanitizers on.
+# test-chd-reader.sh — Build and run the OECHDReader tests (CHD disc images) and the OEChdHashCDReader
+# tests (the RetroAchievements cdreader for CHDs), with sanitizers on.
 #
 #   ./Scripts/test-chd-reader.sh                     # run the tests against the committed fixtures
 #   ./Scripts/test-chd-reader.sh --write-iso <path>  # write the made-up image the fixtures come from
@@ -53,7 +54,18 @@ xcrun clang -std=c11 -UNDEBUG -Wall -Wextra -Werror "${sanitize[@]}" "${includes
 
 if [ "$#" -gt 0 ]; then
     "$work/chd-reader-tests" "$@"
-else
-    mkdir -p "$work/scratch"
-    "$work/chd-reader-tests" "$repo/OpenEmu-SDK/OpenEmuSystemTests/Fixtures/CHD" "$work/scratch"
+    exit 0
 fi
+mkdir -p "$work/scratch"
+"$work/chd-reader-tests" "$repo/OpenEmu-SDK/OpenEmuSystemTests/Fixtures/CHD" "$work/scratch"
+
+# The RetroAchievements cdreader, against rcheevos as the cores build it (vendored code: warnings off).
+rcheevos="$repo/Vendor/rcheevos"
+xcrun clang -c -std=gnu11 -O1 -w "${sanitize[@]}" -DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1 \
+    -I"$rcheevos/include" "$rcheevos/rcheevos_build.c" -o "$work/rcheevos.o"
+xcrun clang -std=c11 -UNDEBUG -Wall -Wextra -Werror "${sanitize[@]}" "${includes[@]}" -I"$rcheevos/include" \
+    "$repo/OpenEmuKit/Source/OEChdHashCDReader.c" \
+    "$repo/OpenEmu-SDK/OpenEmuSystem/OECHDReader.c" \
+    "$repo/OpenEmu-SDK/OpenEmuSystemTests/OEChdHashCDReaderTests.c" \
+    "$work/rcheevos.o" "$work/libchdr.o" "$work/zstd.o" -lz -o "$work/chd-hash-reader-tests"
+"$work/chd-hash-reader-tests" "$repo/OpenEmu-SDK/OpenEmuSystemTests/Fixtures/CHD" "$work/scratch"

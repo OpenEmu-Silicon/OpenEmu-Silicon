@@ -274,7 +274,8 @@ static OECHDReaderStatus OECHDReaderReadTracks(OECHDReader *reader, int gdrom)
     const int hasGaps = !gdrom && OECHDHasMetadata(reader->chd, CDROM_TRACK_METADATA2_TAG);
     const uint32_t tag = gdrom ? GDROM_TRACK_METADATA_TAG : hasGaps ? CDROM_TRACK_METADATA2_TAG : CDROM_TRACK_METADATA_TAG;
     const int fields = gdrom ? 9 : hasGaps ? 8 : 4;
-    uint32_t frame = 0, lba = 0;
+    // 64-bit, so a damaged track list cannot wrap them: 99 tracks of up to INT_MAX frames each.
+    uint64_t frame = 0, lba = 0;
 
     for(unsigned index = 0; index < OECHDMaxTracks; index++) {
         char metadata[256] = { 0 };
@@ -309,16 +310,20 @@ static OECHDReaderStatus OECHDReaderReadTracks(OECHDReader *reader, int gdrom)
         track->postgap = (uint32_t)postgap;
         // GD-ROM: PAD is the empty sectors up to the next track's start (45000 for the high-density
         // area); they are part of FRAMES but not of the track's .bin.
-        track->lba = gdrom ? lba : 0;
-        lba += (uint32_t)frames;
+        track->lba = gdrom ? (uint32_t)lba : 0;
+        lba += (uint64_t)frames;
 
         // Each track's frames are padded to a multiple of OECHDCDTrackPadding in the CHD.
-        reader->trackFirstFrame[index] = frame;
-        frame += (uint32_t)frames + (OECHDCDTrackPadding - (uint32_t)frames % OECHDCDTrackPadding) % OECHDCDTrackPadding;
+        reader->trackFirstFrame[index] = (uint32_t)frame;
+        frame += (uint64_t)frames + (OECHDCDTrackPadding - (uint64_t)frames % OECHDCDTrackPadding) % OECHDCDTrackPadding;
+        // The tracks so far must fit in the CHD, and their starts in the 32-bit fields above (a CD or
+        // GD-ROM has well under a million frames).
+        if(frame > UINT32_MAX || lba > UINT32_MAX || frame * OECHDCDFrameSize > reader->size)
+            return OECHDReaderStatusCouldNotOpen;
         reader->trackCount = index + 1;
     }
 
-    if(reader->trackCount == 0 || (uint64_t)frame * OECHDCDFrameSize > reader->size)
+    if(reader->trackCount == 0)
         return OECHDReaderStatusCouldNotOpen;
     return OECHDReaderStatusOK;
 }

@@ -81,10 +81,13 @@ static uint64_t OEGCZRead64(const uint8_t *bytes)
     _blockCount = OEGCZRead32(bytes + 28);
 
     // The block list and the blocks must fit in the file: a cut-off copy is refused here, not when a
-    // game reaches its missing part.
-    if(_blockSize == 0 || _blockSize > OEGCZMaxBlockSize || _dataSize == 0
-       || _blockCount != (_dataSize + _blockSize - 1) / _blockSize
-       || OEGCZHeaderSize + (uint64_t)_blockCount * 12 + _compressedDataSize > fileSize)
+    // game reaches its missing part. The sums are arranged so a damaged header's huge sizes cannot wrap
+    // around and pass (a block count of 0 for an enormous disc, a compressed size near 2^64).
+    if(_blockSize == 0 || _blockSize > OEGCZMaxBlockSize || _dataSize == 0)
+        return NO;
+    const uint64_t blockCount = _dataSize / _blockSize + (_dataSize % _blockSize != 0);
+    if(_blockCount == 0 || _blockCount != blockCount || _compressedDataSize > fileSize
+       || OEGCZHeaderSize + (uint64_t)_blockCount * 12 > fileSize - _compressedDataSize)
         return NO;
 
     _blockOffsets = [handle readDataUpToLength:(NSUInteger)_blockCount * 8 error:nil];
@@ -101,6 +104,8 @@ static uint64_t OEGCZRead64(const uint8_t *bytes)
 // The decompressed block, or NULL when it cannot be read.
 - (const uint8_t *)_block:(uint64_t)index
 {
+    if(index >= _blockCount)
+        return NULL;
     if(index == _cachedBlock)
         return _cache.bytes;
     _cachedBlock = UINT64_MAX;

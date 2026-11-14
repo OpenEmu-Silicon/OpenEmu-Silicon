@@ -389,6 +389,9 @@ jobs:
       - name: Test CHD disc image reading
         run: ./Scripts/test-chd-reader.sh
 
+      - name: Test GCZ, CSO and ZSO disc image reading
+        run: ./Scripts/test-compressed-disc-files.sh
+
       - name: Build OpenEmu (Debug, arm64)
         run: |
           xcodebuild build \
