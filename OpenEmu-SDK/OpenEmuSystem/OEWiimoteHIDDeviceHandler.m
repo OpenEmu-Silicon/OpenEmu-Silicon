@@ -349,7 +349,9 @@ static void OE_wiimoteIOHIDReportCallback(void            *context,
 
 - (void)disconnect
 {
-    if ([[[NSBundle mainBundle] bundleIdentifier] isEqual:@"org.openemu.OpenEmu"]) {
+    /* Only the app itself (release or debug build) does this, not the helper, which has its own identifier. */
+    NSString *appIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    if ([appIdentifier isEqual:@"org.openemu.OpenEmu"] || [appIdentifier isEqual:@"org.openemu.OpenEmu.debug"]) {
         [self OE_disableReports];
         NSString *btAddress = (__bridge id)IOHIDDeviceGetProperty([self device], CFSTR(kIOHIDSerialNumberKey));
         IOBluetoothDevice *btDevice = [IOBluetoothDevice deviceWithAddressString:btAddress];
