@@ -1,6 +1,6 @@
 # OpenEmu-Silicon pre-release: tester notes
 
-Thank you for helping test. This is an early build, not a normal release. It will not update through the app's built-in updater. It bundles four big pieces of new work that need real people playing real games, plus one older option we would like more eyes on.
+Thank you for helping test. This is an early build, not a normal release. The app keeps its normal update feed, but this build has the same version number as the current release, so the updater will only offer something once a newer release is published. It bundles four big pieces of new work that need real people playing real games, plus one older option we would like more eyes on.
 
 > **Fill in before posting:** the download link and SHA-256 for the DMG (`<DMG LINK>`, `<SHA-256>`), and the build name and commit (`<BUILD NAME>`, `<COMMIT>`). Delete this box.
 
