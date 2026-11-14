@@ -168,6 +168,7 @@
 		<string>cdi</string>
 		<string>gdi</string>
 		<string>cue</string>
+		<string>m3u</string>
 	</array>
 	<key>OEGenericControlNamesKey</key>
 	<array>

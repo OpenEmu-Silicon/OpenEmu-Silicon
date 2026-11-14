@@ -398,11 +398,12 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
     // PSX games to keep saves and disc-swap state coherent (#294); doing this at import time
     // (rather than at launch) ensures the m3u and its referenced .cue/.bin (or .chd) files end up
     // in a single library subfolder via OEM3UFile.copyToURL: instead of being split into per-disc
-    // subfolders by performImportStepOrganize. Only discs of the same format are grouped, so a
-    // CUE/BIN set and a CHD set of one game in the same folder stay apart.
+    // subfolders by performImportStepOrganize. Only discs of the same format are grouped (CUE and
+    // CCD count as one), so a CUE/BIN set and a CHD or GDI set of one game in the same folder stay apart.
     private static func tryMultiDiscM3UAutoCreate(at url: URL) -> URL? {
         let pathExtension = url.pathExtension.lowercased()
-        guard pathExtension == "cue" || pathExtension == "ccd" || pathExtension == "chd" else {
+        let sameFormat: Set<String> = pathExtension == "cue" || pathExtension == "ccd" ? ["cue", "ccd"] : [pathExtension]
+        guard ["cue", "ccd", "chd", "gdi"].contains(pathExtension) else {
             return nil
         }
 
@@ -435,7 +436,7 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
         var discFiles: [(disc: Int, name: String)] = []
         for fileURL in folderContents {
             let ext = fileURL.pathExtension.lowercased()
-            guard ext == pathExtension || (pathExtension != "chd" && (ext == "cue" || ext == "ccd")) else { continue }
+            guard sameFormat.contains(ext) else { continue }
             let candidate = (fileURL.lastPathComponent as NSString).deletingPathExtension
             let candidateRange = NSRange(location: 0, length: (candidate as NSString).length)
             guard let candidateMatch = regex.firstMatch(in: candidate, options: [], range: candidateRange) else { continue }

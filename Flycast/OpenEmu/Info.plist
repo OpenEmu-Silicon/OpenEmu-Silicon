@@ -32,6 +32,8 @@
 		<dict>
 			<key>OEGameCoreHasGlitches</key>
 			<false/>
+			<key>OEGameCoreSupportsMultipleDiscs</key>
+			<true/>
 			<key>OEGameCoreRequiresFiles</key>
 			<true/>
 			<key>OERequiredFiles</key>
