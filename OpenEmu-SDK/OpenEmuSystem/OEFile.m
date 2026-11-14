@@ -27,6 +27,7 @@ static NSMutableDictionary<NSString *, Class> *extensionToSubclassDictionary;
     [self registerClass:NSClassFromString(@"OEDreamcastGDI") forFileExtension:@"gdi"];
     [self registerClass:NSClassFromString(@"OEM3UFile") forFileExtension:@"m3u"];
     [self registerClass:NSClassFromString(@"OECHDFile") forFileExtension:@"chd"];
+    [self registerClass:NSClassFromString(@"OEGCZFile") forFileExtension:@"gcz"];
 }
 
 + (__kindof OEFile *)fileWithURL:(NSURL *)fileURL error:(NSError **)error

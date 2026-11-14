@@ -30,7 +30,8 @@
 
 @implementation OEWiiSystemController
 
-// Read header to detect Wii ISO, WBFS, CISO, RVZ & WIA
+// Read header to detect Wii ISO, WBFS, CISO, RVZ, WIA & GCZ. A GCZ reads as the disc inside it
+// (OEGCZFile), like an ISO.
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
         // wbfs/wad are Wii-only container formats.
