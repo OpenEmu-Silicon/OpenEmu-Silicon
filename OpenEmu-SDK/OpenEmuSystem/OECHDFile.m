@@ -30,6 +30,7 @@
 
 @implementation OECHDFile {
     OECHDReader *_reader;
+    BOOL _isCD;
     BOOL _triedToOpen;
 }
 
@@ -41,10 +42,12 @@
 - (NSData *)readDataInRange:(NSRange)dataRange
 {
     @synchronized(self) {
-        // Opened on first read: an Arcade CHD is never read, so it never pays for decoding the CHD's map.
+        // Opened on first read, so a CHD no system reads never pays for decoding the CHD's map.
         if(!_triedToOpen) {
             _triedToOpen = YES;
-            OECHDReaderOpenDVD(self.fileURL.fileSystemRepresentation, &_reader);
+            const char *path = self.fileURL.fileSystemRepresentation;
+            if(OECHDReaderOpenDVD(path, &_reader) != OECHDReaderStatusOK)
+                _isCD = OECHDReaderOpenCD(path, &_reader) == OECHDReaderStatusOK;
         }
 
         if(_reader == NULL || dataRange.length == 0)
@@ -53,7 +56,9 @@
         NSMutableData *data = [NSMutableData dataWithLength:dataRange.length];
         if(data == nil)
             return [NSData data];
-        data.length = OECHDReaderRead(_reader, dataRange.location, data.mutableBytes, dataRange.length);
+        // A CD reads as its first track's .bin, the file a CUE sheet's data track would be.
+        data.length = _isCD ? OECHDReaderReadTrack(_reader, 0, dataRange.location, data.mutableBytes, dataRange.length)
+                            : OECHDReaderRead(_reader, dataRange.location, data.mutableBytes, dataRange.length);
         return data;
     }
 }

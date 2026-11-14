@@ -35,6 +35,7 @@
 #include "mednafen/mempatcher-driver.h"
 #include "mednafen/cheat_formats/psx.h"
 #include "mednafen/ss/ss.h"
+#include "OEChdVirtualFS.h"
 
 #import "MednafenGameCore.h"
 #import <OpenEmuBase/OERingBuffer.h>
@@ -131,6 +132,9 @@ static const uint32_t kLynxRAWarmupFrames = 150;
 
     OERetroAchievementsBridge *_raBridge;
     NSString *_romPath;
+
+    // A PlayStation game on CHD discs: the VirtualFS Mednafen loads it through (OEChdVirtualFS.h).
+    OEChdVirtualFS *_chdVFS;
     int _rcConsole;
     NSMutableDictionary<NSString *, NSNumber *> *_cheatList;
     // wswan ROM-patch cheats only: rom offset -> original (pristine) byte. Every setCheat call
@@ -3344,6 +3348,7 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
 
     // Defensive: stopEmulation normally frees this; cover paths that bypass it.
     if (_cachedModule) { free(_cachedModule); _cachedModule = NULL; }
+    [self closeCHD];
 }
 
 # pragma mark - Execution
@@ -3426,6 +3431,33 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
     _mednafenCoreModule = mednafenCoreModules[self.systemIdentifier];
     _isSystemPCECD = [self.systemIdentifier isEqualToString:@"openemu.system.pcecd"];
 
+    // PlayStation discs as CHD files: a .chd, or a .m3u listing .chd files, is loaded through
+    // OEChdVirtualFS, which serves each CHD as a CUE sheet and track files (OEChdVirtualFS.h).
+    // Every CHD is opened first, so an unusable one gets a clear error.
+    const BOOL isCHD = [path.pathExtension.lowercaseString isEqualToString:@"chd"];
+    NSArray<NSString *> *chdDiscs = isCHD ? @[ path ] : [self chdDiscsInPlaylistAtPath:path];
+    if(chdDiscs.count > 0)
+    {
+        _chdVFS = new OEChdVirtualFS(&::Mednafen::NVFS);
+        for(NSString *disc in chdDiscs)
+        {
+            OECHDReaderStatus status = OECHDReaderStatusUnsupported;
+            if([_mednafenCoreModule isEqualToString:@"psx"])
+                status = _chdVFS->addDisc(disc.fileSystemRepresentation);
+            if(status == OECHDReaderStatusOK)
+                continue;
+
+            if(error != nil)
+                *error = [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadROMError userInfo:@{
+                    NSLocalizedDescriptionKey : @"Unable to load ROM.",
+                    NSLocalizedRecoverySuggestionErrorKey : [NSString stringWithFormat:@"%@\n\n%s", disc.lastPathComponent, OEChdLoadErrorReason(status).c_str()],
+                }];
+            [self closeCHD];
+            return NO;
+        }
+        OEChdVirtualFS::setCurrent(_chdVFS);
+    }
+
     // Create battery save dir
     NSURL *batterySavesDirectory = [NSURL fileURLWithPath:self.batterySavesDirectoryPath];
     [NSFileManager.defaultManager createDirectoryAtURL:batterySavesDirectory withIntermediateDirectories:YES attributes:nil error:nil];
@@ -3434,10 +3466,10 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
     if([path.pathExtension.lowercaseString isEqualToString:@"m3u"])
     {
         NSString *m3uString = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-        NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@".*\\.cue|.*\\.ccd" options:NSRegularExpressionCaseInsensitive error:nil];
+        NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@".*\\.cue|.*\\.ccd|.*\\.chd" options:NSRegularExpressionCaseInsensitive error:nil];
         NSUInteger numberOfMatches = [regex numberOfMatchesInString:m3uString options:0 range:NSMakeRange(0, m3uString.length)];
 
-        NSLog(@"[Mednafen] Loaded m3u containing %lu cue sheets or ccd", numberOfMatches);
+        NSLog(@"[Mednafen] Loaded m3u containing %lu cue sheets, ccd or chd", numberOfMatches);
 
         _maxDiscs = numberOfMatches;
 
@@ -3446,12 +3478,13 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
             NSRange range = result.range;
             NSString *match = [m3uString substringWithRange:range];
 
-            if([match containsString:@".cue"])
+            if([match.lowercaseString hasSuffix:@".cue"] || [match.lowercaseString hasSuffix:@".chd"])
                 [_allCueSheetFiles addObject:[m3uString substringWithRange:range]];
         }];
     }
-    else if([path.pathExtension.lowercaseString isEqualToString:@"cue"])
+    else if([path.pathExtension.lowercaseString isEqualToString:@"cue"] || isCHD)
     {
+        // The SBI check below looks for "<name>.sbi" next to the disc.
         NSString *filename = path.lastPathComponent;
         [_allCueSheetFiles addObject:filename];
     }
@@ -3463,6 +3496,7 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
     // and disc-swap state coherent (#294).
     if ([_mednafenCoreModule isEqualToString:@"psx"]
         && _isMultiDiscGame
+        && !isCHD
         && ![path.pathExtension.lowercaseString isEqualToString:@"m3u"])
     {
         NSString *autoM3UPath = [self autogenerateMultiDiscM3UFromPath:path totalDiscs:_multiDiscTotal];
@@ -3481,7 +3515,11 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
         }
     }
 
-    game = MDFNI_LoadGame(_mednafenCoreModule.UTF8String, &::Mednafen::NVFS, path.fileSystemRepresentation);
+    if(_chdVFS)
+        // A lone .chd is loaded as a CD: Mednafen recognises discs by extension and does not know .chd.
+        game = MDFNI_LoadGame(_mednafenCoreModule.UTF8String, _chdVFS, path.fileSystemRepresentation, isCHD);
+    else
+        game = MDFNI_LoadGame(_mednafenCoreModule.UTF8String, &::Mednafen::NVFS, path.fileSystemRepresentation);
 
     if(!game)
         return NO;
@@ -3565,7 +3603,7 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
         }
 
         // Handle required SBI files for games
-        if(_isSBIRequired && _allCueSheetFiles.count && ([path.pathExtension.lowercaseString isEqualToString:@"cue"] || [path.pathExtension.lowercaseString isEqualToString:@"m3u"]))
+        if(_isSBIRequired && _allCueSheetFiles.count && ([path.pathExtension.lowercaseString isEqualToString:@"cue"] || [path.pathExtension.lowercaseString isEqualToString:@"m3u"] || isCHD))
         {
             NSURL *romPath = [NSURL fileURLWithPath:path.stringByDeletingLastPathComponent];
 
@@ -3721,6 +3759,8 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
                                                             memoryReader:mednafen_rc_read_memory
                                                                consoleID:(uint32_t)_rcConsole];
         [_raBridge startWithROMPath:path];
+        if (_chdVFS)
+            [_raBridge setHashFileReader:&OEChdHashFileReader];
         [_raBridge markROMReady];
     }
 
@@ -3793,8 +3833,37 @@ static uint32_t mednafen_rc_read_memory(uint32_t address, uint8_t *buffer,
     _raBridge = nil;
     if (_cachedModule) { free(_cachedModule); _cachedModule = NULL; }
     MDFNI_CloseGame();
+    [self closeCHD];
 
     [super stopEmulation];
+}
+
+- (void)closeCHD
+{
+    if (!_chdVFS)
+        return;
+    OEChdVirtualFS::setCurrent(nullptr);
+    delete _chdVFS;
+    _chdVFS = nullptr;
+}
+
+// The .chd files a .m3u lists, as absolute paths; empty for anything else.
+- (NSArray<NSString *> *)chdDiscsInPlaylistAtPath:(NSString *)path
+{
+    if(![path.pathExtension.lowercaseString isEqualToString:@"m3u"])
+        return @[];
+
+    NSString *playlist = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    NSString *folder = path.stringByDeletingLastPathComponent;
+    NSMutableArray<NSString *> *discs = [NSMutableArray array];
+    for(NSString *line in [playlist componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet])
+    {
+        NSString *entry = [line stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+        if(entry.length == 0 || [entry hasPrefix:@"#"] || ![entry.pathExtension.lowercaseString isEqualToString:@"chd"])
+            continue;
+        [discs addObject:entry.isAbsolutePath ? entry : [folder stringByAppendingPathComponent:entry]];
+    }
+    return discs;
 }
 
 - (NSTimeInterval)frameInterval

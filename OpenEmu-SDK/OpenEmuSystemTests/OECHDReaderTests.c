@@ -21,9 +21,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// Checks OECHDReader against small CHDs made from a made-up PSP image (no game data).
+// Checks OECHDReader against small CHDs made from made-up images (no game data): a PSP DVD image,
+// and a two-track CD (a data track and an audio track with a pregap).
 // Run by Scripts/test-chd-reader.sh. The fixtures come from Fixtures/CHD/make-fixtures.sh, which
-// runs this program with --write-iso to get the image and converts it with chdman.
+// runs this program with --write-iso and --write-cd to get the images and converts them with chdman.
 
 #include "../OpenEmuSystem/OECHDReader.h"
 #ifdef NDEBUG
@@ -47,6 +48,35 @@ static void makeImage(uint8_t *image)
     memset(descriptor, 0, SectorSize);
     memcpy(descriptor, "\x01" "CD001" "\x01\x00" "PSP GAME", 16);
 }
+
+// The two-track CD: track 1 is MODE2/2352 data, track 2 is audio whose first 150 sectors are its pregap.
+enum { CDDataSectors = 10, CDAudioSectors = 157, CDAudioPregap = 150, RawSectorSize = 2352 };
+
+static void makeCDDataTrack(uint8_t *track)
+{
+    for(size_t sector = 0; sector < CDDataSectors; sector++) {
+        uint8_t *bytes = track + sector * RawSectorSize;
+        memcpy(bytes, "\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00", 12); // sync
+        bytes[12] = 0; bytes[13] = 2; bytes[14] = (uint8_t)sector; bytes[15] = 2; // header, mode 2
+        for(size_t i = 16; i < RawSectorSize; i++)
+            bytes[i] = (uint8_t)(sector * 7 + (i - 16));
+    }
+}
+
+static void makeCDAudioTrack(uint8_t *track)
+{
+    for(size_t i = 0; i < (size_t)CDAudioSectors * RawSectorSize; i++)
+        track[i] = (uint8_t)((i / RawSectorSize) * 3 + i % RawSectorSize);
+}
+
+static const char *const CDCueSheet =
+    "FILE \"Game (Track 01).bin\" BINARY\n"
+    "  TRACK 01 MODE2/2352\n"
+    "    INDEX 01 00:00:00\n"
+    "FILE \"Game (Track 02).bin\" BINARY\n"
+    "  TRACK 02 AUDIO\n"
+    "    INDEX 00 00:00:00\n"
+    "    INDEX 01 00:02:00\n";
 
 static char fixtureDirectory[1024];
 
@@ -85,10 +115,12 @@ static void checkWholeImage(const char *name, const uint8_t *expected)
     OECHDReaderClose(reader);
 }
 
-static void checkRejected(const char *path, OECHDReaderStatus expected)
+typedef OECHDReaderStatus (*Opener)(const char *, OECHDReader **);
+
+static void checkRejected(Opener open, const char *path, OECHDReaderStatus expected)
 {
     OECHDReader *reader = (OECHDReader *)1;
-    assert(OECHDReaderOpenDVD(path, &reader) == expected);
+    assert(open(path, &reader) == expected);
     assert(reader == NULL);
 }
 
@@ -116,7 +148,7 @@ static size_t readFile(const char *path, uint8_t **bytes)
 }
 
 // A CHD with its version field changed: libchdr must not be asked to read it.
-static void checkVersion(const char *temporaryDirectory, uint8_t version, OECHDReaderStatus expected)
+static void checkVersion(Opener open, const char *temporaryDirectory, uint8_t version, OECHDReaderStatus expected)
 {
     uint8_t *bytes = NULL;
     const size_t length = readFile(fixture("dvd.chd"), &bytes);
@@ -125,7 +157,7 @@ static void checkVersion(const char *temporaryDirectory, uint8_t version, OECHDR
     snprintf(path, sizeof(path), "%s/version-%u.chd", temporaryDirectory, version);
     writeFile(path, bytes, length);
     free(bytes);
-    checkRejected(path, expected);
+    checkRejected(open, path, expected);
 }
 
 // Damaged compressed data must give a short read, never wrong bytes reported as good.
@@ -151,6 +183,66 @@ static void checkDamaged(const char *temporaryDirectory, const uint8_t *expected
     OECHDReaderClose(reader);
 }
 
+static void checkTrack(OECHDReader *reader, unsigned index, const uint8_t *expected, size_t size)
+{
+    assert(OECHDReaderTrackSize(reader, index) == size);
+    uint8_t *actual = calloc(1, size + 16);
+    assert(actual != NULL);
+    assert(OECHDReaderReadTrack(reader, index, 0, actual, size + 16) == size);
+    assert(memcmp(actual, expected, size) == 0);
+
+    // A read that starts at an odd byte inside one sector and ends in another.
+    assert(OECHDReaderReadTrack(reader, index, 2001, actual, 3001) == 3001);
+    assert(memcmp(actual, expected + 2001, 3001) == 0);
+    assert(OECHDReaderReadTrack(reader, index, size, actual, 1) == 0);
+    free(actual);
+}
+
+static void checkCD(void)
+{
+    static uint8_t dataTrack[CDDataSectors * RawSectorSize], audioTrack[CDAudioSectors * RawSectorSize];
+    makeCDDataTrack(dataTrack);
+    makeCDAudioTrack(audioTrack);
+
+    OECHDReader *reader = NULL;
+    assert(OECHDReaderOpenCD(fixture("cd-mixed.chd"), &reader) == OECHDReaderStatusOK);
+    assert(OECHDReaderTrackCount(reader) == 2);
+
+    const OECHDTrack *data = OECHDReaderTrackAtIndex(reader, 0);
+    assert(data->number == 1 && data->type == OECHDTrackTypeMode2Raw && data->sectorSize == RawSectorSize);
+    assert(data->sectors == CDDataSectors && data->pregap == 0 && !data->pregapStored && data->postgap == 0);
+    const OECHDTrack *audio = OECHDReaderTrackAtIndex(reader, 1);
+    assert(audio->number == 2 && audio->type == OECHDTrackTypeAudio && audio->sectorSize == RawSectorSize);
+    assert(audio->sectors == CDAudioSectors && audio->pregap == CDAudioPregap && audio->pregapStored);
+    assert(OECHDReaderTrackAtIndex(reader, 2) == NULL);
+
+    // Track 2 starts after track 1's 10 sectors and 2 sectors of CHD padding; its audio is byte-swapped in the CHD.
+    checkTrack(reader, 0, dataTrack, sizeof(dataTrack));
+    checkTrack(reader, 1, audioTrack, sizeof(audioTrack));
+
+    char cue[512], name[64];
+    assert(OECHDReaderWriteCueSheet(reader, "Game", cue, sizeof(cue)) == strlen(CDCueSheet));
+    assert(strcmp(cue, CDCueSheet) == 0);
+    char small[20];
+    assert(OECHDReaderWriteCueSheet(reader, "Game", small, sizeof(small)) == strlen(CDCueSheet));
+    assert(strlen(small) == sizeof(small) - 1 && strncmp(small, CDCueSheet, sizeof(small) - 1) == 0);
+    assert(OECHDReaderTrackFileName("Game", 2, name, sizeof(name)) == strlen("Game (Track 02).bin"));
+    assert(strcmp(name, "Game (Track 02).bin") == 0);
+    OECHDReaderClose(reader);
+}
+
+// A CD made from a 2048-byte ISO: one MODE1/2048 track whose .bin is the ISO.
+static void checkCDFromISO(const uint8_t *image)
+{
+    OECHDReader *reader = NULL;
+    assert(OECHDReaderOpenCD(fixture("cd.chd"), &reader) == OECHDReaderStatusOK);
+    assert(OECHDReaderTrackCount(reader) == 1);
+    const OECHDTrack *track = OECHDReaderTrackAtIndex(reader, 0);
+    assert(track->type == OECHDTrackTypeMode1 && track->sectorSize == SectorSize && track->sectors == SectorCount);
+    checkTrack(reader, 0, image, ImageSize);
+    OECHDReaderClose(reader);
+}
+
 int main(int argc, char **argv)
 {
     static uint8_t image[ImageSize];
@@ -160,8 +252,22 @@ int main(int argc, char **argv)
         writeFile(argv[2], image, ImageSize);
         return 0;
     }
+    if(argc == 3 && strcmp(argv[1], "--write-cd") == 0) {
+        // The two tracks and their CUE sheet, in the given folder.
+        static uint8_t dataTrack[CDDataSectors * RawSectorSize], audioTrack[CDAudioSectors * RawSectorSize];
+        makeCDDataTrack(dataTrack);
+        makeCDAudioTrack(audioTrack);
+        char path[2048];
+        snprintf(path, sizeof(path), "%s/Game (Track 01).bin", argv[2]);
+        writeFile(path, dataTrack, sizeof(dataTrack));
+        snprintf(path, sizeof(path), "%s/Game (Track 02).bin", argv[2]);
+        writeFile(path, audioTrack, sizeof(audioTrack));
+        snprintf(path, sizeof(path), "%s/Game.cue", argv[2]);
+        writeFile(path, CDCueSheet, strlen(CDCueSheet));
+        return 0;
+    }
     if(argc != 3) {
-        fprintf(stderr, "usage: %s <fixture folder> <temporary folder>\n       %s --write-iso <path>\n", argv[0], argv[0]);
+        fprintf(stderr, "usage: %s <fixture folder> <temporary folder>\n       %s --write-iso <path>\n       %s --write-cd <folder>\n", argv[0], argv[0], argv[0]);
         return 2;
     }
     snprintf(fixtureDirectory, sizeof(fixtureDirectory), "%s", argv[1]);
@@ -170,14 +276,23 @@ int main(int argc, char **argv)
     checkWholeImage("dvd.chd", image);       // chdman's default DVD compression (LZMA, zlib, Huffman, FLAC)
     checkWholeImage("dvd-zstd.chd", image);  // zstd only
 
-    checkRejected(fixture("cd.chd"), OECHDReaderStatusNotDVD);         // chdman createcd
-    checkRejected(fixture("hd.chd"), OECHDReaderStatusNotDVD);         // chdman createhd
-    checkRejected(fixture("child.chd"), OECHDReaderStatusNeedsParent); // createdvd with a parent
-    checkRejected(fixture("make-fixtures.sh"), OECHDReaderStatusCouldNotOpen);
-    checkRejected(fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
-    checkVersion(temporaryDirectory, 4, OECHDReaderStatusNotDVD);
-    checkVersion(temporaryDirectory, 6, OECHDReaderStatusUnsupported);
+    checkRejected(OECHDReaderOpenDVD, fixture("cd.chd"), OECHDReaderStatusNotDVD);         // chdman createcd
+    checkRejected(OECHDReaderOpenDVD, fixture("cd-mixed.chd"), OECHDReaderStatusNotDVD);
+    checkRejected(OECHDReaderOpenDVD, fixture("hd.chd"), OECHDReaderStatusNotDVD);         // chdman createhd
+    checkRejected(OECHDReaderOpenDVD, fixture("child.chd"), OECHDReaderStatusNeedsParent); // createdvd with a parent
+    checkRejected(OECHDReaderOpenDVD, fixture("make-fixtures.sh"), OECHDReaderStatusCouldNotOpen);
+    checkRejected(OECHDReaderOpenDVD, fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
+    checkVersion(OECHDReaderOpenDVD, temporaryDirectory, 4, OECHDReaderStatusNotDVD);
+    checkVersion(OECHDReaderOpenDVD, temporaryDirectory, 6, OECHDReaderStatusUnsupported);
     checkDamaged(temporaryDirectory, image);
+
+    checkCD();
+    checkCDFromISO(image);
+    checkRejected(OECHDReaderOpenCD, fixture("dvd.chd"), OECHDReaderStatusNotCD);
+    checkRejected(OECHDReaderOpenCD, fixture("hd.chd"), OECHDReaderStatusNotCD);
+    checkRejected(OECHDReaderOpenCD, fixture("child.chd"), OECHDReaderStatusNeedsParent);
+    checkRejected(OECHDReaderOpenCD, fixture("missing.chd"), OECHDReaderStatusCouldNotOpen);
+    checkVersion(OECHDReaderOpenCD, temporaryDirectory, 4, OECHDReaderStatusUnsupported);
 
     puts("OECHDReader tests passed");
     return 0;

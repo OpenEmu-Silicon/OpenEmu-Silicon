@@ -21,10 +21,14 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-// Reads a DVD-type CHD (made with `chdman createdvd`) as the plain ISO it was made from: 2048-byte
-// sectors, same size, same bytes. Shared by the host app (OECHDFile, for import) and by cores that
-// cannot read CHD themselves (the PPSSPP wrapper), which compile this file next to
-// Vendor/libchdr/libchdr_build.c. CD-type CHDs (`chdman createcd`) are not handled here yet.
+// Reads a CHD as the files it was made from, so code written for those files keeps working:
+// - a DVD-type CHD (`chdman createdvd`) as the plain ISO: 2048-byte sectors, same size, same bytes;
+// - a CD-type CHD (`chdman createcd`) as a CUE sheet plus one .bin per track: the same sectors as the
+//   original .bin files, with the subchannel data and padding CHD adds taken out and CD audio back in
+//   its original byte order.
+// Shared by the host app (OECHDFile, for import) and by cores that cannot read CHD themselves (the
+// PPSSPP and Mednafen wrappers), which compile this file next to Vendor/libchdr/libchdr_build.c.
+// GD-ROM (Dreamcast) and hard-disk CHDs are not handled.
 //
 // A reader is not thread safe; a caller that reads from several threads must lock around it.
 
@@ -46,18 +50,61 @@ typedef enum {
     OECHDReaderStatusUnsupported,  // a CHD version or compression method libchdr does not know
     OECHDReaderStatusNeedsParent,  // a child CHD, which only stores differences from another CHD
     OECHDReaderStatusNotDVD,       // a CD, GD-ROM or hard-disk CHD
+    OECHDReaderStatusNotCD,        // a DVD, GD-ROM or hard-disk CHD
 } OECHDReaderStatus;
+
+typedef enum {
+    OECHDTrackTypeMode1,    // CUE MODE1/2048
+    OECHDTrackTypeMode1Raw, // CUE MODE1/2352
+    OECHDTrackTypeMode2,    // CUE MODE2/2336
+    OECHDTrackTypeMode2Raw, // CUE MODE2/2352
+    OECHDTrackTypeAudio,    // CUE AUDIO (2352)
+} OECHDTrackType;
+
+/// One track of a CD-type CHD, as it appears in the CUE sheet and its .bin file.
+typedef struct {
+    unsigned number;      // track number on the disc, from 1
+    OECHDTrackType type;
+    uint32_t sectorSize;  // bytes per sector in the track's .bin
+    uint32_t sectors;     // sectors in the track's .bin, a stored pregap included
+    uint32_t pregap;      // pregap sectors (75 per second)
+    int pregapStored;     // 1: the pregap is the start of the .bin (CUE INDEX 00); 0: not stored (CUE PREGAP)
+    uint32_t postgap;     // postgap sectors, never stored
+} OECHDTrack;
 
 /// Opens the CHD at `path` and checks that it holds a DVD image. On success `*reader` must be
 /// closed with OECHDReaderClose; on failure it is set to NULL.
 OECHDReaderStatus OECHDReaderOpenDVD(const char *path, OECHDReader **reader);
 
-/// Size in bytes of the image inside: the size of the original ISO.
+/// DVD: size in bytes of the image inside: the size of the original ISO.
 uint64_t OECHDReaderSize(const OECHDReader *reader);
 
-/// Copies up to `length` bytes starting at `offset` of the image. Returns how many bytes were
+/// DVD: copies up to `length` bytes starting at `offset` of the image. Returns how many bytes were
 /// copied: fewer than asked at the end of the image or when part of the CHD cannot be decompressed.
 size_t OECHDReaderRead(OECHDReader *reader, uint64_t offset, void *buffer, size_t length);
+
+/// Opens the CHD at `path` and checks that it holds a CD image whose tracks a CUE sheet can describe.
+/// On success `*reader` must be closed with OECHDReaderClose; on failure it is set to NULL.
+OECHDReaderStatus OECHDReaderOpenCD(const char *path, OECHDReader **reader);
+
+/// CD: the number of tracks, and each track by index (0 is track 1).
+unsigned OECHDReaderTrackCount(const OECHDReader *reader);
+const OECHDTrack *OECHDReaderTrackAtIndex(const OECHDReader *reader, unsigned index);
+
+/// CD: size in bytes of the track's .bin.
+uint64_t OECHDReaderTrackSize(const OECHDReader *reader, unsigned index);
+
+/// CD: copies up to `length` bytes starting at `offset` of the track's .bin. Returns how many bytes
+/// were copied, like OECHDReaderRead.
+size_t OECHDReaderReadTrack(OECHDReader *reader, unsigned index, uint64_t offset, void *buffer, size_t length);
+
+/// CD: the file name the CUE sheet gives a track's .bin: "<baseName> (Track NN).bin". Like snprintf:
+/// returns the length of the full name, and writes as much as fits.
+size_t OECHDReaderTrackFileName(const char *baseName, unsigned number, char *buffer, size_t capacity);
+
+/// CD: writes a CUE sheet for the tracks, naming their files with OECHDReaderTrackFileName. Like
+/// snprintf: returns the length of the full sheet, and writes as much as fits.
+size_t OECHDReaderWriteCueSheet(const OECHDReader *reader, const char *baseName, char *buffer, size_t capacity);
 
 void OECHDReaderClose(OECHDReader *reader);
 

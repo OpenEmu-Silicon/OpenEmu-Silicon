@@ -30,10 +30,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// A CHD image (MAME's compressed format). For a DVD-type CHD (`chdman createdvd`),
-/// -readDataInRange: returns the bytes of the original ISO, so a system plugin checks the disc
-/// exactly as it does for an .iso. Any other CHD (CD, GD-ROM, hard disk) reads as empty: it is
-/// never refused here, because Arcade imports CHDs as they are.
+/// A CHD image (MAME's compressed format). -readDataInRange: returns the bytes of the file the CHD
+/// was made from, so a system plugin checks the disc exactly as it does for that file: the ISO of a
+/// DVD-type CHD (`chdman createdvd`), or the first track's .bin of a CD-type CHD (`chdman createcd`).
+/// Any other CHD (GD-ROM, hard disk) reads as empty; no system takes it.
 @interface OECHDFile : OEFile
 @end
 

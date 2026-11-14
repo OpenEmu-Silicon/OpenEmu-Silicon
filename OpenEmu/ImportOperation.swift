@@ -396,12 +396,13 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
     // filename-based ("(Disc 1)", "[CD2]", etc.) so it works for any disc-based system without
     // needing per-game serial knowledge in the importer. Mednafen requires .m3u for multi-disc
     // PSX games to keep saves and disc-swap state coherent (#294); doing this at import time
-    // (rather than at launch) ensures the m3u and its referenced .cue/.bin files end up in a
-    // single library subfolder via OEM3UFile.copyToURL: instead of being split into per-disc
-    // subfolders by performImportStepOrganize.
+    // (rather than at launch) ensures the m3u and its referenced .cue/.bin (or .chd) files end up
+    // in a single library subfolder via OEM3UFile.copyToURL: instead of being split into per-disc
+    // subfolders by performImportStepOrganize. Only discs of the same format are grouped, so a
+    // CUE/BIN set and a CHD set of one game in the same folder stay apart.
     private static func tryMultiDiscM3UAutoCreate(at url: URL) -> URL? {
         let pathExtension = url.pathExtension.lowercased()
-        guard pathExtension == "cue" || pathExtension == "ccd" else {
+        guard pathExtension == "cue" || pathExtension == "ccd" || pathExtension == "chd" else {
             return nil
         }
 
@@ -434,7 +435,7 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
         var discFiles: [(disc: Int, name: String)] = []
         for fileURL in folderContents {
             let ext = fileURL.pathExtension.lowercased()
-            guard ext == "cue" || ext == "ccd" else { continue }
+            guard ext == pathExtension || (pathExtension != "chd" && (ext == "cue" || ext == "ccd")) else { continue }
             let candidate = (fileURL.lastPathComponent as NSString).deletingPathExtension
             let candidateRange = NSRange(location: 0, length: (candidate as NSString).length)
             guard let candidateMatch = regex.firstMatch(in: candidate, options: [], range: candidateRange) else { continue }
@@ -455,10 +456,18 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
 
         discFiles.sort { $0.disc < $1.disc }
 
-        let m3uURL = folderURL.appendingPathComponent("\(strippedBaseName).m3u", isDirectory: false)
-
-        // Reuse a pre-existing .m3u so re-imports are idempotent and dedupe via hash.
+        // Reuse a pre-existing .m3u so re-imports are idempotent and dedupe via hash, but only one
+        // that lists this disc: "Game.m3u" may belong to the game's other format in the same folder,
+        // in which case this set gets "Game (CHD).m3u" (or "(CUE)", "(CCD)").
+        var m3uURL = folderURL.appendingPathComponent("\(strippedBaseName).m3u", isDirectory: false)
+        if fileManager.fileExists(atPath: m3uURL.path) && !Self.m3u(at: m3uURL, lists: url.lastPathComponent) {
+            m3uURL = folderURL.appendingPathComponent("\(strippedBaseName) (\(pathExtension.uppercased())).m3u", isDirectory: false)
+        }
         if fileManager.fileExists(atPath: m3uURL.path) {
+            guard Self.m3u(at: m3uURL, lists: url.lastPathComponent) else {
+                DLog("Multi-disc .m3u \(m3uURL.path) exists but does not list \(url.lastPathComponent); importing the disc alone")
+                return nil
+            }
             DLog("Multi-disc .m3u already exists, reusing: \(m3uURL.path)")
             return m3uURL
         }
@@ -473,6 +482,15 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
 
         os_log(.info, log: .import, "Auto-created %d-disc .m3u: %{public}@", discFiles.count, m3uURL.path)
         return m3uURL
+    }
+
+    // Whether the .m3u at `m3uURL` lists a disc file named `fileName` (compared by file name).
+    private static func m3u(at m3uURL: URL, lists fileName: String) -> Bool {
+        guard let content = try? String(contentsOf: m3uURL, encoding: .utf8) else { return false }
+        return content.components(separatedBy: .newlines).contains { line in
+            let entry = line.trimmingCharacters(in: .whitespaces)
+            return !entry.hasPrefix("#") && (entry as NSString).lastPathComponent.caseInsensitiveCompare(fileName) == .orderedSame
+        }
     }
 
     // MARK: -
