@@ -35,6 +35,8 @@ public enum HardcoreModeAction {
     case frameStep
     case cheats
     case saveState
+    /// An outside tool, such as an Archipelago client, reading and writing game memory.
+    case liveMemoryAccess
 }
 
 /// Single source of truth for "what is allowed in hardcore mode."
@@ -51,6 +53,10 @@ public enum HardcoreModePolicy {
 
         switch action {
         case .loadState, .rewind, .slowMotion, .frameStep, .cheats:
+            return false
+        case .liveMemoryAccess:
+            // Writing game memory from outside is cheating by RA's rules, and reads are
+            // only ever paired with writes, so block the connection entirely.
             return false
         case .fastForward:
             // Fast-forward is permitted in hardcore. RA's hardcore-compliance

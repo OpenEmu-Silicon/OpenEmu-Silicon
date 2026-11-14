@@ -200,6 +200,10 @@ final class PresentationWatchdog: @unchecked Sendable {
     var _raUnrecognizedObserver: Any?
     var _raIdleTimer: DispatchSourceTimer?
 
+    // Archipelago clients reading and writing game memory. Nil unless the user turned it on.
+    var _romURL: URL?
+    var _archipelagoConnections: ArchipelagoConnections?
+
     // frame rate debugging
     var previous    = CFTimeInterval()
     var frameRate   = CFTimeInterval()
@@ -362,6 +366,7 @@ final class PresentationWatchdog: @unchecked Sendable {
         }
         
         let url = info.romURL.standardizedFileURL
+        _romURL = url
         
         _shader = info.shaderURL
         _shaderParameters = info.shaderParameters
@@ -531,6 +536,7 @@ final class PresentationWatchdog: @unchecked Sendable {
     public func setPauseEmulation(_ paused: Bool) {
         gameCore.perform {
             self.gameCore.setPauseEmulation(paused)
+            self._archipelagoConnections?.playerChangedPause()
         }
         if paused {
             startRetroAchievementsIdleTimer()
@@ -649,7 +655,23 @@ final class PresentationWatchdog: @unchecked Sendable {
     }
     
     public func startEmulation(completionHandler handler: @escaping () -> Void) {
-        gameCore.startEmulation(completionHandler: handler)
+        gameCore.startEmulation {
+            self.startArchipelagoConnections()
+            handler()
+        }
+    }
+
+    /// Starts after the core thread exists, so memory steps run between frames rather than right away.
+    private func startArchipelagoConnections() {
+        guard ArchipelagoConnections.isEnabled else {
+            os_log(.info, log: .archipelago, "Archipelago connections are turned off")
+            return
+        }
+        guard _archipelagoConnections == nil, let gameCore = gameCore, let romURL = _romURL else { return }
+
+        let connections = ArchipelagoConnections(core: gameCore, romURL: romURL, hardcoreEnabled: _hardcoreEnabled)
+        _archipelagoConnections = connections
+        connections.start()
     }
     
     public func resetEmulation(completionHandler handler: @escaping () -> Void) {
@@ -660,6 +682,8 @@ final class PresentationWatchdog: @unchecked Sendable {
         guard let gameCore = gameCore else { return }
 
         stopRetroAchievementsIdleTimer()
+        _archipelagoConnections?.stop()
+        _archipelagoConnections = nil
 
         if let observer = _achievementObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -724,6 +748,7 @@ final class PresentationWatchdog: @unchecked Sendable {
         // Gate rewind / fast-forward / frame-step at the core level. The OESystemResponder
         // calls those directly on the OEGameCore client, bypassing our host-side gates.
         gameCore?.hardcoreEnabled = enabled
+        _archipelagoConnections?.setHardcoreEnabled(enabled)
         NotificationCenter.default.post(
             name: .OEHardcoreModeDidChange,
             object: nil,

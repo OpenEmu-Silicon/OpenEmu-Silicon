@@ -186,6 +186,19 @@ uint8_t GB::busRead8(uint16_t address) const {
     return p_->cpu.busRead8(address);
 }
 
+unsigned char * GB::memoryArea(MemoryArea area, std::size_t &size) const {
+    if (!p_->cpu.loaded()) {
+        size = 0;
+        return 0;
+    }
+    return p_->cpu.memoryArea(area, size);
+}
+
+void GB::busWritePlain(uint16_t address, uint8_t value) {
+    if (p_->cpu.loaded())
+        p_->cpu.busWritePlain(address, value);
+}
+
 //< OpenEmu
 bool GB::loadState(std::string const &filepath) {
 	if (p_->cpu.loaded()) {
