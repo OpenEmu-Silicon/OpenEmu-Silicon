@@ -480,7 +480,9 @@ static CGFloat OEHACScaleValueWithCalibration(
     
     /* we don't want to disconnect the controller every time the helper
      * app terminates, just when OpenEmu closes */
-    if ([[[NSBundle mainBundle] bundleIdentifier] isEqual:@"org.openemu.OpenEmu"]) {
+    /* Only the app itself (release or debug build) does this, not the helper, which has its own identifier. */
+    NSString *appIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    if ([appIdentifier isEqual:@"org.openemu.OpenEmu"] || [appIdentifier isEqual:@"org.openemu.OpenEmu.debug"]) {
         [self _setPowerState:OEHACPowerStateSleep];
     }
     
