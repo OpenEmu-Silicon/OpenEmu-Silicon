@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-APP_SRC="$HERE/OpenEmu.app"
-CORES_SRC="$HERE/Preview Cores"
+APP_SRC="$HERE/.payload/OpenEmu.app"
+CORES_SRC="$HERE/.payload/Preview Cores"
 APP_DEST="/Applications/OpenEmu.app"
 CORES_DEST="$HOME/Library/Application Support/OpenEmu/Cores"
 

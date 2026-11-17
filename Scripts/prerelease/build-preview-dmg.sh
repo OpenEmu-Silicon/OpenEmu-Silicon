@@ -38,6 +38,16 @@ deep_sign() {
     | while read -r binary; do
         codesign --force --sign "$identity" --options runtime --timestamp "$binary" 2>/dev/null || true
       done
+  # Then seal every nested bundle (frameworks, XPC services, helper apps), deepest first. Signing only the
+  # loose binaries leaves each bundle's recorded file hashes out of date, so Apple's notary rejects it
+  # ("nested code is modified or invalid", e.g. Sparkle's Autoupdate).
+  find "$bundle" -type d \( -name "*.framework" -o -name "*.xpc" -o -name "*.app" \) -not -path "$bundle" -print0 \
+    | xargs -0 -n1 printf '%s\n' \
+    | awk -F/ '{print NF, $0}' | sort -rn | cut -d' ' -f2- \
+    | while read -r nested; do
+        codesign --force --sign "$identity" --options runtime --timestamp "$nested" \
+          || echo "  WARNING: could not sign nested bundle: ${nested#$bundle/}"
+      done
   # Sign the bundle itself last
   codesign --force --sign "$identity" --options runtime --timestamp "$bundle"
 }
@@ -233,7 +243,11 @@ step "3/8  Building cores (Release)"
 STAGING_DIR="$BUILD_DIR/staging"
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"
-CORES_STAGING="$STAGING_DIR/Preview Cores"
+# Everything the installer copies goes in a dot-folder, which Finder hides without setting any Finder
+# attribute. (SetFile -a V on a signed app adds a com.apple.FinderInfo attribute, which strict signature
+# checks and Apple's notary reject: "Disallowed xattr com.apple.FinderInfo".)
+PAYLOAD_STAGING="$STAGING_DIR/.payload"
+CORES_STAGING="$PAYLOAD_STAGING/Preview Cores"
 mkdir -p "$CORES_STAGING"
 
 # Pin a script-owned DerivedData so every build writes here and every lookup
@@ -366,7 +380,7 @@ else
 fi
 
 # Stage the app
-ditto "$APP_PATH" "$STAGING_DIR/OpenEmu.app"
+ditto "$APP_PATH" "$PAYLOAD_STAGING/OpenEmu.app"
 
 # ── 6. Stage DMG assets ──────────────────────────────────────────────────────
 step "6/8  Staging DMG assets"
@@ -380,7 +394,7 @@ while IFS=' ' read -r name version || [ -n "$name" ]; do
   sed -i '' "s|<td>${name}</td>|<td>${name} (${version})</td>|g" "$STAGING_DIR/readme.html"
 done < <(tail -n +3 "$VERSIONS_FILE")
 
-cp "$VERSIONS_FILE" "$STAGING_DIR/core-versions.txt"
+cp "$VERSIONS_FILE" "$PAYLOAD_STAGING/core-versions.txt"
 cp "$ASSETS_DIR/install.command" "$STAGING_DIR/Install.command"
 chmod +x "$STAGING_DIR/Install.command"
 # Don't ship the asset's quarantine/provenance flags inside the DMG
@@ -413,14 +427,7 @@ url.setResourceValue_forKey_error_(True, NSURLHasHiddenExtensionKey, None)
 " 2>/dev/null || true
 fi
 
-# Hide everything except Install.command and readme.txt
-for item in "$STAGING_DIR"/*; do
-  name="$(basename "$item")"
-  case "$name" in
-    Install.command|readme.html) ;;
-    *) SetFile -a V "$item" ;;
-  esac
-done
+# Install.command and readme.html are the only visible items; the payload is a dot-folder (see above).
 
 info "Staged:"
 ls -1A "$STAGING_DIR/" | sed 's/^/  /'
@@ -476,9 +483,7 @@ tell application "Finder"
         set icon size of viewOptions to 96
         set text size of viewOptions to 13
         set background picture of viewOptions to file ".background:background.png"
-        set position of item "OpenEmu.app" of container window to {2000, 2000}
-        set position of item "Preview Cores" of container window to {2000, 2000}
-        set position of item "core-versions.txt" of container window to {2000, 2000}
+        set position of item ".payload" of container window to {2000, 2000}
         set position of item ".background" of container window to {2000, 2000}
         set position of item ".fseventsd" of container window to {2000, 2000}
         set position of item "Install.command" of container window to {204, 273}
@@ -498,6 +503,10 @@ sync
 # otherwise leave Finder info on the file
 if [ "$SIGN_ID" != "-" ]; then
   codesign --verify --strict "$MOUNT_POINT/Install.command" || die "Install.command signature is invalid in the DMG volume"
+  codesign --verify --deep --strict "$MOUNT_POINT/.payload/OpenEmu.app" || die "OpenEmu.app signature is invalid in the DMG volume (Apple would reject it)"
+  for plugin in "$MOUNT_POINT/.payload/Preview Cores"/*.oecoreplugin; do
+    codesign --verify --deep --strict "$plugin" || die "$(basename "$plugin") signature is invalid in the DMG volume"
+  done
 fi
 
 # Eject via Finder first (releases its file handles), fall back to force detach
