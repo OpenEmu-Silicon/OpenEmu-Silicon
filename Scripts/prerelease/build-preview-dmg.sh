@@ -405,6 +405,9 @@ osacompile -o "$INSTALL_APP" "$ASSETS_DIR/install.applescript" || die "Could not
 APP_ICON="$APP_PATH/Contents/Resources/OpenEmu.icns"
 if [ -f "$APP_ICON" ]; then
   cp "$APP_ICON" "$INSTALL_APP/Contents/Resources/applet.icns"
+  # osacompile points CFBundleIconName at a generic icon in the applet's asset catalog, and macOS prefers
+  # that over applet.icns. Drop it so the OpenEmu icon is the one shown.
+  /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$INSTALL_APP/Contents/Info.plist" 2>/dev/null || true
 fi
 xattr -cr "$INSTALL_APP"
 if [ "$SIGN_ID" != "-" ]; then
