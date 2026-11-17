@@ -15,8 +15,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 WORKSPACE="$REPO_ROOT/OpenEmu-metal.xcworkspace"
 ASSETS_DIR="$SCRIPT_DIR/dmg-assets"
-# The window background and Install icon are shared with the RetroAchievements review build.
-SHARED_ASSETS_DIR="$(dirname "$SCRIPT_DIR")/retro-achievements/dmg-assets"
 BUILD_DIR="$SCRIPT_DIR/build"
 VERSIONS_FILE="$ASSETS_DIR/preview-cores.txt"
 README_FILE="$ASSETS_DIR/readme.html"
@@ -395,39 +393,29 @@ while IFS=' ' read -r name version || [ -n "$name" ]; do
 done < <(tail -n +3 "$VERSIONS_FILE")
 
 cp "$VERSIONS_FILE" "$PAYLOAD_STAGING/core-versions.txt"
-cp "$ASSETS_DIR/install.command" "$STAGING_DIR/Install.command"
-chmod +x "$STAGING_DIR/Install.command"
-# Don't ship the asset's quarantine/provenance flags inside the DMG
-xattr -c "$STAGING_DIR/Install.command" 2>/dev/null || true
-
+# The installer is a small app, not a .command script: Apple's notarization covers apps but not plain shell
+# scripts, so Gatekeeper refuses to run a downloaded .command file ("Apple could not verify ... is free of
+# malware") even from a notarized disk image. Build it from dmg-assets/install.applescript, give it the
+# OpenEmu icon, and sign it like everything else so the notarization ticket covers it.
+INSTALL_APP="$STAGING_DIR/Install.app"
+osacompile -o "$INSTALL_APP" "$ASSETS_DIR/install.applescript" || die "Could not build Install.app from install.applescript"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string org.openemu.silicon.preview.installer" "$INSTALL_APP/Contents/Info.plist" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier org.openemu.silicon.preview.installer" "$INSTALL_APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName Install" "$INSTALL_APP/Contents/Info.plist" 2>/dev/null || true
+APP_ICON="$APP_PATH/Contents/Resources/OpenEmu.icns"
+if [ -f "$APP_ICON" ]; then
+  cp "$APP_ICON" "$INSTALL_APP/Contents/Resources/applet.icns"
+fi
+xattr -cr "$INSTALL_APP"
 if [ "$SIGN_ID" != "-" ]; then
-  # Gatekeeper refuses to open an unsigned script from a downloaded DMG. Sign it
-  # (signature lives in xattrs, kept by ditto/HFS+) so notarization covers it.
-  # No custom icon or hidden extension: the resource fork / Finder info they add
-  # fail strict signature validation ("detritus not allowed").
-  codesign --force --sign "$SIGN_ID" --timestamp \
-    --identifier "org.openemu.silicon.preview.install" "$STAGING_DIR/Install.command"
-  info "Signed Install.command"
+  deep_sign "$INSTALL_APP" "$SIGN_ID"
+  codesign --verify --deep --strict "$INSTALL_APP" || die "Install.app signature is invalid"
+  info "Signed Install.app"
 else
-  # Set custom icon and hide extension on the .command file
-  INSTALL_ICON="$SHARED_ASSETS_DIR/icon.png"
-  if [ -f "$INSTALL_ICON" ]; then
-    osascript -e "
-      use framework \"AppKit\"
-      set iconImage to current application's NSImage's alloc()'s initWithContentsOfFile:\"$INSTALL_ICON\"
-      current application's NSWorkspace's sharedWorkspace()'s setIcon:iconImage forFile:\"$STAGING_DIR/Install.command\" options:0
-    " 2>/dev/null || true
-  fi
-  SetFile -a CE "$STAGING_DIR/Install.command"
-  # Reinforce extension-hidden via URL resource value (most reliable across DMG tools)
-  python3 -c "
-from Foundation import NSURL, NSURLHasHiddenExtensionKey
-url = NSURL.fileURLWithPath_('$STAGING_DIR/Install.command')
-url.setResourceValue_forKey_error_(True, NSURLHasHiddenExtensionKey, None)
-" 2>/dev/null || true
+  codesign --force --deep --sign - "$INSTALL_APP"
 fi
 
-# Install.command and readme.html are the only visible items; the payload is a dot-folder (see above).
+# Install.app and readme.html are the only visible items; the payload is a dot-folder (see above).
 
 info "Staged:"
 ls -1A "$STAGING_DIR/" | sed 's/^/  /'
@@ -465,7 +453,7 @@ ditto "$STAGING_DIR/" "$MOUNT_POINT/"
 
 # Copy background image into hidden directory
 mkdir -p "$MOUNT_POINT/.background"
-cp "$SHARED_ASSETS_DIR/background.png" "$MOUNT_POINT/.background/background.png"
+cp "$ASSETS_DIR/background.png" "$MOUNT_POINT/.background/background.png"
 
 # Configure Finder window via AppleScript
 info "Setting background and icon layout via Finder..."
@@ -486,7 +474,7 @@ tell application "Finder"
         set position of item ".payload" of container window to {2000, 2000}
         set position of item ".background" of container window to {2000, 2000}
         set position of item ".fseventsd" of container window to {2000, 2000}
-        set position of item "Install.command" of container window to {204, 273}
+        set position of item "Install.app" of container window to {204, 273}
         set position of item "readme.html" of container window to {391, 273}
         close
         open
@@ -502,7 +490,7 @@ sync
 # Strict validation, as Gatekeeper does — after Finder's layout pass, which could
 # otherwise leave Finder info on the file
 if [ "$SIGN_ID" != "-" ]; then
-  codesign --verify --strict "$MOUNT_POINT/Install.command" || die "Install.command signature is invalid in the DMG volume"
+  codesign --verify --deep --strict "$MOUNT_POINT/Install.app" || die "Install.app signature is invalid in the DMG volume"
   codesign --verify --deep --strict "$MOUNT_POINT/.payload/OpenEmu.app" || die "OpenEmu.app signature is invalid in the DMG volume (Apple would reject it)"
   for plugin in "$MOUNT_POINT/.payload/Preview Cores"/*.oecoreplugin; do
     codesign --verify --deep --strict "$plugin" || die "$(basename "$plugin") signature is invalid in the DMG volume"
