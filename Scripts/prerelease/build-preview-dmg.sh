@@ -241,11 +241,11 @@ step "3/8  Building cores (Release)"
 STAGING_DIR="$BUILD_DIR/staging"
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR"
-# Everything the installer copies goes in a dot-folder, which Finder hides without setting any Finder
-# attribute. (SetFile -a V on a signed app adds a com.apple.FinderInfo attribute, which strict signature
-# checks and Apple's notary reject: "Disallowed xattr com.apple.FinderInfo".)
-PAYLOAD_STAGING="$STAGING_DIR/.payload"
-CORES_STAGING="$PAYLOAD_STAGING/Preview Cores"
+# The disk image is a plain drag-to-Applications image: OpenEmu.app, a shortcut to /Applications, and a
+# Cores folder whose cores the tester double-clicks (OpenEmu imports a core plugin it is asked to open and
+# copies it into its Cores folder). There is no installer script or app: Apple's notarization does not cover
+# plain scripts, and a downloaded installer app is run from a temporary copy, so both proved fragile.
+CORES_STAGING="$STAGING_DIR/Cores"
 mkdir -p "$CORES_STAGING"
 
 # Pin a script-owned DerivedData so every build writes here and every lookup
@@ -378,7 +378,8 @@ else
 fi
 
 # Stage the app
-ditto "$APP_PATH" "$PAYLOAD_STAGING/OpenEmu.app"
+ditto "$APP_PATH" "$STAGING_DIR/OpenEmu.app"
+ln -s /Applications "$STAGING_DIR/Applications"
 
 # ── 6. Stage DMG assets ──────────────────────────────────────────────────────
 step "6/8  Staging DMG assets"
@@ -392,33 +393,6 @@ while IFS=' ' read -r name version || [ -n "$name" ]; do
   sed -i '' "s|<td>${name}</td>|<td>${name} (${version})</td>|g" "$STAGING_DIR/readme.html"
 done < <(tail -n +3 "$VERSIONS_FILE")
 
-cp "$VERSIONS_FILE" "$PAYLOAD_STAGING/core-versions.txt"
-# The installer is a small app, not a .command script: Apple's notarization covers apps but not plain shell
-# scripts, so Gatekeeper refuses to run a downloaded .command file ("Apple could not verify ... is free of
-# malware") even from a notarized disk image. Build it from dmg-assets/install.applescript, give it the
-# OpenEmu icon, and sign it like everything else so the notarization ticket covers it.
-INSTALL_APP="$STAGING_DIR/Install.app"
-osacompile -o "$INSTALL_APP" "$ASSETS_DIR/install.applescript" || die "Could not build Install.app from install.applescript"
-/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string org.openemu.silicon.preview.installer" "$INSTALL_APP/Contents/Info.plist" 2>/dev/null \
-  || /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier org.openemu.silicon.preview.installer" "$INSTALL_APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleName Install" "$INSTALL_APP/Contents/Info.plist" 2>/dev/null || true
-APP_ICON="$APP_PATH/Contents/Resources/OpenEmu.icns"
-if [ -f "$APP_ICON" ]; then
-  cp "$APP_ICON" "$INSTALL_APP/Contents/Resources/applet.icns"
-  # osacompile points CFBundleIconName at a generic icon in the applet's asset catalog, and macOS prefers
-  # that over applet.icns. Drop it so the OpenEmu icon is the one shown.
-  /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$INSTALL_APP/Contents/Info.plist" 2>/dev/null || true
-fi
-xattr -cr "$INSTALL_APP"
-if [ "$SIGN_ID" != "-" ]; then
-  deep_sign "$INSTALL_APP" "$SIGN_ID"
-  codesign --verify --deep --strict "$INSTALL_APP" || die "Install.app signature is invalid"
-  info "Signed Install.app"
-else
-  codesign --force --deep --sign - "$INSTALL_APP"
-fi
-
-# Install.app and readme.html are the only visible items; the payload is a dot-folder (see above).
 
 info "Staged:"
 ls -1A "$STAGING_DIR/" | sed 's/^/  /'
@@ -467,18 +441,19 @@ tell application "Finder"
         set current view of container window to icon view
         set toolbar visible of container window to false
         set statusbar visible of container window to false
-        -- 600 wide × 440 tall = 400 content + 28 title bar + 12 status bar slack
-        set the bounds of container window to {200, 100, 800, 532}
+        -- 600 wide × 532 tall = 500 content + 28 title bar + 4 slack
+        set the bounds of container window to {200, 100, 800, 632}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
         set icon size of viewOptions to 96
         set text size of viewOptions to 13
         set background picture of viewOptions to file ".background:background.png"
-        set position of item ".payload" of container window to {2000, 2000}
         set position of item ".background" of container window to {2000, 2000}
         set position of item ".fseventsd" of container window to {2000, 2000}
-        set position of item "Install.app" of container window to {204, 273}
-        set position of item "readme.html" of container window to {391, 273}
+        set position of item "OpenEmu.app" of container window to {170, 215}
+        set position of item "Applications" of container window to {430, 215}
+        set position of item "Cores" of container window to {170, 385}
+        set position of item "readme.html" of container window to {430, 385}
         close
         open
         delay 2
@@ -493,9 +468,8 @@ sync
 # Strict validation, as Gatekeeper does — after Finder's layout pass, which could
 # otherwise leave Finder info on the file
 if [ "$SIGN_ID" != "-" ]; then
-  codesign --verify --deep --strict "$MOUNT_POINT/Install.app" || die "Install.app signature is invalid in the DMG volume"
-  codesign --verify --deep --strict "$MOUNT_POINT/.payload/OpenEmu.app" || die "OpenEmu.app signature is invalid in the DMG volume (Apple would reject it)"
-  for plugin in "$MOUNT_POINT/.payload/Preview Cores"/*.oecoreplugin; do
+  codesign --verify --deep --strict "$MOUNT_POINT/OpenEmu.app" || die "OpenEmu.app signature is invalid in the DMG volume (Apple would reject it)"
+  for plugin in "$MOUNT_POINT/Cores"/*.oecoreplugin; do
     codesign --verify --deep --strict "$plugin" || die "$(basename "$plugin") signature is invalid in the DMG volume"
   done
 fi
