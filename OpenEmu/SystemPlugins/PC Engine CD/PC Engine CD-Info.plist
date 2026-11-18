@@ -134,6 +134,7 @@
 	<array>
 		<string>cue</string>
 		<string>ccd</string>
+		<string>chd</string>
 	</array>
 	<key>OEGenericControlNamesKey</key>
 	<array>

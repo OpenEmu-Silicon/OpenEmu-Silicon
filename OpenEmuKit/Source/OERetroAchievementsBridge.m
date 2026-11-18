@@ -56,6 +56,8 @@ static const void *const kOERABridgeQueueKey = &kOERABridgeQueueKey;
 
     BOOL                                        _started;
     BOOL                                        _snapshotDirty;
+
+    rc_hash_callbacks_t                         _hashCallbacks; // only touched on _serialQueue
 }
 
 #pragma mark - Lifecycle
@@ -443,10 +445,20 @@ static void oe_ra_bridge_server_call(const rc_api_request_t *request,
     rc_hash_filereader_t copy = *reader;
     dispatch_sync(_serialQueue, ^{
         if (!self->_rcClient || self.shuttingDown) { return; }
-        rc_hash_callbacks_t callbacks;
-        memset(&callbacks, 0, sizeof(callbacks));
-        callbacks.filereader = copy;
-        rc_client_set_hash_callbacks(self->_rcClient, &callbacks);
+        // rc_client replaces all its hash callbacks at once; keep what the other setter installed.
+        self->_hashCallbacks.filereader = copy;
+        rc_client_set_hash_callbacks(self->_rcClient, &self->_hashCallbacks);
+    });
+}
+
+- (void)setHashCDReader:(const struct rc_hash_cdreader *)reader
+{
+    if (!reader) { return; }
+    rc_hash_cdreader_t copy = *reader;
+    dispatch_sync(_serialQueue, ^{
+        if (!self->_rcClient || self.shuttingDown) { return; }
+        self->_hashCallbacks.cdreader = copy;
+        rc_client_set_hash_callbacks(self->_rcClient, &self->_hashCallbacks);
     });
 }
 

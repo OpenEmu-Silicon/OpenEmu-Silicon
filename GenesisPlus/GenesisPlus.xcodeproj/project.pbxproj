@@ -37,6 +37,10 @@
 /* Begin PBXBuildFile section */
 		OE0GPLU0BUILDFILE000000001 /* rcheevos_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0GPLU0FILEREF000000001 /* rcheevos_build.c */; settings = {COMPILER_FLAGS = "-DRC_NO_THREADS=1 -DRC_CLIENT_SUPPORTS_HASH=1"; }; };
 		OE0GPLU0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */ = {isa = PBXBuildFile; fileRef = OE0GPLU0FILEREF000000002 /* OERetroAchievementsTransport.m */; };
+		OE0GPLU0BUILDFILE000000003 /* libchdr_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0GPLU0FILEREF000000003 /* libchdr_build.c */; settings = {COMPILER_FLAGS = "-w"; }; };
+		OE0GPLU0BUILDFILE000000004 /* libchdr_zstd_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0GPLU0FILEREF000000004 /* libchdr_zstd_build.c */; settings = {COMPILER_FLAGS = "-w"; }; };
+		OE0GPLU0BUILDFILE000000005 /* OECHDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0GPLU0FILEREF000000005 /* OECHDReader.c */; };
+		OE0GPLU0BUILDFILE000000006 /* OEChdHashCDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0GPLU0FILEREF000000006 /* OEChdHashCDReader.c */; };
 		82287C39101E9DB40072172D /* GenPlusGameCore.m in Sources */ = {isa = PBXBuildFile; fileRef = 82287C34101E9DB40072172D /* GenPlusGameCore.m */; };
 		87709EF32950DA090084AEE0 /* megasd.c in Sources */ = {isa = PBXBuildFile; fileRef = 87709EF22950DA090084AEE0 /* megasd.c */; };
 		879243AE1C0D044B0064C515 /* xe_1ap.c in Sources */ = {isa = PBXBuildFile; fileRef = 879243AC1C0D044B0064C515 /* xe_1ap.c */; };
@@ -138,6 +142,10 @@
 		82287C34101E9DB40072172D /* GenPlusGameCore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GenPlusGameCore.m; sourceTree = "<group>"; };
 		OE0GPLU0FILEREF000000001 /* rcheevos_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = rcheevos_build.c; path = ../Vendor/rcheevos/rcheevos_build.c; sourceTree = SOURCE_ROOT; };
 		OE0GPLU0FILEREF000000002 /* OERetroAchievementsTransport.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OERetroAchievementsTransport.m; path = ../OpenEmuKit/Source/OERetroAchievementsTransport.m; sourceTree = SOURCE_ROOT; };
+		OE0GPLU0FILEREF000000003 /* libchdr_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = libchdr_build.c; path = ../Vendor/libchdr/libchdr_build.c; sourceTree = SOURCE_ROOT; };
+		OE0GPLU0FILEREF000000004 /* libchdr_zstd_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = libchdr_zstd_build.c; path = ../Vendor/libchdr/libchdr_zstd_build.c; sourceTree = SOURCE_ROOT; };
+		OE0GPLU0FILEREF000000005 /* OECHDReader.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = OECHDReader.c; path = "../OpenEmu-SDK/OpenEmuSystem/OECHDReader.c"; sourceTree = SOURCE_ROOT; };
+		OE0GPLU0FILEREF000000006 /* OEChdHashCDReader.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = OEChdHashCDReader.c; path = ../OpenEmuKit/Source/OEChdHashCDReader.c; sourceTree = SOURCE_ROOT; };
 		825C7E44101FAB7F0072187B /* Carbon.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Carbon.framework; path = System/Library/Frameworks/Carbon.framework; sourceTree = SDKROOT; };
 		87709EF12950DA080084AEE0 /* megasd.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = megasd.h; sourceTree = "<group>"; };
 		87709EF22950DA090084AEE0 /* megasd.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = megasd.c; sourceTree = "<group>"; };
@@ -652,6 +660,10 @@
 			files = (
 				OE0GPLU0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
 				OE0GPLU0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
+				OE0GPLU0BUILDFILE000000003 /* libchdr_build.c in Sources */,
+				OE0GPLU0BUILDFILE000000004 /* libchdr_zstd_build.c in Sources */,
+				OE0GPLU0BUILDFILE000000005 /* OECHDReader.c in Sources */,
+				OE0GPLU0BUILDFILE000000006 /* OEChdHashCDReader.c in Sources */,
 				82287C39101E9DB40072172D /* GenPlusGameCore.m in Sources */,
 				879243B11C0D05120064C515 /* graphic_board.c in Sources */,
 				94ED8A9214CF933700FF8901 /* areplay.c in Sources */,
@@ -745,6 +757,9 @@
 					"$(SRCROOT)/../Vendor/rcheevos/include",
 					"$(SRCROOT)/../Vendor/rcheevos/src",
 					"$(SRCROOT)/../OpenEmuKit/Source",
+					"$(SRCROOT)/../Vendor/libchdr/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/lzma-24.05/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/zstd-1.5.6/lib",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -753,6 +768,7 @@
 					"-DUSE_32BPP_RENDERING",
 					"-DMAXROMSIZE=33554432",
 					"-DENABLE_SUB_68K_ADDRESS_ERROR_EXCEPTIONS",
+					"-DUSE_LIBCHDR",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:identifier}";
 				PRODUCT_NAME = GenesisPlus;
@@ -773,6 +789,9 @@
 					"$(SRCROOT)/../Vendor/rcheevos/include",
 					"$(SRCROOT)/../Vendor/rcheevos/src",
 					"$(SRCROOT)/../OpenEmuKit/Source",
+					"$(SRCROOT)/../Vendor/libchdr/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/lzma-24.05/include",
+					"$(SRCROOT)/../Vendor/libchdr/deps/zstd-1.5.6/lib",
 				);
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "\"$(USER_LIBRARY_DIR)/Application Support/OpenEmu/Cores\"";
@@ -781,6 +800,7 @@
 					"-DUSE_32BPP_RENDERING",
 					"-DMAXROMSIZE=33554432",
 					"-DENABLE_SUB_68K_ADDRESS_ERROR_EXCEPTIONS",
+					"-DUSE_LIBCHDR",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.${PRODUCT_NAME:identifier}";
 				PRODUCT_NAME = GenesisPlus;

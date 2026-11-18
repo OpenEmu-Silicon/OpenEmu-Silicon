@@ -22,6 +22,11 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		OE0MDFN0BUILDFILE000000004 /* OEChdVirtualFS.cpp in Sources */ = {isa = PBXBuildFile; fileRef = OE0MDFN0FILEREF000000005 /* OEChdVirtualFS.cpp */; };
+		OE0MDFN0BUILDFILE000000005 /* OECHDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0MDFN0FILEREF000000007 /* OECHDReader.c */; };
+		OE0MDFN0BUILDFILE000000006 /* libchdr_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0MDFN0FILEREF000000008 /* libchdr_build.c */; settings = {COMPILER_FLAGS = "-w"; }; };
+		OE0MDFN0BUILDFILE000000007 /* libchdr_zstd_build.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0MDFN0FILEREF000000009 /* libchdr_zstd_build.c */; settings = {COMPILER_FLAGS = "-w"; }; };
+		OE0MDFN0BUILDFILE000000008 /* OEChdHashCDReader.c in Sources */ = {isa = PBXBuildFile; fileRef = OE0MDFN0FILEREF000000010 /* OEChdHashCDReader.c */; };
 		3DCDE7191BD2D8FD00392D0D /* libvorbis.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9453E37C1AC5E1E9004F42AD /* libvorbis.a */; };
 		3DDC76191BD2D825002E7674 /* CDAFReader_SF.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 94B082471A8697EF00D3C0BC /* CDAFReader_SF.cpp */; };
 		3DDC761A1BD2D86B002E7674 /* libsndfile_FLAC.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 27FF3AC11B1CF78F002F941E /* libsndfile_FLAC.a */; };
@@ -297,6 +302,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		OE0MDFN0FILEREF000000005 /* OEChdVirtualFS.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = OEChdVirtualFS.cpp; sourceTree = "<group>"; };
+		OE0MDFN0FILEREF000000006 /* OEChdVirtualFS.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEChdVirtualFS.h; sourceTree = "<group>"; };
+		OE0MDFN0FILEREF000000007 /* OECHDReader.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = OECHDReader.c; path = ../OpenEmu-SDK/OpenEmuSystem/OECHDReader.c; sourceTree = SOURCE_ROOT; };
+		OE0MDFN0FILEREF000000008 /* libchdr_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = libchdr_build.c; path = ../Vendor/libchdr/libchdr_build.c; sourceTree = SOURCE_ROOT; };
+		OE0MDFN0FILEREF000000010 /* OEChdHashCDReader.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = OEChdHashCDReader.c; path = ../OpenEmuKit/Source/OEChdHashCDReader.c; sourceTree = SOURCE_ROOT; };
+		OE0MDFN0FILEREF000000011 /* OEChdHashCDReader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OEChdHashCDReader.h; path = ../OpenEmuKit/Source/OEChdHashCDReader.h; sourceTree = SOURCE_ROOT; };
+		OE0MDFN0FILEREF000000009 /* libchdr_zstd_build.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = libchdr_zstd_build.c; path = ../Vendor/libchdr/libchdr_zstd_build.c; sourceTree = SOURCE_ROOT; };
 		089C1672FE841209C02AAC07 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		089C167EFE841241C02AAC07 /* en */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		089C167FFE841241C02AAC07 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
@@ -1827,6 +1839,13 @@
 				944543F31785289B006C057B /* OEWSSystemResponderClient.h */,
 				824088340FFDDCF400F0FE7D /* MednafenGameCore.h */,
 				824088350FFDDCF400F0FE7D /* MednafenGameCore.mm */,
+				OE0MDFN0FILEREF000000005 /* OEChdVirtualFS.cpp */,
+				OE0MDFN0FILEREF000000006 /* OEChdVirtualFS.h */,
+				OE0MDFN0FILEREF000000007 /* OECHDReader.c */,
+				OE0MDFN0FILEREF000000008 /* libchdr_build.c */,
+				OE0MDFN0FILEREF000000009 /* libchdr_zstd_build.c */,
+				OE0MDFN0FILEREF000000010 /* OEChdHashCDReader.c */,
+				OE0MDFN0FILEREF000000011 /* OEChdHashCDReader.h */,
 				94454E3B17852E61006C057B /* stubs.cpp */,
 				94454E3617852E44006C057B /* thread.cpp */,
 				94454E3717852E44006C057B /* thread.h */,
@@ -4459,6 +4478,11 @@
 			files = (
 				824088360FFDDCF400F0FE7D /* MednafenGameCore.mm in Sources */,
 				OE0MDFN0BUILDFILE000000001 /* rcheevos_build.c in Sources */,
+				OE0MDFN0BUILDFILE000000004 /* OEChdVirtualFS.cpp in Sources */,
+				OE0MDFN0BUILDFILE000000005 /* OECHDReader.c in Sources */,
+				OE0MDFN0BUILDFILE000000006 /* libchdr_build.c in Sources */,
+				OE0MDFN0BUILDFILE000000007 /* libchdr_zstd_build.c in Sources */,
+				OE0MDFN0BUILDFILE000000008 /* OEChdHashCDReader.c in Sources */,
 				OE0MDFN0BUILDFILE000000002 /* OERetroAchievementsTransport.m in Sources */,
 				OE0MDFN0BUILDFILE000000003 /* OERetroAchievementsBridge.m in Sources */,
 				8CB3E10B17F2169A0090372A /* video.cpp in Sources */,
@@ -4758,6 +4782,9 @@
 					"\"$(SRCROOT)/libsndfile\"",
 					"\"$(SRCROOT)/../Vendor/rcheevos/include\"",
 					"\"$(SRCROOT)/../Vendor/rcheevos/src\"",
+					"\"$(SRCROOT)/../Vendor/libchdr/include\"",
+					"\"$(SRCROOT)/../Vendor/libchdr/deps/lzma-24.05/include\"",
+					"\"$(SRCROOT)/../Vendor/libchdr/deps/zstd-1.5.6/lib\"",
 					"\"$(SRCROOT)/../OpenEmuKit/Source\"",
 				);
 				INFOPLIST_FILE = Info.plist;
@@ -4830,6 +4857,9 @@
 					"\"$(SRCROOT)/libsndfile\"",
 					"\"$(SRCROOT)/../Vendor/rcheevos/include\"",
 					"\"$(SRCROOT)/../Vendor/rcheevos/src\"",
+					"\"$(SRCROOT)/../Vendor/libchdr/include\"",
+					"\"$(SRCROOT)/../Vendor/libchdr/deps/lzma-24.05/include\"",
+					"\"$(SRCROOT)/../Vendor/libchdr/deps/zstd-1.5.6/lib\"",
 					"\"$(SRCROOT)/../OpenEmuKit/Source\"",
 				);
 				INFOPLIST_FILE = Info.plist;

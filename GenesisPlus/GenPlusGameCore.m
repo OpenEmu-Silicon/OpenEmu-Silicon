@@ -36,6 +36,9 @@
 
 #include "shared.h"
 
+// Before RC_CLIENT_SUPPORTS_HASH is defined: rc_hash is a module, which the macro does not configure.
+#include "OEChdHashCDReader.h"
+
 #define RC_CLIENT_SUPPORTS_HASH 1
 #include <rc_client.h>
 #include <rc_consoles.h>
@@ -491,6 +494,13 @@ static __weak GenPlusGameCore *_current;
         rc_client_set_hardcore_enabled(_rcClient, _raHardcoreEnabled ? 1 : 0);
         rc_client_set_allow_background_memory_reads(_rcClient, 0);
         rc_client_enable_logging(_rcClient, RC_CLIENT_LOG_LEVEL_INFO, genplus_rc_log);
+        if (_rcConsole == RC_CONSOLE_SEGA_CD) {
+            // rcheevos cannot open a CHD on its own; this reader hands every other disc back to it.
+            rc_hash_callbacks_t hashCallbacks;
+            memset(&hashCallbacks, 0, sizeof(hashCallbacks));
+            hashCallbacks.cdreader = OEChdHashCDReader;
+            rc_client_set_hash_callbacks(_rcClient, &hashCallbacks);
+        }
 
         __weak GenPlusGameCore *weakSelf = self;
         _raTokenObserver = [[NSNotificationCenter defaultCenter]

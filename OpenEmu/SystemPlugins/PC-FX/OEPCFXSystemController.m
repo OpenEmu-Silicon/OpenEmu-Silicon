@@ -28,28 +28,55 @@
 
 @implementation OEPCFXSystemController
 
+// Whether a data track holds the PC-FX boot header.
+static BOOL OEPCFXHasHeader(NSData *dataTrackBuffer, NSURL *dataTrackURL)
+{
+    NSString *dataTrackString = @"PC-FX:Hu_CD-ROM ";
+    NSData *dataSearch = [dataTrackString dataUsingEncoding:NSUTF8StringEncoding];
+    // this still slows import down but we need to scan the disc as there's no common offset
+    NSRange indexOfData = [dataTrackBuffer rangeOfData: dataSearch options:0 range:NSMakeRange(0, [dataTrackBuffer length])];
+
+    if(indexOfData.length == 0)
+        return NO;
+
+    NSLog(@"PC-FX data track: %@", dataTrackURL);
+    NSLog (@"'%@' at offset = 0x%lX", dataTrackString, indexOfData.location);
+    return YES;
+}
+
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
+    // A .m3u is a PC-FX game when its first disc is. Only that disc is checked: the check reads
+    // whole data tracks, and every other system's playlists come through here too.
+    if ([file.fileExtension isEqualToString:@"m3u"] && [file isKindOfClass:[OEDiscDescriptor class]]) {
+        NSURL *firstDiscURL = [(OEDiscDescriptor *)file referencedFileURLs].firstObject;
+        OEFile *firstDisc = firstDiscURL != nil ? [OEFile fileWithURL:firstDiscURL error:nil] : nil;
+        return firstDisc != nil ? [self canHandleDisc:firstDisc] : OEFileSupportNo;
+    }
+
+    return [self canHandleDisc:file];
+}
+
+- (OEFileSupport)canHandleDisc:(OEFile *)file
+{
+    // A CHD reads as its first data track's .bin. The header is in the track's first sector, after
+    // the pregap Redump dumps keep at the start of the track (usually 3 seconds, 225 sectors), so the
+    // first 2 MB hold it without decompressing the whole track.
+    if ([file.fileExtension isEqualToString:@"chd"])
+        return OEPCFXHasHeader([file readDataInRange:NSMakeRange(0, 2 * 1024 * 1024)], file.fileURL) ? OEFileSupportYes : OEFileSupportNo;
+
     if (![file isKindOfClass:[OEDiscDescriptor class]])
         return OEFileSupportNo;
 
-    OEDiscDescriptor *descriptor = file;
+    OEDiscDescriptor *descriptor = (OEDiscDescriptor *)file;
     for(NSURL *dataTrack in descriptor.referencedBinaryFileURLs)
     {
+        // Mapped, not read: every CUE and CCD the app imports is checked here, whatever its system.
         NSError *error = nil;
-        NSData *dataTrackBuffer = [NSData dataWithContentsOfURL:dataTrack options:NSDataReadingUncached error:&error];
+        NSData *dataTrackBuffer = [NSData dataWithContentsOfURL:dataTrack options:NSDataReadingMappedIfSafe | NSDataReadingUncached error:&error];
 
-        NSString *dataTrackString = @"PC-FX:Hu_CD-ROM ";
-        NSData *dataSearch = [dataTrackString dataUsingEncoding:NSUTF8StringEncoding];
-        // this still slows import down but we need to scan the disc as there's no common offset
-        NSRange indexOfData = [dataTrackBuffer rangeOfData: dataSearch options:0 range:NSMakeRange(0, [dataTrackBuffer length])];
-
-        if(indexOfData.length == 0)
-            continue;
-
-        NSLog(@"PC-FX data track: %@", dataTrack);
-        NSLog (@"'%@' at offset = 0x%lX", dataTrackString, indexOfData.location);
-        return OEFileSupportYes;
+        if(OEPCFXHasHeader(dataTrackBuffer, dataTrack))
+            return OEFileSupportYes;
     }
 
     return OEFileSupportNo;

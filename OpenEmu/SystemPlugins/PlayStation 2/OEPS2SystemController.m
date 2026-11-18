@@ -28,9 +28,33 @@
 
 @implementation OEPS2SystemController
 
+// A disc comes as a CUE/CCD/M3U descriptor, an ISO, a CSO or ZSO, which reads as the ISO inside it, or
+// a CHD, which reads as the ISO it was made from (DVD-type) or as its first data track's .bin (CD-type).
+static BOOL OEPS2IsDisc(OEFile *file)
+{
+    return [file isKindOfClass:[OEDiscDescriptor class]]
+        || [file.fileExtension caseInsensitiveCompare:@"iso"] == NSOrderedSame
+        || [file.fileExtension caseInsensitiveCompare:@"cso"] == NSOrderedSame
+        || [file.fileExtension caseInsensitiveCompare:@"zso"] == NSOrderedSame
+        || [file.fileExtension caseInsensitiveCompare:@"chd"] == NSOrderedSame;
+}
+
+// The engine's CsoFileReader plays CSO and ZSO version 1 only. The version is byte 20 of the file's
+// header; the file's contents read as the ISO inside (OECSOFile), so the header is read from the file.
+static BOOL OEPS2IsUnsupportedCSO(OEFile *file)
+{
+    if ([file.fileExtension caseInsensitiveCompare:@"cso"] != NSOrderedSame
+        && [file.fileExtension caseInsensitiveCompare:@"zso"] != NSOrderedSame)
+        return NO;
+    NSFileHandle *handle = [NSFileHandle fileHandleForReadingFromURL:file.fileURL error:nil];
+    NSData *header = [handle readDataUpToLength:21 error:nil];
+    [handle closeAndReturnError:nil];
+    return header.length < 21 || ((const uint8_t *)header.bytes)[20] > 1;
+}
+
 - (OEFileSupport)canHandleFile:(__kindof OEFile *)file
 {
-    if (!([file isKindOfClass:[OEDiscDescriptor class]] || [file.fileExtension caseInsensitiveCompare:@"iso"] == NSOrderedSame))
+    if (!OEPS2IsDisc(file) || OEPS2IsUnsupportedCSO(file))
         return OEFileSupportNo;
 
     NSString *dataTrackString = [file readASCIIStringInRange:NSMakeRange(0x8008, 11)];
@@ -132,7 +156,7 @@
 
 - (NSString *)serialLookupForFile:(__kindof OEFile *)file
 {
-    if(!([file isKindOfClass:[OEDiscDescriptor class]] || [file.fileExtension caseInsensitiveCompare:@"iso"] == NSOrderedSame))
+    if(!OEPS2IsDisc(file))
         return nil;
 
     // ISO 9660 CD001, check for MODE1 or MODE2
