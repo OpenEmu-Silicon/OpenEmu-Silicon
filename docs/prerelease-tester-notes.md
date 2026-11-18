@@ -27,7 +27,20 @@ Thank you for helping test. This is an early build, not a normal release. The ap
 
 1. Open the DMG and double-click **Install**. It copies the app to `/Applications` and the new cores to `~/Library/Application Support/OpenEmu/Cores/`.
 2. Open OpenEmu from `/Applications`.
-3. To go back: quit OpenEmu, delete `/Applications/OpenEmu.app`, install the latest normal release from the Releases page, then (if you want) delete `Azahar.oecoreplugin` and `PCSX2.oecoreplugin` from the Cores folder and restore your library backup.
+3. **If Install does nothing,** install by hand. Open the disk image so it is mounted, quit OpenEmu, then paste this into Terminal (macOS may ask to let Terminal change apps; allow it):
+   ```bash
+   V="$(ls -d /Volumes/OpenEmu\ Preview*/.payload | head -1)"
+   rm -rf /Applications/OpenEmu.app
+   ditto "$V/OpenEmu.app" /Applications/OpenEmu.app
+   mkdir -p ~/Library/Application\ Support/OpenEmu/Cores
+   for p in "$V/Preview Cores"/*.oecoreplugin; do
+     rm -rf ~/Library/Application\ Support/OpenEmu/Cores/"$(basename "$p")"
+     ditto "$p" ~/Library/Application\ Support/OpenEmu/Cores/"$(basename "$p")"
+   done
+   xattr -cr /Applications/OpenEmu.app
+   ```
+   Then tell us your macOS version and what you saw when you double-clicked Install.
+4. To go back: quit OpenEmu, delete `/Applications/OpenEmu.app`, install the latest normal release from the Releases page, then (if you want) delete `Azahar.oecoreplugin` and `PCSX2.oecoreplugin` from the Cores folder and restore your library backup.
 
 ## What to try
 

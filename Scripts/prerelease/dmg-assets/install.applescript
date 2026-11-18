@@ -4,8 +4,13 @@
 -- not plain shell scripts, so Gatekeeper refuses a downloaded .command file.)
 
 on run
-	set hereFolder to do shell script "dirname " & quoted form of (POSIX path of (path to me))
-	set payload to hereFolder & "/.payload"
+	-- macOS runs a downloaded app from a temporary copy ("App Translocation"), so the files that sit beside
+	-- Install.app on the disk image are not next to the running copy. Look for them on the mounted disk images.
+	set payload to my findPayload()
+	if payload is "" then
+		display dialog "Could not find the OpenEmu files on the disk image. Please eject the disk image, open it again, and open Install from the disk image window." buttons {"OK"} default button "OK" with icon stop with title "Install OpenEmu pre-release"
+		return
+	end if
 	set appSource to payload & "/OpenEmu.app"
 	set coresSource to payload & "/Preview Cores"
 	set appDest to "/Applications/OpenEmu.app"
@@ -50,3 +55,11 @@ on run
 		do shell script "open " & quoted form of appDest
 	end if
 end run
+
+on findPayload()
+	try
+		return do shell script "for v in /Volumes/*/.payload; do if [ -d \"$v/OpenEmu.app\" ] && [ -d \"$v/Preview Cores\" ]; then echo \"$v\"; break; fi; done"
+	on error
+		return ""
+	end try
+end findPayload
