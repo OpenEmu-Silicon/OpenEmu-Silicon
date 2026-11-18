@@ -442,7 +442,7 @@ tell application "Finder"
         set toolbar visible of container window to false
         set statusbar visible of container window to false
         -- 600 wide, 610 tall: 500 content + about 110 for the title bar, tab bar and path bar Finder adds
-        set the bounds of container window to {200, 100, 800, 710}
+        set the bounds of container window to {200, 100, 800, 696}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
         set icon size of viewOptions to 96
