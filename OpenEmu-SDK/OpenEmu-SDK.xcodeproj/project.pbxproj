@@ -25,6 +25,7 @@
 		0442B0031A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */; };
 		0442B0021A2F4E6C00442002 /* HardcoreModePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */; };
 		0442B0041A2F4E6C00442004 /* HardcoreModePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */; };
+		A7C0DE0129A000000000000A /* ApplicationUserDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0129A0000000000009 /* ApplicationUserDefaultsTests.swift */; };
 		0518D6DD24F17C6E0037101D /* OEGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 0518D6DC24F17C6E0037101D /* OEGeometry.m */; };
 		0572A3FF287781BA00AC32F8 /* OEGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0572A3FE287781BA00AC32F8 /* OEGeometry.swift */; };
 		05F2F90824EA029900BFAF18 /* Controller-Database.plist in Resources */ = {isa = PBXBuildFile; fileRef = 05F2F90724EA029900BFAF18 /* Controller-Database.plist */; };
@@ -170,6 +171,7 @@
 		0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEMemoryRegionDescriptorTests.m; sourceTree = "<group>"; };
 		0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardcoreModePolicy.swift; sourceTree = "<group>"; };
 		0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardcoreModePolicyTests.swift; sourceTree = "<group>"; };
+		A7C0DE0129A0000000000009 /* ApplicationUserDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationUserDefaultsTests.swift; sourceTree = "<group>"; };
 		0518D6DC24F17C6E0037101D /* OEGeometry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEGeometry.m; sourceTree = "<group>"; };
 		0572A3FE287781BA00AC32F8 /* OEGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OEGeometry.swift; sourceTree = "<group>"; };
 		05F2F90724EA029900BFAF18 /* Controller-Database.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Database.plist"; sourceTree = "<group>"; };
@@ -319,6 +321,7 @@
 				0442B0001A2F4E6C00442001 /* OEGameCoreHardcoreTests.m */,
 				0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */,
 				0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */,
+				A7C0DE0129A0000000000009 /* ApplicationUserDefaultsTests.swift */,
 			);
 			path = OpenEmuBaseTests;
 			sourceTree = "<group>";
@@ -783,6 +786,7 @@
 				0442B0011A2F4E6C00442001 /* OEGameCoreHardcoreTests.m in Sources */,
 				0442B0031A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m in Sources */,
 				0442B0041A2F4E6C00442004 /* HardcoreModePolicyTests.swift in Sources */,
+				A7C0DE0129A000000000000A /* ApplicationUserDefaultsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
