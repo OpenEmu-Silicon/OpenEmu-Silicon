@@ -25,6 +25,10 @@
 		0442B0031A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */; };
 		0442B0021A2F4E6C00442002 /* HardcoreModePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */; };
 		0442B0041A2F4E6C00442004 /* HardcoreModePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */; };
+		A7C0DE0129A0000000000002 /* LiveMemoryChain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0129A0000000000001 /* LiveMemoryChain.swift */; };
+		A7C0DE0129A0000000000004 /* BizHawkClientCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0129A0000000000003 /* BizHawkClientCodec.swift */; };
+		A7C0DE0129A0000000000006 /* LiveMemoryChainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0129A0000000000005 /* LiveMemoryChainTests.swift */; };
+		A7C0DE0129A0000000000008 /* BizHawkClientCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0129A0000000000007 /* BizHawkClientCodecTests.swift */; };
 		0518D6DD24F17C6E0037101D /* OEGeometry.m in Sources */ = {isa = PBXBuildFile; fileRef = 0518D6DC24F17C6E0037101D /* OEGeometry.m */; };
 		0572A3FF287781BA00AC32F8 /* OEGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0572A3FE287781BA00AC32F8 /* OEGeometry.swift */; };
 		05F2F90824EA029900BFAF18 /* Controller-Database.plist in Resources */ = {isa = PBXBuildFile; fileRef = 05F2F90724EA029900BFAF18 /* Controller-Database.plist */; };
@@ -170,6 +174,10 @@
 		0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEMemoryRegionDescriptorTests.m; sourceTree = "<group>"; };
 		0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardcoreModePolicy.swift; sourceTree = "<group>"; };
 		0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardcoreModePolicyTests.swift; sourceTree = "<group>"; };
+		A7C0DE0129A0000000000001 /* LiveMemoryChain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMemoryChain.swift; sourceTree = "<group>"; };
+		A7C0DE0129A0000000000003 /* BizHawkClientCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BizHawkClientCodec.swift; sourceTree = "<group>"; };
+		A7C0DE0129A0000000000005 /* LiveMemoryChainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMemoryChainTests.swift; sourceTree = "<group>"; };
+		A7C0DE0129A0000000000007 /* BizHawkClientCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BizHawkClientCodecTests.swift; sourceTree = "<group>"; };
 		0518D6DC24F17C6E0037101D /* OEGeometry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OEGeometry.m; sourceTree = "<group>"; };
 		0572A3FE287781BA00AC32F8 /* OEGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OEGeometry.swift; sourceTree = "<group>"; };
 		05F2F90724EA029900BFAF18 /* Controller-Database.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Database.plist"; sourceTree = "<group>"; };
@@ -319,6 +327,8 @@
 				0442B0001A2F4E6C00442001 /* OEGameCoreHardcoreTests.m */,
 				0442B0021A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m */,
 				0442B0051A2F4E6C00442005 /* HardcoreModePolicyTests.swift */,
+				A7C0DE0129A0000000000005 /* LiveMemoryChainTests.swift */,
+				A7C0DE0129A0000000000007 /* BizHawkClientCodecTests.swift */,
 			);
 			path = OpenEmuBaseTests;
 			sourceTree = "<group>";
@@ -395,6 +405,8 @@
 				0518D6DC24F17C6E0037101D /* OEGeometry.m */,
 				0572A3FE287781BA00AC32F8 /* OEGeometry.swift */,
 				0442B0031A2F4E6C00442003 /* HardcoreModePolicy.swift */,
+				A7C0DE0129A0000000000001 /* LiveMemoryChain.swift */,
+				A7C0DE0129A0000000000003 /* BizHawkClientCodec.swift */,
 				C694EEC11C2A065400DFD15C /* OEPropertyList.h */,
 				01F306F920AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.h */,
 				01F306FA20AA1C64005C8F18 /* NSUserDefaults+OpenEmuSDK.m */,
@@ -783,6 +795,8 @@
 				0442B0011A2F4E6C00442001 /* OEGameCoreHardcoreTests.m in Sources */,
 				0442B0031A2F4E6C00442001 /* OEMemoryRegionDescriptorTests.m in Sources */,
 				0442B0041A2F4E6C00442004 /* HardcoreModePolicyTests.swift in Sources */,
+				A7C0DE0129A0000000000006 /* LiveMemoryChainTests.swift in Sources */,
+				A7C0DE0129A0000000000008 /* BizHawkClientCodecTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -813,6 +827,8 @@
 				0518D6DD24F17C6E0037101D /* OEGeometry.m in Sources */,
 				0572A3FF287781BA00AC32F8 /* OEGeometry.swift in Sources */,
 				0442B0021A2F4E6C00442002 /* HardcoreModePolicy.swift in Sources */,
+				A7C0DE0129A0000000000002 /* LiveMemoryChain.swift in Sources */,
+				A7C0DE0129A0000000000004 /* BizHawkClientCodec.swift in Sources */,
 				CE117DFAA143768BB64EA609 /* OEMemoryRegionDescriptor.m in Sources */,
 				B8296619452A248C4B234493 /* OESystemConstants.m in Sources */,
 			);

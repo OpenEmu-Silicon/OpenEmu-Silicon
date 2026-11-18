@@ -51,6 +51,8 @@
 		057E7FEF28762D4700BC1C04 /* OpenGL2GameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057E7FEE28762D4700BC1C04 /* OpenGL2GameRenderer.swift */; };
 		057E7FF128762D5400BC1C04 /* OpenGL3GameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057E7FF028762D5400BC1C04 /* OpenGL3GameRenderer.swift */; };
 		057E7FF2287630C000BC1C04 /* OpenEmuHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 057E7FEA28755C5600BC1C04 /* OpenEmuHelperApp.swift */; };
+		A7C0DE0229A0000000000002 /* ArchipelagoConnections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0229A0000000000001 /* ArchipelagoConnections.swift */; };
+		A7C0DE0229A0000000000004 /* BizHawkClientListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C0DE0229A0000000000003 /* BizHawkClientListener.swift */; };
 		05AAD98726758240004466E3 /* XPCDebugSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05AAD98626758240004466E3 /* XPCDebugSupport.swift */; };
 		05B078172735DA2300F1E302 /* SystemShaderPresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B078162735DA2300F1E302 /* SystemShaderPresetStore.swift */; };
 		05B0781927371B2200F1E302 /* GameAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B0781827371B2200F1E302 /* GameAudio.swift */; };
@@ -158,6 +160,8 @@
 		05796B2628727F790007E415 /* MTLGameRenderer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MTLGameRenderer.swift; sourceTree = "<group>"; };
 		05796B2A28738FFE0007E415 /* CoreVideoTexture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreVideoTexture.swift; sourceTree = "<group>"; };
 		057E7FEA28755C5600BC1C04 /* OpenEmuHelperApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OpenEmuHelperApp.swift; sourceTree = "<group>"; };
+		A7C0DE0229A0000000000001 /* ArchipelagoConnections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchipelagoConnections.swift; sourceTree = "<group>"; };
+		A7C0DE0229A0000000000003 /* BizHawkClientListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BizHawkClientListener.swift; sourceTree = "<group>"; };
 		057E7FEC28755CB100BC1C04 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		057E7FEE28762D4700BC1C04 /* OpenGL2GameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenGL2GameRenderer.swift; sourceTree = "<group>"; };
 		057E7FF028762D5400BC1C04 /* OpenGL3GameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenGL3GameRenderer.swift; sourceTree = "<group>"; };
@@ -341,6 +345,8 @@
 				05E6B9F024CCD45400ACFB35 /* Renderers */,
 				05E6B9FF24CCD47400ACFB35 /* Video */,
 				057E7FEA28755C5600BC1C04 /* OpenEmuHelperApp.swift */,
+				A7C0DE0229A0000000000001 /* ArchipelagoConnections.swift */,
+				A7C0DE0229A0000000000003 /* BizHawkClientListener.swift */,
 				0572A4002877883100AC32F8 /* OpenEmuXPCHelperApp.swift */,
 				05D532932895F73C004DC253 /* ScreenShot.swift */,
 			);
@@ -646,6 +652,8 @@
 				05EEF0F22707C875008A03DC /* ShaderPresetData.swift in Sources */,
 				05796B2728727F790007E415 /* MTLGameRenderer.swift in Sources */,
 				057E7FF2287630C000BC1C04 /* OpenEmuHelperApp.swift in Sources */,
+				A7C0DE0229A0000000000002 /* ArchipelagoConnections.swift in Sources */,
+				A7C0DE0229A0000000000004 /* BizHawkClientListener.swift in Sources */,
 				05D828D524E9881E00BB975E /* OEXPCMatchMaking.swift in Sources */,
 				057E7FEF28762D4700BC1C04 /* OpenGL2GameRenderer.swift in Sources */,
 				0572A42C287BEA3800AC32F8 /* NSXPCConnection+HelperApp.swift in Sources */,

@@ -72,6 +72,25 @@ public:
 	LoadRes loadROM(File &file, std::string const &filename, bool forceDmg, bool multicartCompat);
 	char const * romTitle() const { return reinterpret_cast<char const *>(memptrs_.romdata() + 0x134); }
 	class PakInfo const pakInfo(bool multicartCompat) const;
+
+//> OpenEmu
+	// Whole ROM (0), work RAM (1) or cartridge RAM (2), for live memory access.
+	unsigned char * memoryArea(int area, std::size_t &size) const {
+		switch (area) {
+		case 0:
+			size = memptrs_.romdataend() - memptrs_.romdata();
+			return memptrs_.romdata();
+		case 1:
+			size = memptrs_.wramdataend() - memptrs_.wramdata(0);
+			return memptrs_.wramdata(0);
+		case 2:
+			size = memptrs_.rambankdataend() - memptrs_.rambankdata();
+			return memptrs_.rambankdata();
+		}
+		size = 0;
+		return 0;
+	}
+//< OpenEmu
 	void setGameGenie(std::string const &codes);
 
 private:
