@@ -27,7 +27,7 @@ Thank you for helping test. This is an early build, not a normal release. The ap
 
 1. Quit OpenEmu if it is open. Open the disk image and drag **OpenEmu** onto **Applications** (choose Replace if it asks).
 2. Open OpenEmu from `/Applications` once.
-3. In the **Cores** folder on the disk image, double-click each core (`Azahar`, `PCSX2`, `FBNeo`). OpenEmu copies it into its own Cores folder. If it asks you to restart OpenEmu, do.
+3. In the **Cores** folder on the disk image, double-click each core (`Azahar`, `PCSX2`, `FBNeo`) **one at a time**. Do not select all three and open them together; that does not import them. OpenEmu copies each into its own Cores folder. If it asks you to restart OpenEmu, do.
 4. **If a core does not import,** copy it in by hand. With the disk image open, paste this into Terminal:
    ```bash
    V="$(ls -d /Volumes/OpenEmu\ Preview* | head -1)"

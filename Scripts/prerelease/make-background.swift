@@ -80,7 +80,7 @@ func text(_ string: String, size: CGFloat, bold: Bool, centreX: CGFloat, top t: 
 }
 text("Pre-Release Test Build", size: 22, bold: true, centreX: CGFloat(w) / 2, top: 88, glowRed: true)
 text("1   Drag OpenEmu onto Applications", size: 15, bold: false, centreX: CGFloat(w) / 2, top: 130)
-text("2   Then double-click each core to add it", size: 15, bold: false, centreX: CGFloat(w) / 2, top: 305)
+text("2   Then double-click each core, one at a time", size: 15, bold: false, centreX: CGFloat(w) / 2, top: 305)
 
 // An arrow from the app to the Applications shortcut (icons sit at x = 170 and 430, centre y = 215).
 ctx.setStrokeColor(red: 0.4, green: 0.9, blue: 0.4, alpha: 0.95)
