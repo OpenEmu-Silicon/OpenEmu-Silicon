@@ -20,14 +20,25 @@ Thank you for helping test. This is an early build, not a normal release. The ap
 ## Before you install (please read)
 
 1. **Back up your library.** Copy `~/Library/Application Support/OpenEmu` somewhere safe. The new artwork storage changes how pictures are kept, and going back to an older OpenEmu later may not show artwork you changed in this build.
-2. **Installing replaces `/Applications/OpenEmu.app`** with this build. Your games and saves are left alone (they live in the folder you just backed up).
+2. **Dragging OpenEmu to Applications replaces `/Applications/OpenEmu.app`** with this build. Your games and saves are left alone (they live in the folder you just backed up).
 3. **You bring your own game files.** We do not provide, and cannot help you find, game images, 3DS keys, or a PlayStation 2 BIOS.
 
 ## Install
 
-1. Open the DMG and double-click **Install**. It copies the app to `/Applications` and the new cores to `~/Library/Application Support/OpenEmu/Cores/`.
-2. Open OpenEmu from `/Applications`.
-3. To go back: quit OpenEmu, delete `/Applications/OpenEmu.app`, install the latest normal release from the Releases page, then (if you want) delete `Azahar.oecoreplugin` and `PCSX2.oecoreplugin` from the Cores folder and restore your library backup.
+1. Quit OpenEmu if it is open. Open the disk image and drag **OpenEmu** onto **Applications** (choose Replace if it asks).
+2. Open OpenEmu from `/Applications` once.
+3. In the **Cores** folder on the disk image, double-click each core (`Azahar`, `PCSX2`, `FBNeo`) **one at a time**. Do not select all three and open them together; that does not import them. OpenEmu copies each into its own Cores folder. If it asks you to restart OpenEmu, do.
+4. **If a core does not import,** copy it in by hand. With the disk image open, paste this into Terminal:
+   ```bash
+   V="$(ls -d /Volumes/OpenEmu\ Preview* | head -1)"
+   mkdir -p ~/Library/Application\ Support/OpenEmu/Cores
+   for p in "$V/Cores"/*.oecoreplugin; do
+     rm -rf ~/Library/Application\ Support/OpenEmu/Cores/"$(basename "$p")"
+     ditto "$p" ~/Library/Application\ Support/OpenEmu/Cores/"$(basename "$p")"
+   done
+   ```
+   Then restart OpenEmu, and tell us your macOS version and what happened.
+5. To go back: quit OpenEmu, delete `/Applications/OpenEmu.app`, install the latest normal release from the Releases page, then (if you want) delete `Azahar.oecoreplugin` and `PCSX2.oecoreplugin` from the Cores folder and restore your library backup.
 
 ## What to try
 

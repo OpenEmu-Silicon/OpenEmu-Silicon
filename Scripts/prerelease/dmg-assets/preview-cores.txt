@@ -1,4 +1,4 @@
-Core plugin versions built from commit 0000000
+Core plugin versions built from commit 718b4cf2f
 
 Azahar 0.1.0.0
 PCSX2 0.1.0.0

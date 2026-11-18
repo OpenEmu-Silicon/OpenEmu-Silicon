@@ -77,21 +77,23 @@
 <h2>Build Identity</h2>
 <div class="build-identity">
   <p><strong>App version:</strong> 1.4.1 (release candidate)</p>
-  <p><strong>Source commit:</strong> <code>0000000</code></p>
+  <p><strong>Source commit:</strong> <code>718b4cf2f</code></p>
 </div>
 
 <h2>Before you install</h2>
 <ul>
   <li><strong>Back up your OpenEmu library first</strong> (<code>~/Library/Application Support/OpenEmu</code>). This build changes how artwork is stored, so going back to an older OpenEmu afterwards may not show your new artwork.</li>
-  <li>Installing <strong>replaces</strong> <code>/Applications/OpenEmu.app</code> with this build.</li>
+  <li>Dragging OpenEmu to Applications <strong>replaces</strong> your current <code>/Applications/OpenEmu.app</code> with this build.</li>
   <li>This is a test build. The app keeps its normal update feed; it will only offer an update once a newer release is published.</li>
 </ul>
 
 <h2>Install</h2>
 <ol>
-  <li>Double-click <strong>Install</strong> in this disk image. It copies the app to <code>/Applications</code> and the cores to <code>~/Library/Application Support/OpenEmu/Cores/</code>.</li>
-  <li>Open OpenEmu from <code>/Applications</code>.</li>
+  <li>Quit OpenEmu if it is open. Drag <strong>OpenEmu</strong> onto <strong>Applications</strong> (choose Replace if it asks).</li>
+  <li>Open OpenEmu from <code>/Applications</code> once.</li>
+  <li>In the <strong>Cores</strong> folder on this disk image, double-click each core <strong>one at a time</strong> (do not select all three and open them together). OpenEmu copies each into its own Cores folder. If it asks you to restart OpenEmu, do.</li>
 </ol>
+<p>If a core does not import, copy the three <code>.oecoreplugin</code> files into <code>~/Library/Application Support/OpenEmu/Cores/</code> yourself and restart OpenEmu.</p>
 
 <h2>Cores in this build</h2>
 <table>
