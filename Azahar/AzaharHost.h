@@ -41,6 +41,10 @@ struct Folders {
 /// One-time engine setup. Call before anything else.
 bool Initialize(const Folders &folders, std::string *error);
 
+/// Lightweight, append-only V2 shutdown diagnostic. Logs to the core's support directory.
+/// Each entry is flushed immediately so an incomplete shutdown leaves useful evidence.
+void TraceEvent(const char *event);
+
 /// The CAMetalLayer the engine's Vulkan surface is created from. Call before Load.
 void SetRenderSurface(void *metalLayer);
 
@@ -53,9 +57,13 @@ bool RunFrame(std::string *error);
 /// How the two screens are arranged in the picture.
 enum class Layout { Stacked, TopOnly, BottomOnly, SideBySide, LargeTop };
 
-/// Choose the screen layout and the render scale (1 to 4 times the 3DS's own resolution). Safe to
-/// call before Load (it is remembered) and while a game runs, from the thread that runs frames.
-void SetDisplay(Layout layout, unsigned scale);
+/// 3DS stereoscopic output (independent of the two-screen layout above).
+enum class StereoMode { Off, SideBySideHalf, SideBySideFull, Anaglyph };
+
+/// Apply layout, render scale, 3D output and depth in one engine-thread operation.
+/// This avoids transient mismatches between stereoscopic framebuffer width and layout.
+/// Depth is a 0..100 percent value; Azahar uses that as its stereo factor.
+void SetDisplay(Layout layout, unsigned scale, StereoMode stereo, unsigned depthPercent);
 /// Picture size for the current layout and resolution, known before the first frame is drawn.
 void ExpectedFrameSize(uint32_t *width, uint32_t *height);
 
