@@ -44,20 +44,19 @@ final class ControlsPopUpButtonCell: NSPopUpButtonCell {
     }
     
     override func imageRect(forBounds rect: NSRect) -> NSRect {
-        if #available(macOS 11.0, *) {
-            var imageRect = super.imageRect(forBounds: rect)
-            imageRect.origin.y -= 1
-            return imageRect
+        var imageRect = super.imageRect(forBounds: rect)
+        if !imageRect.isEmpty {
+            // Center the console icon independently from the menu title.
+            imageRect.origin.y = rect.midY - imageRect.height / 2
         }
-        return super.imageRect(forBounds: rect)
+        return imageRect
     }
     
     override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
-        var titleRect = titleRect(forBounds: cellFrame)
+        let titleRect = titleRect(forBounds: cellFrame)
         let imageRect = imageRect(forBounds: cellFrame)
         
         if !titleRect.isEmpty {
-            titleRect.origin.y -= 3
             let attributedTitle = NSAttributedString(string: title, attributes: Self.attributes)
             drawTitle(attributedTitle, withFrame: titleRect, in: controlView)
         }

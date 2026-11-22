@@ -24,58 +24,30 @@
 
 import Cocoa
 
+// The Controls nib still instantiates this compatibility class. Once the nib
+// has finished loading, replace it with a real AppKit NSScroller. A custom
+// NSScroller subclass can prevent NSScrollView from using overlay scrollers,
+// even if it no longer draws custom thumb/track artwork.
 final class ControlsScroller: NSScroller {
-    
-    lazy var knobImage = NSImage(named: "wood_knob_vertical")!
-    
-    override class var isCompatibleWithOverlayScrollers: Bool {
-        return true
-    }
-    
-    override class func scrollerWidth(for controlSize: NSControl.ControlSize, scrollerStyle: NSScroller.Style) -> CGFloat {
-        guard scrollerStyle == .legacy else {
-            return super.scrollerWidth(for: controlSize, scrollerStyle: scrollerStyle)
+
+    override func awakeFromNib() {
+        super.awakeFromNib()
+
+        // Defer until the scroll view has finished attaching the nib's scroller.
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  let scrollView = self.enclosingScrollView,
+                  scrollView.verticalScroller === self else { return }
+
+            // Use the actual system class, not our subclass.
+            let nativeScroller = NSScroller(frame: self.frame)
+            scrollView.verticalScroller = nativeScroller
+
+            // Let the panel's existing wood/image background show through.
+            scrollView.drawsBackground = false
+            scrollView.scrollerStyle = .overlay
+            scrollView.scrollerKnobStyle = .dark
+            scrollView.tile()
         }
-        
-        return 15
-    }
-    
-    override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {
-        
-        let slotColor = NSColor(deviceRed: 0.45, green: 0.24, blue: 0, alpha: 0.3)
-        slotColor.setFill()
-        
-        var slotRect = bounds
-        slotRect.fill()
-        
-        let lineColor = NSColor(deviceRed: 0.45, green: 0.24, blue: 0, alpha: 1)
-        lineColor.setFill()
-        
-        slotRect.size.width = 1
-        slotRect.fill()
-    }
-    
-    override func drawKnob() {
-        guard scrollerStyle == .legacy else {
-            return super.drawKnob()
-        }
-        
-        let targetRect = rect(for: .knob)
-        knobImage.draw(in: targetRect)
-    }
-    
-    override func rect(for partCode: NSScroller.Part) -> NSRect {
-        guard scrollerStyle == .legacy,
-              partCode == .knob else {
-            return super.rect(for: partCode)
-        }
-        
-        let knobImageWidth = knobImage.size.width
-        let knobSlotWidth = super.rect(for: .knobSlot).width
-        
-        var knobRect = super.rect(for: .knob)
-        knobRect.size.width = knobImageWidth
-        knobRect.origin.x = ((knobSlotWidth-knobImageWidth)/2).rounded(.down)
-        return knobRect
     }
 }

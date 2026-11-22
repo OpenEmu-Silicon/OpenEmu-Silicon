@@ -25,21 +25,26 @@
 import Cocoa
 
 final class PrefLibraryController: NSViewController {
-    
+
+    private static let showStarRatingsKey = "OEShowStarRatings"
+    private static let showCollectionsKey = "OEShowCollections"
+    private static let showToolbarKey = "OEShowLibraryToolbar"
+    private static let roundedCornersKey = "OERoundedGameCorners"
+
     @IBOutlet var availableLibrariesViewController: AvailableLibrariesViewController!
     @IBOutlet var librariesView: NSView!
     @IBOutlet var pathField: NSPathControl!
     @IBOutlet var resetLocationButton: NSButton!
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+
         pathField.url = OELibraryDatabase.default?.databaseFolderURL
         showResetLocationButtonIfNeeded()
-        
+
         availableLibrariesViewController.isEnableObservers = true
         addChild(availableLibrariesViewController)
-        
+
         let size = librariesView.frame.size
         let scrollView = availableLibrariesViewController.view as! NSScrollView
         let gridView = librariesView.superview as! NSGridView
@@ -71,25 +76,110 @@ final class PrefLibraryController: NSViewController {
             gridView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -30)
         ])
 
+        addDisplayOptions(to: gridView)
         availableLibrariesViewController.loadData()
     }
-    
+
+    // MARK: - Library display preferences
+
+    private func addDisplayOptions(to gridView: NSGridView) {
+        // The original XIB has nine rows: organization ends at row 6,
+        // a separator is row 7, and Available Libraries is row 8.
+        // Insert the new preferences between that separator and the library list.
+        guard let librariesLabel = gridView.cell(atColumnIndex: 0, rowIndex: 8).contentView else { return }
+        let previousSeparator = gridView.cell(atColumnIndex: 0, rowIndex: 7).contentView
+
+        // The old label-to-separator constraint would skip over our new rows.
+        for constraint in gridView.constraints where
+            (constraint.firstItem as? NSView) === librariesLabel &&
+            (constraint.secondItem as? NSView) === previousSeparator &&
+            constraint.firstAttribute == .top {
+            constraint.isActive = false
+        }
+
+        let displayLabel = NSTextField(labelWithString: NSLocalizedString("Display Options:", comment: "Library preferences section title"))
+        displayLabel.alignment = .right
+        displayLabel.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+
+        let defaults = UserDefaults.standard
+
+        // 1. Collections: enabled by default, and hiding never deletes data.
+        let showCollections = NSButton(checkboxWithTitle: NSLocalizedString("Show Collections", comment: "Library display preference"),
+                                       target: self, action: #selector(toggleCollections(_:)))
+        showCollections.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        showCollections.state = (defaults.object(forKey: Self.showCollectionsKey) == nil || defaults.bool(forKey: Self.showCollectionsKey)) ? .on : .off
+        gridView.insertRow(at: 8, with: [displayLabel, showCollections])
+
+        // 2. Ratings: enabled by default; hide only the star control.
+        let showStars = NSButton(checkboxWithTitle: NSLocalizedString("Show Star Ratings", comment: "Library display preference"),
+                                 target: self, action: #selector(toggleStarRatings(_:)))
+        showStars.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        showStars.state = (defaults.object(forKey: Self.showStarRatingsKey) == nil || defaults.bool(forKey: Self.showStarRatingsKey)) ? .on : .off
+        gridView.insertRow(at: 9, with: [NSView(), showStars])
+
+        // 3. Library window toolbar: enabled by default; the selection persists.
+        let showToolbar = NSButton(checkboxWithTitle: NSLocalizedString("Show Toolbar", comment: "Library display preference"),
+                                   target: self, action: #selector(toggleLibraryToolbar(_:)))
+        showToolbar.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        showToolbar.state = (defaults.object(forKey: Self.showToolbarKey) == nil || defaults.bool(forKey: Self.showToolbarKey)) ? .on : .off
+        gridView.insertRow(at: 10, with: [NSView(), showToolbar])
+
+        // 4. Artwork corners: opt-in, retaining the existing saved preference.
+        let roundedCorners = NSButton(checkboxWithTitle: NSLocalizedString("Round Corners on Game Artwork", comment: "Library display preference"),
+                                      target: self, action: #selector(toggleRoundedCorners(_:)))
+        roundedCorners.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        roundedCorners.state = defaults.bool(forKey: Self.roundedCornersKey) ? .on : .off
+        gridView.insertRow(at: 11, with: [NSView(), roundedCorners])
+
+        let separator = NSBox()
+        separator.boxType = .separator
+        let separatorRow = gridView.insertRow(at: 12, with: [separator, NSView()])
+        separatorRow.topPadding = 6
+        separatorRow.bottomPadding = 6
+        gridView.mergeCells(inHorizontalRange: NSRange(location: 0, length: 2),
+                            verticalRange: NSRange(location: 12, length: 1))
+
+        // Re-anchor the Available Libraries label to the new separator, leaving
+        // its original top padding and the existing libraries list intact.
+        NSLayoutConstraint.activate([
+            librariesLabel.topAnchor.constraint(equalTo: separator.bottomAnchor, constant: 23)
+        ])
+    }
+
+    @objc private func toggleStarRatings(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: Self.showStarRatingsKey)
+        NotificationCenter.default.post(name: .oeStarRatingsVisibilityDidChange, object: nil)
+    }
+
+    @objc private func toggleCollections(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: Self.showCollectionsKey)
+        NotificationCenter.default.post(name: .oeCollectionsVisibilityDidChange, object: nil)
+    }
+
+    @objc private func toggleLibraryToolbar(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: Self.showToolbarKey)
+        NotificationCenter.default.post(name: .oeLibraryToolbarVisibilityDidChange, object: nil)
+    }
+
+    @objc private func toggleRoundedCorners(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: Self.roundedCornersKey)
+        NotificationCenter.default.post(name: .oeRoundedGameCornersDidChange, object: nil)
+    }
+
     deinit {
         availableLibrariesViewController.isEnableObservers = false
     }
-    
+
     // MARK: - Actions
-    
+
     @IBAction func resetLibraryFolder(_ sender: Any?) {
-        
         OELibraryDatabase.default?.moveGameLibraryToDefaultLocation()
-        
+
         pathField.url = OELibraryDatabase.default?.databaseFolderURL
         showResetLocationButtonIfNeeded()
     }
-    
+
     @IBAction func changeLibraryFolder(_ sender: Any?) {
-        
         let alert = OEAlert()
         alert.messageUsesHTML = true
         alert.messageText = NSLocalizedString(
@@ -106,9 +196,8 @@ final class PrefLibraryController: NSViewController {
             }
         }
     }
-    
+
     private func moveGameLibrary() {
-        
         let openPanel = NSOpenPanel()
         openPanel.canChooseFiles = false
         openPanel.canChooseDirectories = true
@@ -122,19 +211,17 @@ final class PrefLibraryController: NSViewController {
             }
         }
     }
-    
+
     private func showResetLocationButtonIfNeeded() {
-        
         let defaultDatabasePath = (UserDefaults.standard.string(forKey: OELibraryDatabase.defaultDatabasePathKey)! as NSString).expandingTildeInPath
         let defaultLocation = URL(fileURLWithPath: defaultDatabasePath, isDirectory: true)
-        
+
         let currentLocation = OELibraryDatabase.default?.databaseFolderURL
-        
+
         resetLocationButton.isHidden = currentLocation == defaultLocation
     }
-    
+
     @IBAction func resetWarningDialogs(_ sender: Any?) {
-        
         let keysToRemove: [String] = [
             OEAlert.OEDeleteGameAlertSuppressionKey,
             OEAlert.OEDeleteSaveStateAlertSuppressionKey,
@@ -154,7 +241,7 @@ final class PrefLibraryController: NSViewController {
             OEAlert.OEDeleteShaderPresetAlertSuppressionKey,
             OEAlert.OEInputMonitoringAlertSuppressionKey,
         ]
-        
+
         keysToRemove.forEach { key in
             UserDefaults.standard.removeObject(forKey: key)
         }
@@ -164,10 +251,10 @@ final class PrefLibraryController: NSViewController {
 // MARK: - PreferencePane
 
 extension PrefLibraryController: PreferencePane {
-    
+
     var icon: NSImage? { NSImage(named: "library_tab_icon") }
-    
+
     var panelTitle: String { "Library" }
-    
+
     var viewSize: NSSize { view.fittingSize }
 }

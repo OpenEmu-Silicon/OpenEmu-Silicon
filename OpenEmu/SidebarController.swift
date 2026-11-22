@@ -28,6 +28,7 @@ import OpenEmuKit
 
 extension NSNotification.Name {
     static let OESidebarSelectionDidChange = NSNotification.Name("OESidebarSelectionDidChange")
+    static let oeCollectionsVisibilityDidChange = NSNotification.Name("OECollectionsVisibilityDidChange")
 }
 
 private extension NSUserInterfaceItemIdentifier {
@@ -36,6 +37,14 @@ private extension NSUserInterfaceItemIdentifier {
 }
 
 final class SidebarController: NSViewController {
+
+    private static let showCollectionsKey = "OEShowCollections"
+
+    // A missing key means the existing Collections sidebar remains visible.
+    private var showsCollections: Bool {
+        let defaults = UserDefaults.standard
+        return defaults.object(forKey: Self.showCollectionsKey) == nil || defaults.bool(forKey: Self.showCollectionsKey)
+    }
     
     @IBOutlet var sidebarView: NSOutlineView!
     @IBOutlet var gameScannerViewController: GameScannerViewController!
@@ -68,12 +77,14 @@ final class SidebarController: NSViewController {
             reloadData()
             self.lastSidebarSelection = lastSidebarSelection
 
-            guard
-                !lastSidebarSelection.isEmpty,
-                let item = lastSidebarSelectionItem
-            else { return }
-
-            selectItem(item)
+            // A saved collection may no longer be visible when this setting is off.
+            if !lastSidebarSelection.isEmpty,
+               let item = lastSidebarSelectionItem,
+               sidebarView.row(forItem: item) != -1 {
+                selectItem(item)
+            } else if !showsCollections, let system = systems.first {
+                selectItem(system)
+            }
         }
     }
     
@@ -139,6 +150,9 @@ final class SidebarController: NSViewController {
                 guard let self = self else { return }
 
                 self.reloadDataAndPreserveSelection()
+            },
+            NotificationCenter.default.addObserver(forName: .oeCollectionsVisibilityDidChange, object: nil, queue: .main) { [weak self] _ in
+                self?.updateCollectionsVisibility()
             },
         ]
         
@@ -209,6 +223,31 @@ final class SidebarController: NSViewController {
         sidebarView.reloadData()
     }
     
+    // Rebuild only the sidebar presentation. Collection database objects remain intact.
+    private func updateCollectionsVisibility() {
+        let previousItem = selectedSidebarItem
+        reloadData()
+        if showsCollections {
+            // Newly revealed groups may not have been expanded at app startup.
+            sidebarView.expandItem(groups[1], expandChildren: true)
+        }
+
+        if let previousItem, sidebarView.row(forItem: previousItem) != -1 {
+            selectItem(previousItem)
+        } else if let system = systems.first {
+            // If a currently selected collection was hidden, show a console instead.
+            selectItem(system)
+        } else if showsCollections, let collection = collections.first {
+            selectItem(collection)
+        } else {
+            sidebarView.deselectAll(nil)
+        }
+
+        // Refresh the displayed game list even when the outline view keeps
+        // the same selected row after its contents change.
+        outlineViewSelectionDidChange(Notification(name: NSOutlineView.selectionDidChangeNotification))
+    }
+
     // MARK: - Actions
     
     func selectItem(_ item: SidebarItem) {
@@ -425,7 +464,9 @@ extension SidebarController: NSOutlineViewDataSource {
     
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
         if item == nil {
-            return groups.count
+            // Only expose the Consoles header when Collections are hidden.
+            // Keep `groups` intact because other sidebar actions use groups[1].
+            return showsCollections ? groups.count : 1
         }
         
         guard
