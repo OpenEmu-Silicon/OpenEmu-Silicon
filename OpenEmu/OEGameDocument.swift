@@ -3638,7 +3638,12 @@ extension OEGameDocument {
         performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
     }
 
-    private func performFolderBackupSyncCheck(systemId: String, gameName: String, completion: @escaping () -> Void) {
+    /// How many times the "Still Syncing" prompt offers to wait before it gives up and plays with the save on this Mac.
+    /// Without a limit, a download that never finishes (iCloud Drive paused, offline, a stale placeholder) brings the
+    /// same prompt back forever.
+    private static let stillSyncingMaxWaits = 3
+
+    private func performFolderBackupSyncCheck(systemId: String, gameName: String, waitsSoFar: Int = 0, completion: @escaping () -> Void) {
         let backupManager = OEFolderBackupManager.shared
         guard backupManager.backupFolderURL != nil else { completion(); return }
 
@@ -3668,8 +3673,11 @@ extension OEGameDocument {
                 }
 
             case .stillSyncing:
-                if self.presentStillSyncingAlert(gameName: gameName) {
-                    self.performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, completion: completion)
+                if waitsSoFar >= Self.stillSyncingMaxWaits {
+                    self.presentGaveUpSyncingAlert(gameName: gameName)
+                    completion()
+                } else if self.presentStillSyncingAlert(gameName: gameName) {
+                    self.performFolderBackupSyncCheck(systemId: systemId, gameName: gameName, waitsSoFar: waitsSoFar + 1, completion: completion)
                 } else {
                     completion()
                 }
@@ -3717,6 +3725,21 @@ extension OEGameDocument {
         alert.alternateButtonTitle = String(format: NSLocalizedString("Use %@'s Save", comment: "Save Sync conflict: use the other Mac's save"), other)
         alert.otherButtonTitle     = NSLocalizedString("Decide Later", comment: "Save Sync conflict: play without choosing")
         return alert.runModal()
+    }
+
+    /// Shown once after the waits run out, so the prompt does not repeat for ever.
+    private func presentGaveUpSyncingAlert(gameName: String) {
+        let alert = OEAlert()
+        alert.messageText = NSLocalizedString("Still Not Downloaded", comment: "Save Sync: gave up waiting for downloads, title")
+        alert.informativeText = String(
+            format: NSLocalizedString(
+                "Saves for '%@' have not finished downloading from your backup folder after several tries, so iCloud Drive may be paused, offline or stuck. The game will start with the save on this Mac, which is kept as it is. Check iCloud Drive in Finder, then start the game again to look for newer saves.",
+                comment: "Save Sync: gave up waiting for downloads, body: game name"
+            ),
+            gameName
+        )
+        alert.defaultButtonTitle = NSLocalizedString("Play", comment: "Save Sync: play with the save on this Mac")
+        alert.runModal()
     }
 
     private func presentStillSyncingAlert(gameName: String) -> Bool {
