@@ -43,6 +43,11 @@ final class MainWindowController: NSWindowController {
     private var isLaunchingGame = false
     @objc var mainWindowRunsGame = false
     private lazy var libraryController = LibraryController()
+    /// SPIKE: the SwiftUI library, used instead of `libraryController` when `-OESwiftUILibrary YES` is passed.
+    private lazy var swiftLibraryController = OESwiftLibraryController(onPlay: { [weak self] game in self?.startGame(game) })
+    private var libraryContentController: NSViewController {
+        OESwiftLibraryController.isEnabled ? swiftLibraryController : libraryController
+    }
     @IBOutlet var placeholderView: NSView!
     private var lastPlaceholderViewTopConstraint: NSLayoutConstraint!
     
@@ -52,7 +57,7 @@ final class MainWindowController: NSWindowController {
             _currentContentController
         }
         set {
-            let newController = newValue ?? libraryController
+            let newController = newValue ?? libraryContentController
             
             if newController == _currentContentController {
                 return
@@ -75,6 +80,13 @@ final class MainWindowController: NSWindowController {
                 window.titleVisibility = .visible
                 window.titlebarAppearsTransparent = false
                 overlapsTitleBar = false
+            }
+            else if OESwiftLibraryController.isEnabled, newController == swiftLibraryController {
+                window.toolbar = nil
+                window.titleVisibility = .hidden
+                window.titlebarAppearsTransparent = true
+                window.styleMask.insert(.closable)
+                overlapsTitleBar = true
             }
             else if newController == libraryController {
                 window.toolbar = libraryController.toolbar
@@ -136,6 +148,7 @@ final class MainWindowController: NSWindowController {
         setUpWindow()
         setUpCurrentContentController()
         setUpViewMenuItemBindings()
+        if let window { OELibraryBench.start(window: window) }
     }
     
     private func setUpPlaceholderView() {
@@ -153,6 +166,7 @@ final class MainWindowController: NSWindowController {
     }
     
     private func setUpLibraryController() {
+        guard !OESwiftLibraryController.isEnabled else { return }
         libraryController.delegate = self
         _ = libraryController.view
         
@@ -181,14 +195,14 @@ final class MainWindowController: NSWindowController {
         if !UserDefaults.standard.bool(forKey: SetupAssistant.hasFinishedKey) {
             let setupAssistant = SetupAssistant()
             setupAssistant.completionBlock = {
-                self.currentContentController = self.libraryController
+                self.currentContentController = self.libraryContentController
             }
             
             window?.center()
             
             currentContentController = setupAssistant
         } else {
-            currentContentController = libraryController
+            currentContentController = libraryContentController
         }
     }
     
@@ -467,11 +481,11 @@ extension MainWindowController: NSWindowDelegate {
     
     func windowWillClose(_ notification: Notification) {
         // Make sure the current content controller gets viewWillDisappear / viewDidAppear so it has a chance to store its state
-        if currentContentController == libraryController {
-            libraryController.viewWillDisappear()
-            libraryController.viewDidDisappear()
-            libraryController.viewWillAppear()
-            libraryController.viewDidAppear()
+        if currentContentController == libraryContentController {
+            libraryContentController.viewWillDisappear()
+            libraryContentController.viewDidDisappear()
+            libraryContentController.viewWillAppear()
+            libraryContentController.viewDidAppear()
         }
         
         currentContentController = nil
@@ -529,7 +543,7 @@ extension MainWindowController: NSWindowDelegate {
     }
     
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        if currentContentController == libraryController {
+        if currentContentController == libraryContentController {
             return true
         } else {
             gameDocument?.canClose { document, shouldClose in

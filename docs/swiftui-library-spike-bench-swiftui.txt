@@ -1,0 +1,10 @@
+   1.38s  fetch 5000 games: 18 ms
+   1.39s  window created
+   1.44s  fetch 5000 games: 17 ms
+   1.70s  grid ready: document height 336104 pt
+   4.83s  window 965x575, visible true, screen 60 Hz
+   9.85s  slow  2000 pt/s: 299 frames in 5.0s (59.6 fps), travelled 10032 pt | frame ms p50 16.7 p95 16.8 p99 20.5 max 33.4 | late frames 1, dropped 1 (0.3%) | main-thread CPU 19% | footprint 58 MB
+  15.44s  fast  8000 pt/s: 239 frames in 4.0s (59.6 fps), travelled 32079 pt | frame ms p50 16.7 p95 16.8 p99 17.3 max 27.9 | late frames 1, dropped 1 (0.4%) | main-thread CPU 39% | footprint 62 MB
+  15.52s  fetch 5000 games: 22 ms
+  22.02s  warm  2000 pt/s (same range as slow): 296 frames in 5.0s (59.1 fps), travelled 10019 pt | frame ms p50 16.7 p95 16.7 p99 28.0 max 54.2 | late frames 4, dropped 5 (1.7%) | main-thread CPU 14% | footprint 75 MB
+  23.60s  done
