@@ -68,6 +68,15 @@ static NSArray<NSString *> *PreferredBIOSNames(void)
 	return @[@"scph39001.bin", @"scph70004.bin", @"scph10000.bin", @"scph50000.bin", @"scph30004r.bin"];
 }
 
+/// A PS2 BIOS dump is a few megabytes (4 MB for most consoles). Anything much smaller, such as a 512 KB
+/// PlayStation BIOS, or much larger, is not one, and booting it only gives a black screen.
+static BOOL IsPlausiblePS2BIOS(NSString *path)
+{
+	NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:path error:nil];
+	unsigned long long size = [attributes fileSize];
+	return size >= 1024 * 1024 && size <= 8 * 1024 * 1024;
+}
+
 // rcheevos reads PS2 memory during -doFrame, which runs on the engine's CPU thread.
 static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t num_bytes, rc_client_t *client)
 {
@@ -119,18 +128,22 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 	}
 	_gameURL = _discURLs.firstObject;
 
-	// Find a BIOS now so a missing one is reported before anything starts.
+	// Find a BIOS now so a missing one is reported before anything starts. The BIOS folder is shared with
+	// other systems (a PlayStation BIOS is also a .bin), so only a file the size of a PS2 BIOS counts.
 	NSFileManager *fm = NSFileManager.defaultManager;
 	for (NSString *name in PreferredBIOSNames()) {
-		if ([fm fileExistsAtPath:[self.biosDirectory URLByAppendingPathComponent:name].path]) {
+		if (IsPlausiblePS2BIOS([self.biosDirectory URLByAppendingPathComponent:name].path)) {
 			_biosFilename = name;
 			break;
 		}
 	}
 	if (_biosFilename == nil) {
-		// Fall back to any .bin the user put in the BIOS folder.
-		for (NSString *name in [fm contentsOfDirectoryAtPath:self.biosDirectory.path error:nil]) {
-			if ([name.pathExtension caseInsensitiveCompare:@"bin"] == NSOrderedSame) {
+		// Fall back to any other .bin of the right size in the BIOS folder.
+		NSArray<NSString *> *names = [[fm contentsOfDirectoryAtPath:self.biosDirectory.path error:nil]
+			sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+		for (NSString *name in names) {
+			if ([name.pathExtension caseInsensitiveCompare:@"bin"] == NSOrderedSame
+				&& IsPlausiblePS2BIOS([self.biosDirectory URLByAppendingPathComponent:name].path)) {
 				_biosFilename = name;
 				break;
 			}
@@ -141,7 +154,7 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 			*error = [NSError errorWithDomain:OEGameCoreErrorDomain
 										 code:OEGameCoreCouldNotLoadROMError
 									 userInfo:@{NSLocalizedDescriptionKey: @"No PlayStation 2 BIOS found.",
-												NSLocalizedRecoverySuggestionErrorKey: @"Add a PS2 BIOS dump (for example scph39001.bin) to the PlayStation 2 BIOS folder and try again.",
+												NSLocalizedRecoverySuggestionErrorKey: @"Add a PS2 BIOS dump (for example scph39001.bin) to OpenEmu's BIOS folder (~/Library/Application Support/OpenEmu/BIOS) and try again. A PlayStation (PS1) BIOS will not work.",
 												NSURLErrorKey: url}];
 		}
 		return NO;
