@@ -34,6 +34,8 @@
 // The engine's headers use the name BOOL too. Rename Objective-C's for their duration.
 #define BOOL PCSX2BOOL
 #include "OEHost.h"
+#include <chrono>
+#include <memory>
 #include "common/Error.h"
 #include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/Host/AudioStream.h"
@@ -273,7 +275,12 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 	_raBridge = nil;
 
 	_engineStarted = NO;  // stops executeFrame touching the stream while it is torn down
-	OEHost::StopCPUThread();
+	// Wait for the engine to shut down, but not forever: if it hangs, the game window would never
+	// close and OpenEmu would need a force quit (#872). The engine's shutdown normally takes
+	// well under a second.
+	if (!OEHost::StopCPUThread(std::chrono::seconds(8))) {
+		NSLog(@"[PCSX2] The engine did not shut down in time; closing the game anyway.");
+	}
 	OEHost::SetFrameCallback(nullptr);
 	OEHost::SetResetCallback(nullptr);
 	[super stopEmulation];
@@ -623,25 +630,33 @@ static NSError *SaveStateError(NSString *message, NSURL *url)
 		return;
 	}
 
+	// The result lives in a shared box, because the wait below gives up after a while and the
+	// engine may finish later; it must not write into this call's stack by then.
+	struct Result {
+		bool saved = false;
+		std::string failure;
+	};
+	auto result = std::make_shared<Result>();
 	const std::string path = fileURL.fileSystemRepresentation;
-	bool saved = false;
-	std::string failure;
-	Host::RunOnCPUThread([&]() {
+	// Closing a game saves its auto save through here. A hung engine must not keep the window open.
+	const bool finished = OEHost::RunOnCPUThreadAndWait([result, path]() {
 		if (!VMManager::HasValidVM()) {
-			failure = "No game is running.";
+			result->failure = "No game is running.";
 			return;
 		}
 		// Not zipped on a background thread, so the file is complete when this returns.
-		VMManager::SaveState(path.c_str(), false, false, [&failure](const std::string &error) {
-			failure = error.empty() ? "The save failed." : error;
+		VMManager::SaveState(path.c_str(), false, false, [result](const std::string &error) {
+			result->failure = error.empty() ? "The save failed." : error;
 		});
-		saved = failure.empty();
-	}, true);
+		result->saved = result->failure.empty();
+	}, std::chrono::seconds(20));
 
-	if (saved) {
+	if (!finished) {
+		block(NO, SaveStateError(@"Could not save the state: the PlayStation 2 engine did not answer.", fileURL));
+	} else if (result->saved) {
 		block(YES, nil);
 	} else {
-		block(NO, SaveStateError([NSString stringWithFormat:@"Could not save the state: %s", failure.c_str()], fileURL));
+		block(NO, SaveStateError([NSString stringWithFormat:@"Could not save the state: %s", result->failure.c_str()], fileURL));
 	}
 }
 
@@ -657,27 +672,31 @@ static NSError *SaveStateError(NSString *message, NSURL *url)
 		return;
 	}
 
+	struct Result {
+		bool loaded = false;
+		std::string failure;
+	};
+	auto result = std::make_shared<Result>();
 	const std::string path = fileURL.fileSystemRepresentation;
-	bool loaded = false;
-	std::string failure;
-	Host::RunOnCPUThread([&]() {
+	const bool finished = OEHost::RunOnCPUThreadAndWait([result, path]() {
 		if (!VMManager::HasValidVM()) {
-			failure = "No game is running.";
+			result->failure = "No game is running.";
 			return;
 		}
 		Error error;
-		loaded = VMManager::LoadState(path.c_str(), &error);
-		if (!loaded) {
-			failure = error.GetDescription();
+		result->loaded = VMManager::LoadState(path.c_str(), &error);
+		if (!result->loaded) {
+			result->failure = error.GetDescription();
 		}
-	}, true);
+	}, std::chrono::seconds(20));
 
-	if (loaded) {
+	if (finished && result->loaded) {
 		block(YES, nil);
 	} else {
+		const std::string reason = finished ? result->failure : std::string("the PlayStation 2 engine did not answer.");
 		block(NO, [NSError errorWithDomain:OEGameCoreErrorDomain
 									  code:OEGameCoreCouldNotLoadStateError
-								  userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not load the state: %s", failure.c_str()],
+								  userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Could not load the state: %s", reason.c_str()],
 											 NSURLErrorKey: fileURL}]);
 	}
 }

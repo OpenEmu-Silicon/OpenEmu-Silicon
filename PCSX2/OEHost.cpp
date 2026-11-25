@@ -34,9 +34,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -58,6 +60,15 @@ static std::atomic<bool> s_shutdown_requested{false};
 static std::mutex s_cpu_queue_lock;
 static std::deque<std::function<void()>> s_cpu_queue;
 static std::condition_variable s_cpu_queue_cv;
+// Whether the CPU thread will still drain the queue. Read and written under s_cpu_queue_lock, so
+// nothing is queued after the thread's last drain: a caller waiting for work nobody runs would
+// wait forever (a save state on close, #872).
+static bool s_cpu_queue_open = false;
+
+// Signalled when the CPU thread has finished, so StopCPUThread can give up after a while.
+static std::mutex s_cpu_exit_lock;
+static std::condition_variable s_cpu_exit_cv;
+static bool s_cpu_thread_exited = false;
 
 static std::function<void()> s_reset_callback;
 
@@ -183,6 +194,23 @@ static void DrainCPUThreadQueue()
 	}
 }
 
+// The CPU thread's last step: stop taking work, run what is still queued (each callback checks
+// HasValidVM and finds no machine), and say it has finished.
+static void CloseCPUThread()
+{
+	{
+		std::lock_guard<std::mutex> lock(s_cpu_queue_lock);
+		s_cpu_queue_open = false;
+	}
+	DrainCPUThreadQueue();
+	s_cpu_thread_running.store(false, std::memory_order_release);
+	{
+		std::lock_guard<std::mutex> lock(s_cpu_exit_lock);
+		s_cpu_thread_exited = true;
+	}
+	s_cpu_exit_cv.notify_all();
+}
+
 static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bool, const std::string&)> on_boot)
 {
 	Threading::SetNameOfCurrentThread("CPU Thread");
@@ -193,9 +221,9 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 	{
 		Console.Error("CPU thread init failed.");
 		VMManager::Internal::CPUThreadShutdown();
-		s_cpu_thread_running.store(false, std::memory_order_release);
 		if (on_boot)
 			on_boot(false, "The engine could not start its CPU thread.");
+		CloseCPUThread();
 		return;
 	}
 
@@ -274,10 +302,12 @@ static void CPUThreadMain(VMBootParameters initial_params, std::function<void(bo
 		}
 	}
 
+	Console.WriteLn("(OEHost) CPU thread is shutting the machine down.");
 	if (VMManager::HasValidVM())
 		VMManager::Shutdown(false);
 	VMManager::Internal::CPUThreadShutdown();
-	s_cpu_thread_running.store(false, std::memory_order_release);
+	Console.WriteLn("(OEHost) CPU thread finished.");
+	CloseCPUThread();
 }
 
 void OEHost::StartCPUThread(VMBootParameters params, std::function<void(bool, const std::string&)> on_boot)
@@ -285,15 +315,69 @@ void OEHost::StartCPUThread(VMBootParameters params, std::function<void(bool, co
 	if (s_cpu_thread.joinable())
 		return;
 	s_shutdown_requested.store(false, std::memory_order_release);
+	{
+		std::lock_guard<std::mutex> lock(s_cpu_queue_lock);
+		// Work queued while no game ran belongs to an old session.
+		s_cpu_queue.clear();
+		s_cpu_queue_open = true;
+	}
+	{
+		std::lock_guard<std::mutex> lock(s_cpu_exit_lock);
+		s_cpu_thread_exited = false;
+	}
 	s_cpu_thread = std::thread(CPUThreadMain, std::move(params), std::move(on_boot));
 }
 
-void OEHost::StopCPUThread()
+bool OEHost::StopCPUThread(std::chrono::milliseconds timeout)
 {
 	s_shutdown_requested.store(true, std::memory_order_release);
 	s_cpu_queue_cv.notify_all();
-	if (s_cpu_thread.joinable())
-		s_cpu_thread.join();
+	if (!s_cpu_thread.joinable())
+		return true;
+
+	bool exited;
+	{
+		std::unique_lock<std::mutex> lock(s_cpu_exit_lock);
+		exited = s_cpu_exit_cv.wait_for(lock, timeout, []() { return s_cpu_thread_exited; });
+	}
+	if (!exited)
+	{
+		// Stuck somewhere in the engine's shutdown. Waiting longer would leave the game window open
+		// for good and OpenEmu needing a force quit (#872). Leave the thread behind: the helper
+		// process that runs the game exits once OpenEmu has closed the window.
+		Console.Error("(OEHost) The CPU thread did not stop within %lld ms; leaving it behind.",
+			static_cast<long long>(timeout.count()));
+		s_cpu_thread.detach();
+		return false;
+	}
+	s_cpu_thread.join();
+	return true;
+}
+
+bool OEHost::RunOnCPUThreadAndWait(std::function<void()> function, std::chrono::milliseconds timeout)
+{
+	struct Done
+	{
+		std::mutex lock;
+		std::condition_variable cv;
+		bool done = false;
+	};
+	// Shared, so a callback that finishes after the caller gave up still has somewhere to report.
+	auto done = std::make_shared<Done>();
+	{
+		std::lock_guard<std::mutex> lock(s_cpu_queue_lock);
+		if (!s_cpu_queue_open)
+			return false;
+		s_cpu_queue.emplace_back([function = std::move(function), done]() {
+			function();
+			std::lock_guard<std::mutex> lk(done->lock);
+			done->done = true;
+			done->cv.notify_all();
+		});
+	}
+	s_cpu_queue_cv.notify_all();
+	std::unique_lock<std::mutex> lk(done->lock);
+	return done->cv.wait_for(lk, timeout, [&done]() { return done->done; });
 }
 
 bool OEHost::IsCPUThreadRunning()
@@ -643,6 +727,9 @@ void Host::RunOnCPUThread(std::function<void()> function, bool block)
 		};
 		{
 			std::lock_guard<std::mutex> lock(s_cpu_queue_lock);
+			// No CPU thread will run it, so waiting would never end.
+			if (!s_cpu_queue_open)
+				return;
 			s_cpu_queue.emplace_back(std::move(wrapped));
 		}
 		s_cpu_queue_cv.notify_all();
@@ -653,6 +740,8 @@ void Host::RunOnCPUThread(std::function<void()> function, bool block)
 
 	{
 		std::lock_guard<std::mutex> lock(s_cpu_queue_lock);
+		if (!s_cpu_queue_open)
+			return;
 		s_cpu_queue.emplace_back(std::move(function));
 	}
 	s_cpu_queue_cv.notify_all();

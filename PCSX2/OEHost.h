@@ -9,6 +9,7 @@
 
 #include "pcsx2/VMManager.h"
 
+#include <chrono>
 #include <functional>
 #include <string>
 
@@ -85,8 +86,15 @@ namespace OEHost
 	/// `on_boot` runs on the CPU thread once the boot succeeded or failed.
 	void StartCPUThread(VMBootParameters params, std::function<void(bool ok, const std::string& error)> on_boot);
 
-	/// Asks the CPU thread to stop the machine and exit, then waits for it. Safe to call twice.
-	void StopCPUThread();
+	/// Asks the CPU thread to stop the machine and exit, then waits for it, up to `timeout`.
+	/// Returns false if the thread had not finished by then; it is left running (detached) so the
+	/// game window can still close. Safe to call twice.
+	bool StopCPUThread(std::chrono::milliseconds timeout);
+
+	/// Runs `function` on the CPU thread and waits for it, up to `timeout`. Returns false if no CPU
+	/// thread will run it or it had not finished in time. It may then still run later, so it must
+	/// own everything it uses (capture by value or shared_ptr, never a reference to the caller's stack).
+	bool RunOnCPUThreadAndWait(std::function<void()> function, std::chrono::milliseconds timeout);
 
 	/// Whether the CPU thread is alive.
 	bool IsCPUThreadRunning();
