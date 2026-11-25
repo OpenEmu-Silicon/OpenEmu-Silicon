@@ -146,6 +146,11 @@ bool OEHost::Initialize(const Folders& folders, std::string* error)
 		si.SetBoolValue("InputSources", "SDL", false);
 		si.SetStringValue("SPU2/Output", "Backend", "Null");
 
+		// The engine plugs a controller into port 1 only and leaves port 2 empty, so
+		// player 2's presses had nowhere to go (#873). OpenEmu sends input for every
+		// player, so plug a DualShock 2 into port 2 as well.
+		si.SetStringValue("Pad2", "Type", "DualShock2");
+
 		// All recompilers on. The persisted VU JIT cache goes under the data root.
 		si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableEE", true);
 		si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableIOP", true);
