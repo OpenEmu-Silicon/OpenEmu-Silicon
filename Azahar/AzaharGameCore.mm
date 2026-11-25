@@ -37,9 +37,14 @@
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #import <OpenEmuBase/OEAudioBuffer.h>
+#import <OpenEmuBase/OERingBuffer.h>
+
+#include <cmath>
 
 static NSString *const kLayoutKey = @"azahar.layout";
 static NSString *const kScaleKey = @"azahar.resolution";
+static NSString *const kStereoKey = @"azahar.stereo";
+static NSString *const kStereoDepthKey = @"azahar.stereo.depth";
 
 static const NSUInteger kFrameWidth = 400;
 static const NSUInteger kFrameHeight = 480;
@@ -54,8 +59,26 @@ static const NSUInteger kFrameHeight = 480;
     BOOL _touching;
     NSString *_layoutName;
     NSUInteger _scale;
+    NSString *_stereoName;
+    NSUInteger _stereoDepthPercent;
     uint32_t *_videoBuffer;
     BOOL _ownsVideoBuffer;
+    // Keep the click-free audio restart after brief ring-buffer starvation.
+    CFAbsoluteTime _audioLastDeliveryAt;
+    NSUInteger _audioFadeFramesRemaining;
+    // Display Candidate 3: preserve OpenEmu's natural window geometry by letting
+    // it settle on a native-size frame before publishing high-resolution frames.
+    // This does NOT downsample the final frame: after the short geometry phase,
+    // Metal textures and screenRect both use the engine's complete output size.
+    NSUInteger _nativeStartupFrames;
+    BOOL _nativeStartupComplete;
+    NSUInteger _nativeLayoutFramesRemaining;
+    AzaharHost::Layout _requestedLayoutOnCoreThread;
+    unsigned _requestedScaleOnCoreThread;
+    AzaharHost::StereoMode _requestedStereoOnCoreThread;
+    unsigned _requestedDepthOnCoreThread;
+    AzaharHost::Layout _appliedLayoutOnCoreThread;
+    AzaharHost::StereoMode _appliedStereoOnCoreThread;
 }
 
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
@@ -76,16 +99,30 @@ static const NSUInteger kFrameHeight = 480;
     if (!AzaharHost::Initialize(folders, &failure)) {
         return [self failLoad:error message:@(failure.c_str())];
     }
-
     [self ensureRenderView];
     AzaharHost::SetRenderSurface((__bridge void *)_renderView.layer);
+
+    // Initialize starts with native geometry even if a previous session left
+    // engine globals at 4x. Saved modes are restored below, but their high-res
+    // scale is deferred until OpenEmu has established the first window size.
+    _nativeStartupFrames = 0;
+    _nativeStartupComplete = NO;
+    _nativeLayoutFramesRemaining = 0;
+    _requestedLayoutOnCoreThread = AzaharHost::Layout::Stacked;
+    _appliedLayoutOnCoreThread = AzaharHost::Layout::Stacked;
+    _requestedScaleOnCoreThread = 1;
+    _requestedStereoOnCoreThread = AzaharHost::StereoMode::Off;
+    _appliedStereoOnCoreThread = AzaharHost::StereoMode::Off;
+    _requestedDepthOnCoreThread = 100;
+    _stereoDepthPercent = 100; // Default full 3D depth; selectable in 10% steps.
+    AzaharHost::SetDisplay(AzaharHost::Layout::Stacked, 1, AzaharHost::StereoMode::Off, 100);
 
     if (!AzaharHost::Load(path.fileSystemRepresentation, &failure)) {
         return [self failLoad:error message:@(failure.c_str())];
     }
     _loaded = YES;
     // Bring back the layout and resolution picked last time.
-    for (NSString *key in @[kLayoutKey, kScaleKey]) {
+    for (NSString *key in @[kLayoutKey, kScaleKey, kStereoKey, kStereoDepthKey]) {
         NSString *saved = self.displayModeInfo[key];
         if ([saved isKindOfClass:NSString.class]) {
             [self changeDisplayWithMode:saved];
@@ -133,6 +170,14 @@ static const NSUInteger kFrameHeight = 480;
 
 - (void)startEmulation
 {
+    // OpenEmu's ring is 75 ms and normally refuses a read unless it has 2x the
+    // requested audio. During 3DS loading spikes that can turn a brief shortage
+    // into a full silent callback. For this core only, allow *partial* reads:
+    // OpenEmu's unchanged audio renderer already zero-fills the missing tail.
+    id<OEAudioBuffer> audio = [self audioBufferAtIndex:0];
+    if ([audio isKindOfClass:[OERingBuffer class]]) {
+        ((OERingBuffer *)audio).anticipatesUnderflow = NO;
+    }
     [super startEmulation];
     // OpenEmu's Metal renderer makes the game loop wait after every frame for a signal that
     // only OpenGL cores send. We pace the engine ourselves, so turn that wait off.
@@ -159,7 +204,35 @@ static const NSUInteger kFrameHeight = 480;
 
 static NSArray<NSString *> *LayoutNames(void)
 {
-    return @[@"Stacked", @"Top screen only", @"Bottom screen only", @"Side by side", @"Large top screen"];
+    return @[@"Stacked", @"Top Screen Only", @"Bottom Screen Only", @"Side-by-Side", @"Large Top Screen"];
+}
+
+static NSArray<NSString *> *StereoNames(void)
+{
+    return @[@"Off (2D)", @"Side-by-Side Half", @"Side-by-Side Full", @"Anaglyph (Red/Cyan)"];
+}
+
+// Legacy display-mode values may still be stored in OpenEmu preferences.
+// Normalize them so existing users keep their selected layout and stereo mode.
+static NSString *CanonicalDisplayModeName(NSString *name)
+{
+    if ([name isEqualToString:@"Top screen only"])    return @"Top Screen Only";
+    if ([name isEqualToString:@"Bottom screen only"]) return @"Bottom Screen Only";
+    if ([name isEqualToString:@"Side by side"])       return @"Side-by-Side";
+    if ([name isEqualToString:@"Large top screen"])    return @"Large Top Screen";
+    if ([name isEqualToString:@"Side-by-side Half"])  return @"Side-by-Side Half";
+    if ([name isEqualToString:@"Side-by-side Full"])  return @"Side-by-Side Full";
+    return name;
+}
+
+static AzaharHost::StereoMode StereoForName(NSString *name)
+{
+    switch ([StereoNames() indexOfObject:name]) {
+        case 1: return AzaharHost::StereoMode::SideBySideHalf;
+        case 2: return AzaharHost::StereoMode::SideBySideFull;
+        case 3: return AzaharHost::StereoMode::Anaglyph;
+        default: return AzaharHost::StereoMode::Off;
+    }
 }
 
 static AzaharHost::Layout LayoutForName(NSString *name)
@@ -183,42 +256,125 @@ static AzaharHost::Layout LayoutForName(NSString *name)
         [layouts addObject:OEDisplayMode_OptionWithStateValue(name, kLayoutKey, @([name isEqualToString:layout]), name)];
     }
     NSMutableArray *scales = [NSMutableArray array];
-    for (NSUInteger s = 1; s <= 4; s++) {
+    for (NSUInteger s = 1; s <= 6; s++) {
         NSString *name = [NSString stringWithFormat:@"%lux", (unsigned long)s];
         [scales addObject:OEDisplayMode_OptionWithStateValue(name, kScaleKey, @(s == scale), name)];
     }
-    return @[
-        @{OEGameCoreDisplayModeGroupNameKey: @"Screen Layout", OEGameCoreDisplayModeGroupItemsKey: layouts},
+    // Stereo output is independent of how the two 3DS screens are arranged.
+    NSString *stereo = _stereoName ?: StereoNames()[0];
+    NSMutableArray *stereos = [NSMutableArray array];
+    for (NSString *name in StereoNames()) {
+        [stereos addObject:OEDisplayMode_OptionWithStateValue(name, kStereoKey,
+                                                             @([name isEqualToString:stereo]), name)];
+    }
+    // Keep the menu ordered Resolution, Screen Layout, Stereoscopic Mode,
+    // and (only while stereo is active) 3D Depth at the very bottom.
+    NSMutableArray *groups = [NSMutableArray arrayWithArray:@[
         @{OEGameCoreDisplayModeGroupNameKey: @"Resolution", OEGameCoreDisplayModeGroupItemsKey: scales},
-    ];
+        @{OEGameCoreDisplayModeGroupNameKey: @"Screen Layout", OEGameCoreDisplayModeGroupItemsKey: layouts},
+        @{OEGameCoreDisplayModeGroupNameKey: @"Stereoscopic Mode", OEGameCoreDisplayModeGroupItemsKey: stereos},
+    ]];
+    // OpenEmu re-requests displayModes after a selection. Hide depth while 2D
+    // is active; retain the saved depth for the next time stereo is enabled.
+    if (![stereo isEqualToString:StereoNames()[0]]) {
+        NSMutableArray *depths = [NSMutableArray array];
+        for (NSUInteger d = 10; d <= 100; d += 10) {
+            NSString *name = [NSString stringWithFormat:@"%lu%%", (unsigned long)d];
+            [depths addObject:OEDisplayMode_OptionWithStateValue(name, kStereoDepthKey,
+                                                                 @(d == _stereoDepthPercent), name)];
+        }
+        [groups addObject:@{OEGameCoreDisplayModeGroupNameKey: @"3D Depth", OEGameCoreDisplayModeGroupItemsKey: depths}];
+    }
+    return groups;
 }
 
 - (void)changeDisplayWithMode:(NSString *)displayMode
 {
+    // Accept values saved by previous builds, but use the new labels going forward.
+    displayMode = CanonicalDisplayModeName(displayMode);
     if ([LayoutNames() containsObject:displayMode]) {
         _layoutName = displayMode;
-    } else if (displayMode.length == 2 && [displayMode hasSuffix:@"x"] && [displayMode integerValue] >= 1 && [displayMode integerValue] <= 4) {
+    } else if (displayMode.length == 2 && [displayMode hasSuffix:@"x"] && [displayMode integerValue] >= 1 && [displayMode integerValue] <= 6) {
         _scale = (NSUInteger)[displayMode integerValue];
+    } else if ([StereoNames() containsObject:displayMode]) {
+        _stereoName = displayMode;
+    } else if ([displayMode hasSuffix:@"%"] && displayMode.length >= 3) {
+        NSString *numeric = [displayMode substringToIndex:displayMode.length - 1];
+        const NSInteger amount = [numeric integerValue];
+        if (amount < 10 || amount > 100 || amount % 10 != 0 ||
+            ![numeric isEqualToString:[NSString stringWithFormat:@"%ld", (long)amount]]) return;
+        _stereoDepthPercent = (NSUInteger)amount;
     } else {
         return;
     }
     NSString *layout = _layoutName ?: LayoutNames()[0];
     const NSUInteger scale = _scale ?: 1;
+    NSString *stereo = _stereoName ?: StereoNames()[0];
+    const NSUInteger depth = _stereoDepthPercent;
+    const BOOL layoutModeChanged = [LayoutNames() containsObject:displayMode];
     [self performBlock:^{
-        AzaharHost::SetDisplay(LayoutForName(layout), (unsigned)scale);
+        const AzaharHost::Layout requestedLayout = LayoutForName(layout);
+        const unsigned requestedScale = (unsigned)scale;
+        const AzaharHost::StereoMode requestedStereo = StereoForName(stereo);
+        const unsigned requestedDepth = (unsigned)depth;
+        const BOOL layoutActuallyChanged =
+            layoutModeChanged && requestedLayout != self->_appliedLayoutOnCoreThread;
+        const BOOL fullStereoWidthChanged =
+            (requestedStereo == AzaharHost::StereoMode::SideBySideFull) !=
+            (self->_appliedStereoOnCoreThread == AzaharHost::StereoMode::SideBySideFull);
+        self->_requestedLayoutOnCoreThread = requestedLayout;
+        self->_requestedScaleOnCoreThread = requestedScale;
+        self->_requestedStereoOnCoreThread = requestedStereo;
+        self->_requestedDepthOnCoreThread = requestedDepth;
+
+        // Initial startup: give OpenEmu a correctly shaped native frame before
+        // reporting the complete high-resolution texture and source rectangle.
+        // When changing layouts later at >1x, similarly show a few native frames
+        // so its existing one-shot aspect-change resize uses natural dimensions.
+        // Resolution changes within the same layout do not change its aspect.
+        if (!self->_nativeStartupComplete) {
+            AzaharHost::SetDisplay(requestedLayout, 1, requestedStereo, requestedDepth);
+            self->_appliedLayoutOnCoreThread = requestedLayout;
+            self->_appliedStereoOnCoreThread = requestedStereo;
+        } else if ((layoutActuallyChanged || fullStereoWidthChanged) && requestedScale > 1) {
+            // Both the two-screen layout and SBS Full alter the image's natural
+            // aspect. Stage one native-size image before restoring 2x-4x pixels.
+            self->_nativeLayoutFramesRemaining = 12;
+            AzaharHost::SetDisplay(requestedLayout, 1, requestedStereo, requestedDepth);
+            self->_appliedLayoutOnCoreThread = requestedLayout;
+            self->_appliedStereoOnCoreThread = requestedStereo;
+        } else if (self->_nativeLayoutFramesRemaining > 0) {
+            AzaharHost::SetDisplay(requestedLayout, 1, requestedStereo, requestedDepth);
+            self->_appliedLayoutOnCoreThread = requestedLayout;
+            self->_appliedStereoOnCoreThread = requestedStereo;
+        } else {
+            AzaharHost::SetDisplay(requestedLayout, requestedScale, requestedStereo, requestedDepth);
+            self->_appliedLayoutOnCoreThread = requestedLayout;
+            self->_appliedStereoOnCoreThread = requestedStereo;
+        }
     }];
 }
 
 - (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
-    // The engine is not thread safe: run on the thread that runs frames.
-    [self performBlock:^{
+    // OpenEmuHelperApp already dispatches saveStateToFile to OEGameCore's run loop.
+    // Re-enqueueing it from the emulation thread can strand the close-time autosave:
+    // the callback requesting the save runs, but the nested CFRunLoopPerformBlock may
+    // never execute. Preserve the emulation-thread requirement without the extra hop.
+    void (^saveOnCoreThread)(void) = ^{
         std::string failure;
         const BOOL ok = self->_loaded && AzaharHost::SaveState(fileName.fileSystemRepresentation, &failure);
         block(ok, ok ? nil : [NSError errorWithDomain:OEGameCoreErrorDomain
                                                  code:OEGameCoreCouldNotSaveStateError
                                              userInfo:@{NSLocalizedDescriptionKey: @(failure.c_str())}]);
-    }];
+    };
+
+    if ([[[NSThread currentThread] name] isEqualToString:@"org.openemu.core-thread"]) {
+        saveOnCoreThread();
+    } else {
+        // Other callers may invoke this method from an arbitrary thread.
+        [self performBlock:saveOnCoreThread];
+    }
 }
 
 - (void)loadStateFromFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
@@ -238,7 +394,8 @@ static AzaharHost::Layout LayoutForName(NSString *name)
         return;
     }
     std::string failure;
-    if (!AzaharHost::RunFrame(&failure)) {
+    const bool frameOK = AzaharHost::RunFrame(&failure);
+    if (!frameOK) {
         NSLog(@"[Azahar] %s", failure.c_str());
         _loaded = NO;
         return;
@@ -250,16 +407,52 @@ static AzaharHost::Layout LayoutForName(NSString *name)
     id<OEAudioBuffer> ring = [self audioBufferAtIndex:0];
     int16_t pcm[2048 * 2];
     size_t frames;
+    const CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    // If the core has supplied no audio for >80 ms, OpenEmu's 75-ms ring may
+    // have emptied. Restart gently instead of jumping from silence directly
+    // to an arbitrary non-zero sample. Only the first 8 ms are attenuated.
+    if (_audioLastDeliveryAt > 0 && now - _audioLastDeliveryAt > 0.080) {
+        _audioFadeFramesRemaining = 384; // 8 ms at 48 kHz
+    }
+    size_t framesDeliveredThisCall = 0;
     while ((frames = AzaharHost::PullAudio(pcm, 2048)) > 0) {
         if (!silent) {
-            [ring write:pcm maxLength:frames * 2 * sizeof(int16_t)];
+            const NSUInteger requested = frames * 2 * sizeof(int16_t);
+            for (size_t i = 0; i < frames && _audioFadeFramesRemaining != 0; ++i) {
+                const double gain = (384.0 - _audioFadeFramesRemaining) / 384.0;
+                pcm[i * 2] = static_cast<int16_t>(std::lround(pcm[i * 2] * gain));
+                pcm[i * 2 + 1] = static_cast<int16_t>(std::lround(pcm[i * 2 + 1] * gain));
+                --_audioFadeFramesRemaining;
+            }
+            [ring write:pcm maxLength:requested];
+            framesDeliveredThisCall += frames;
         }
     }
-
+    if (framesDeliveredThisCall > 0) _audioLastDeliveryAt = now;
     // The engine's texture is its own frame; keep a reference to the newest one for OpenEmu to show.
     id<MTLTexture> frame = (__bridge id<MTLTexture>)AzaharHost::FrameTexture();
     @synchronized (self) {
         _frameTexture = frame;
+    }
+    // Defer scale activation until AFTER this frame's Metal texture has been
+    // handed to OpenEmu. The next engine frame then carries the entire high-res
+    // texture, while the initial window-size calculation already used 1x.
+    // A frame countdown schedules transitions without timers or thread waits.
+    if (!_nativeStartupComplete) {
+        ++_nativeStartupFrames;
+        if (_nativeStartupFrames >= 180) {
+            _nativeStartupComplete = YES;
+            if (_requestedScaleOnCoreThread > 1) {
+                AzaharHost::SetDisplay(_requestedLayoutOnCoreThread, _requestedScaleOnCoreThread,
+                                       _requestedStereoOnCoreThread, _requestedDepthOnCoreThread);
+            }
+        }
+    } else if (_nativeLayoutFramesRemaining > 0) {
+        --_nativeLayoutFramesRemaining;
+        if (_nativeLayoutFramesRemaining == 0) {
+            AzaharHost::SetDisplay(_requestedLayoutOnCoreThread, _requestedScaleOnCoreThread,
+                                   _requestedStereoOnCoreThread, _requestedDepthOnCoreThread);
+        }
     }
 }
 
@@ -371,7 +564,8 @@ static AzaharHost::Layout LayoutForName(NSString *name)
 
 - (double)audioSampleRate
 {
-    return 32728;
+    // Output at a standard device-friendly rate; the host resamples.
+    return 48000;
 }
 
 #pragma mark - Input
