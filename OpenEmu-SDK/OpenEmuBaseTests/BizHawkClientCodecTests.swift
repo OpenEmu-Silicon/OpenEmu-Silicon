@@ -48,6 +48,9 @@ final class BizHawkClientCodecTests: XCTestCase {
         case .run(let request):
             let outcome = LiveMemoryChain.run(request.operations, on: memory)
             reply = codec.encode(request, results: outcome.results)
+        case .drop:
+            XCTFail("\(line) should not have been dropped")
+            return []
         }
         XCTAssertFalse(reply.contains("\n"), "Each reply must be a single line.")
         let objects = try JSONSerialization.jsonObject(with: Data(reply.utf8)) as? [[String: Any]]
@@ -61,6 +64,30 @@ final class BizHawkClientCodecTests: XCTestCase {
     func testVersionHandshake() {
         guard case .reply(let text) = codec.decode("VERSION") else { return XCTFail("VERSION must get a direct reply") }
         XCTAssertEqual(text, "1")
+    }
+
+    func testAnythingButVersionOrAJSONArrayDropsTheConnection() {
+        // What a web page posting to 127.0.0.1:43055 would send, line by line. The request line comes first
+        // and the page cannot change it, so the body, here a real write request, is never reached.
+        let httpRequest = [
+            "POST / HTTP/1.1",
+            "Host: 127.0.0.1:43055",
+            "Content-Type: text/plain",
+            "",
+            #"[{"type":"WRITE","domain":"WRAM","address":0,"value":"AQ=="}]"#,
+        ]
+        guard case .drop = codec.decode(httpRequest[0]) else {
+            return XCTFail("An HTTP request line must drop the connection")
+        }
+        for line in ["GET / HTTP/1.1", "", "hello", "version", #"{"type":"PING"}"#, "[not json", "42", #""VERSION""#] {
+            guard case .drop = codec.decode(line) else { return XCTFail("\(line.debugDescription) must drop the connection") }
+        }
+    }
+
+    func testRealClientLinesAreNotDropped() {
+        for line in ["VERSION", "VERSION\r", "[]", #"[{"type":"PING"}]"#, #"[{"no type":1}]"#] {
+            if case .drop = codec.decode(line) { XCTFail("\(line.debugDescription) must not drop the connection") }
+        }
     }
 
     func testStartupRequests() throws {
@@ -135,8 +162,9 @@ final class BizHawkClientCodecTests: XCTestCase {
         XCTAssertEqual(replies[0]["value"] as? String, base64([0x11, 0x11, 0, 0]))
     }
 
-    func testBadLineGetsAnErrorReply() throws {
-        let replies = try send("not json", to: makeMemory())
+    func testBadRequestInsideAListGetsAnErrorReply() throws {
+        // A line that isn't a JSON array drops the connection (see above); a bad request inside one is answered.
+        let replies = try send(#"[{"no type":1}]"#, to: makeMemory())
         XCTAssertEqual(replies.count, 1)
         XCTAssertEqual(replies[0]["type"] as? String, "ERROR")
     }

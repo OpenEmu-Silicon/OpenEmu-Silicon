@@ -44,8 +44,13 @@ public struct BizHawkClientCodec {
     }
 
     public enum Decoded {
-        /// Send this line back as is (the VERSION handshake, or a message that could not be read).
+        /// Send this line back as is (the VERSION handshake).
         case reply(String)
+        /// Close the connection without running or answering anything. The line was neither `VERSION`
+        /// nor a JSON array, so it is not from Archipelago's client. A web page can send text to
+        /// 127.0.0.1 with an HTTP request, but its first line is always the request line
+        /// (`POST / HTTP/1.1`), so it is dropped here before any of its body is read as requests.
+        case drop
         /// Run these steps between two frames, then pass the results to `encode`.
         case run(Request)
     }
@@ -85,7 +90,7 @@ public struct BizHawkClientCodec {
         guard let data = line.data(using: .utf8),
               let list = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
         else {
-            return .reply(Self.encodeLine([Self.errorObject("Could not read request: expected a JSON array")]))
+            return .drop
         }
 
         var operations: [LiveMemoryOperation] = []

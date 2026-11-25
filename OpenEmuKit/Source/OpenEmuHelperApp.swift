@@ -534,9 +534,11 @@ final class PresentationWatchdog: @unchecked Sendable {
     }
     
     public func setPauseEmulation(_ paused: Bool) {
+        // Read _archipelagoConnections here, on the thread that sets it, not inside the block on the emulation thread.
+        let archipelagoConnections = _archipelagoConnections
         gameCore.perform {
             self.gameCore.setPauseEmulation(paused)
-            self._archipelagoConnections?.playerChangedPause()
+            archipelagoConnections?.playerChangedPause()
         }
         if paused {
             startRetroAchievementsIdleTimer()

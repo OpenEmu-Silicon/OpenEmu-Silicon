@@ -100,6 +100,8 @@ final class BizHawkClientListener: @unchecked Sendable {
 
         // Loopback only: nothing outside this Mac can connect. There is no authentication, as in BizHawk's own
         // connector, so any program on this Mac can. docs/archipelago.md and the Debug checkbox say so.
+        // A web page can't: the codec drops any line that isn't VERSION or a JSON array, and an HTTP
+        // request's first line never is.
         let parameters = NWParameters.tcp
         parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: nwPort)
         parameters.acceptLocalOnly = true
@@ -205,6 +207,10 @@ final class BizHawkClientListener: @unchecked Sendable {
         switch codec.decode(line) {
         case .reply(let text):
             send(text, to: client)
+
+        case .drop:
+            os_log(.error, log: .archipelago, "Dropped a connection that is not Archipelago's client")
+            dropClient()
 
         case .run(let request):
             busy = true
