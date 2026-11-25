@@ -106,6 +106,21 @@ dualsense() {
 }
 step "dualsense-decoding" dualsense
 
+# 4b. CHD disc image reading and the RetroAchievements cdreader for CHDs (plain C with libchdr and
+#     rcheevos, sanitizers on), same as CI.
+if touches '^(OpenEmu-SDK/OpenEmuSystem/OECHD|OpenEmuKit/Source/OEChdHashCDReader|OpenEmu-SDK/OpenEmuSystemTests/(OECHDReaderTests\.c|OEChdHashCDReaderTests\.c|Fixtures/CHD/)|Vendor/(libchdr|rcheevos)/|Scripts/test-chd-reader\.sh)'; then
+  step "chd-reader" ./Scripts/test-chd-reader.sh
+else
+  SKIPPED+=("CHD reader tests (no change to OECHDReader, OEChdHashCDReader, their tests, Vendor/libchdr or Vendor/rcheevos; --all runs them)")
+fi
+
+# 4c. GCZ, CSO and ZSO disc image reading, valid and malformed (Objective-C, sanitizers on), same as CI.
+if touches '^(OpenEmu-SDK/OpenEmuSystem/(OEFile|OEGCZFile|OECSOFile)\.|OpenEmu-SDK/OpenEmuSystemTests/OECompressedDiscFileTests\.m|Scripts/test-compressed-disc-files\.sh)'; then
+  step "compressed-disc-files" ./Scripts/test-compressed-disc-files.sh
+else
+  SKIPPED+=("GCZ/CSO/ZSO reader tests (no change to OEFile, OEGCZFile, OECSOFile or their tests; --all runs them)")
+fi
+
 # 5. Headless: the Gambatte core loads, draws, takes button presses and round-trips save states, with no window.
 if touches '^(OpenEmu-SDK/|OpenEmuKit/|Gambatte/|Scripts/headless/|Scripts/prove\.sh)'; then
   step "headless-gameboy" ./Scripts/headless/gb-checks.sh

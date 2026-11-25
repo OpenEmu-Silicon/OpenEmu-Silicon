@@ -171,6 +171,7 @@
 	<array>
 		<string>iso</string>
 		<string>cso</string>
+		<string>chd</string>
 	</array>
 	<key>OEGenericControlNamesKey</key>
 	<array>
