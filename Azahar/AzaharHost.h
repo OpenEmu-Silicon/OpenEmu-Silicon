@@ -41,10 +41,6 @@ struct Folders {
 /// One-time engine setup. Call before anything else.
 bool Initialize(const Folders &folders, std::string *error);
 
-/// Lightweight, append-only V2 shutdown diagnostic. Logs to the core's support directory.
-/// Each entry is flushed immediately so an incomplete shutdown leaves useful evidence.
-void TraceEvent(const char *event);
-
 /// The CAMetalLayer the engine's Vulkan surface is created from. Call before Load.
 void SetRenderSurface(void *metalLayer);
 

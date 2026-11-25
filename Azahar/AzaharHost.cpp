@@ -33,7 +33,6 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
-#include <thread>
 #include <tuple>
 #include <vector>
 
@@ -57,23 +56,7 @@
 
 namespace {
 
-// V2 diagnosis only: one small, flushed record per lifecycle milestone. The trace is stored
-// alongside this core's user data, not in OpenEmu's application or any other core directory.
-std::mutex gTraceLock;
-std::string gTracePath;
-
-void WriteCoreTrace(const char *event) {
-    std::lock_guard<std::mutex> lock(gTraceLock);
-    if (gTracePath.empty()) return;
-    std::ofstream file(gTracePath, std::ios::app);
-    if (!file) return;
-    const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
-    file << millis << " thread=" << std::this_thread::get_id() << " " << event << '\n';
-    file.flush();
-}
-
-// Diagnostic 4: Azahar's DSP produces stereo PCM at approximately 32,728 frames/sec.
+// Azahar's DSP produces stereo PCM at approximately 32,728 frames/sec.
 // Passing this irregular rate directly into AVAudioEngine appeared to leave its
 // real-time resampler busy when OpenEmu tried to pause audio. Produce 48-kHz PCM
 // at the core boundary, without changing emulation timing, pitch, or the host app.
@@ -213,13 +196,6 @@ void LayoutSize(AzaharHost::Layout layout, unsigned *w, unsigned *h) {
 
 void ApplyDisplay(bool running) {
     using L = AzaharHost::Layout;
-    {
-        const std::string message = "DISPLAY4: ApplyDisplay layoutIndex=" +
-            std::to_string(static_cast<unsigned>(gLayout)) + " scale=" +
-            std::to_string(gScale) + " stereo=" + std::to_string(static_cast<unsigned>(gStereo)) +
-            " depth=" + std::to_string(gStereoDepth) + " running=" + std::to_string(running);
-        WriteCoreTrace(message.c_str());
-    }
     auto &v = Settings::values;
     switch (gLayout) {
     case L::TopOnly:    v.layout_option = Settings::LayoutOption::SingleScreen; v.swap_screen = false; break;
@@ -251,20 +227,11 @@ void ApplyDisplay(bool running) {
         // its full resolution (e.g. Stacked 1x 800x480, 6x 4800x2880).
         const unsigned framebufferWidth = w * gScale * StereoWidthMultiplier();
         const unsigned framebufferHeight = h * gScale;
-        const std::string dimensions = "DISPLAY4: framebuffer request=" +
-            std::to_string(framebufferWidth) + "x" + std::to_string(framebufferHeight) +
-            " native=" + std::to_string(w) + "x" + std::to_string(h) +
-            " stereo=" + std::to_string(static_cast<unsigned>(gStereo));
-        WriteCoreTrace(dimensions.c_str());
         gWindow->SetLayoutSize(framebufferWidth, framebufferHeight);
-        WriteCoreTrace("DISPLAY1: framebuffer layout updated");
     }
     if (running) {
-        WriteCoreTrace("DISPLAY1: before System::ApplySettings");
         Core::System::GetInstance().ApplySettings();
-        WriteCoreTrace("DISPLAY1: after System::ApplySettings");
     }
-    WriteCoreTrace("DISPLAY1: ApplyDisplay complete");
 }
 
 std::atomic<bool> gFrameDone{false};
@@ -385,15 +352,8 @@ extern "C" void OEHostFrameRendered(u32 width, u32 height, void *metalTexture) {
 
 namespace AzaharHost {
 
-void TraceEvent(const char *event) { WriteCoreTrace(event); }
-
 bool Initialize(const Folders &folders, std::string *error) {
-    // Set the trace path before the early return so repeated loads can be distinguished.
-    gTracePath = folders.userDir + "/3DS-Core-V2-shutdown-trace.log";
-    TraceEvent("SESSION: Initialize requested");
-    TraceEvent("DIAG4: core-side 32728-to-48000 stereo resampler and audio counters");
     if (gInitialized) {
-        TraceEvent("INIT: already initialized");
         return true;
     }
     gMoltenVKPath = folders.moltenVKPath;
@@ -423,7 +383,6 @@ bool Initialize(const Folders &folders, std::string *error) {
 
     ApplyOpenEmuSettings();
     gInitialized = true;
-    TraceEvent("INIT: complete");
     (void)error;
     return true;
 }
@@ -433,7 +392,6 @@ void SetRenderSurface(void *metalLayer) {
 }
 
 bool Load(const std::string &path, std::string *error) {
-    TraceEvent("LOAD: enter");
     if (!gInitialized || gMetalLayer == nullptr) {
         if (error) *error = "The Azahar host was not set up.";
         return false;
@@ -443,9 +401,7 @@ bool Load(const std::string &path, std::string *error) {
 
     auto &system = Core::System::GetInstance();
     system.ApplySettings();
-    TraceEvent("LOAD: before engine System::Load");
     const Core::System::ResultStatus result = system.Load(*gWindow, path);
-    TraceEvent("LOAD: after engine System::Load");
     switch (result) {
     case Core::System::ResultStatus::Success:
         break;
@@ -470,7 +426,6 @@ bool Load(const std::string &path, std::string *error) {
     // even with the disk cache turned off; without it the first programmable shader crashes.
     system.GPU().Renderer().Rasterizer()->LoadDefaultDiskResources(false, nullptr);
     gLoaded = true;
-    TraceEvent("LOAD: complete");
     return true;
 }
 
@@ -530,60 +485,41 @@ void ExpectedFrameSize(uint32_t *width, uint32_t *height) {
 // finish first. Same approach as Azahar's libretro frontend.
 static bool DrainAsyncOperations(Core::System &system) {
     if (!system.KernelRunning()) {
-        TraceEvent("SAVE: kernel not running; no async drain needed");
         return true;
     }
     const auto start = std::chrono::steady_clock::now();
-    const bool hadPending = system.Kernel().AreAsyncOperationsPending();
-    if (hadPending) TraceEvent("SAVE: async drain begin");
-    bool firstIteration = true;
     while (system.Kernel().AreAsyncOperationsPending()) {
         if (std::chrono::steady_clock::now() - start > std::chrono::seconds(5)) {
-            TraceEvent("SAVE: async drain timeout");
             return false;
         }
-        if (firstIteration) TraceEvent("SAVE: before first async RunLoop");
         if (system.RunLoop() != Core::System::ResultStatus::Success) {
-            TraceEvent("SAVE: async RunLoop failed");
             return false;
         }
-        if (firstIteration) TraceEvent("SAVE: after first async RunLoop");
-        firstIteration = false;
     }
-    TraceEvent("SAVE: async drain complete");
     return true;
 }
 
 bool SaveState(const std::string &path, std::string *error) {
-    TraceEvent("SAVE: enter engine SaveState");
     auto &system = Core::System::GetInstance();
     if (!gLoaded || !system.IsPoweredOn()) {
-        TraceEvent("SAVE: no active game");
         if (error) *error = "No game is running";
         return false;
     }
-    TraceEvent("SAVE: before async drain");
     if (!DrainAsyncOperations(system)) {
-        TraceEvent("SAVE: async drain failed");
         if (error) *error = "The game was busy and could not be saved right now";
         return false;
     }
     try {
-        TraceEvent("SAVE: before engine SaveStateBuffer");
         const std::vector<u8> buffer = system.SaveStateBuffer();
-        TraceEvent("SAVE: after engine SaveStateBuffer");
         std::ofstream out(path, std::ios::binary | std::ios::trunc);
         out.write(reinterpret_cast<const char *>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
         out.close();
         if (!out) {
-            TraceEvent("SAVE: could not write state file");
             if (error) *error = "Could not write the state file";
             return false;
         }
-        TraceEvent("SAVE: complete");
         return true;
     } catch (const std::exception &e) {
-        TraceEvent("SAVE: exception");
         if (error) *error = e.what();
         return false;
     }
@@ -624,25 +560,17 @@ void Reset() {
 }
 
 void Shutdown() {
-    TraceEvent("SHUTDOWN: enter host Shutdown");
     if (gLoaded || Core::System::GetInstance().IsPoweredOn()) {
-        TraceEvent("SHUTDOWN: before engine System::Shutdown");
         Core::System::GetInstance().Shutdown();
-        TraceEvent("SHUTDOWN: after engine System::Shutdown");
-    } else {
-        TraceEvent("SHUTDOWN: engine not loaded/powered");
     }
     gLoaded = false;
     gFrameTexture = nullptr;
-    TraceEvent("SHUTDOWN: before audio queue clear");
     {
         std::lock_guard<std::mutex> lock(gAudioLock);
         gAudioRead = 0;
         gAudioSize = 0;
     }
-    TraceEvent("SHUTDOWN: before render-window release");
     gWindow.reset();
-    TraceEvent("SHUTDOWN: host Shutdown complete");
 }
 
 void SetButton(Button button, bool pressed) {

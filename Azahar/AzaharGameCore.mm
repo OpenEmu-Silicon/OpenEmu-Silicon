@@ -63,26 +63,9 @@ static const NSUInteger kFrameHeight = 480;
     NSUInteger _stereoDepthPercent;
     uint32_t *_videoBuffer;
     BOOL _ownsVideoBuffer;
-    // Diagnostic 5: record *successful writes* (the ring returns a Boolean) and
-    // correlate audio gaps with prolonged engine frames. Do not alter the native
-    // 32,728 -> 48,000 Hz resampler that fixed in-game sound and shutdown.
-    CFAbsoluteTime _audioStatsStartedAt;
+    // Keep the click-free audio restart after brief ring-buffer starvation.
     CFAbsoluteTime _audioLastDeliveryAt;
-    uint64_t _audioFramesPulled;
-    uint64_t _audioWritesSucceeded;
-    uint64_t _audioWritesFailed;
-    uint64_t _audioSlowFrames;
-    uint64_t _audioFadeEvents;
-    // Performance candidate 2: quantify engine-frame cost within existing
-    // once-per-second AUDIO5 trace, without additional per-frame file I/O.
-    uint64_t _perfEngineFrames;
-    uint64_t _perfFramesOver33Ms;
-    double _perfEngineTotalMs;
-    double _audioWorstFrameMs;
     NSUInteger _audioFadeFramesRemaining;
-    // Display Diagnostic 1: limited frame-size snapshots after each mode change.
-    // These run only on OpenEmu's emulation thread (no per-frame file writes).
-    NSUInteger _displayDiagnosticFramesRemaining;
     // Display Candidate 3: preserve OpenEmu's natural window geometry by letting
     // it settle on a native-size frame before publishing high-resolution frames.
     // This does NOT downsample the final frame: after the short geometry phase,
@@ -116,9 +99,7 @@ static const NSUInteger kFrameHeight = 480;
     if (!AzaharHost::Initialize(folders, &failure)) {
         return [self failLoad:error message:@(failure.c_str())];
     }
-    AzaharHost::TraceEvent("WRAPPER: before render-view creation");
     [self ensureRenderView];
-    AzaharHost::TraceEvent("WRAPPER: after render-view creation");
     AzaharHost::SetRenderSurface((__bridge void *)_renderView.layer);
 
     // Initialize starts with native geometry even if a previous session left
@@ -135,14 +116,11 @@ static const NSUInteger kFrameHeight = 480;
     _requestedDepthOnCoreThread = 100;
     _stereoDepthPercent = 100; // Default full 3D depth; selectable in 10% steps.
     AzaharHost::SetDisplay(AzaharHost::Layout::Stacked, 1, AzaharHost::StereoMode::Off, 100);
-    AzaharHost::TraceEvent("DISPLAY3: native bootstrap before engine load");
 
     if (!AzaharHost::Load(path.fileSystemRepresentation, &failure)) {
-        AzaharHost::TraceEvent("WRAPPER: AzaharHost::Load failed");
         return [self failLoad:error message:@(failure.c_str())];
     }
     _loaded = YES;
-    AzaharHost::TraceEvent("WRAPPER: game loaded");
     // Bring back the layout and resolution picked last time.
     for (NSString *key in @[kLayoutKey, kScaleKey, kStereoKey, kStereoDepthKey]) {
         NSString *saved = self.displayModeInfo[key];
@@ -199,9 +177,6 @@ static const NSUInteger kFrameHeight = 480;
     id<OEAudioBuffer> audio = [self audioBufferAtIndex:0];
     if ([audio isKindOfClass:[OERingBuffer class]]) {
         ((OERingBuffer *)audio).anticipatesUnderflow = NO;
-        AzaharHost::TraceEvent("DIAG5: Azahar ring accepts partial reads; 48k output preserved");
-    } else {
-        AzaharHost::TraceEvent("DIAG5: unexpected audio buffer; underflow policy unchanged");
     }
     [super startEmulation];
     // OpenEmu's Metal renderer makes the game loop wait after every frame for a signal that
@@ -209,29 +184,13 @@ static const NSUInteger kFrameHeight = 480;
     [self.renderDelegate suspendFPSLimiting];
 }
 
-// Shutdown diagnostic pass 2: OpenEmu requests a pause before its close confirmation
-// and autosave. If pause handling stalls, neither saveState nor stopEmulation runs.
-- (void)setPauseEmulation:(BOOL)paused
-{
-    AzaharHost::TraceEvent(paused ? "PAUSE: core received pause request" : "PAUSE: core received resume request");
-    [super setPauseEmulation:paused];
-    AzaharHost::TraceEvent(paused ? "PAUSE: base handler returned" : "PAUSE: base resume handler returned");
-}
-
 - (void)stopEmulation
 {
-    AzaharHost::TraceEvent("WRAPPER: stopEmulation entered");
     if (_loaded) {
         _loaded = NO;
-        AzaharHost::TraceEvent("WRAPPER: before AzaharHost::Shutdown");
         AzaharHost::Shutdown();
-        AzaharHost::TraceEvent("WRAPPER: after AzaharHost::Shutdown");
-    } else {
-        AzaharHost::TraceEvent("WRAPPER: stop called with _loaded false; no host shutdown");
     }
-    AzaharHost::TraceEvent("WRAPPER: before super stopEmulation");
     [super stopEmulation];
-    AzaharHost::TraceEvent("WRAPPER: stopEmulation returned");
 }
 
 - (void)resetEmulation
@@ -352,12 +311,6 @@ static AzaharHost::Layout LayoutForName(NSString *name)
     const NSUInteger scale = _scale ?: 1;
     NSString *stereo = _stereoName ?: StereoNames()[0];
     const NSUInteger depth = _stereoDepthPercent;
-    // Log one requested transition, then trace the host's settings application.
-    // Do not touch the known-good audio path or Metal presentation behavior.
-    NSString *request = [NSString stringWithFormat:@"DISPLAY4: request mode=%@ layout=%@ scale=%lux stereo=%@ depth=%lu loaded=%d",
-                         displayMode, layout, (unsigned long)scale, stereo,
-                         (unsigned long)depth, (int)_loaded];
-    AzaharHost::TraceEvent(request.UTF8String);
     const BOOL layoutModeChanged = [LayoutNames() containsObject:displayMode];
     [self performBlock:^{
         const AzaharHost::Layout requestedLayout = LayoutForName(layout);
@@ -373,7 +326,6 @@ static AzaharHost::Layout LayoutForName(NSString *name)
         self->_requestedScaleOnCoreThread = requestedScale;
         self->_requestedStereoOnCoreThread = requestedStereo;
         self->_requestedDepthOnCoreThread = requestedDepth;
-        self->_displayDiagnosticFramesRemaining = 3;
 
         // Initial startup: give OpenEmu a correctly shaped native frame before
         // reporting the complete high-resolution texture and source rectangle.
@@ -384,7 +336,6 @@ static AzaharHost::Layout LayoutForName(NSString *name)
             AzaharHost::SetDisplay(requestedLayout, 1, requestedStereo, requestedDepth);
             self->_appliedLayoutOnCoreThread = requestedLayout;
             self->_appliedStereoOnCoreThread = requestedStereo;
-            AzaharHost::TraceEvent("DISPLAY4: startup native frame geometry");
         } else if ((layoutActuallyChanged || fullStereoWidthChanged) && requestedScale > 1) {
             // Both the two-screen layout and SBS Full alter the image's natural
             // aspect. Stage one native-size image before restoring 2x-4x pixels.
@@ -392,45 +343,36 @@ static AzaharHost::Layout LayoutForName(NSString *name)
             AzaharHost::SetDisplay(requestedLayout, 1, requestedStereo, requestedDepth);
             self->_appliedLayoutOnCoreThread = requestedLayout;
             self->_appliedStereoOnCoreThread = requestedStereo;
-            AzaharHost::TraceEvent("DISPLAY4: geometry transition staged at native size");
         } else if (self->_nativeLayoutFramesRemaining > 0) {
             AzaharHost::SetDisplay(requestedLayout, 1, requestedStereo, requestedDepth);
             self->_appliedLayoutOnCoreThread = requestedLayout;
             self->_appliedStereoOnCoreThread = requestedStereo;
-            AzaharHost::TraceEvent("DISPLAY4: geometry transition pending high-res frame");
         } else {
             AzaharHost::SetDisplay(requestedLayout, requestedScale, requestedStereo, requestedDepth);
             self->_appliedLayoutOnCoreThread = requestedLayout;
             self->_appliedStereoOnCoreThread = requestedStereo;
-            AzaharHost::TraceEvent("DISPLAY4: full-resolution output applied");
         }
     }];
 }
 
 - (void)saveStateToFileAtPath:(NSString *)fileName completionHandler:(void (^)(BOOL, NSError *))block
 {
-    AzaharHost::TraceEvent("WRAPPER: saveState requested");
     // OpenEmuHelperApp already dispatches saveStateToFile to OEGameCore's run loop.
     // Re-enqueueing it from the emulation thread can strand the close-time autosave:
     // the callback requesting the save runs, but the nested CFRunLoopPerformBlock may
     // never execute. Preserve the emulation-thread requirement without the extra hop.
     void (^saveOnCoreThread)(void) = ^{
-        AzaharHost::TraceEvent("WRAPPER: saveState block entered");
         std::string failure;
         const BOOL ok = self->_loaded && AzaharHost::SaveState(fileName.fileSystemRepresentation, &failure);
-        AzaharHost::TraceEvent(ok ? "WRAPPER: saveState succeeded" : "WRAPPER: saveState failed");
         block(ok, ok ? nil : [NSError errorWithDomain:OEGameCoreErrorDomain
                                                  code:OEGameCoreCouldNotSaveStateError
                                              userInfo:@{NSLocalizedDescriptionKey: @(failure.c_str())}]);
-        AzaharHost::TraceEvent("WRAPPER: saveState completion invoked");
     };
 
     if ([[[NSThread currentThread] name] isEqualToString:@"org.openemu.core-thread"]) {
-        AzaharHost::TraceEvent("WRAPPER: saveState running inline on emulation thread");
         saveOnCoreThread();
     } else {
         // Other callers may invoke this method from an arbitrary thread.
-        AzaharHost::TraceEvent("WRAPPER: saveState enqueued from another thread");
         [self performBlock:saveOnCoreThread];
     }
 }
@@ -451,31 +393,10 @@ static AzaharHost::Layout LayoutForName(NSString *name)
     if (!_loaded) {
         return;
     }
-    // Keep routine frame execution free of file I/O. Trace only the first three
-    // frames after a display-mode change, including a checkpoint before RunFrame.
-    const BOOL traceDisplayFrame = _displayDiagnosticFramesRemaining > 0;
-    if (traceDisplayFrame) {
-        AzaharHost::TraceEvent("DISPLAY1: before RunFrame");
-    }
     std::string failure;
-    const CFAbsoluteTime frameStartedAt = CFAbsoluteTimeGetCurrent();
     const bool frameOK = AzaharHost::RunFrame(&failure);
-    const CFAbsoluteTime frameEndedAt = CFAbsoluteTimeGetCurrent();
-    const double elapsedMs = (frameEndedAt - frameStartedAt) * 1000.0;
-    if (elapsedMs > _audioWorstFrameMs) _audioWorstFrameMs = elapsedMs;
-    if (elapsedMs > 75.0) _audioSlowFrames++;
-    if (elapsedMs > 33.3) _perfFramesOver33Ms++;
-    _perfEngineTotalMs += elapsedMs;
-    _perfEngineFrames++;
-    if (traceDisplayFrame) {
-        NSString *frameStats = [NSString stringWithFormat:
-            @"DISPLAY1: after RunFrame engineFrame=%ux%u elapsedMs=%.1f ok=%d",
-            AzaharHost::FrameWidth(), AzaharHost::FrameHeight(), elapsedMs, (int)frameOK];
-        AzaharHost::TraceEvent(frameStats.UTF8String);
-    }
     if (!frameOK) {
         NSLog(@"[Azahar] %s", failure.c_str());
-        AzaharHost::TraceEvent("WRAPPER: executeFrame failure (core remains initialized)");
         _loaded = NO;
         return;
     }
@@ -490,14 +411,11 @@ static AzaharHost::Layout LayoutForName(NSString *name)
     // If the core has supplied no audio for >80 ms, OpenEmu's 75-ms ring may
     // have emptied. Restart gently instead of jumping from silence directly
     // to an arbitrary non-zero sample. Only the first 8 ms are attenuated.
-    // This cannot prevent *all* underruns; that is why we keep diagnostics.
     if (_audioLastDeliveryAt > 0 && now - _audioLastDeliveryAt > 0.080) {
         _audioFadeFramesRemaining = 384; // 8 ms at 48 kHz
-        _audioFadeEvents++;
     }
     size_t framesDeliveredThisCall = 0;
     while ((frames = AzaharHost::PullAudio(pcm, 2048)) > 0) {
-        _audioFramesPulled += frames;
         if (!silent) {
             const NSUInteger requested = frames * 2 * sizeof(int16_t);
             for (size_t i = 0; i < frames && _audioFadeFramesRemaining != 0; ++i) {
@@ -506,60 +424,16 @@ static AzaharHost::Layout LayoutForName(NSString *name)
                 pcm[i * 2 + 1] = static_cast<int16_t>(std::lround(pcm[i * 2 + 1] * gain));
                 --_audioFadeFramesRemaining;
             }
-            // OERingBuffer returns 0 or 1 for the *entire write*, not a byte
-            // count. Diagnostic 4's 'bytesRejected' values were misleading.
-            if ([ring write:pcm maxLength:requested]) {
-                _audioWritesSucceeded++;
-            } else {
-                _audioWritesFailed++;
-            }
+            [ring write:pcm maxLength:requested];
             framesDeliveredThisCall += frames;
         }
     }
     if (framesDeliveredThisCall > 0) _audioLastDeliveryAt = now;
-    if (_audioStatsStartedAt == 0) _audioStatsStartedAt = now;
-    if (now - _audioStatsStartedAt >= 1.0) {
-        NSString *stats = [NSString stringWithFormat:
-            @"AUDIO5/PERF2: 48k; %.2fs framesPulled=%llu writesOK=%llu writesFail=%llu slowFrames75ms=%llu worstFrameMs=%.1f fadeEvents=%llu engineFrames=%llu avgEngineMs=%.1f slowFrames33ms=%llu",
-            now - _audioStatsStartedAt,
-            (unsigned long long)_audioFramesPulled,
-            (unsigned long long)_audioWritesSucceeded,
-            (unsigned long long)_audioWritesFailed,
-            (unsigned long long)_audioSlowFrames,
-            _audioWorstFrameMs,
-            (unsigned long long)_audioFadeEvents,
-            (unsigned long long)_perfEngineFrames,
-            _perfEngineFrames ? (_perfEngineTotalMs / _perfEngineFrames) : 0.0,
-            (unsigned long long)_perfFramesOver33Ms];
-        AzaharHost::TraceEvent(stats.UTF8String);
-        _audioStatsStartedAt = now;
-        _audioFramesPulled = 0;
-        _audioWritesSucceeded = 0;
-        _audioWritesFailed = 0;
-        _audioSlowFrames = 0;
-        _audioWorstFrameMs = 0;
-        _audioFadeEvents = 0;
-        _perfEngineFrames = 0;
-        _perfFramesOver33Ms = 0;
-        _perfEngineTotalMs = 0;
-    }
-
     // The engine's texture is its own frame; keep a reference to the newest one for OpenEmu to show.
     id<MTLTexture> frame = (__bridge id<MTLTexture>)AzaharHost::FrameTexture();
     @synchronized (self) {
         _frameTexture = frame;
     }
-    if (traceDisplayFrame) {
-        const OEIntSize logical = [self bufferSize];
-        NSString *handoff = [NSString stringWithFormat:
-            @"DISPLAY1: texture=%lux%lu reportedBuffer=%dx%d frameTexture=%d",
-            (unsigned long)(frame ? frame.width : 0),
-            (unsigned long)(frame ? frame.height : 0),
-            logical.width, logical.height, (int)(frame != nil)];
-        AzaharHost::TraceEvent(handoff.UTF8String);
-        --_displayDiagnosticFramesRemaining;
-    }
-
     // Defer scale activation until AFTER this frame's Metal texture has been
     // handed to OpenEmu. The next engine frame then carries the entire high-res
     // texture, while the initial window-size calculation already used 1x.
@@ -571,17 +445,13 @@ static AzaharHost::Layout LayoutForName(NSString *name)
             if (_requestedScaleOnCoreThread > 1) {
                 AzaharHost::SetDisplay(_requestedLayoutOnCoreThread, _requestedScaleOnCoreThread,
                                        _requestedStereoOnCoreThread, _requestedDepthOnCoreThread);
-                _displayDiagnosticFramesRemaining = 3;
             }
-            AzaharHost::TraceEvent("DISPLAY3: startup window settled; full-resolution output enabled");
         }
     } else if (_nativeLayoutFramesRemaining > 0) {
         --_nativeLayoutFramesRemaining;
         if (_nativeLayoutFramesRemaining == 0) {
             AzaharHost::SetDisplay(_requestedLayoutOnCoreThread, _requestedScaleOnCoreThread,
                                    _requestedStereoOnCoreThread, _requestedDepthOnCoreThread);
-            _displayDiagnosticFramesRemaining = 3;
-            AzaharHost::TraceEvent("DISPLAY3: native layout resize staged; full-resolution output restored");
         }
     }
 }
@@ -694,7 +564,7 @@ static AzaharHost::Layout LayoutForName(NSString *name)
 
 - (double)audioSampleRate
 {
-    // Diagnostic 4: output at a standard device-friendly rate; the host resamples.
+    // Output at a standard device-friendly rate; the host resamples.
     return 48000;
 }
 
