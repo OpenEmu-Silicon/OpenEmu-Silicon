@@ -63,7 +63,7 @@ Three principles:
 | `help wanted` | Maintainer wants a contributor but can't prioritize it now |
 | `critical` | App-level blocker — needs a patch release |
 | `checklist` | Tracking checklist for a release or major effort |
-| `ready-for-agent` | Fully specified, ready for an AFK agent to implement |
+| `ready` | Specified well enough to begin work; a human queues it for an agent or a contributor |
 | `retro-achievements` | RetroAchievements integration work |
 
 ### Resolution Labels
@@ -181,7 +181,7 @@ The stale workflow runs daily and applies a 60-day/14-day lifecycle to issues aw
 ```
 pinned, security, in-progress, help wanted, good first issue,
 confirmed, blocked, critical, retro-achievements, known-issue,
-checklist, ready-for-agent
+checklist, ready
 ```
 
 PRs are never auto-closed.
