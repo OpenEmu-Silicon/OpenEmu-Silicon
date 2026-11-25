@@ -48,6 +48,9 @@ final class LibraryGamesViewController: NSSplitViewController {
     private var averageCoverHeightPerWidth: CGFloat = 1
     private var measuredCoverRatios = [URL: CGFloat]()
     private var currentGridCategory: AnyObject?
+    // The first restored console may not emit a selection-change event, and
+    // the collection view may reset its item size during initial appearance.
+    private var needsInitialGridSpacingPass = true
 
     // These values match GameCollectionViewItem.xib. They are fixed in points,
     // not scaled with the artwork: 13+13 horizontal image margins, 7 top,
@@ -102,7 +105,24 @@ final class LibraryGamesViewController: NSSplitViewController {
         
         collectionController.updateBlankSlate()
         applyCachedGridSpacing()
-        
+
+        // The first console is restored before the library finishes appearing.
+        // Force one measurement after AppKit and the collection controller have
+        // completed their initial layout/zoom setup. Later console changes and
+        // artwork saves continue to use their existing measurement paths.
+        if needsInitialGridSpacingPass {
+            needsInitialGridSpacingPass = false
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard self.view.window != nil else {
+                    self.needsInitialGridSpacingPass = true
+                    return
+                }
+                self.currentGridCategory = self.sidebarController.selectedSidebarItem as AnyObject?
+                self.measureSelectedArtworkAspectRatio()
+            }
+        }
+
         if #available(macOS 11.0, *) {
             view.window?.titlebarSeparatorStyle = .automatic
         }
