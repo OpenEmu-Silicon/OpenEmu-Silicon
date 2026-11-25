@@ -66,27 +66,55 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         return []
     }
     
+    // AppKit asks for separate toolbar items for the live toolbar and for
+    // the customization palette. Each request gets a brand-new item/view.
+    // Cached references below point only to the most recent LIVE controls,
+    // so LibraryController's actions keep working after customization.
+    private var liveItems = [NSToolbarItem.Identifier: NSToolbarItem]()
+
+    private func liveItem(_ identifier: NSToolbarItem.Identifier) -> NSToolbarItem {
+        if let existing = liveItems[identifier] { return existing }
+        let created = makeToolbarItem(identifier)!
+        liveItems[identifier] = created
+        return created
+    }
+
     func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        
-        switch itemIdentifier {
-        case .oeGridSize:
-            return gridSizeToolbarItem
-        case .oeViewMode:
-            return viewModeToolbarItem
-        case .oeCategory:
-            return categoryToolbarItem
-        case .oeSearch:
-            return searchToolbarItem
-        case .oeAdd:
-            return addToolbarItem
-        default:
-            return nil
+        guard let created = makeToolbarItem(itemIdentifier) else { return nil }
+        if flag {
+            liveItems[itemIdentifier] = created
         }
+        return created
+    }
+
+    private func makeToolbarItem(_ identifier: NSToolbarItem.Identifier) -> NSToolbarItem? {
+        switch identifier {
+        case .oeGridSize: return makeGridSizeToolbarItem()
+        case .oeViewMode: return makeViewModeToolbarItem()
+        case .oeCategory: return makeCategoryToolbarItem()
+        case .oeSearch: return makeSearchToolbarItem()
+        case .oeAdd: return makeAddToolbarItem()
+        default: return nil
+        }
+    }
+
+    var gridSizeToolbarItem: NSToolbarItem { liveItem(.oeGridSize) }
+    var viewModeToolbarItem: NSToolbarItem { liveItem(.oeViewMode) }
+    var categoryToolbarItem: NSToolbarItem { liveItem(.oeCategory) }
+    var searchToolbarItem: NSToolbarItem { liveItem(.oeSearch) }
+    var addToolbarItem: NSToolbarItem { liveItem(.oeAdd) }
+
+    var searchField: NSSearchField {
+        if #available(macOS 11.0, *),
+           let searchItem = searchToolbarItem as? NSSearchToolbarItem {
+            return searchItem.searchField
+        }
+        return searchToolbarItem.view as! NSSearchField
     }
     
     // MARK: - Grid Size
     
-    private(set) lazy var gridSizeToolbarItem: NSToolbarItem = {
+    private func makeGridSizeToolbarItem() -> NSToolbarItem {
         
         let slider = GridSizeSlider()
         slider.target = toolbarOwner
@@ -100,12 +128,12 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         let item = NSToolbarItem(itemIdentifier: .oeGridSize)
         item.view = slider
         item.label = NSLocalizedString("Grid Size", comment:"Toolbar, grid size slider label")
-        item.menuFormRepresentation = gridSizeMenu
+        item.menuFormRepresentation = makeGridSizeMenu()
         
         return item
-    }()
+    }
     
-    private lazy var gridSizeMenu: NSMenuItem = {
+    private func makeGridSizeMenu() -> NSMenuItem {
         
         let decrease = NSMenuItem()
         decrease.title = NSLocalizedString("Decrease Grid Size", comment: "")
@@ -123,11 +151,11 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         gridSizeMenu.submenu = menu
         
         return gridSizeMenu
-    }()
+    }
     
     // MARK: - View Mode
     
-    private(set) lazy var viewModeToolbarItem: NSToolbarItem = {
+    private func makeViewModeToolbarItem() -> NSToolbarItem {
         
         let images = [NSImage(named: NSImage.iconViewTemplateName)!,
                       NSImage(named: NSImage.listViewTemplateName)!]
@@ -142,13 +170,13 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         let item = NSToolbarItem(itemIdentifier: .oeViewMode)
         item.view = segmControl
         item.visibilityPriority = .low
-        item.menuFormRepresentation = viewModeMenu
+        item.menuFormRepresentation = makeViewModeMenu()
         item.label = NSLocalizedString("View Mode", comment:"Toolbar, view mode selector label")
         
         return item
-    }()
+    }
     
-    private lazy var viewModeMenu: NSMenuItem = {
+    private func makeViewModeMenu() -> NSMenuItem {
         
         let gridView = NSMenuItem()
         gridView.title = NSLocalizedString("as Grid", tableName: "MainMenu", comment: "")
@@ -166,11 +194,11 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         viewModeMenu.submenu = menu
         
         return viewModeMenu
-    }()
+    }
     
     // MARK: - Category
     
-    private(set) lazy var categoryToolbarItem: NSToolbarItem = {
+    private func makeCategoryToolbarItem() -> NSToolbarItem {
         
         let titles = [NSLocalizedString("Toolbar: Library", value: "Library", comment: "toolbar, category label"),
                       NSLocalizedString("Toolbar: Save States", value: "Save States", comment: "toolbar, category label"),
@@ -183,13 +211,13 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         let item = NSToolbarItem(itemIdentifier: .oeCategory)
         item.view = segmControl
         item.visibilityPriority = .high
-        item.menuFormRepresentation = categoryMenu
+        item.menuFormRepresentation = makeCategoryMenu()
         item.label = NSLocalizedString("Category", comment:"Toolbar, category selector label")
         
         return item
-    }()
+    }
     
-    private lazy var categoryMenu: NSMenuItem = {
+    private func makeCategoryMenu() -> NSMenuItem {
         
         let library = NSMenuItem()
         library.title = NSLocalizedString("Toolbar: Library", value: "Library", comment: "")
@@ -219,11 +247,11 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         categoryMenu.submenu = menu
         
         return categoryMenu
-    }()
+    }
     
     // MARK: - Search
     
-    private(set) lazy var searchField: NSSearchField = {
+    private func makeSearchField() -> NSSearchField {
         let searchField = OESearchField()
         searchField.lineBreakMode = .byClipping
         searchField.usesSingleLineMode = true
@@ -235,9 +263,10 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         searchField.target = toolbarOwner
         searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 166).isActive = true
         return searchField
-    }()
+    }
     
-    private(set) lazy var searchToolbarItem: NSToolbarItem = {
+    private func makeSearchToolbarItem() -> NSToolbarItem {
+        let searchField = makeSearchField()
         let label = NSLocalizedString("Search", comment:"Toolbar, search field label")
         if #available(macOS 11.0, *) {
             let item = NSSearchToolbarItem(itemIdentifier: .oeSearch)
@@ -252,17 +281,17 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
             
             return item
         }
-    }()
+    }
     
     // MARK: - Add
     
-    private(set) lazy var addToolbarItem: NSToolbarItem = {
+    private func makeAddToolbarItem() -> NSToolbarItem {
         
         let images = [NSImage(named: NSImage.addTemplateName)!]
         
         let segmControl = NSSegmentedControl(images: images, trackingMode: .momentary, target: nil, action: nil)
         segmControl.setWidth(28, forSegment: 0)
-        segmControl.setMenu(addMenu, forSegment: 0)
+        segmControl.setMenu(makeAddMenu(), forSegment: 0)
         
         let item = NSToolbarItem(itemIdentifier: .oeAdd)
         item.view = segmControl
@@ -270,13 +299,13 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
         
         let addMenu = NSMenuItem()
         addMenu.title = NSLocalizedString("Add", comment:"")
-        addMenu.submenu = self.addMenu
+        addMenu.submenu = makeAddMenu()
         item.menuFormRepresentation = addMenu
         
         return item
-    }()
+    }
     
-    private lazy var addMenu: NSMenu = {
+    private func makeAddMenu() -> NSMenu {
         
         let addToLibrary = NSMenuItem()
         addToLibrary.title = NSLocalizedString("Add to Library…", comment: "")
@@ -292,5 +321,5 @@ final class LibraryToolbarDelegate: NSObject, NSToolbarDelegate {
                       newCollection]
         
         return menu
-    }()
+    }
 }
