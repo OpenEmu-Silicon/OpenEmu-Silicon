@@ -51,7 +51,6 @@ static CFStringRef const kOrientationKey = CFSTR("sideways");
     if((self = [super initWithController:controller])) {
         _lastRead = 0;
         _desiredSideways = NO;
-        NSLog(@"[WiiOrientation v16] Wii gameplay responder initialized");
     }
     return self;
 }
@@ -96,8 +95,6 @@ static CFStringRef const kOrientationKey = CFSTR("sideways");
             [client didPushWiiButton:OEWiimoteChangeExtension forPlayer:player];
         }];
     }
-    NSLog(@"[WiiOrientation v16] Requested Dolphin sideways toggle for player %lu",
-          (unsigned long)player);
 }
 
 - (void)synchronizePlayer:(NSUInteger)player onCoreThread:(BOOL)onCoreThread

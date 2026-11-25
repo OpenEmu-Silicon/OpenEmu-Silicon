@@ -130,7 +130,6 @@ static void OEWiiFindViews(NSView *root, NSMutableArray<NSView *> *out)
 // group heading or radio/button/section geometry is repositioned.
 // Track the last adjusted frame to avoid drift on repeated window updates.
 static char OEWiiBalancedHeadingRectKey;
-static char OEWiiHeadingLogKey;
 static const CGFloat OEWiiOrientationTitleDown = 4.5;
 static const CGFloat OEWiiWiimoteTitleDown = 3.0;
 
@@ -209,16 +208,6 @@ static void OEWiiBalanceGroupHeadings(NSView *list)
             objc_setAssociatedObject(view, &OEWiiBalancedHeadingRectKey,
                                      [NSValue valueWithRect:current], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-
-        // Print a one-time per-view diagnostic if we need to distinguish a
-        // cached/old plugin from this build on the user's Mac.
-        if(deviceHeading && !objc_getAssociatedObject(view, &OEWiiHeadingLogKey)) {
-            NSFont *drawnFont = heading.attributedStringValue.length ?
-                [heading.attributedStringValue attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL] : nil;
-            NSLog(@"[WiiOrientation v17] %@ heading: field=%.1fpt attributed=%.1fpt",
-                  label, heading.font.pointSize, drawnFont.pointSize);
-            objc_setAssociatedObject(view, &OEWiiHeadingLogKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
     }
 }
 
@@ -251,9 +240,7 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
 {
     CFPreferencesSetAppValue(CFSTR("sideways"), sideways ? kCFBooleanTrue : kCFBooleanFalse,
                              CFSTR("org.openemu.WiiOrientation"));
-    if(!CFPreferencesAppSynchronize(CFSTR("org.openemu.WiiOrientation"))) {
-        NSLog(@"[WiiOrientation v17] WARNING: could not save shared gameplay orientation");
-    }
+    CFPreferencesAppSynchronize(CFSTR("org.openemu.WiiOrientation"));
 }
 
 @implementation OEWiiOrientationCoordinator
@@ -315,7 +302,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
     self.sideways = [[NSUserDefaults standardUserDefaults] boolForKey:@"OEWiiOrientationSidewaysPreview"];
     // Migrate the approved v14 UI choice into the shared gameplay preference.
     OEWiiPublishGameplayOrientation(self.sideways);
-    NSLog(@"[WiiOrientation v17] Artwork configured, sideways=%d", (int)self.sideways);
 
     NSMutableDictionary *values = [NSMutableDictionary dictionary];
     for(NSString *key in [self pointPairs]) {
@@ -687,7 +673,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
         if(inserted) break;
     }
     if(!inserted) {
-        NSLog(@"[WiiOrientation v17] ERROR: Wiimote/D-Pad control-list anchor absent");
         return original;
     }
 
@@ -698,7 +683,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
     // down together; no other internal gaps, fonts, or UI coordinates change.
     // Three spaces deliberately differs from the single/double-space radio
     // anchors, so the selector lookup cannot accidentally attach to these.
-    NSUInteger deviceSeparatorsAdded = 0;
     for(NSUInteger groupIndex = 0; groupIndex < gameplayGroups.count; ++groupIndex) {
         NSArray *originalGroup = gameplayGroups[groupIndex];
         if(![originalGroup isKindOfClass:[NSArray class]]) continue;
@@ -710,21 +694,16 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
                ([row isEqualToString:@"Nunchuk"] ||
                 [row isEqualToString:@"Classic Controller"])) {
                 [group insertObject:@"   " atIndex:rowIndex];
-                deviceSeparatorsAdded++;
                 changed = YES;
                 rowIndex++; // Skip the device label; do not insert twice.
             }
         }
         if(changed) gameplayGroups[groupIndex] = [group copy];
     }
-    if(deviceSeparatorsAdded != 2)
-        NSLog(@"[WiiOrientation v17] WARNING: expected two device spacers; added %lu", (unsigned long)deviceSeparatorsAdded);
 
     // Supersede the legacy orientation hotkeys in Controls preferences only.
     // Keep the underlying responder/key definitions unchanged for compatibility
     // with existing saved bindings; this UI-only step does not alter Dolphin.
-    NSUInteger removed = 0;
-    NSUInteger shortened = 0;
     for(NSUInteger groupIndex = 0; groupIndex < gameplayGroups.count; ++groupIndex) {
         NSArray *originalGroup = gameplayGroups[groupIndex];
         if(![originalGroup isKindOfClass:[NSArray class]]) continue;
@@ -735,7 +714,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
                 NSString *keyName = ((NSDictionary *)row)[OEControlListKeyNameKey];
                 if([keyName isEqualToString:@"OEWiimoteSideways"] ||
                    [keyName isEqualToString:@"OEWiimoteUpright"]) {
-                    removed++;
                     changedGroup = YES;
                     continue;
                 }
@@ -747,7 +725,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
                     NSMutableDictionary *shortRow = [(NSDictionary *)row mutableCopy];
                     shortRow[OEControlListKeyLabelKey] = @"Back";
                     [filtered addObject:[shortRow copy]];
-                    shortened++;
                     changedGroup = YES;
                     continue;
                 }
@@ -759,7 +736,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
 
     NSMutableArray *pages = [original mutableCopy];
     pages[1] = gameplayGroups;
-    NSLog(@"[WiiOrientation v17] Wii selector rows registered; %lu legacy orientation rows hidden; %lu labels shortened", (unsigned long)removed, (unsigned long)shortened);
 
     // The host constructs ControlsButtonSetupView after reading this value.
     // Refresh after that layout pass as well as on subsequent window updates.
@@ -775,7 +751,6 @@ static void OEWiiPublishGameplayOrientation(BOOL sideways)
 {
     // Registration is passive and only paints controls if the Wii placeholder
     // rows and native ControllerImageView both exist in a visible window.
-    NSLog(@"[WiiOrientation v17] Wii UI extension loaded");
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
     NSArray<NSNotificationName> *names = @[
         NSWindowDidUpdateNotification,
