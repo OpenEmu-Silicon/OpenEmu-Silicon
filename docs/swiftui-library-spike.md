@@ -15,31 +15,39 @@ unless you pass `-OESwiftUILibrary YES`, and nothing in it is meant to merge as 
 - `OELibraryBench.swift`: `-OELibraryBench YES` scrolls the biggest scroll view in the library window on a display link and
   writes frame times and memory, then quits. It works on the AppKit grid too, so the two are measured the same way.
 
+- `OESwiftCell.swift` and small edits to `GameCollectionViewItem` / `GameCollectionDataSource`: the **middle route**.
+  With `-OESwiftUICells YES` the existing AppKit grid keeps its NSCollectionView (selection, drag and drop, menus, Quick
+  Look, type to select) and each cell draws its picture, title, rating and overlays in SwiftUI. Selection ring and
+  overlays are drawn by SwiftUI; the data source still loads the images.
+
 Not ported from AltUI: its store (loads every game into memory), its box-image cache, home screen, game detail page,
 hero fetcher, SteamGridDB client (already on this base) and RetroAchievements store. See the gaps below.
 
 ## Base branch
 
-`OEArtworkStore`, `OEBigPictureArt` and the NSCollectionView grid are not on `main`. They are on
-`feat/artwork-originals-archive`, so the spike is based there. `Scripts/make-synthetic-library.sh` and its generator come
-from `feat/library-games-grid-nscollectionview`.
+The spike was written on `feat/artwork-originals-archive`, which had `OEArtworkStore`, `OEBigPictureArt` and the
+NSCollectionView grid before they reached `main`. That branch has since merged, so this branch is rebased on `main`.
 
 ## Numbers
 
 5,000 synthetic games, Debug build, 60 Hz display, 965 x 575 window, macOS 26. Two runs each, run-to-run noise is
 about one dropped frame. Raw output is in the two `swiftui-library-spike-bench-*.txt` files next to this one.
 
-| | AppKit grid (NSCollectionView) | SwiftUI (LazyVGrid) |
-|---|---|---|
-| Launch to grid filled | 0.5 to 0.7 s | 0.5 to 1.7 s |
-| Scroll 2,000 pt/s | 58.9 to 59.8 fps | 59.6 to 59.7 fps |
-| Scroll 8,000 pt/s | 59.5 to 59.9 fps | 59.6 to 59.8 fps |
-| Dropped frames over 5 s | 0 to 5 | 0 to 5 |
-| Process CPU while scrolling | 39 to 44 % | 14 to 41 % |
-| Memory (footprint) | 61 to 63 MB | 58 to 75 MB |
+| | AppKit grid (NSCollectionView) | SwiftUI (LazyVGrid) | Middle route (AppKit grid, SwiftUI cells) |
+|---|---|---|---|
+| Launch to grid filled | 0.5 to 0.7 s | 0.5 to 1.7 s | 0.6 to 1.8 s |
+| Scroll 2,000 pt/s | 58.9 to 59.8 fps | 59.6 to 59.7 fps | 58.3 to 58.6 fps (cold), 59.5 (warm) |
+| Scroll 8,000 pt/s | 59.5 to 59.9 fps | 59.6 to 59.8 fps | 59.6 fps |
+| Dropped frames over 5 s | 0 to 5 | 0 to 5 | 7 to 8 cold, 1 warm |
+| Process CPU while scrolling | 39 to 44 % | 14 to 41 % | 35 to 40 % |
+| Memory (footprint) | 61 to 63 MB | 58 to 75 MB | 66 to 67 MB |
 
 Read this as: at 5,000 games a lazy SwiftUI grid scrolls as smoothly as the AppKit one, and loading is not the
 problem if the store does one batched fetch.
+
+The middle route drops a few more frames on the first pass over cold cells (about 2.5 % against 0 to 1.7 %), then settles.
+A screenshot confirms the cells draw: covers, titles, a rating star, rounded corners. It is not pixel matched to the old
+cells, and the selection ring, hover, and overlays were not exercised by hand.
 
 What the numbers do not cover:
 - The benchmark games have 24 shared covers and no provider artwork. In an earlier run, with artwork lookups on, the
@@ -50,6 +58,12 @@ What the numbers do not cover:
 - Debug build. `LazyVGrid` is usually slower in Debug than Release.
 - The AppKit grid's document is 61,000 to 80,000 pt tall and the SwiftUI one 336,000 pt. The cells are different sizes,
   so rows scrolled per second differ.
+
+## What the spike did not verify
+
+- Starting a game from the SwiftUI window. It is wired to `MainWindowController.startGame` but nobody launched a game.
+- Any keyboard or mouse behavior, in either SwiftUI variant.
+- A real library with real artwork, a 120 Hz display, or a Release build.
 
 ## Things found on the way
 

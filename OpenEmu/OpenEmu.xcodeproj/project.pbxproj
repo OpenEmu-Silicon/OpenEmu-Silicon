@@ -77,6 +77,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		5B1C9F0A00000000000A0B01 /* OESwiftCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A00000000000A0F01 /* OESwiftCell.swift */; };
 		5B1C9F0A0000000000000B01 /* OESwiftLibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000000F01 /* OESwiftLibraryStore.swift */; };
 		5B1C9F0A0000000000001B01 /* OESwiftLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000001F01 /* OESwiftLibraryView.swift */; };
 		5B1C9F0A0000000000002B01 /* OESwiftLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000002F01 /* OESwiftLibraryController.swift */; };
@@ -1192,6 +1193,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5B1C9F0A00000000000A0F01 /* OESwiftCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftCell.swift; sourceTree = "<group>"; };
 		5B1C9F0A0000000000000F01 /* OESwiftLibraryStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftLibraryStore.swift; sourceTree = "<group>"; };
 		5B1C9F0A0000000000001F01 /* OESwiftLibraryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftLibraryView.swift; sourceTree = "<group>"; };
 		5B1C9F0A0000000000002F01 /* OESwiftLibraryController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftLibraryController.swift; sourceTree = "<group>"; };
@@ -2987,6 +2989,7 @@
 				0B1C9F0D000000000000B101 /* OEArtworkLocation.swift */,
 				0B1C9F0E000000000000B101 /* OEArtworkPicker.swift */,
 				0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */,
+				5B1C9F0A00000000000A0F01 /* OESwiftCell.swift */,
 				5B1C9F0A0000000000000F01 /* OESwiftLibraryStore.swift */,
 				5B1C9F0A0000000000001F01 /* OESwiftLibraryView.swift */,
 				5B1C9F0A0000000000002F01 /* OESwiftLibraryController.swift */,
@@ -6635,6 +6638,7 @@
 				0B1C9F0D000000000000A101 /* OEArtworkLocation.swift in Sources */,
 				0B1C9F0E000000000000A101 /* OEArtworkPicker.swift in Sources */,
 				0B1C9F0B000000000000A103 /* OEBigPictureArt.swift in Sources */,
+				5B1C9F0A00000000000A0B01 /* OESwiftCell.swift in Sources */,
 				5B1C9F0A0000000000000B01 /* OESwiftLibraryStore.swift in Sources */,
 				5B1C9F0A0000000000001B01 /* OESwiftLibraryView.swift in Sources */,
 				5B1C9F0A0000000000002B01 /* OESwiftLibraryController.swift in Sources */,

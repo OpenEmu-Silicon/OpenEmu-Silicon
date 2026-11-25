@@ -23,6 +23,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import Cocoa
+import SwiftUI
 
 /// What the box art of a game shows on top of itself.
 enum GameIndication {
@@ -49,9 +50,41 @@ final class GameCollectionViewItem: ImageCollectionViewItem {
         set { ratingIndicator?.integerValue = newValue }
     }
     
+    /// SPIKE: set up only when `-OESwiftUICells YES`. See `OESwiftCell`.
+    let swiftCellModel = OESwiftCellModel()
+    private var swiftCellHost: NSView?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.addSubview(indicationView, positioned: .above, relativeTo: imageView)
+        if OESwiftCell.isEnabled {
+            let host = NSHostingView(rootView: OESwiftCellContent(model: swiftCellModel))
+            host.frame = view.bounds
+            host.autoresizingMask = [.width, .height]
+            view.addSubview(host, positioned: .above, relativeTo: nil)
+            swiftCellHost = host
+            // The old subviews stay in place so layout is unchanged; they are just not drawn.
+            view.subviews.filter { $0 !== host }.forEach { $0.alphaValue = 0 }
+        }
+    }
+    
+    /// Copies what the data source put in the AppKit subviews into the SwiftUI cell.
+    func syncSwiftCell() {
+        guard OESwiftCell.isEnabled else { return }
+        swiftCellModel.image = isShowingMissingArtwork ? nil : imageView?.image
+        swiftCellModel.title = textField?.stringValue ?? ""
+        swiftCellModel.rating = rating
+        swiftCellModel.indication = indication
+        swiftCellModel.systemIdentifier = (representedObject as? OEDBGame)?.system?.systemIdentifier
+        swiftCellModel.isSelected = isSelected
+    }
+    
+    override func updateHighlightState() {
+        if OESwiftCell.isEnabled {
+            swiftCellModel.isSelected = isSelected || highlightState == .forSelection
+            return
+        }
+        super.updateHighlightState()
     }
     
     override func prepareForReuse() {
@@ -59,6 +92,8 @@ final class GameCollectionViewItem: ImageCollectionViewItem {
         indication = .none
         ratingIndicator?.integerValue = 0
         isShowingMissingArtwork = false
+        swiftCellModel.image = nil
+        swiftCellModel.isSelected = false
     }
     
     override func viewDidLayout() {
