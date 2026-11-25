@@ -6,7 +6,7 @@ OpenEmu can let those clients connect to a running game. It is off unless you tu
 
 ## What works
 
-Only Game Boy, Game Boy Color, and Game Boy Advance games using Archipelago's **Bizhawk Client** are supported. This includes both core (such as Pokémon Red/Blue) and non core games (such as Pokémon Crystal). More cores may be supported in the future.
+Only Game Boy, Game Boy Color, and Game Boy Advance games using Archipelago's **Bizhawk Client** are supported. This includes both games supported by the default Archipelago installation (such as Pokémon Red/Blue) and non-default games, typically referred to as "custom worlds" (such as Pokémon Crystal). Games on other platforms may be supported in the future.
 
 ## Setting it up
 
