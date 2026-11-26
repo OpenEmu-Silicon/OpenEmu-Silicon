@@ -609,5 +609,6 @@ final class ControlsOptionView: NSSegmentedControl {
     @objc private func segmentClicked(_ sender: Any?) {
         guard option.choices.indices.contains(selectedSegment) else { return }
         option.select(option.choices[selectedSegment].value, in: defaults)
+        NotificationCenter.default.post(name: ControlOption.didChangeNotification, object: self)
     }
 }

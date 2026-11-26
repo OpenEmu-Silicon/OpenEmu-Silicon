@@ -34,6 +34,8 @@
 			<dict>
 				<key>OEControlListKeyOptionDefaultsKey</key>
 				<string>dolphin.orientation</string>
+				<key>OEControlListKeyOptionLabelKey</key>
+				<string>Orientation</string>
 				<key>OEControlListKeyOptionContainerKey</key>
 				<string>displayMode.org.openemu.Dolphin</string>
 				<key>OEControlListKeyOptionChoicesKey</key>

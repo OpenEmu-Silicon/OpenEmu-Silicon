@@ -128,6 +128,8 @@ final class PrefControlsController: NSViewController {
         
         controlsSetupView.target = self
         controlsSetupView.action = #selector(changeInputControl(_:))
+        NotificationCenter.default.addObserver(self, selector: #selector(controlOptionDidChange(_:)),
+                                               name: ControlOption.didChangeNotification, object: controlsSetupView)
         
         controlsSetupView.bind(NSBindingName("bindingsProvider"), to: self, withKeyPath: "currentPlayerBindings", options: nil)
         
@@ -364,6 +366,11 @@ final class PrefControlsController: NSViewController {
             }
         }
         inputPopupButton.selectItem(at: Int(max(0, inputPopupButton.indexOfItem(withRepresentedObject: representedObject))))
+    }
+    
+    /// A system can show a different controller picture for each choice (Wii: upright or sideways).
+    @objc private func controlOptionDidChange(_ notification: Notification) {
+        setUpControllerImageView()
     }
     
     private func setUpControllerImageView() {

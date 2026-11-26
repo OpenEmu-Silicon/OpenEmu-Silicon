@@ -628,6 +628,7 @@
 		0B1C9F0E000000000000A104 /* OEArtworkBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */; };
 		0B1C9F0E000000000000A105 /* ArtworkBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */; };
 		0C0D1E0F000000000000B002 /* ControlOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0D1E0F000000000000B001 /* ControlOptionTests.swift */; };
+		0C0D1E0F000000000000B012 /* WiiOrientationOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0D1E0F000000000000B011 /* WiiOrientationOptionTests.swift */; };
 		0B1C9F0E000000000000A106 /* OEArtworkCoverSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */; };
 		0B1C9F0E000000000000A107 /* OEArtworkBulk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */; };
 		0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */; };
@@ -1392,6 +1393,7 @@
 		0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBackup.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBackupTests.swift; sourceTree = "<group>"; };
 		0C0D1E0F000000000000B001 /* ControlOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlOptionTests.swift; sourceTree = "<group>"; };
+		0C0D1E0F000000000000B011 /* WiiOrientationOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiiOrientationOptionTests.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkCoverSource.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBulk.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBulkTests.swift; sourceTree = "<group>"; };
@@ -2689,6 +2691,7 @@
 				0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */,
 				0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */,
 				0C0D1E0F000000000000B001 /* ControlOptionTests.swift */,
+				0C0D1E0F000000000000B011 /* WiiOrientationOptionTests.swift */,
 				B16A1C102D7F4A0100000001 /* ArtworkLocationTests.swift */,
 				C0DEA27500000000000A0002 /* CoverArtSyncTests.swift */,
 				C0DEA27500000000000A0102 /* GamesDataSourceTests.swift */,
@@ -6406,6 +6409,7 @@
 				0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */,
 				0B1C9F0E000000000000A105 /* ArtworkBackupTests.swift in Sources */,
 				0C0D1E0F000000000000B002 /* ControlOptionTests.swift in Sources */,
+				0C0D1E0F000000000000B012 /* WiiOrientationOptionTests.swift in Sources */,
 				B16A1C102D7F4A0100000002 /* ArtworkLocationTests.swift in Sources */,
 				C0DEA27500000000000A0001 /* CoverArtSyncTests.swift in Sources */,
 				C0DEA27500000000000A0101 /* GamesDataSourceTests.swift in Sources */,
