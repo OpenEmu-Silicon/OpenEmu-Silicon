@@ -3404,18 +3404,27 @@ extension OEGameDocument: OESystemBindingsObserver {
     /// Rumbles the controller assigned to a player (player numbers start at 1). Only
     /// controllers that support force feedback respond; keyboards and others ignore it.
     private func applyRumble(player: Int, strong: Float, weak: Float) {
-        let enabled = UserDefaults.standard.object(forKey: "OERumbleEnabled") as? Bool ?? true
-        let strength = enabled ? CGFloat(strong) : 0
-        let softness = enabled ? CGFloat(weak) : 0
+        let level = OERumbleMapping.strengths(strong: strong, weak: weak, enabled: OERumbleSettings.isEnabled())
         let bindings = OEBindingsController.default.systemBindings(for: systemPlugin.controller)
         // Not deviceHandler(forPlayer:), which asserts when the player has no controller
         // (for example keyboard only). This returns nil in that case.
         guard let handler = bindings.devicePlayerBindings(forPlayer: UInt(player))?.deviceHandler else { return }
-        handler.forceFeedback(withStrongIntensity: strength, weakIntensity: softness)
+        // Pads that speak IOKit force feedback keep using it; everything else goes through the system's
+        // GameController haptics, which ignores a controller that has none.
+        // (OEHIDDeviceHandler is not visible to Swift, so ask by name; other handlers do not answer.)
+        let hasForceFeedback = handler.responds(to: NSSelectorFromString("supportsForceFeedback"))
+            && (handler.value(forKey: "supportsForceFeedback") as? Bool ?? false)
+        if hasForceFeedback {
+            handler.forceFeedback(withStrongIntensity: CGFloat(level.strong), weakIntensity: CGFloat(level.weak))
+        } else {
+            OEControllerHaptics.shared.rumble(player: player, deviceName: handler.deviceDescription?.product,
+                                              strong: level.strong, weak: level.weak)
+        }
     }
 
     /// Stops every controller's motors, for pause, quit and a crashed core, so one never stays on.
     func silenceRumble() {
+        OEControllerHaptics.shared.stopAll()
         let players = Int(systemPlugin.controller.numberOfPlayers)
         guard players >= 1 else { return }
         for player in 1...players {
