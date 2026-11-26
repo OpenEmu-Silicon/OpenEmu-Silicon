@@ -36,6 +36,7 @@ final class PrefGameplayController: NSViewController {
     private var saturationLabel:  NSTextField?
     private var gammaSlider:      NSSlider?
     private var gammaLabel:       NSTextField?
+    private var volumeLabel:      NSTextField?
     private var settingsGridView: NSGridView?
 
     // MARK: - Lifecycle
@@ -111,10 +112,31 @@ final class PrefGameplayController: NSViewController {
         gamRow.spacing = 8
         gamRow.distribution = .fill
 
+        // ── Build Volume row ──────────────────────────────────────────────
+        // Same saved value the in-game volume slider reads and writes.
+        let vol = OEGameDocument.clampedVolume(UserDefaults.standard.float(forKey: OEGameVolumeKey))
+        let volTitle = NSTextField(labelWithString: "Volume:")
+        volTitle.font = .systemFont(ofSize: NSFont.systemFontSize)
+
+        let volSlider = NSSlider(value: Double(vol), minValue: 0, maxValue: 1,
+                                 target: self, action: #selector(volumeChanged(_:)))
+        volSlider.isContinuous = true
+        volSlider.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let volPct = NSTextField(labelWithString: String(format: "%.0f%%", vol * 100))
+        volPct.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize - 1, weight: .regular)
+        volPct.setContentHuggingPriority(.required, for: .horizontal)
+
+        let volRow = NSStackView(views: [volSlider, volPct])
+        volRow.orientation = .horizontal
+        volRow.spacing = 8
+        volRow.distribution = .fill
+
         // ── Insert rows above Shader ──────────────────────────────────────
         // Insert Gamma at 0 first, then Saturation at 0 → Saturation ends up on top.
         gridView.insertRow(at: 0, with: [gamLabel, gamRow])
         gridView.insertRow(at: 0, with: [satLabel, satRow])
+        gridView.insertRow(at: 0, with: [volTitle, volRow])
 
         // Center the grid horizontally within the (potentially wider) window.
         // Deactivate the XIB's fixed leading=30 and soft trailing>=30 constraints,
@@ -137,6 +159,7 @@ final class PrefGameplayController: NSViewController {
         saturationLabel  = satPct
         gammaSlider      = gamSlider
         gammaLabel       = gamPct
+        volumeLabel      = volPct
     }
 
     // MARK: - Cheat settings
@@ -193,6 +216,16 @@ final class PrefGameplayController: NSViewController {
     }
 
     // MARK: - Slider actions
+
+    @objc private func volumeChanged(_ sender: NSSlider) {
+        let v = OEGameDocument.clampedVolume(sender.floatValue)
+        volumeLabel?.stringValue = String(format: "%.0f%%", v * 100)
+        UserDefaults.standard.set(v, forKey: OEGameVolumeKey)
+        
+        NSDocumentController.shared.documents.forEach {
+            ($0 as? OEGameDocument)?.savedVolumeDidChange()
+        }
+    }
 
     @objc private func saturationChanged(_ sender: NSSlider) {
         let v = OEGameDocument.clampedSaturation(sender.floatValue)
