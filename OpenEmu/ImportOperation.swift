@@ -400,7 +400,7 @@ final class ImportOperation: Operation, NSCopying, @unchecked Sendable {
     // in a single library subfolder via OEM3UFile.copyToURL: instead of being split into per-disc
     // subfolders by performImportStepOrganize. Only discs of the same format are grouped (CUE and
     // CCD count as one), so a CUE/BIN set and a CHD or GDI set of one game in the same folder stay apart.
-    private static func tryMultiDiscM3UAutoCreate(at url: URL) -> URL? {
+    static func tryMultiDiscM3UAutoCreate(at url: URL) -> URL? {
         let pathExtension = url.pathExtension.lowercased()
         let sameFormat: Set<String> = pathExtension == "cue" || pathExtension == "ccd" ? ["cue", "ccd"] : [pathExtension]
         guard ["cue", "ccd", "chd", "gdi"].contains(pathExtension) else {

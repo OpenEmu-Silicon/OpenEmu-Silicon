@@ -136,3 +136,31 @@ class ROMImporterTests: XCTestCase {
         }
     }
 }
+
+class MultiDiscM3UTests: XCTestCase {
+
+    private func makeDiscSet(in folder: URL, sega: Bool) throws -> URL {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var first: URL?
+        for n in 1...2 {
+            let name = "Game (Disc \(n))"
+            var bytes = Data(count: 2352 * 2)
+            if sega { bytes.replaceSubrange(0..<16, with: Data("SEGADISCSYSTEM  ".utf8)) }
+            try bytes.write(to: folder.appendingPathComponent("\(name).bin"))
+            let cue = "FILE \"\(name).bin\" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n"
+            let cueURL = folder.appendingPathComponent("\(name).cue")
+            try cue.write(to: cueURL, atomically: true, encoding: .utf8)
+            if first == nil { first = cueURL }
+        }
+        return try XCTUnwrap(first)
+    }
+
+    // #805: Sega CD can't open an .m3u, so multi-disc Sega CD sets must import each .cue.
+    func testSegaCDMultiDiscDoesNotCreateM3U() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("OE-805-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cue = try makeDiscSet(in: folder, sega: true)
+        XCTAssertNil(ImportOperation.tryMultiDiscM3UAutoCreate(at: cue))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Game.m3u").path))
+    }
+}
