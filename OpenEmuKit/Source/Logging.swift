@@ -30,4 +30,6 @@ extension OSLog {
     static let helper    = OSLog(subsystem: "org.openemu.OpenEmuKit", category: "helper")
     /// Which rendering type the core uses, logged with every screenshot so a blank one can be put in context.
     static let captureRendering = OSLog(subsystem: "org.openemu.OpenEmuKit", category: "capture")
+    /// Archipelago clients connecting, disconnecting and sending messages.
+    static let archipelago = OSLog(subsystem: "org.openemu.OpenEmuKit", category: "archipelago")
 }

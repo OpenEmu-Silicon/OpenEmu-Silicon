@@ -75,6 +75,7 @@ final class PrefDebugController: NSViewController {
         Checkbox(key: OEScreenshotAspectRatioCorrectionDisabled, label: "Disable aspect ratio correction in screenshots"),
         Checkbox(key: OEPopoutGameWindowTreatScaleFactorAsPixels, label: "Change scale menu unit from points to pixels"),
         Checkbox(key: OEAdaptiveSyncEnabledKey, label: "Enable adaptive sync for supported displays (full screen)"),
+        Checkbox(key: ArchipelagoConnectionsEnabledKey, label: "Allow Archipelago connections (any app on this Mac can then change game memory; from the next game you start)"),
         Popover(key: OEAppearance.HUDBar.key, label: "Appearance:", action: #selector(changeHUDBarAppearance(_:)), options: [
             Option(label: "Vibrant", value: OEAppearance.HUDBar.vibrant.rawValue),
             Option(label: "Dark", value: OEAppearance.HUDBar.dark.rawValue),
