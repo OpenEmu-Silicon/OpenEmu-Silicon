@@ -24,6 +24,8 @@
 
 import XCTest
 @testable import OpenEmu
+import OpenEmuSystem
+import OpenEmuKit
 
 extension XCTestCase {
     /// Returns the app's library, creating a throwaway one first if the test host did not load any.
@@ -160,6 +162,14 @@ class MultiDiscM3UTests: XCTestCase {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("OE-805-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: folder) }
         let cue = try makeDiscSet(in: folder, sega: true)
+
+        // Control: the Sega CD system must recognise this fake disc, otherwise the checks below would pass
+        // without testing anything (no plugin loaded, or the disc not parsed).
+        let plugin = try XCTUnwrap(OESystemPlugin.allPlugins.first { $0.systemIdentifier == "openemu.system.scd" },
+                                   "Sega CD system plugin is not loaded in the test host")
+        let controller = try XCTUnwrap(plugin.controller)
+        XCTAssertEqual(controller.canHandle(try OEFile(url: cue)), .yes)
+
         XCTAssertNil(ImportOperation.tryMultiDiscM3UAutoCreate(at: cue))
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Game.m3u").path))
     }
