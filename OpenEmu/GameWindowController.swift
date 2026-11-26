@@ -359,14 +359,21 @@ final class GameWindowController: NSWindowController {
     }
     
     func fullScreenWindowFrameForScreen(_ screen: NSScreen) -> NSRect {
-        var screenFrame = screen.frame
         if #available(macOS 12.0, *) {
-            // adjust frame based on insets
-            let safeArea = screen.safeAreaInsets;
-            screenFrame.origin = screenFrame.origin.applying(.identity.translatedBy(x: safeArea.left, y: safeArea.top))
-            screenFrame.size   = fullScreenContentSizeForScreen(screen)
+            return Self.fullScreenWindowFrame(screenFrame: screen.frame, safeAreaInsets: screen.safeAreaInsets)
         }
-        return screenFrame
+        return screen.frame
+    }
+    
+    /// Where the full screen window goes: the screen minus the notch area.
+    /// Screen coordinates start at the bottom left, so the window keeps the screen's bottom edge
+    /// (plus any bottom inset) and the notch area is cut off the top.
+    static func fullScreenWindowFrame(screenFrame: NSRect, safeAreaInsets: NSEdgeInsets) -> NSRect {
+        guard safeAreaInsets.top > 0 else { return screenFrame }
+        let size = fullScreenContentSize(screenSize: screenFrame.size, safeAreaInsets: safeAreaInsets)
+        return NSRect(x: screenFrame.origin.x + safeAreaInsets.left,
+                      y: screenFrame.origin.y + safeAreaInsets.bottom,
+                      width: size.width, height: size.height)
     }
     
     /// A size with the same aspect ratio as the game document, matching the screen size in one dimension.
