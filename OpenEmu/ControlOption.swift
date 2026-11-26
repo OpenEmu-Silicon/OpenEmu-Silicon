@@ -36,6 +36,8 @@ struct ControlOption: Equatable {
     static let defaultsKey = "OEControlListKeyOptionDefaultsKey"
     static let containerKey = "OEControlListKeyOptionContainerKey"
     static let choicesKey = "OEControlListKeyOptionChoicesKey"
+    /// Optional. What VoiceOver calls the whole row, for example "Orientation".
+    static let labelKey = "OEControlListKeyOptionLabelKey"
     static let valueKey = "OEControlListKeyOptionValueKey"
 
     struct Choice: Equatable {
@@ -51,6 +53,8 @@ struct ControlOption: Equatable {
     /// name. Game core display modes are saved this way (one dictionary per core).
     let containerKey: String?
     let choices: [Choice]
+    /// Plain text from the plist for VoiceOver, or nil.
+    let label: String?
 
     /// Reads one plist row. Returns nil unless it names a place to save the value and has at least two choices
     /// with different values, so a typo in a plist hides the row instead of drawing a broken one.
@@ -72,6 +76,7 @@ struct ControlOption: Equatable {
         self.defaultsKey = defaultsKey
         self.containerKey = (row[Self.containerKey] as? String).flatMap { $0.isEmpty ? nil : $0 }
         self.choices = choices
+        self.label = (row[Self.labelKey] as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// The saved value, or the first choice when nothing valid is saved.

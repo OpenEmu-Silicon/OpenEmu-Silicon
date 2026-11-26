@@ -76,6 +76,13 @@ final class ControlOptionTests: XCTestCase {
                      "an ordinary button row is not an option")
     }
 
+    func testOptionalLabelIsKept() throws {
+        var withLabel = row()
+        withLabel[ControlOption.labelKey] = "Orientation"
+        XCTAssertEqual(ControlOption(plistRow: withLabel)?.label, "Orientation")
+        XCTAssertNil(ControlOption(plistRow: row())?.label)
+    }
+
     func testFirstChoiceIsTheDefault() throws {
         let option = try XCTUnwrap(ControlOption(plistRow: row()))
         XCTAssertEqual(option.selectedValue(in: defaults), "upright")
