@@ -100,6 +100,14 @@ final class ControlsButtonSetupView: NSView {
         layoutSubviews()
     }
     
+    /// Shows the saved values again. Another place (the in-game display modes menu) can change them while the
+    /// pane is not on screen.
+    func refreshOptions() {
+        for case let view as ControlsOptionView in subviews {
+            view.refreshSelection()
+        }
+    }
+    
     @objc fileprivate func selectInputControl(_ sender: ControlsKeyButton) {
         // Only one object should be there
         guard let key = keyToButtonMap.compactMap({ $1 == sender ? $0 : nil }).last
@@ -581,6 +589,9 @@ final class ControlsOptionView: NSSegmentedControl {
             setWidth(0, forSegment: index)
         }
         refreshSelection()
+        if let label = option.label {
+            setAccessibilityLabel(NSLocalizedString(label, tableName: "ControlLabels", comment: "Option Label"))
+        }
         
         target = self
         action = #selector(segmentClicked(_:))
@@ -590,7 +601,7 @@ final class ControlsOptionView: NSSegmentedControl {
         fatalError("init(coder:) has not been implemented")
     }
     
-    private func refreshSelection() {
+    func refreshSelection() {
         let value = option.selectedValue(in: defaults)
         selectedSegment = option.choices.firstIndex { $0.value == value } ?? 0
     }

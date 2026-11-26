@@ -100,6 +100,8 @@ extern NSString *const OEAxisControlsKey;
  *     <string>orientation</string>           <!-- Name the chosen value is saved under in UserDefaults -->
  *     <key>OEControlListKeyOptionContainerKey</key>   <!-- Optional: save it inside the dictionary stored
  *     <string>OEGameCoreDisplayModeKey.org.openemu.Dolphin</string>   under this key (core display modes) -->
+ *     <key>OEControlListKeyOptionLabelKey</key>       <!-- Optional: what VoiceOver calls the row -->
+ *     <string>Orientation</string>
  *     <key>OEControlListKeyOptionChoicesKey</key>
  *     <array>                                <!-- At least two. The first one is the default. -->
  *       <dict>

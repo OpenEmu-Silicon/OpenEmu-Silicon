@@ -193,6 +193,8 @@ final class PrefControlsController: NSViewController {
             setUpEventMonitor()
         }
         
+        controlsSetupView.refreshOptions()
+        
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(windowDidBecomeKey(_:)), name: NSWindow.didBecomeKeyNotification, object: nil)
         nc.addObserver(self, selector: #selector(windowDidResignKey(_:)), name: NSWindow.didResignKeyNotification, object: nil)
