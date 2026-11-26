@@ -319,14 +319,18 @@ static int DolphinResolutionForName(NSString *name)
 
     // Only the Wii has a Wiimote to hold.
     if (_isWii) {
-        const BOOL sideways = _wiimoteSideways;
-        [groups addObject:
-            @{OEGameCoreDisplayModeGroupNameKey: @"Wiimote Orientation",
-              OEGameCoreDisplayModeGroupItemsKey: @[
-                  OEDisplayMode_OptionWithStateValue(kDolphinOrientationUpright, kDolphinOrientationPrefKey,
-                                                     @(!sideways), kDolphinOrientationUpright),
-                  OEDisplayMode_OptionWithStateValue(kDolphinOrientationSideways, kDolphinOrientationPrefKey,
-                                                     @(sideways), kDolphinOrientationSideways)]}];
+        // Menu only: the "next display mode" hotkey steps through every mode that is not marked manual, and
+        // it must not flip how the remote is held.
+        NSMutableArray *orientations = [NSMutableArray arrayWithCapacity:2];
+        for (NSString *name in @[kDolphinOrientationUpright, kDolphinOrientationSideways]) {
+            const BOOL selected = [name isEqualToString:kDolphinOrientationSideways] == _wiimoteSideways;
+            NSMutableDictionary *item = [OEDisplayMode_OptionWithStateValue(
+                name, kDolphinOrientationPrefKey, @(selected), name) mutableCopy];
+            item[OEGameCoreDisplayModeManualOnlyKey] = @YES;
+            [orientations addObject:item];
+        }
+        [groups addObject:@{OEGameCoreDisplayModeGroupNameKey: @"Wiimote Orientation",
+                            OEGameCoreDisplayModeGroupItemsKey: orientations}];
     }
     return groups;
 }
