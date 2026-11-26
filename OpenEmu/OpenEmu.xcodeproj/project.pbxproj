@@ -163,8 +163,6 @@
 		1E0E90051A8932BB72161909 /* PrefCloudSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EF37C00BE9099269AB29467 /* PrefCloudSyncController.swift */; };
 		1E2F3DBB10DEAB4C0019AA84 /* OEVersionMigrationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1E2F3DBA10DEAB4C0019AA84 /* OEVersionMigrationController.m */; };
 		1E4B7FC710DE4156A46DAB79 /* OEWiiSystemController.m in Sources */ = {isa = PBXBuildFile; fileRef = 60C6AA00A0A44B609186B94D /* OEWiiSystemController.m */; };
-		A57E17000000000000000001 /* OEWiiOrientationGameplay.m in Sources */ = {isa = PBXBuildFile; fileRef = A57E17000000000000000004 /* OEWiiOrientationGameplay.m */; };
-		A57E17000000000000000002 /* OEWiiOrientationUI.m in Sources */ = {isa = PBXBuildFile; fileRef = A57E17000000000000000005 /* OEWiiOrientationUI.m */; };
 		22477F282F81F85500C2A0BD /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 22477F272F81F85500C2A0BD /* Sentry */; };
 		22477F2A2F81F99300C2A0BD /* SentryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22477F292F81F99300C2A0BD /* SentryService.swift */; };
 		22477F2B2F82A00000C2A0BD /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 22477F2C2F82A00000C2A0BD /* Sentry */; };
@@ -631,6 +629,7 @@
 		0B1C9F0E000000000000A104 /* OEArtworkBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */; };
 		0B1C9F0E000000000000A105 /* ArtworkBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */; };
 		0C0D1E0F000000000000B002 /* ControlOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0D1E0F000000000000B001 /* ControlOptionTests.swift */; };
+		0C0D1E0F000000000000B012 /* WiiOrientationOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0D1E0F000000000000B011 /* WiiOrientationOptionTests.swift */; };
 		0B1C9F0E000000000000A106 /* OEArtworkCoverSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */; };
 		0B1C9F0E000000000000A107 /* OEArtworkBulk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */; };
 		0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */; };
@@ -1395,6 +1394,7 @@
 		0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBackup.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBackupTests.swift; sourceTree = "<group>"; };
 		0C0D1E0F000000000000B001 /* ControlOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlOptionTests.swift; sourceTree = "<group>"; };
+		0C0D1E0F000000000000B011 /* WiiOrientationOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiiOrientationOptionTests.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkCoverSource.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBulk.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBulkTests.swift; sourceTree = "<group>"; };
@@ -1448,9 +1448,6 @@
 		5AFD06BC2058893B00DFE765 /* GameScannerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameScannerViewController.swift; sourceTree = "<group>"; };
 		5C5F9C05070A447796EC6D4D /* OEWiiSystemResponderClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiSystemResponderClient.h; sourceTree = "<group>"; };
 		60C6AA00A0A44B609186B94D /* OEWiiSystemController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEWiiSystemController.m; sourceTree = "<group>"; };
-		A57E17000000000000000003 /* OEWiiOrientationGameplay.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiOrientationGameplay.h; sourceTree = "<group>"; };
-		A57E17000000000000000004 /* OEWiiOrientationGameplay.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEWiiOrientationGameplay.m; sourceTree = "<group>"; };
-		A57E17000000000000000005 /* OEWiiOrientationUI.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OEWiiOrientationUI.m; sourceTree = "<group>"; };
 		669734CE138046AC84F66296 /* OEWiiSystemController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OEWiiSystemController.h; sourceTree = "<group>"; };
 		68416A57049F48B997026285 /* Controller-Mappings.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Controller-Mappings.plist"; sourceTree = "<group>"; };
 		6FAD47F297164AD6B87C99DF /* OECoreMigration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OECoreMigration.swift; sourceTree = "<group>"; };
@@ -2697,6 +2694,7 @@
 				0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */,
 				0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */,
 				0C0D1E0F000000000000B001 /* ControlOptionTests.swift */,
+				0C0D1E0F000000000000B011 /* WiiOrientationOptionTests.swift */,
 				B16A1C102D7F4A0100000001 /* ArtworkLocationTests.swift */,
 				C0DEA27500000000000A0002 /* CoverArtSyncTests.swift */,
 				C0DEA27500000000000A0102 /* GamesDataSourceTests.swift */,
@@ -4232,9 +4230,6 @@
 			children = (
 				669734CE138046AC84F66296 /* OEWiiSystemController.h */,
 				60C6AA00A0A44B609186B94D /* OEWiiSystemController.m */,
-				A57E17000000000000000003 /* OEWiiOrientationGameplay.h */,
-				A57E17000000000000000004 /* OEWiiOrientationGameplay.m */,
-				A57E17000000000000000005 /* OEWiiOrientationUI.m */,
 				99574CB1B5EE4AE89B192EBD /* OEWiiSystemResponder.h */,
 				4C5E668B27CE43FF88AE57AF /* OEWiiSystemResponder.m */,
 				5C5F9C05070A447796EC6D4D /* OEWiiSystemResponderClient.h */,
@@ -6417,6 +6412,7 @@
 				0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */,
 				0B1C9F0E000000000000A105 /* ArtworkBackupTests.swift in Sources */,
 				0C0D1E0F000000000000B002 /* ControlOptionTests.swift in Sources */,
+				0C0D1E0F000000000000B012 /* WiiOrientationOptionTests.swift in Sources */,
 				B16A1C102D7F4A0100000002 /* ArtworkLocationTests.swift in Sources */,
 				C0DEA27500000000000A0001 /* CoverArtSyncTests.swift in Sources */,
 				C0DEA27500000000000A0101 /* GamesDataSourceTests.swift in Sources */,
@@ -6466,8 +6462,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				1E4B7FC710DE4156A46DAB79 /* OEWiiSystemController.m in Sources */,
-				A57E17000000000000000001 /* OEWiiOrientationGameplay.m in Sources */,
-				A57E17000000000000000002 /* OEWiiOrientationUI.m in Sources */,
 				9ACAEF142DD44E2AACFFB26F /* OEWiiSystemResponder.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

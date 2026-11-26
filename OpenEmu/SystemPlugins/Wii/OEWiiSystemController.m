@@ -28,7 +28,86 @@
 #import "OEWiiSystemResponder.h"
 #import "OEWiiSystemResponderClient.h"
 
+// The Controls pane shows the Wiimote the way the player holds it. The choice is saved by the pane (and by Dolphin's
+// in-game display-mode menu) under the same key and values the Dolphin core reads; see the "Orientation" row in
+// Wii-Info.plist and kDolphinOrientationPrefKey in DolphinGameCore.mm.
+static BOOL OEWiiSavedOrientationIsSideways(void)
+{
+    NSDictionary *dolphin = [[NSUserDefaults standardUserDefaults] dictionaryForKey:@"displayMode.org.openemu.Dolphin"];
+    return [dolphin[@"dolphin.orientation"] isEqual:@"Sideways"];
+}
+
+// Where each Wiimote button sits on the sideways picture, in points from its bottom-left corner. The upright
+// positions are in Controller-Preferences.plist.
+static NSDictionary<NSString *, NSValue *> *OEWiiSidewaysKeyPositions(void)
+{
+    static NSDictionary *positions;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        positions = @{
+            @"OEWiiMoteButtonUp":    [NSValue valueWithPoint:NSMakePoint(85, 243.5)],
+            @"OEWiiMoteButtonDown":  [NSValue valueWithPoint:NSMakePoint(85, 214.5)],
+            @"OEWiiMoteButtonLeft":  [NSValue valueWithPoint:NSMakePoint(70.5, 229)],
+            @"OEWiiMoteButtonRight": [NSValue valueWithPoint:NSMakePoint(99.5, 229)],
+            @"OEWiiMoteButtonA":     [NSValue valueWithPoint:NSMakePoint(145, 230)],
+            @"OEWiiMoteButtonB":     [NSValue valueWithPoint:NSMakePoint(178.5, 230)],
+            @"OEWiiMoteButtonMinus": [NSValue valueWithPoint:NSMakePoint(213, 202.5)],
+            @"OEWiiMoteButtonHome":  [NSValue valueWithPoint:NSMakePoint(213, 230.5)],
+            @"OEWiiMoteButtonPlus":  [NSValue valueWithPoint:NSMakePoint(213.5, 258)],
+            @"OEWiiMoteButton1":     [NSValue valueWithPoint:NSMakePoint(319, 231)],
+            @"OEWiiMoteButton2":     [NSValue valueWithPoint:NSMakePoint(356, 231)],
+        };
+    });
+    return positions;
+}
+
 @implementation OEWiiSystemController
+
+// Builds from #885 saved the choice as a plain on/off value. Move it to where the Dolphin core and the pane look,
+// once, and only when the new place has no choice yet.
++ (void)initialize
+{
+    if (self != [OEWiiSystemController class])
+        return;
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *oldKey = @"OEWiiOrientationSidewaysPreview";
+    if ([defaults objectForKey:oldKey] == nil)
+        return;
+
+    NSString *containerKey = @"displayMode.org.openemu.Dolphin";
+    NSMutableDictionary *dolphin = [[defaults dictionaryForKey:containerKey] mutableCopy] ?: [NSMutableDictionary dictionary];
+    if (dolphin[@"dolphin.orientation"] == nil) {
+        dolphin[@"dolphin.orientation"] = [defaults boolForKey:oldKey] ? @"Sideways" : @"Upright";
+        [defaults setObject:dolphin forKey:containerKey];
+    }
+    [defaults removeObjectForKey:oldKey];
+}
+
+- (NSImage *)controllerImage
+{
+    if (OEWiiSavedOrientationIsSideways())
+        return [self.bundle imageForResource:@"controller_wii_sideways"] ?: [super controllerImage];
+    return [super controllerImage];
+}
+
+- (NSImage *)controllerImageMask
+{
+    if (OEWiiSavedOrientationIsSideways())
+        return [self.bundle imageForResource:@"controller_wii_sideways_mask"] ?: [super controllerImageMask];
+    return [super controllerImageMask];
+}
+
+- (NSDictionary<NSString *, NSValue *> *)controllerKeyPositions
+{
+    NSDictionary<NSString *, NSValue *> *upright = [super controllerKeyPositions];
+    if (!OEWiiSavedOrientationIsSideways())
+        return upright;
+
+    NSMutableDictionary *positions = [upright mutableCopy] ?: [NSMutableDictionary dictionary];
+    [positions addEntriesFromDictionary:OEWiiSidewaysKeyPositions()];
+    return positions;
+}
 
 // Read header to detect Wii ISO, WBFS, CISO, RVZ, WIA & GCZ. A GCZ reads as the disc inside it
 // (OEGCZFile), like an ISO.

@@ -30,6 +30,30 @@
 	<array>
 		<array>
 			<string>Wiimote</string>
+			<string>Orientation</string>
+			<dict>
+				<key>OEControlListKeyOptionDefaultsKey</key>
+				<string>dolphin.orientation</string>
+				<key>OEControlListKeyOptionLabelKey</key>
+				<string>Orientation</string>
+				<key>OEControlListKeyOptionContainerKey</key>
+				<string>displayMode.org.openemu.Dolphin</string>
+				<key>OEControlListKeyOptionChoicesKey</key>
+				<array>
+					<dict>
+						<key>OEControlListKeyLabelKey</key>
+						<string>Upright</string>
+						<key>OEControlListKeyOptionValueKey</key>
+						<string>Upright</string>
+					</dict>
+					<dict>
+						<key>OEControlListKeyLabelKey</key>
+						<string>Sideways</string>
+						<key>OEControlListKeyOptionValueKey</key>
+						<string>Sideways</string>
+					</dict>
+				</array>
+			</dict>
 			<string>D-Pad</string>
 			<dict>
 				<key>OEControlListKeyLabelKey</key>
@@ -129,7 +153,7 @@
 			</dict>
 			<dict>
 				<key>OEControlListKeyLabelKey</key>
-				<string>Backward</string>
+				<string>Back</string>
 				<key>OEControlListKeyNameKey</key>
 				<string>OEWiiMoteTiltBackward</string>
 			</dict>
@@ -168,7 +192,7 @@
 			</dict>
 			<dict>
 				<key>OEControlListKeyLabelKey</key>
-				<string>Backward</string>
+				<string>Back</string>
 				<key>OEControlListKeyNameKey</key>
 				<string>OEWiiMoteSwingBackward</string>
 			</dict>
@@ -380,18 +404,6 @@
 				<string>Change Extension</string>
 				<key>OEControlListKeyNameKey</key>
 				<string>OEWiimoteChangeExtension</string>
-			</dict>
-			<dict>
-				<key>OEControlListKeyLabelKey</key>
-				<string>Hold Sideways</string>
-				<key>OEControlListKeyNameKey</key>
-				<string>OEWiimoteSideways</string>
-			</dict>
-			<dict>
-				<key>OEControlListKeyLabelKey</key>
-				<string>Hold Upright</string>
-				<key>OEControlListKeyNameKey</key>
-				<string>OEWiimoteUpright</string>
 			</dict>
 		</array>
 	</array>

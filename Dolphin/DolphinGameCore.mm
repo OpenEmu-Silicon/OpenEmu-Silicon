@@ -213,6 +213,7 @@ static void dolphin_hash_close(void *handle)
     atomic_bool _isInitialized;
     float _frameInterval;
     int _internalResolution;       // menu / saved choice (1-6)
+    BOOL _wiimoteSideways;        // saved orientation choice (Wii only)
     int _activeOutputScale;       // actual Metal output texture dimensions
     int _pendingStartupScale;     // apply saved 2-6x only after the window is established
     NSUInteger _startupFrameCount;
@@ -280,6 +281,21 @@ static void dolphin_hash_close(void *handle)
 // size remains under the host app's control; the output aspect ratio is unchanged.
 static NSString *const kDolphinResolutionPrefKey = @"dolphin.resolution";
 
+// How a Wii remote is held. "Upright" is Dolphin's normal pointing position; "Sideways" is the NES-style
+// two-hand grip. The same saved value is shown as a choice in Preferences > Controls (the Wii plugin's
+// plist names the same key and values), so change them in both places together.
+static NSString *const kDolphinOrientationPrefKey = @"dolphin.orientation";
+static NSString *const kDolphinOrientationUpright = @"Upright";
+static NSString *const kDolphinOrientationSideways = @"Sideways";
+
+// 1 = sideways, 0 = upright, -1 = not an orientation name.
+static int DolphinSidewaysForOrientationName(NSString *name)
+{
+    if ([name isEqualToString:kDolphinOrientationSideways]) return 1;
+    if ([name isEqualToString:kDolphinOrientationUpright]) return 0;
+    return -1;
+}
+
 static int DolphinResolutionForName(NSString *name)
 {
     if (![name isKindOfClass:[NSString class]] || name.length != 2 ||
@@ -297,8 +313,26 @@ static int DolphinResolutionForName(NSString *name)
         [resolutions addObject:OEDisplayMode_OptionWithStateValue(
             name, kDolphinResolutionPrefKey, @(scale == _internalResolution), name)];
     }
-    return @[@{OEGameCoreDisplayModeGroupNameKey: @"Resolution",
-              OEGameCoreDisplayModeGroupItemsKey: resolutions}];
+    NSMutableArray *groups = [NSMutableArray arrayWithObject:
+        @{OEGameCoreDisplayModeGroupNameKey: @"Resolution",
+          OEGameCoreDisplayModeGroupItemsKey: resolutions}];
+
+    // Only the Wii has a Wiimote to hold.
+    if (_isWii) {
+        // Menu only: the "next display mode" hotkey steps through every mode that is not marked manual, and
+        // it must not flip how the remote is held.
+        NSMutableArray *orientations = [NSMutableArray arrayWithCapacity:2];
+        for (NSString *name in @[kDolphinOrientationUpright, kDolphinOrientationSideways]) {
+            const BOOL selected = [name isEqualToString:kDolphinOrientationSideways] == _wiimoteSideways;
+            NSMutableDictionary *item = [OEDisplayMode_OptionWithStateValue(
+                name, kDolphinOrientationPrefKey, @(selected), name) mutableCopy];
+            item[OEGameCoreDisplayModeManualOnlyKey] = @YES;
+            [orientations addObject:item];
+        }
+        [groups addObject:@{OEGameCoreDisplayModeGroupNameKey: @"Wiimote Orientation",
+                            OEGameCoreDisplayModeGroupItemsKey: orientations}];
+    }
+    return groups;
 }
 
 // Set both Dolphin's high-resolution internal EFB and its high-resolution Metal
@@ -372,6 +406,14 @@ static int DolphinResolutionForName(NSString *name)
 
 - (void)changeDisplayWithMode:(NSString *)displayMode
 {
+    const int orientation = DolphinSidewaysForOrientationName(displayMode);
+    if (orientation >= 0) {
+        _wiimoteSideways = orientation == 1;
+        if (_isInitialized && _isWii)
+            [self applyWiimoteOrientation];
+        return;
+    }
+
     const int scale = DolphinResolutionForName(displayMode);
     if (scale == 0)
         return;
@@ -386,6 +428,14 @@ static int DolphinResolutionForName(NSString *name)
     }
 
     _internalResolution = scale;
+}
+
+// Tell Dolphin how every Wiimote is held. Dolphin only has its Wiimotes once the game has booted, so this is
+// called after boot and again whenever the choice changes.
+- (void)applyWiimoteOrientation
+{
+    dol_host->SetWiimoteOrientation(_wiimoteSideways);
+    NSLog(@"[DolphinOrientation] %@", _wiimoteSideways ? kDolphinOrientationSideways : kDolphinOrientationUpright);
 }
 
 # pragma mark - Execution
@@ -415,6 +465,7 @@ static int DolphinResolutionForName(NSString *name)
     // avoiding oversized startup windows and unnecessary high-res boot work.
     const int savedScale = DolphinResolutionForName(self.displayModeInfo[kDolphinResolutionPrefKey]);
     _internalResolution = savedScale ?: 1;
+    _wiimoteSideways = DolphinSidewaysForOrientationName(self.displayModeInfo[kDolphinOrientationPrefKey]) == 1;
     _activeOutputScale = 1;
     _pendingStartupScale = _internalResolution > 1 ? _internalResolution : 0;
     _startupFrameCount = 0;
@@ -473,6 +524,9 @@ static int DolphinResolutionForName(NSString *name)
             _isInitialized = true;
         
         _frameInterval = dol_host->GetFrameInterval();
+
+        if (_isInitialized && _isWii)
+            [self applyWiimoteOrientation];
 
         // Dolphin has booted and GameCube RAM is mapped; let rcheevos read it during -doFrame.
         [_raBridge markROMReady];

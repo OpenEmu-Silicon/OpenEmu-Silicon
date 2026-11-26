@@ -117,4 +117,27 @@ final class ControlOptionTests: XCTestCase {
         XCTAssertEqual(option.selectedValue(in: defaults), "sideways")
         XCTAssertNil(defaults.object(forKey: "orientation"), "must not also write a top-level key")
     }
+
+    /// The pane reloads the controller picture when this fires, and only accepts it from a view inside its setup
+    /// view. (It once listened for the setup view itself, so the picture never changed.)
+    func testPickingAChoicePostsFromInsideTheSetupView() throws {
+        let setupView = ControlsButtonSetupView(frame: NSRect(x: 0, y: 0, width: 300, height: 300))
+        let group: [AnyHashable] = ["Orientation", NSDictionary(dictionary: row(key: "controlOptionTest.\(suiteName!)"))]
+        setupView.setup(withControlList: ["Gameplay Buttons", NSArray(object: group)])
+        let optionView = try XCTUnwrap(setupView.subviews.compactMap { $0 as? ControlsOptionView }.first)
+        let saved = optionView.option
+        defer { UserDefaults.standard.removeObject(forKey: saved.defaultsKey) }
+
+        var sender: NSView?
+        let token = NotificationCenter.default.addObserver(forName: ControlOption.didChangeNotification, object: nil, queue: nil) {
+            sender = $0.object as? NSView
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        optionView.selectedSegment = 1
+        optionView.performClick(nil)
+
+        XCTAssertEqual(sender?.isDescendant(of: setupView), true)
+        XCTAssertEqual(saved.selectedValue(), "sideways")
+    }
 }

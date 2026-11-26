@@ -3,11 +3,33 @@
 <plist version="1.0">
 <dict>
 	<key>OEControllerImageKey</key>
-	<string>controller_wii</string>
+	<string>controller_wii_upright</string>
 	<key>OEControllerImageMaskKey</key>
-	<string>controller_wii_mask</string>
+	<string>controller_wii_upright_mask</string>
 	<key>OEControllerKeyPositionKey</key>
 	<dict>
+		<key>OEWiiMoteButtonUp</key>
+		<string>{229, 384.5}</string>
+		<key>OEWiiMoteButtonDown</key>
+		<string>{229, 355.5}</string>
+		<key>OEWiiMoteButtonLeft</key>
+		<string>{214.5, 370}</string>
+		<key>OEWiiMoteButtonRight</key>
+		<string>{243.5, 370}</string>
+		<key>OEWiiMoteButtonA</key>
+		<string>{230.5, 309.5}</string>
+		<key>OEWiiMoteButtonB</key>
+		<string>{230.5, 276}</string>
+		<key>OEWiiMoteButtonMinus</key>
+		<string>{202, 242}</string>
+		<key>OEWiiMoteButtonHome</key>
+		<string>{230, 242}</string>
+		<key>OEWiiMoteButtonPlus</key>
+		<string>{258, 242}</string>
+		<key>OEWiiMoteButton1</key>
+		<string>{230.5, 136.5}</string>
+		<key>OEWiiMoteButton2</key>
+		<string>{230.5, 99.5}</string>
 		<key>OEWiiClassicButtonUp</key>
 		<string>{0, 0}</string>
 		<key>OEWiiClassicButtonDown</key>

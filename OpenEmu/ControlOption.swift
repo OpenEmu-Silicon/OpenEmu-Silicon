@@ -33,6 +33,9 @@ import OpenEmuSystem
 /// Nothing here draws anything, so it can be tested on its own.
 struct ControlOption: Equatable {
 
+    /// Posted by the pane after the player picks a choice, so the controller picture can follow it.
+    static let didChangeNotification = Notification.Name("OEControlOptionDidChange")
+
     static let defaultsKey = "OEControlListKeyOptionDefaultsKey"
     static let containerKey = "OEControlListKeyOptionContainerKey"
     static let choicesKey = "OEControlListKeyOptionChoicesKey"
