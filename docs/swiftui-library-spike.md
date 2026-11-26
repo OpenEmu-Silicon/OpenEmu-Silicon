@@ -65,6 +65,19 @@ What the numbers do not cover:
 - Any keyboard or mouse behavior, in either SwiftUI variant.
 - A real library with real artwork, a 120 Hz display, or a Release build.
 
+## Open problem: selection in the SwiftUI-cell grid (found 2026-11-26)
+
+With `-OESwiftUICells YES`, a click from the computer-use tool selects a cell (accent ring and name capsule draw) and then
+the grid deselects it within the same `mouseDown`. The stack goes `NSCollectionViewMouseSession handleEvent` to
+`commitSelectionAndClearHighlighting` to `_deselectItemsAtIndexPaths`, and the event arrives through AppKit's
+`_NSGestureRecognizerSortAndSendDelayedEvents` (a gesture path the AppKit-only grid does not have). The same click on the
+AppKit cells keeps its selection. A selection restored at launch stays selected.
+
+Not known yet: whether a real human click does the same (the tool injects down and up together), and whether the SwiftUI
+hosting view's gesture recognizers delay the event. Two things tried: `isSelected` now drives the cell, and a hosting view
+that returns nil from `hitTest` (uncommitted; clicks then land on the AppKit image view). Neither fixed the injected
+click. Next: click by hand, then try removing the hosting view's gesture recognizers.
+
 ## Things found on the way
 
 - `OEArtworkStore` and the Big Picture caches ignore `-databasePath`. They write under
