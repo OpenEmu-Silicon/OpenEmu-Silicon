@@ -46,6 +46,7 @@ final class PrefGameplayController: NSViewController {
 
         loadShaderMenu()
         addSliders()
+        addRumbleSettings()
         addCheatSettings()
 
         token = NotificationCenter.default.addObserver(forName: .shaderModelCustomShadersDidChange, object: nil, queue: .main) { [weak self] _ in
@@ -197,6 +198,39 @@ final class PrefGameplayController: NSViewController {
         // The pane's bottom margin is a weak constraint, so the last row supplies its own spacing.
         row.bottomPadding = 20
         row.cell(at: 0).yPlacement = .top
+    }
+
+    // MARK: - Rumble setting
+
+    private let rumbleCheckbox = NSButton(checkboxWithTitle: "Controller rumble", target: nil, action: nil)
+
+    /// Adds a "Controller:" row with the rumble on/off switch.
+    private func addRumbleSettings() {
+        guard let gridView = settingsGridView else { return }
+
+        rumbleCheckbox.target = self
+        rumbleCheckbox.action = #selector(toggleRumble(_:))
+        rumbleCheckbox.state = OERumbleSettings.isEnabled() ? .on : .off
+
+        let note = NSTextField(wrappingLabelWithString: "Vibrates a controller when the game asks it to. Needs a controller that can vibrate and a core that supports it.")
+        note.font = .systemFont(ofSize: 11)
+        note.textColor = .secondaryLabelColor
+        note.preferredMaxLayoutWidth = 300
+
+        let stack = NSStackView(views: [rumbleCheckbox, note])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 4
+
+        let label = NSTextField(labelWithString: "Controller:")
+        label.font = .systemFont(ofSize: NSFont.systemFontSize)
+
+        let row = gridView.addRow(with: [label, stack])
+        row.cell(at: 0).yPlacement = .top
+    }
+
+    @objc private func toggleRumble(_ sender: NSButton) {
+        OERumbleSettings.setEnabled(sender.state == .on)
     }
 
     @objc private func toggleCheatWorks(_ sender: NSButton) {
