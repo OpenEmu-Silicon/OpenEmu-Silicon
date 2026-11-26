@@ -39,10 +39,16 @@
 #import "DolphinGameCore.h"
 #include "DolHost.h"
 #include "AudioCommon/SoundStream.h"
+#include "Common/Config/Config.h"
+#include "Core/Config/GraphicsSettings.h"
 #include "Core/Core.h"
 #include "Core/State.h"
 #include "Core/System.h"
 #include "Core/HW/Memmap.h"
+// Dolphin owns the emulation GPU; the presenter lets us resize only its output
+// surface, independently of OpenEmu's game window and without editing OpenEmu.
+#include "VideoCommon/Fifo.h"
+#include "VideoCommon/Present.h"
 #include "OpenEmuAudioStream.h"
 #include "UICommon/UICommon.h"
 #include <stdatomic.h>
@@ -54,6 +60,7 @@
 #import "OERetroAchievementsTransport.h"
 #import "OERetroAchievementsBridge.h"
 #import <OpenEmuBase/OEMemoryRegionDescriptor.h>
+#import <OpenEmuBase/OEGameCoreDisplayModes.h>
 #include <rc_consoles.h>
 #include <rc_hash.h>
 
@@ -205,6 +212,10 @@ static void dolphin_hash_close(void *handle)
     bool _isWii;
     atomic_bool _isInitialized;
     float _frameInterval;
+    int _internalResolution;       // menu / saved choice (1-6)
+    int _activeOutputScale;       // actual Metal output texture dimensions
+    int _pendingStartupScale;     // apply saved 2-6x only after the window is established
+    NSUInteger _startupFrameCount;
 
     NSString *autoLoadStatefileName;
     NSString *_dolphinCoreModule;
@@ -221,6 +232,10 @@ static void dolphin_hash_close(void *handle)
 {
     if(self = [super init]){
         dol_host = DolHost::GetInstance();
+        _internalResolution = 1;
+        _activeOutputScale = 1;
+        _pendingStartupScale = 0;
+        _startupFrameCount = 0;
     }
 
     _current = self;
@@ -258,6 +273,121 @@ static void dolphin_hash_close(void *handle)
     [_raBridge deserializeProgress:data];
 }
 
+# pragma mark - Display modes
+
+// OpenEmu remembers this mode per game. Internal EFB scale and the Metal output
+// both increase, so OpenEmu receives REAL high-resolution frames. The window's
+// size remains under the host app's control; the output aspect ratio is unchanged.
+static NSString *const kDolphinResolutionPrefKey = @"dolphin.resolution";
+
+static int DolphinResolutionForName(NSString *name)
+{
+    if (![name isKindOfClass:[NSString class]] || name.length != 2 ||
+        [name characterAtIndex:1] != 'x')
+        return 0;
+    const unichar digit = [name characterAtIndex:0];
+    return digit >= '1' && digit <= '6' ? (int)(digit - '0') : 0;
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)displayModes
+{
+    NSMutableArray *resolutions = [NSMutableArray arrayWithCapacity:6];
+    for (int scale = 1; scale <= 6; ++scale) {
+        NSString *name = [NSString stringWithFormat:@"%dx", scale];
+        [resolutions addObject:OEDisplayMode_OptionWithStateValue(
+            name, kDolphinResolutionPrefKey, @(scale == _internalResolution), name)];
+    }
+    return @[@{OEGameCoreDisplayModeGroupNameKey: @"Resolution",
+              OEGameCoreDisplayModeGroupItemsKey: resolutions}];
+}
+
+// Set both Dolphin's high-resolution internal EFB and its high-resolution Metal
+// output. The output surface and OpenEmu texture must agree in pixel dimensions.
+// Crucially, we do not touch OpenEmu's NSWindow, which retains its user-selected
+// size through in-game display-mode changes.
+- (BOOL)applyResolutionScale:(int)scale
+{
+    if (scale < 1 || scale > 6)
+        return NO;
+
+    if (_activeOutputScale != scale) {
+        id<MTLTexture> oldTexture = nil;
+        @synchronized (self) { oldTexture = _dolMetalTexture; }
+        if (!oldTexture || !_dolMetalLayer)
+            return NO;
+
+        const NSUInteger width = (NSUInteger)_dolphinCoreScreen.width * scale;
+        const NSUInteger height = (NSUInteger)_dolphinCoreScreen.height * scale;
+        id<MTLDevice> device = oldTexture.device;
+        MTLTextureDescriptor *desc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                         width:width height:height mipmapped:NO];
+        desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        desc.storageMode = MTLStorageModePrivate;
+        id<MTLTexture> newTexture = [device newTextureWithDescriptor:desc];
+        if (!newTexture) {
+            NSLog(@"[DolphinResolution] Unable to allocate %lux%lu output texture",
+                  (unsigned long)width, (unsigned long)height);
+            return NO;
+        }
+
+        // Clear newly allocated texture before allowing OpenEmu to composite it.
+        id<MTLCommandBuffer> cb = [[device newCommandQueue] commandBuffer];
+        MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+        rpd.colorAttachments[0].texture = newTexture;
+        rpd.colorAttachments[0].loadAction = MTLLoadActionClear;
+        rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+        rpd.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
+        [[cb renderCommandEncoderWithDescriptor:rpd] endEncoding];
+        [cb commit];
+        [cb waitUntilCompleted];
+
+        // The Dolphin GPU thread must not read the target pointer or recreate the
+        // backbuffer while these dimensions change. PauseAndLock is also used by
+        // Dolphin's normal live graphics-configuration refresh.
+        auto& system = Core::System::GetInstance();
+        const bool lockGPU = Core::IsRunning(system);
+        if (lockGPU)
+            system.GetFifo().PauseAndLock();
+
+        @synchronized (self) {
+            _dolMetalTexture = newTexture;
+            _dolMetalLayer.bounds = CGRectMake(0, 0, width, height);
+            _activeOutputScale = scale;
+            dol_host->SetMetalTexture(newTexture);
+            if (g_presenter)
+                g_presenter->ResizeSurface();
+        }
+
+        if (lockGPU)
+            system.GetFifo().RestoreState(true);
+    }
+
+    // Dolphin rebuilds its scaled EFB through its existing config callback.
+    Config::SetCurrent(Config::GFX_EFB_SCALE, scale);
+    NSLog(@"[DolphinResolution] Active %dx, output %dx%d, logical window unchanged",
+          scale, _dolphinCoreScreen.width * scale, _dolphinCoreScreen.height * scale);
+    return YES;
+}
+
+- (void)changeDisplayWithMode:(NSString *)displayMode
+{
+    const int scale = DolphinResolutionForName(displayMode);
+    if (scale == 0)
+        return;
+
+    if (_isInitialized) {
+        if (![self applyResolutionScale:scale])
+            return; // Keep the previously selected mode if allocation failed.
+        _pendingStartupScale = 0; // Manual choice overrides pending restore.
+    } else {
+        // Before the Metal texture exists, remember the request for startup.
+        _pendingStartupScale = scale > 1 ? scale : 0;
+    }
+
+    _internalResolution = scale;
+}
+
 # pragma mark - Execution
 - (BOOL)loadFileAtPath:(NSString *)path
 {
@@ -279,6 +409,16 @@ static void dolphin_hash_close(void *handle)
     }
 
     dol_host->Init([[self supportDirectoryPath] fileSystemRepresentation], [path fileSystemRepresentation] );
+
+    // Start at native resolution while the window and Metal surface are being
+    // established. A remembered higher scale is restored after initial frames,
+    // avoiding oversized startup windows and unnecessary high-res boot work.
+    const int savedScale = DolphinResolutionForName(self.displayModeInfo[kDolphinResolutionPrefKey]);
+    _internalResolution = savedScale ?: 1;
+    _activeOutputScale = 1;
+    _pendingStartupScale = _internalResolution > 1 ? _internalResolution : 0;
+    _startupFrameCount = 0;
+    Config::SetCurrent(Config::GFX_EFB_SCALE, 1);
 
     // The RA bridge logs in and hashes off the ROM path here; markROMReady is deferred to
     // -startEmulation, once Dolphin has booted and RAM is mapped.
@@ -365,6 +505,18 @@ static void dolphin_hash_close(void *handle)
           autoLoadStatefileName = nil;
 
       [_raBridge doFrame];
+
+      // Do not enlarge the output during Dolphin's boot or OpenEmu's initial
+      // window layout. Restore the saved resolution after 90 host frames.
+      // Changing it here uses exactly the same live path as the menu choice.
+      if (_pendingStartupScale > 1 && ++_startupFrameCount >= 90) {
+          const int wanted = _pendingStartupScale;
+          _pendingStartupScale = 0;
+          if (![self applyResolutionScale:wanted]) {
+              _internalResolution = 1;
+              NSLog(@"[DolphinResolution] Saved %dx restore failed; staying at 1x", wanted);
+          }
+      }
     }
 }
 
@@ -425,7 +577,8 @@ static void dolphin_hash_close(void *handle)
 
 - (id<MTLTexture>)metalTexture
 {
-    return _dolMetalTexture;
+    // Metal renderer can ask from a different thread during a live mode change.
+    @synchronized (self) { return _dolMetalTexture; }
 }
 
 // MTL3DGameRenderer.update() reads these to resolve OEMTLPixelFormat even in Metal2 mode.
@@ -446,7 +599,14 @@ static void dolphin_hash_close(void *handle)
 
 - (OEIntSize)bufferSize
 {
-    return _dolphinCoreScreen;
+    // Physical source resolution follows the Metal output. This ensures
+    // OpenEmu shaders see *all* pixels instead of cropping a high-resolution texture to 1x.
+    // OpenEmu's window controller controls the onscreen size separately.
+    @synchronized (self) {
+        const int scale = _activeOutputScale > 0 ? _activeOutputScale : 1;
+        return OEIntSizeMake(_dolphinCoreScreen.width * scale,
+                             _dolphinCoreScreen.height * scale);
+    }
 }
 
 - (OEIntSize)aspectSize
