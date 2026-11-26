@@ -508,9 +508,39 @@ void DolHost::processSpecialKeys (int button , int player)
        setWiimoteUpright(player);
     }
 }
+// Finds one of a Wiimote's on/off options by Dolphin's own name for it, not by its place in the list.
+// Returns null when this player has no Wiimote (a GameCube game, or a player number Dolphin does not have).
+static ControllerEmu::NumericSetting<bool>* FindWiimoteBoolOption(int player, const char* iniName)
+{
+    InputConfig* config = Wiimote::GetConfig();
+    if (!config || player < 0 || player >= config->GetControllerCount() || !config->GetController(player))
+        return nullptr;
+
+    ControllerEmu::ControlGroup* options = Wiimote::GetWiimoteGroup(player, WiimoteEmu::WiimoteGroup::Options);
+    if (!options)
+        return nullptr;
+
+    for (auto& setting : options->numeric_settings)
+    {
+        if (std::strcmp(setting->GetININame(), iniName) == 0)
+            return static_cast<ControllerEmu::NumericSetting<bool>*>(setting.get());
+    }
+    return nullptr;
+}
+
 void DolHost::setWiimoteSideways (int player)
 {
-    static_cast<ControllerEmu::NumericSetting<bool>*>(Wiimote::GetWiimoteGroup(player, WiimoteEmu::WiimoteGroup::Options)->numeric_settings[3].get())->SetValue(_wmSideways[player]);
+    if (auto* setting = FindWiimoteBoolOption(player, WiimoteEmu::Wiimote::SIDEWAYS_OPTION))
+        setting->SetValue(_wmSideways[player]);
+}
+
+void DolHost::SetWiimoteOrientation (bool sideways)
+{
+    for (int player = 0; player < 4; player++)
+    {
+        _wmSideways[player] = sideways;
+        setWiimoteSideways(player);
+    }
 }
 
 void DolHost::setWiimoteUpright (int player)

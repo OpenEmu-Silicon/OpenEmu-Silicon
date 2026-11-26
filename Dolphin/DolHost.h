@@ -62,6 +62,7 @@ public:
 
     void processSpecialKeys (int button , int player);
     void setWiimoteSideways (int player);
+    void SetWiimoteOrientation (bool sideways);   // all four players; does nothing for a GameCube game
     void setWiimoteUpright (int player);
     void changeWiimoteExtension(int extension, int player);
 
