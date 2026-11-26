@@ -226,6 +226,11 @@ final class OEGameDocument: NSDocument {
     @objc dynamic var imageSaturation: Float = 1.0
     @objc dynamic var imageGamma: Float = 1.0
     
+    /// Volume is always 0...1. Anything outside that (a hand-edited preference) is pulled back in.
+    static func clampedVolume(_ value: Float) -> Float {
+        return max(0, min(1, value))
+    }
+    
     static func clampedSaturation(_ value: Float) -> Float {
         return max(0.5, min(3.0, value))
     }
@@ -1629,6 +1634,13 @@ final class OEGameDocument: NSDocument {
         if defaultFlag {
             UserDefaults.standard.set(volume, forKey: OEGameVolumeKey)
         }
+    }
+    
+    /// Called when the default volume is changed in Preferences > Gameplay. A muted game stays muted;
+    /// it picks up the new volume when it is unmuted.
+    func savedVolumeDidChange() {
+        if isMuted { return }
+        setVolume(Self.clampedVolume(volume), asDefault: false)
     }
     
     func setSaturation(_ value: Float, asDefault: Bool) {
