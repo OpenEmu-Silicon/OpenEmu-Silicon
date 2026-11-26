@@ -63,6 +63,27 @@ static NSDictionary<NSString *, NSValue *> *OEWiiSidewaysKeyPositions(void)
 
 @implementation OEWiiSystemController
 
+// Builds from #885 saved the choice as a plain on/off value. Move it to where the Dolphin core and the pane look,
+// once, and only when the new place has no choice yet.
++ (void)initialize
+{
+    if (self != [OEWiiSystemController class])
+        return;
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *oldKey = @"OEWiiOrientationSidewaysPreview";
+    if ([defaults objectForKey:oldKey] == nil)
+        return;
+
+    NSString *containerKey = @"displayMode.org.openemu.Dolphin";
+    NSMutableDictionary *dolphin = [[defaults dictionaryForKey:containerKey] mutableCopy] ?: [NSMutableDictionary dictionary];
+    if (dolphin[@"dolphin.orientation"] == nil) {
+        dolphin[@"dolphin.orientation"] = [defaults boolForKey:oldKey] ? @"Sideways" : @"Upright";
+        [defaults setObject:dolphin forKey:containerKey];
+    }
+    [defaults removeObjectForKey:oldKey];
+}
+
 - (NSImage *)controllerImage
 {
     if (OEWiiSavedOrientationIsSideways())
