@@ -77,8 +77,9 @@ final class OERumbleMappingTests: XCTestCase {
         XCTAssertEqual(OERumbleMapping.controllerIndex(forPlayer: 2, deviceName: "Pad", controllerNames: names), 1)
     }
 
-    func testSingleControllerIsUsedForAnyPlayerWhenNamesDiffer() {
-        XCTAssertEqual(OERumbleMapping.controllerIndex(forPlayer: 2, deviceName: "Something else", controllerNames: ["Pad"]), 0)
+    func testOnlyControllerBelongsToPlayerOne() {
+        XCTAssertEqual(OERumbleMapping.controllerIndex(forPlayer: 1, deviceName: "Something else", controllerNames: ["Pad"]), 0)
+        XCTAssertNil(OERumbleMapping.controllerIndex(forPlayer: 2, deviceName: "Something else", controllerNames: ["Pad"]))
     }
 
     func testPlayerPastTheListGetsNothing() {

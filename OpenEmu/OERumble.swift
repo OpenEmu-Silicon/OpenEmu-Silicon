@@ -59,9 +59,9 @@ enum OERumbleMapping {
 
     /// Picks which controller in `controllerNames` should rumble for a player (counting from 1).
     ///
-    /// A controller whose name matches the player's input device wins. Otherwise, with only one controller
-    /// connected it is used, and with several the one in the player's position is used. Returns nil when
-    /// nothing fits, so a request never lands on the wrong pad by guessing past the end of the list.
+    /// A controller whose name matches the player's input device wins. Otherwise player 1 uses the only
+    /// controller when just one is connected, and any player uses the controller in their position. Returns nil
+    /// when nothing fits, so player 2 never drives player 1's only pad and a request never lands past the list.
     static func controllerIndex(forPlayer player: Int, deviceName: String?, controllerNames: [String?]) -> Int? {
         guard player >= 1, !controllerNames.isEmpty else { return nil }
 
@@ -72,7 +72,7 @@ enum OERumbleMapping {
             if matches.count == 1 { return matches[0] }
         }
 
-        if controllerNames.count == 1 { return 0 }
+        if controllerNames.count == 1 { return player == 1 ? 0 : nil }
         let position = player - 1
         return position < controllerNames.count ? position : nil
     }
@@ -88,6 +88,9 @@ final class OEControllerHaptics {
     private final class Motor {
         let engine: CHHapticEngine
         var player: CHHapticAdvancedPatternPlayer?
+        var needsStart = false
+        /// What the core last asked for; used to keep a held rumble going past the system's 30 second event limit.
+        var strength: Float = 0
         init(engine: CHHapticEngine) { self.engine = engine }
     }
 
@@ -97,12 +100,20 @@ final class OEControllerHaptics {
     }
 
     private var motors: [ObjectIdentifier: Motors] = [:]
+    private var disconnectObserver: NSObjectProtocol?
+
+    private init() {
+        disconnectObserver = NotificationCenter.default.addObserver(forName: .GCControllerDidDisconnect, object: nil, queue: .main) { [weak self] note in
+            guard let controller = note.object as? GCController else { return }
+            MainActor.assumeIsolated { self?.forget(controller) }
+        }
+    }
 
     /// Sets both motors of the controller that belongs to a player. Zero strengths stop them.
     func rumble(player: Int, deviceName: String?, strong: Float, weak: Float) {
-        let controllers = GCController.controllers().filter { $0.haptics != nil }
-        let names = controllers.map { $0.vendorName }
-        guard let index = OERumbleMapping.controllerIndex(forPlayer: player, deviceName: deviceName, controllerNames: names),
+        let controllers = GCController.controllers()
+        guard let index = OERumbleMapping.controllerIndex(forPlayer: player, deviceName: deviceName,
+                                                          controllerNames: controllers.map { $0.vendorName }),
               let haptics = controllers[index].haptics
         else { return }
 
@@ -117,14 +128,25 @@ final class OEControllerHaptics {
     func stopAll() {
         for entry in motors.values {
             for motor in [entry.strong, entry.weak] {
+                motor?.strength = 0
                 try? motor?.player?.stop(atTime: CHHapticTimeImmediate)
                 motor?.player = nil
             }
         }
     }
 
+    private func forget(_ controller: GCController) {
+        guard let entry = motors.removeValue(forKey: ObjectIdentifier(controller)) else { return }
+        for motor in [entry.strong, entry.weak] {
+            motor?.strength = 0
+            try? motor?.player?.stop(atTime: CHHapticTimeImmediate)
+            motor?.engine.stop()
+        }
+    }
+
     private func update(_ existing: Motor?, haptics: GCDeviceHaptics, locality: GCHapticsLocality, strength: Float) -> Motor? {
         if strength <= 0 {
+            existing?.strength = 0
             try? existing?.player?.stop(atTime: CHHapticTimeImmediate)
             existing?.player = nil
             return existing
@@ -136,34 +158,55 @@ final class OEControllerHaptics {
         } else {
             guard let engine = haptics.createEngine(withLocality: locality) else { return nil }
             let created = Motor(engine: engine)
-            engine.resetHandler = { [weak created] in created?.player = nil }
-            engine.stoppedHandler = { [weak created] _ in created?.player = nil }
-            do { try engine.start() } catch { return nil }
+            created.needsStart = true
+            // CoreHaptics calls these on its own thread. After either, the engine must be started again.
+            engine.resetHandler = { [weak created] in
+                DispatchQueue.main.async { created?.player = nil; created?.needsStart = true }
+            }
+            engine.stoppedHandler = { [weak created] _ in
+                DispatchQueue.main.async { created?.player = nil; created?.needsStart = true }
+            }
             motor = created
         }
 
+        motor.strength = strength
+        if motor.needsStart {
+            do { try motor.engine.start(); motor.needsStart = false } catch { return motor }
+        }
+        apply(motor)
+        return motor
+    }
+
+    /// Starts the steady event, or changes the strength of the one already running.
+    private func apply(_ motor: Motor) {
+        let strength = motor.strength
         do {
             if let player = motor.player {
                 try player.sendParameters([CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: strength, relativeTime: 0)],
                                           atTime: CHHapticTimeImmediate)
             } else {
-                // One long steady event; its strength is changed in place afterwards. The system caps it at 30
-                // seconds, after which the next request starts a new one.
+                // One long steady event, its strength changed in place afterwards. The system caps an event at
+                // 30 seconds; when it ends and the core still wants rumble, a new one is started.
                 let event = CHHapticEvent(eventType: .hapticContinuous,
                                           parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: strength),
                                                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)],
                                           relativeTime: 0, duration: 30)
                 let pattern = try CHHapticPattern(events: [event], parameters: [])
                 let player = try motor.engine.makeAdvancedPlayer(with: pattern)
-                player.completionHandler = { [weak motor] _ in
-                    DispatchQueue.main.async { motor?.player = nil }
+                player.completionHandler = { [weak self, weak motor, weak player] _ in
+                    DispatchQueue.main.async {
+                        guard let self, let motor, motor.player === player else { return }
+                        motor.player = nil
+                        if motor.strength > 0 { self.apply(motor) }
+                    }
                 }
                 try player.start(atTime: CHHapticTimeImmediate)
                 motor.player = player
             }
         } catch {
             motor.player = nil
+            // A stopped engine throws here; start it again on the next request.
+            motor.needsStart = true
         }
-        return motor
     }
 }
