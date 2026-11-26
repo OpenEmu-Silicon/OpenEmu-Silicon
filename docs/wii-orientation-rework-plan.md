@@ -106,5 +106,5 @@ reaches Dolphin, not how it feels with a physical remote.
 
 ## AI disclosure
 
-This plan was drafted with an AI coding assistant (Claude Code) and reviewed by
-the maintainer.
+This plan was drafted with an AI coding assistant (Claude Code) and is waiting for
+the maintainer's review.
