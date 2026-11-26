@@ -219,7 +219,7 @@ static NSArray<OEControllerDescription *> *_knownControllerDescriptions;
     return [_controls allValues];
 }
 
-- (OEControlValueDescription *)controlValueDescriptionForEvent:(OEHIDEvent *)event;
+- (nullable OEControlValueDescription *)controlValueDescriptionForEvent:(OEHIDEvent *)event;
 {
     return _valueIdentifierToControlValue[@([event controlValueIdentifier])];
 }

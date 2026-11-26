@@ -49,7 +49,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(readonly) NSArray<OEControlDescription *> *controls;
 @property (nonatomic, readonly) BOOL wantsCalibration;
 
-- (OEControlValueDescription *)controlValueDescriptionForEvent:(OEHIDEvent *)event;
+- (nullable OEControlValueDescription *)controlValueDescriptionForEvent:(OEHIDEvent *)event;
 - (nullable OEControlValueDescription *)controlValueDescriptionForRepresentation:(id)representation;
 
 - (OEControlDescription *)addControlWithIdentifier:(nullable NSString *)identifier name:(nullable NSString *)name event:(OEHIDEvent *)event;
