@@ -53,6 +53,7 @@
 #import "OERetroAchievementsBridge.h"
 #include "OEChdHashCDReader.h"
 #include "OEPS2HashFileReader.h"
+#import "OEPS2BIOSSelection.h"
 #include <rc_consoles.h>
 
 // Defined by the engine patch PCSX2/patches/0001-openemu-metal-output.patch.
@@ -68,15 +69,6 @@ static const NSUInteger kFrameHeight = 448;
 static NSArray<NSString *> *PreferredBIOSNames(void)
 {
 	return @[@"scph39001.bin", @"scph70004.bin", @"scph10000.bin", @"scph50000.bin", @"scph30004r.bin"];
-}
-
-/// A PS2 BIOS dump is a few megabytes (4 MB for most consoles). Anything much smaller, such as a 512 KB
-/// PlayStation BIOS, or much larger, is not one, and booting it only gives a black screen.
-static BOOL IsPlausiblePS2BIOS(NSString *path)
-{
-	NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:path error:nil];
-	unsigned long long size = [attributes fileSize];
-	return size >= 1024 * 1024 && size <= 8 * 1024 * 1024;
 }
 
 // rcheevos reads PS2 memory during -doFrame, which runs on the engine's CPU thread.
@@ -131,26 +123,9 @@ static uint32_t pcsx2_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
 	_gameURL = _discURLs.firstObject;
 
 	// Find a BIOS now so a missing one is reported before anything starts. The BIOS folder is shared with
-	// other systems (a PlayStation BIOS is also a .bin), so only a file the size of a PS2 BIOS counts.
-	NSFileManager *fm = NSFileManager.defaultManager;
-	for (NSString *name in PreferredBIOSNames()) {
-		if (IsPlausiblePS2BIOS([self.biosDirectory URLByAppendingPathComponent:name].path)) {
-			_biosFilename = name;
-			break;
-		}
-	}
-	if (_biosFilename == nil) {
-		// Fall back to any other .bin of the right size in the BIOS folder.
-		NSArray<NSString *> *names = [[fm contentsOfDirectoryAtPath:self.biosDirectory.path error:nil]
-			sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
-		for (NSString *name in names) {
-			if ([name.pathExtension caseInsensitiveCompare:@"bin"] == NSOrderedSame
-				&& IsPlausiblePS2BIOS([self.biosDirectory URLByAppendingPathComponent:name].path)) {
-				_biosFilename = name;
-				break;
-			}
-		}
-	}
+	// other systems (a PlayStation BIOS is also a .bin), so a file counts only if it looks like a PS2 BIOS
+	// by size and content (see OEPS2BIOSSelection.m).
+	_biosFilename = OEPS2ChooseBIOS(self.biosDirectory.path, PreferredBIOSNames());
 	if (_biosFilename == nil) {
 		if (error) {
 			*error = [NSError errorWithDomain:OEGameCoreErrorDomain
