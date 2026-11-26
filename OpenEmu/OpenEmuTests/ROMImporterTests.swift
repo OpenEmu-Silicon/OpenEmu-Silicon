@@ -24,6 +24,8 @@
 
 import XCTest
 @testable import OpenEmu
+import OpenEmuSystem
+import OpenEmuKit
 
 extension XCTestCase {
     /// Returns the app's library, creating a throwaway one first if the test host did not load any.
@@ -134,5 +136,41 @@ class ROMImporterTests: XCTestCase {
             XCTAssertEqual(op.url.absoluteString, url2.absoluteString)
             XCTAssertEqual(op.sourceURL.absoluteString, url2.absoluteString)
         }
+    }
+}
+
+class MultiDiscM3UTests: XCTestCase {
+
+    private func makeDiscSet(in folder: URL, sega: Bool) throws -> URL {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var first: URL?
+        for n in 1...2 {
+            let name = "Game (Disc \(n))"
+            var bytes = Data(count: 2352 * 2)
+            if sega { bytes.replaceSubrange(0..<16, with: Data("SEGADISCSYSTEM  ".utf8)) }
+            try bytes.write(to: folder.appendingPathComponent("\(name).bin"))
+            let cue = "FILE \"\(name).bin\" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n"
+            let cueURL = folder.appendingPathComponent("\(name).cue")
+            try cue.write(to: cueURL, atomically: true, encoding: .utf8)
+            if first == nil { first = cueURL }
+        }
+        return try XCTUnwrap(first)
+    }
+
+    // #805: Sega CD can't open an .m3u, so multi-disc Sega CD sets must import each .cue.
+    func testSegaCDMultiDiscDoesNotCreateM3U() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("OE-805-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cue = try makeDiscSet(in: folder, sega: true)
+
+        // Control: the Sega CD system must recognise this fake disc, otherwise the checks below would pass
+        // without testing anything (no plugin loaded, or the disc not parsed).
+        let plugin = try XCTUnwrap(OESystemPlugin.allPlugins.first { $0.systemIdentifier == "openemu.system.scd" },
+                                   "Sega CD system plugin is not loaded in the test host")
+        let controller = try XCTUnwrap(plugin.controller)
+        XCTAssertEqual(controller.canHandle(try OEFile(url: cue)), .yes)
+
+        XCTAssertNil(ImportOperation.tryMultiDiscM3UAutoCreate(at: cue))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Game.m3u").path))
     }
 }
