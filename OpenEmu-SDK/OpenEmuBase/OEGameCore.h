@@ -516,6 +516,33 @@ OE_EXPORTED_CLASS
 /// Override this in cores that support cheat search / memory inspection.
 - (NSArray<OEMemoryRegionDescriptor *> *)readableMemoryRegions;
 
+#pragma mark - Live Memory - Optional
+
+// Live memory lets an outside tool (such as an Archipelago client) read and write the
+// running game's memory. Call these only from inside -performLiveMemoryTransaction:,
+// so no frame runs in the middle of a set of reads and writes.
+
+/// The platform of the loaded game ("GB", "GBC", "GBA", ...), or nil if the core does not support live memory.
+- (NSString * _Nullable)liveMemoryPlatform;
+
+/// The names of the memory areas that can be read and written while the game runs. Empty if unsupported.
+- (NSArray<NSString *> *)liveMemoryAreaNames;
+
+/// The size in bytes of a memory area, or 0 for an unknown area.
+- (NSUInteger)sizeOfLiveMemoryArea:(NSString *)area;
+
+/// Copies bytes from a memory area. Bytes past the end of the area read as 0.
+/// Returns NO only when the area is unknown.
+- (BOOL)readLiveMemoryArea:(NSString *)area offset:(uint64_t)offset length:(NSUInteger)length into:(uint8_t *)buffer;
+
+/// Writes bytes into a memory area. Bytes past the end of the area are ignored.
+/// Returns NO only when the area is unknown.
+- (BOOL)writeLiveMemoryArea:(NSString *)area offset:(uint64_t)offset bytes:(const uint8_t *)bytes length:(NSUInteger)length;
+
+/// Runs the block on the emulation thread while no frame is running. The default uses -performBlock:.
+/// Cores that run the emulated CPU on a thread of their own must override this before listing any areas.
+- (void)performLiveMemoryTransaction:(void (^)(void))block;
+
 #pragma mark - Discs - Optional
 
 @property(readonly) NSUInteger discCount;

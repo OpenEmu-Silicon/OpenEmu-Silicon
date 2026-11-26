@@ -44,7 +44,14 @@ final public class GameAudio2: GameAudioProtocol {
     private var isDefaultOutputDevice = true
     private var isRunning = false
     private var currentSampleRate: Double = 0
-    
+    /// The device rate the current source node was built for.
+    private var outputSampleRate: Double = 0
+    /// Bumped whenever audio is paused or stopped, so a restart queued before that point does nothing.
+    private var resumeGeneration = 0
+    private var configurationChangePending = false
+    private var rateListenerDevice: AudioObjectID = 0
+    private var rateListener: AudioObjectPropertyListenerBlock?
+
     public init(withCore gameCore: OEGameCore) {
         self.gameCore = gameCore
         volume = 1.0
@@ -77,28 +84,40 @@ final public class GameAudio2: GameAudioProtocol {
         updateSourceNode()
         connectNodes()
         setOutputDeviceID(outputDeviceID)
+        if engine.outputNode.outputFormat(forBus: 0).sampleRate != outputSampleRate {
+            updateSourceNode()
+            connectNodes()
+        }
         
         engine.prepare()
         // per the following, we need to wait before resuming to allow devices to start 🤦🏻‍♂️
         //  https://github.com/AudioKit/AudioKit/blob/f2a404ff6cf7492b93759d2cd954c8a5387c8b75/Examples/macOS/OutputSplitter/OutputSplitter/Audio/Output.swift#L88-L95
         performResumeAudio()
         startMonitoringEngineConfiguration()
+        startMonitoringDeviceRate()
     }
     
     public func stopAudio() {
+        // Forget any restart still waiting on the main queue, and stop listening for device changes, so nothing
+        // brings the engine back after the game has been closed.
+        resumeGeneration &+= 1
+        stopMonitoringEngineConfiguration()
+        isRunning = false
         engine.stop()
         destroyNodes()
-        isRunning = true
     }
-    
+
     public func pauseAudio() {
+        resumeGeneration &+= 1
         engine.pause()
         isRunning = false
     }
-    
+
     private func performResumeAudio() {
+        let generation = resumeGeneration
         DispatchQueue.main
-            .asyncAfter(deadline: .now() + 0.020) {
+            .asyncAfter(deadline: .now() + 0.020) { [weak self] in
+                guard let self, generation == self.resumeGeneration else { return }
                 self.resumeAudio()
             }
     }
@@ -162,10 +181,31 @@ final public class GameAudio2: GameAudioProtocol {
         let bytesPerFrame = sd.mBytesPerFrame
         let channelCount  = sd.mChannelsPerFrame
         
-        src = AVAudioSourceNode(format: renderFormat,
-                                renderBlock: Self.makeRenderBlock(read: read,
-                                                                 bytesPerFrame: bytesPerFrame,
-                                                                 channelCount: channelCount))
+        // The system mixer converts a core's rate to the device's rate. For some pairs it does that very slowly: a
+        // 32768 Hz core (Game Boy Advance) or a 32728 Hz core (DS) on a 44.1 kHz device makes the audio thread use
+        // about ten times the CPU, which crackles and can leave the engine unable to pause when the game closes.
+        // When the core is slower than the device, convert here with a cheap interpolator and hand the mixer audio
+        // that is already at the device rate.
+        let deviceRate = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        outputSampleRate = deviceRate
+        if deviceRate > sd.mSampleRate * 1.0001,
+           channelCount > 0,
+           let format = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                      sampleRate: deviceRate,
+                                      channels: AVAudioChannelCount(channelCount),
+                                      interleaved: false) {
+            let renderer = UpsamplingRenderer(read: read,
+                                              channelCount: Int(channelCount),
+                                              bytesPerSample: Int(sd.mBytesPerFrame / channelCount),
+                                              inputRate: sd.mSampleRate,
+                                              outputRate: deviceRate)
+            src = AVAudioSourceNode(format: format, renderBlock: renderer.renderBlock)
+        } else {
+            src = AVAudioSourceNode(format: renderFormat,
+                                    renderBlock: Self.makeRenderBlock(read: read,
+                                                                     bytesPerFrame: bytesPerFrame,
+                                                                     channelCount: channelCount))
+        }
         if let src {
             engine.attach(src)
         }
@@ -212,12 +252,66 @@ final public class GameAudio2: GameAudioProtocol {
             .addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
                 guard let self = self else { return }
                 
-                log.debug("AVAudioEngine configuration change")
-                self.setOutputDeviceID(self.outputDeviceID)
+                self.handleConfigurationChange()
             }
+    }
+
+    /// The output device changed (a different device, or the same one at a new sample rate). The engine has already
+    /// stopped itself. Reconnect the nodes to the new output format and start again. Do not set the output device here:
+    /// setting it, even to the device already in use, makes CoreAudio send another change notification, and the
+    /// notifications feed each other until the audio thread is spinning and closing the game hangs.
+    private func handleConfigurationChange() {
+        log.debug("AVAudioEngine configuration change; running: \(self.isRunning)")
+        guard isRunning, src != nil else { return }
+        // Several notifications usually arrive together for one change; restart once.
+        guard !configurationChangePending else { return }
+        configurationChangePending = true
+
+        let generation = resumeGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.100) { [weak self] in
+            guard let self else { return }
+            self.configurationChangePending = false
+            guard generation == self.resumeGeneration, self.isRunning, self.src != nil else { return }
+                self.engine.stop()
+            self.updateSourceNode()
+            self.connectNodes()
+            self.engine.prepare()
+            self.performResumeAudio()
+            self.startMonitoringDeviceRate()
+        }
+    }
+    
+    /// AVAudioEngine announces a device change only some of the time: after one change it can keep playing at the old
+    /// rate through a later one, and the audio thread then spins and pausing the engine never returns. Listen to the
+    /// device ourselves so every rate change restarts the engine.
+    private func startMonitoringDeviceRate() {
+        stopMonitoringDeviceRate()
+        let device = engine.outputNode.auAudioUnit.deviceID
+        guard device != 0 else { return }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyNominalSampleRate,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.handleConfigurationChange()
+        }
+        if AudioObjectAddPropertyListenerBlock(device, &address, DispatchQueue.main, block) == noErr {
+            rateListener = block
+            rateListenerDevice = device
+        }
+    }
+    
+    private func stopMonitoringDeviceRate() {
+        guard let block = rateListener else { return }
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyNominalSampleRate,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        AudioObjectRemovePropertyListenerBlock(rateListenerDevice, &address, DispatchQueue.main, block)
+        rateListener = nil
+        rateListenerDevice = 0
     }
     
     private func stopMonitoringEngineConfiguration() {
+        stopMonitoringDeviceRate()
         if let token = token {
             NotificationCenter.default.removeObserver(token)
             self.token = nil
@@ -247,10 +341,13 @@ final public class GameAudio2: GameAudioProtocol {
         
         engine.stop()
         
-        do {
-            try engine.outputNode.auAudioUnit.setDeviceID(id)
-        } catch {
-            log.error("Unable to set output device ID \(id): \(error.localizedDescription, privacy: .public)")
+        // Setting the device it already has still makes CoreAudio announce a configuration change.
+        if engine.outputNode.auAudioUnit.deviceID != id {
+            do {
+                try engine.outputNode.auAudioUnit.setDeviceID(id)
+            } catch {
+                log.error("Unable to set output device ID \(id): \(error.localizedDescription, privacy: .public)")
+            }
         }
         
         connectNodes()
@@ -263,5 +360,116 @@ final public class GameAudio2: GameAudioProtocol {
     
     var outputDeviceID: AudioDeviceID {
         isDefaultOutputDevice ? 0 : engine.outputNode.auAudioUnit.deviceID
+    }
+}
+
+
+/// Converts a core's audio to a higher device rate inside the render callback, using Catmull-Rom interpolation.
+/// It allocates everything up front and takes no locks of its own, so it is safe on the audio thread.
+final class UpsamplingRenderer {
+    private let read: OEAudioBufferReadBlock
+    private let channelCount: Int
+    private let bytesPerSample: Int
+    private let step: Double            // input frames consumed per output frame; below 1 when upsampling
+    private let chunkFrames = 64
+    private let raw: UnsafeMutableRawPointer
+    private let stage: UnsafeMutablePointer<Float>
+    private let history: UnsafeMutablePointer<Float>   // four frames, oldest first
+    private var stageIndex: Int
+    private var stageCount = 0
+    private var position = 4.0          // fractional position; starts high so the first frames fill the history
+    private var gotRealFrames = false
+    
+    init(read: @escaping OEAudioBufferReadBlock, channelCount: Int, bytesPerSample: Int, inputRate: Double, outputRate: Double) {
+        self.read = read
+        self.channelCount = channelCount
+        self.bytesPerSample = bytesPerSample
+        self.step = inputRate / outputRate
+        raw = .allocate(byteCount: chunkFrames * channelCount * bytesPerSample, alignment: 16)
+        stage = .allocate(capacity: chunkFrames * channelCount)
+        history = .allocate(capacity: 4 * channelCount)
+        history.initialize(repeating: 0, count: 4 * channelCount)
+        stageIndex = chunkFrames
+    }
+    
+    deinit {
+        raw.deallocate()
+        stage.deallocate()
+        history.deallocate()
+    }
+    
+    var renderBlock: AVAudioSourceNodeRenderBlock {
+        { [self] isSilence, _, frameCount, outputData in
+            gotRealFrames = false
+            let buffers = UnsafeMutableAudioBufferListPointer(outputData)
+            let frames = Int(frameCount)
+            let channels = channelCount
+            let h = history
+            
+            for i in 0..<frames {
+                while position >= 1 {
+                    position -= 1
+                    pushInputFrame()
+                }
+                let t = Float(position)
+                for c in 0..<min(channels, buffers.count) {
+                    let p0 = h[c], p1 = h[channels + c], p2 = h[2 * channels + c], p3 = h[3 * channels + c]
+                    let a = -p0 + 3 * p1 - 3 * p2 + p3
+                    let b = 2 * p0 - 5 * p1 + 4 * p2 - p3
+                    let k = p2 - p0
+                    let value = p1 + 0.5 * t * (k + t * (b + t * a))
+                    buffers[c].mData?.assumingMemoryBound(to: Float.self)[i] = value
+                }
+                position += step
+            }
+            for c in 0..<buffers.count {
+                buffers[c].mDataByteSize = UInt32(frames * MemoryLayout<Float>.size)
+            }
+            isSilence.pointee = ObjCBool(!gotRealFrames)
+            return noErr
+        }
+    }
+    
+    /// Slides the history window by one input frame, reading a new chunk from the core when the last one runs out.
+    private func pushInputFrame() {
+        if stageIndex >= stageCount {
+            refill()
+        }
+        let channels = channelCount
+        let h = history
+        for f in 0..<3 {
+            for c in 0..<channels {
+                h[f * channels + c] = h[(f + 1) * channels + c]
+            }
+        }
+        let base = stageIndex * channels
+        for c in 0..<channels {
+            h[3 * channels + c] = stage[base + c]
+        }
+        stageIndex += 1
+    }
+    
+    private func refill() {
+        let bytesPerFrame = channelCount * bytesPerSample
+        let wanted = chunkFrames * bytesPerFrame
+        let copied = Int(read(raw, UInt(wanted)))
+        let frames = copied / bytesPerFrame
+        if frames > 0 { gotRealFrames = true }
+        
+        let total = chunkFrames * channelCount
+        let have = frames * channelCount
+        if bytesPerSample == 2 {
+            let src = raw.assumingMemoryBound(to: Int16.self)
+            for i in 0..<have { stage[i] = Float(src[i]) * (1.0 / 32768.0) }
+        } else {
+            let src = raw.assumingMemoryBound(to: Float.self)
+            for i in 0..<have { stage[i] = src[i] }
+        }
+        // A short read (the core fell behind) plays out as silence, as the direct path does.
+        if have < total {
+            (stage + have).update(repeating: 0, count: total - have)
+        }
+        stageCount = chunkFrames
+        stageIndex = 0
     }
 }

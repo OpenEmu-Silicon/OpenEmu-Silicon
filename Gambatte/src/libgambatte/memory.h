@@ -45,6 +45,16 @@ public:
 	void saveSavedata() { cart_.saveSavedata(); }
 	std::string const saveBasePath() const { return cart_.saveBasePath(); }
 
+//> OpenEmu
+	unsigned char * memoryArea(int area, std::size_t &size) const { return cart_.memoryArea(area, size); }
+
+	// Writes only where plain memory backs the address (work RAM, cartridge RAM), with no side effects.
+	void plainWrite(unsigned p, unsigned data) {
+		if (unsigned char *w = cart_.wmem(p >> 12))
+			w[p] = data;
+	}
+//< OpenEmu
+
 	void setOsdElement(transfer_ptr<OsdElement> osdElement) {
 		lcd_.setOsdElement(osdElement);
 	}

@@ -36,6 +36,8 @@
 			<true/>
 			<key>OEGameCoreSupportsRetroAchievements</key>
 			<true/>
+			<key>OEGameCoreSupportsDisplayModeChange</key>
+			<true/>
 		</dict>
 		<key>openemu.system.wii</key>
 		<dict>
@@ -46,6 +48,8 @@
 			<key>OEGameCoreSupportsCheatSearch</key>
 			<true/>
 			<key>OEGameCoreSupportsRetroAchievements</key>
+			<true/>
+			<key>OEGameCoreSupportsDisplayModeChange</key>
 			<true/>
 		</dict>
 	</dict>

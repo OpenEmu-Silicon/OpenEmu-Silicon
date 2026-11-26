@@ -20,7 +20,8 @@ This file is the source of truth for what each term means *in this codebase*. If
 | Term | Meaning |
 |---|---|
 | **host app** | The main `OpenEmu.app` — the library, preferences, controllers UI, save state browser. |
-| **helper / broker / `OpenEmuHelperApp`** | The sandboxed XPC process that actually runs an emulator core. Lives in `OpenEmu/broker/`. The host app and helper communicate via XPC; the helper isolates crashes so a bad core can't take down the library. |
+| **helper / `OpenEmuHelperApp`** | The process that actually runs an emulator core, one per running game. The host app starts it from `OpenEmu.app/Contents/MacOS/OpenEmuHelperApp` and talks to it over XPC; it isolates crashes so a bad core can't take down the library. It is not sandboxed. |
+| **broker** | The small XPC service in `OpenEmu/broker/` that only introduces the host app and a helper to each other. |
 | **rcheevos** | The vendored C library that talks to the RetroAchievements service. Built into the helper. Cores integrate it directly. |
 
 ## Update / distribution
@@ -71,6 +72,9 @@ This file is the source of truth for what each term means *in this codebase*. If
 | **artwork backup** | Add-only copy of pinned art and History (or everything) to `{backup folder}/Artwork`, run with the folder backup. Two Macs that changed the same picture keep both (`Name (from <Mac>).png`). Code: `OEArtworkBackup`. |
 | **rewind** | The host-side save-state ring buffer that lets the player step backward. Implemented in the helper, controlled from the host. |
 | **CHD** | MAME's compressed disc image format (`.chd`), read with libchdr. A **DVD-type CHD** (`chdman createdvd`) holds a DVD image such as a PSP ISO; a **CD-type CHD** (`chdman createcd`) holds CD tracks; a **GD-ROM CHD** (`chdman createcd` of a Dreamcast GDI or CUE) holds a GD-ROM's tracks. Today the app reads DVD-type CHDs for PSP, CD-type CHDs for PlayStation, Saturn, PC Engine CD, PC-FX and Sega CD, and GD-ROM CHDs for Dreamcast: `OECHDFile` at import, and `OECHDReader` in the cores that cannot read CHD themselves (PPSSPP; Mednafen, which loads a made-up CUE sheet served from the CHD by `OEChdVirtualFS`). Flycast reads CHD itself, and so does Genesis Plus GX, built with `USE_LIBCHDR` against `Vendor/libchdr` (not the older copy in its `cd_hw/libchdr`). For RetroAchievements, the Mednafen, Flycast and Genesis Plus GX wrappers give rcheevos `OEChdHashCDReader` (`OpenEmuKit/Source`), which reads a CD-type CHD as its CUE sheet and a GD-ROM CHD as its GDI, so the hash is the original's. Arcade does not accept CHDs: MAME looks for a game's CHD in a folder named after the game, which the library's flat Arcade folder does not provide, so a CHD no system recognises is refused at import. |
+| **Archipelago connections** | Lets an Archipelago randomizer client read and write a running game's memory. Off by default; see [`docs/archipelago.md`](docs/archipelago.md). |
+| **live memory** | The optional `OEGameCore` methods (`liveMemoryAreaNames`, `readLiveMemoryArea:…`, `writeLiveMemoryArea:…`, `performLiveMemoryTransaction:`) that let an outside tool read and write game memory between frames. Different from `readableMemoryRegions`, which copies memory for the cheat finder. |
+| **adapter** (Archipelago) | The layer that speaks one Archipelago client's protocol and turns it into live memory steps. The first is BizHawk Client (`BizHawkClientCodec`, `BizHawkClientListener`). |
 
 ## What this file is not
 
