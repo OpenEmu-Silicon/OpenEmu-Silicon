@@ -428,12 +428,19 @@ final class PresentationWatchdog: @unchecked Sendable {
         } catch {
             gameCore = nil
             
-			throw OEGameCoreErrorCodes(.couldNotLoadROMError,
-                                       userInfo: [
-                                        NSLocalizedDescriptionKey: NSLocalizedString("The emulator could not load ROM.",
-                                                                                     comment: "Error when loading a ROM."),
-                                        NSUnderlyingErrorKey: error
-                                       ])
+            // When the core says why it failed (for example "No PlayStation 2 BIOS found."), show that
+            // instead of the generic line, so people know what to fix.
+            let coreError = error as NSError
+            let coreReason = coreError.userInfo[NSLocalizedDescriptionKey] as? String
+            var userInfo: [String: Any] = [
+                NSLocalizedDescriptionKey: coreReason ?? NSLocalizedString("The emulator could not load ROM.",
+                                                                           comment: "Error when loading a ROM."),
+                NSUnderlyingErrorKey: error
+            ]
+            if coreReason != nil, let suggestion = coreError.userInfo[NSLocalizedRecoverySuggestionErrorKey] as? String {
+                userInfo[NSLocalizedRecoverySuggestionErrorKey] = suggestion
+            }
+			throw OEGameCoreErrorCodes(.couldNotLoadROMError, userInfo: userInfo)
         }
 
         // A core asks a controller to rumble by posting "OEGameCoreRumble" with the player

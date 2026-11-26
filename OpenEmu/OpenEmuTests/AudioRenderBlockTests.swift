@@ -124,3 +124,94 @@ final class AudioRenderBlockTests: XCTestCase {
         return (data, isSilent.boolValue)
     }
 }
+
+/// The converter that stands in for the system mixer when a core's rate is below the device's. The system converter
+/// is very slow for pairs such as 32768 Hz to 44100 Hz, which crackles and can stop the game from closing.
+final class UpsamplingRendererTests: XCTestCase {
+    private let coreRate = 32768.0
+    private let deviceRate = 44100.0
+
+    func testSineKeepsItsPitch() {
+        var phase = 0.0
+        let step = 2 * Double.pi * 1000 / coreRate
+        let renderer = UpsamplingRenderer(read: { data, requested in
+            let frames = Int(requested) / 4
+            let samples = data!.bindMemory(to: Int16.self, capacity: frames * 2)
+            for i in 0..<frames {
+                let v = Int16(sin(phase) * 12000)
+                samples[2 * i] = v
+                samples[2 * i + 1] = v
+                phase += step
+            }
+            return requested
+        }, channelCount: 2, bytesPerSample: 2, inputRate: coreRate, outputRate: deviceRate)
+
+        let left = renderSeconds(1, renderer: renderer).left
+        var crossings = 0
+        for i in 1..<left.count where left[i - 1] < 0 && left[i] >= 0 { crossings += 1 }
+        XCTAssertEqual(crossings, 1000, accuracy: 3)
+        XCTAssertLessThan(left.map(abs).max() ?? 0, 0.40, "interpolation must not overshoot the 12000/32768 peak by much")
+    }
+
+    func testConstantLevelIsPreserved() {
+        let renderer = UpsamplingRenderer(read: { data, requested in
+            let count = Int(requested) / 2
+            data!.bindMemory(to: Int16.self, capacity: count).initialize(repeating: 8192, count: count)
+            return requested
+        }, channelCount: 2, bytesPerSample: 2, inputRate: coreRate, outputRate: deviceRate)
+
+        let out = renderSeconds(0.2, renderer: renderer)
+        XCTAssertTrue(out.left.suffix(2000).allSatisfy { abs($0 - 0.25) < 0.001 })
+        XCTAssertTrue(out.right.suffix(2000).allSatisfy { abs($0 - 0.25) < 0.001 })
+        XCTAssertFalse(out.wasSilent)
+    }
+
+    func testEmptyReadIsSilent() {
+        let renderer = UpsamplingRenderer(read: { _, _ in 0 },
+                                          channelCount: 2, bytesPerSample: 2, inputRate: coreRate, outputRate: deviceRate)
+        let out = renderSeconds(0.1, renderer: renderer)
+        XCTAssertTrue(out.left.allSatisfy { $0 == 0 })
+        XCTAssertTrue(out.wasSilent)
+    }
+
+    func testShortReadPlaysTheSamplesThenSilence() {
+        var delivered = false
+        let renderer = UpsamplingRenderer(read: { data, requested in
+            guard !delivered else { return 0 }
+            delivered = true
+            let count = Int(requested) / 2
+            data!.bindMemory(to: Int16.self, capacity: count).initialize(repeating: 8192, count: count)
+            return requested / 2   // only half of the first chunk
+        }, channelCount: 2, bytesPerSample: 2, inputRate: coreRate, outputRate: deviceRate)
+
+        let out = renderSeconds(0.1, renderer: renderer)
+        XCTAssertTrue(out.left.contains { $0 > 0.2 })
+        XCTAssertTrue(out.left.suffix(1000).allSatisfy { $0 == 0 })
+    }
+
+    /// Renders in 512-frame calls, like the audio thread, and returns both channels.
+    private func renderSeconds(_ seconds: Double, renderer: UpsamplingRenderer) -> (left: [Float], right: [Float], wasSilent: Bool) {
+        let block = renderer.renderBlock
+        let calls = Int(seconds * deviceRate / 512)
+        var left: [Float] = [], right: [Float] = []
+        var lastSilent = true
+        for _ in 0..<calls {
+            var l = [Float](repeating: 9, count: 512), r = [Float](repeating: 9, count: 512)
+            var silent = ObjCBool(false)
+            var timestamp = AudioTimeStamp()
+            l.withUnsafeMutableBytes { lb in
+                r.withUnsafeMutableBytes { rb in
+                    let list = AudioBufferList.allocate(maximumBuffers: 2)
+                    defer { free(list.unsafeMutablePointer) }
+                    list[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 2048, mData: lb.baseAddress)
+                    list[1] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 2048, mData: rb.baseAddress)
+                    XCTAssertEqual(block(&silent, &timestamp, 512, list.unsafeMutablePointer), noErr)
+                }
+            }
+            lastSilent = silent.boolValue
+            left += l
+            right += r
+        }
+        return (left, right, lastSilent)
+    }
+}

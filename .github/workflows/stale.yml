@@ -43,5 +43,5 @@ jobs:
           days-before-pr-close: -1
 
           # Don't touch issues with these labels — intentionally open items
-          exempt-issue-labels: 'pinned,security,in-progress,help wanted,good first issue,confirmed,blocked,critical,retro-achievements,known-issue,checklist,ready-for-agent'
+          exempt-issue-labels: 'pinned,security,in-progress,help wanted,good first issue,confirmed,blocked,critical,retro-achievements,known-issue,checklist,ready'
           exempt-all-milestones: true

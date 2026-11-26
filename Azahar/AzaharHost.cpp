@@ -26,13 +26,15 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <chrono>
 #include <fstream>
 #include <atomic>
-#include <deque>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <tuple>
+#include <vector>
 
 #include "audio_core/audio_types.h"
 #include "audio_core/sink.h"
@@ -54,26 +56,94 @@
 
 namespace {
 
-/// Samples the engine has produced and OpenEmu has not taken yet. The engine pushes them from the
-/// emulation thread as it makes them; the core drains them in executeFrame.
+// Azahar's DSP produces stereo PCM at approximately 32,728 frames/sec.
+// Passing this irregular rate directly into AVAudioEngine appeared to leave its
+// real-time resampler busy when OpenEmu tried to pause audio. Produce 48-kHz PCM
+// at the core boundary, without changing emulation timing, pitch, or the host app.
+constexpr double kAzaharDSPRate = 32728.0;
+constexpr unsigned int kOpenEmuPCMRate = 48000;
+
+// Performance candidate 2: fixed-capacity stereo FIFO. The previous std::deque
+// inserted and erased individual samples for every DSP batch and every pull.
+// Retain the exact one-second limit and oldest-sample-drop behavior, but use
+// contiguous copies and no queue allocations on the emulation hot path.
+constexpr size_t kAudioCapacitySamples = static_cast<size_t>(kOpenEmuPCMRate) * 2;
 std::mutex gAudioLock;
-std::deque<int16_t> gAudio;
+std::array<int16_t, kAudioCapacitySamples> gAudio{};
+size_t gAudioRead = 0;
+size_t gAudioSize = 0;
+
+void AppendAudioLocked(const int16_t* samples, size_t count) {
+    if (count >= kAudioCapacitySamples) {
+        // Whole FIFO replaced by the most recent second, matching old behavior.
+        samples += count - kAudioCapacitySamples;
+        count = kAudioCapacitySamples;
+        gAudioRead = 0;
+        gAudioSize = 0;
+    } else if (gAudioSize + count > kAudioCapacitySamples) {
+        const size_t dropped = gAudioSize + count - kAudioCapacitySamples;
+        gAudioRead = (gAudioRead + dropped) % kAudioCapacitySamples;
+        gAudioSize -= dropped;
+    }
+    const size_t write = (gAudioRead + gAudioSize) % kAudioCapacitySamples;
+    const size_t first = std::min(count, kAudioCapacitySamples - write);
+    std::memcpy(gAudio.data() + write, samples, first * sizeof(int16_t));
+    if (count > first) {
+        std::memcpy(gAudio.data(), samples + first, (count - first) * sizeof(int16_t));
+    }
+    gAudioSize += count;
+}
 
 class OEAudioSink final : public AudioCore::Sink {
 public:
-    unsigned int GetNativeSampleRate() const override { return 32728; }
+    unsigned int GetNativeSampleRate() const override { return kOpenEmuPCMRate; }
     void SetCallback(std::function<void(s16 *, std::size_t)>) override {}
     bool ImmediateSubmission() override { return true; }
     void PushSamples(const void *data, std::size_t numSamples) override {
+        // ImmediateSubmission delivers native DSP samples. GetNativeSampleRate is
+        // also used for Azahar's optional time stretcher; it does not resample
+        // these direct submissions. Resample explicitly to keep pitch correct.
         const int16_t *samples = static_cast<const int16_t *>(data);
-        std::lock_guard<std::mutex> lock(gAudioLock);
-        gAudio.insert(gAudio.end(), samples, samples + numSamples * 2);
-        // Never hold more than about a second; if OpenEmu stops draining, drop the oldest.
-        constexpr size_t kMaxSamples = 32728 * 2;
-        if (gAudio.size() > kMaxSamples) {
-            gAudio.erase(gAudio.begin(), gAudio.begin() + (gAudio.size() - kMaxSamples));
+        if (samples == nullptr || numSamples == 0) return;
+
+        // Reuse storage across DSP batches instead of allocating a new vector
+        // on every call. This does not change interpolation or sample timing.
+        converted_.clear();
+        const size_t needed = static_cast<size_t>(numSamples *
+            (kOpenEmuPCMRate / kAzaharDSPRate) * 2 + 8);
+        if (converted_.capacity() < needed) converted_.reserve(needed);
+        constexpr double step = kAzaharDSPRate / kOpenEmuPCMRate;
+        for (std::size_t i = 0; i < numSamples; ++i) {
+            const std::array<int16_t, 2> current{samples[i * 2], samples[i * 2 + 1]};
+            const double currentPosition = static_cast<double>(sourceFramesSeen_++);
+            if (!hasPrevious_) {
+                previous_ = current;
+                hasPrevious_ = true;
+            }
+            const double previousPosition = currentPosition > 0 ? currentPosition - 1.0 : 0.0;
+            while (nextOutputPosition_ <= currentPosition) {
+                const double blend = (currentPosition == 0)
+                    ? 1.0 : std::clamp(nextOutputPosition_ - previousPosition, 0.0, 1.0);
+                for (std::size_t channel = 0; channel < 2; ++channel) {
+                    const double value = (1.0 - blend) * previous_[channel] + blend * current[channel];
+                    const long rounded = std::lround(value);
+                    converted_.push_back(static_cast<int16_t>(std::clamp(rounded, -32768L, 32767L)));
+                }
+                nextOutputPosition_ += step;
+            }
+            previous_ = current;
         }
+        // The producer and PullAudio agree on interleaved 16-bit stereo samples.
+        std::lock_guard<std::mutex> lock(gAudioLock);
+        AppendAudioLocked(converted_.data(), converted_.size());
     }
+
+private:
+    std::vector<int16_t> converted_;
+    bool hasPrevious_ = false;
+    std::array<int16_t, 2> previous_{};
+    uint64_t sourceFramesSeen_ = 0;
+    double nextOutputPosition_ = 0;
 };
 
 /// The window the engine draws into. The engine never shows it; each finished frame is
@@ -102,6 +172,14 @@ bool gLoaded = false;
 
 AzaharHost::Layout gLayout = AzaharHost::Layout::Stacked;
 unsigned gScale = 1;
+AzaharHost::StereoMode gStereo = AzaharHost::StereoMode::Off;
+unsigned gStereoDepth = 100;
+
+/// SBS Full contains two complete eye images, doubling the *output* width.
+/// Half SBS and anaglyph keep the same output dimensions as ordinary 2D.
+unsigned StereoWidthMultiplier() {
+    return gStereo == AzaharHost::StereoMode::SideBySideFull ? 2u : 1u;
+}
 
 /// Size of the picture for a layout at 1x. The engine fits its screens into this size.
 void LayoutSize(AzaharHost::Layout layout, unsigned *w, unsigned *h) {
@@ -128,12 +206,32 @@ void ApplyDisplay(bool running) {
     default:            v.layout_option = Settings::LayoutOption::Default; v.swap_screen = false; break;
     }
     v.resolution_factor = gScale;
+    // Let Azahar's existing Vulkan composition produce both eyes, or the red/cyan
+    // anaglyph, *before* the final MTLTexture is handed to OpenEmu.
+    switch (gStereo) {
+    case AzaharHost::StereoMode::SideBySideHalf:
+        v.render_3d = Settings::StereoRenderOption::SideBySide; break;
+    case AzaharHost::StereoMode::SideBySideFull:
+        v.render_3d = Settings::StereoRenderOption::SideBySideFull; break;
+    case AzaharHost::StereoMode::Anaglyph:
+        v.render_3d = Settings::StereoRenderOption::Anaglyph; break;
+    default:
+        v.render_3d = Settings::StereoRenderOption::Off; break;
+    }
+    v.factor_3d = gStereoDepth;
     if (gWindow) {
         unsigned w, h;
         LayoutSize(gLayout, &w, &h);
-        gWindow->SetLayoutSize(w * gScale, h * gScale);
+        // Azahar halves the requested width internally while composing SBS Full,
+        // then doubles the final layout width. Supply 2x width so each eye retains
+        // its full resolution (e.g. Stacked 1x 800x480, 6x 4800x2880).
+        const unsigned framebufferWidth = w * gScale * StereoWidthMultiplier();
+        const unsigned framebufferHeight = h * gScale;
+        gWindow->SetLayoutSize(framebufferWidth, framebufferHeight);
     }
-    if (running) Core::System::GetInstance().ApplySettings();
+    if (running) {
+        Core::System::GetInstance().ApplySettings();
+    }
 }
 
 std::atomic<bool> gFrameDone{false};
@@ -368,27 +466,35 @@ bool RunFrame(std::string *error) {
     return true;
 }
 
-void SetDisplay(Layout layout, unsigned scale) {
+void SetDisplay(Layout layout, unsigned scale, StereoMode stereo, unsigned depthPercent) {
     gLayout = layout;
-    gScale = scale < 1 ? 1 : (scale > 4 ? 4 : scale);
+    gScale = scale < 1 ? 1 : (scale > 6 ? 6 : scale);
+    gStereo = stereo;
+    gStereoDepth = std::min(depthPercent, 100u);
     ApplyDisplay(gLoaded);
 }
 
 void ExpectedFrameSize(uint32_t *width, uint32_t *height) {
     unsigned w, h;
     LayoutSize(gLayout, &w, &h);
-    *width = w * gScale;
+    *width = w * gScale * StereoWidthMultiplier();
     *height = h * gScale;
 }
 
 // A state saved while the kernel has asynchronous work in flight would lose that work, so let it
 // finish first. Same approach as Azahar's libretro frontend.
 static bool DrainAsyncOperations(Core::System &system) {
-    if (!system.KernelRunning()) return true;
+    if (!system.KernelRunning()) {
+        return true;
+    }
     const auto start = std::chrono::steady_clock::now();
     while (system.Kernel().AreAsyncOperationsPending()) {
-        if (std::chrono::steady_clock::now() - start > std::chrono::seconds(5)) return false;
-        if (system.RunLoop() != Core::System::ResultStatus::Success) return false;
+        if (std::chrono::steady_clock::now() - start > std::chrono::seconds(5)) {
+            return false;
+        }
+        if (system.RunLoop() != Core::System::ResultStatus::Success) {
+            return false;
+        }
     }
     return true;
 }
@@ -461,7 +567,8 @@ void Shutdown() {
     gFrameTexture = nullptr;
     {
         std::lock_guard<std::mutex> lock(gAudioLock);
-        gAudio.clear();
+        gAudioRead = 0;
+        gAudioSize = 0;
     }
     gWindow.reset();
 }
@@ -505,10 +612,17 @@ uint32_t FrameHeight() { return gFrameHeight; }
 void *FrameTexture() { return gFrameTexture; }
 
 size_t PullAudio(int16_t *out, size_t maxFrames) {
+    if (out == nullptr || maxFrames == 0) return 0;
     std::lock_guard<std::mutex> lock(gAudioLock);
-    const size_t frames = std::min(maxFrames, gAudio.size() / 2);
-    std::copy_n(gAudio.begin(), frames * 2, out);
-    gAudio.erase(gAudio.begin(), gAudio.begin() + frames * 2);
+    const size_t frames = std::min(maxFrames, gAudioSize / 2);
+    const size_t count = frames * 2;
+    const size_t first = std::min(count, kAudioCapacitySamples - gAudioRead);
+    std::memcpy(out, gAudio.data() + gAudioRead, first * sizeof(int16_t));
+    if (count > first) {
+        std::memcpy(out + first, gAudio.data(), (count - first) * sizeof(int16_t));
+    }
+    gAudioRead = (gAudioRead + count) % kAudioCapacitySamples;
+    gAudioSize -= count;
     return frames;
 }
 
