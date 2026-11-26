@@ -51,6 +51,17 @@ extern char szAppHiscorePath[FBNEO_MAX_PATH];
 extern char szAppBlendPath[FBNEO_MAX_PATH];
 extern char szAppHDDPath[FBNEO_MAX_PATH];
 
+// FBNeo's driver list, also exported by the dylib (declared in src/burn/burn.h).
+// Used only to ask which disk images a set needs, before the set is loaded.
+extern "C" {
+extern unsigned int nBurnDrvCount;
+extern unsigned int nBurnDrvActive;
+char *BurnDrvGetTextA(unsigned int i);
+int BurnDrvGetHDDName(char **pszName, unsigned int i, int nAka);
+}
+#define FBNEO_DRV_NAME   0
+#define FBNEO_DRV_PARENT 7
+
 static void fbneo_set_support_path(char *dest, NSString *path)
 {
     // FBNeo appends file names directly, so the path must end with a slash.
@@ -126,6 +137,85 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
     fbneo_set_support_path(szAppHDDPath, [base stringByAppendingPathComponent:@"hdd"]);
 }
 
+// A few arcade sets (Killer Instinct, Killer Instinct 2) need a hard disk image
+// (.chd) besides the ROM zip. FBNeo only looks for it in
+// <support folder>/hdd/<set>/<disk>.chd (then the parent set's folder), never
+// next to the zip. So before the set loads, find each disk the set needs next to
+// the zip (<disk>.chd, or <disk>/<disk>.chd style folders named after the set or
+// its parent) and link it into that folder. The user's files are never moved,
+// copied or changed; only a link inside the core's own support folder is made.
+// Returns the names of the disks the set needs but that could not be found.
+- (NSArray<NSString *> *)linkDiskImagesForSet:(NSString *)shortName romDirectory:(NSString *)romDir
+{
+    NSMutableArray<NSString *> *missing = [NSMutableArray array];
+    NSString *base = self.supportDirectoryPath;
+
+    unsigned int index = 0;
+    for (; index < nBurnDrvCount; index++) {
+        nBurnDrvActive = index;
+        const char *name = BurnDrvGetTextA(FBNEO_DRV_NAME);
+        if (name != NULL && strcmp(name, shortName.UTF8String) == 0)
+            break;
+    }
+    if (index >= nBurnDrvCount)
+        return missing; // unknown set; the normal load reports that
+
+    const char *parentC = BurnDrvGetTextA(FBNEO_DRV_PARENT);
+    NSString *parent = (parentC != NULL && parentC[0] != 0) ? @(parentC) : nil;
+
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *hddRoot = [base stringByAppendingPathComponent:@"hdd"];
+
+    for (unsigned int d = 0; ; d++) {
+        char *diskC = NULL;
+        if (BurnDrvGetHDDName(&diskC, d, 0) != 0 || diskC == NULL)
+            break;
+        NSString *disk = @(diskC);
+
+        NSMutableArray<NSString *> *setFolders = [NSMutableArray arrayWithObject:shortName];
+        if (parent != nil)
+            [setFolders addObject:parent];
+
+        BOOL ready = NO;
+        NSString *source = nil;
+        for (NSString *ext in @[@".chd", @".img"]) {
+            NSString *file = [disk stringByAppendingString:ext];
+            // Already in the support folder (a real file the user placed there, or our link).
+            for (NSString *folder in setFolders) {
+                NSString *existing = [[hddRoot stringByAppendingPathComponent:folder] stringByAppendingPathComponent:file];
+                if ([fm fileExistsAtPath:existing]) // follows links, so a dangling link is not "ready"
+                    ready = YES;
+            }
+            if (ready) break;
+            NSMutableArray<NSString *> *candidates = [NSMutableArray arrayWithObject:[romDir stringByAppendingPathComponent:file]];
+            for (NSString *folder in setFolders)
+                [candidates addObject:[[romDir stringByAppendingPathComponent:folder] stringByAppendingPathComponent:file]];
+            for (NSString *candidate in candidates) {
+                if ([fm fileExistsAtPath:candidate]) { source = candidate; break; }
+            }
+            if (source != nil) {
+                NSString *destDir = [hddRoot stringByAppendingPathComponent:shortName];
+                NSString *dest = [destDir stringByAppendingPathComponent:file];
+                NSError *linkError = nil;
+                [fm createDirectoryAtPath:destDir withIntermediateDirectories:YES attributes:nil error:nil];
+                // Only ever replace one of our own links (a dangling or stale one), never a real file.
+                if ([fm destinationOfSymbolicLinkAtPath:dest error:nil] != nil)
+                    [fm removeItemAtPath:dest error:nil];
+                if ([fm createSymbolicLinkAtPath:dest withDestinationPath:source error:&linkError]) {
+                    os_log_info(OE_CORE_LOG, "linked disk image %{public}@ for %{public}@", source, shortName);
+                    ready = YES;
+                } else {
+                    os_log_error(OE_CORE_LOG, "could not link %{public}@: %{public}@", source, linkError.localizedDescription);
+                }
+                break;
+            }
+        }
+        if (!ready)
+            [missing addObject:[disk stringByAppendingString:@".chd"]];
+    }
+    return missing;
+}
+
 - (BOOL)loadFileAtPath:(NSString *)path error:(NSError **)error
 {
     FBHeadlessInit();
@@ -138,9 +228,16 @@ static uint32_t fbneo_rc_read_memory(uint32_t address, uint8_t *buffer, uint32_t
     NSString *shortName = [[path lastPathComponent] stringByDeletingPathExtension];
     os_log_info(OE_CORE_LOG, "loading FBNeo driver %{public}@ from %{public}@", shortName, romDir);
 
+    NSArray<NSString *> *missingDisks = [self linkDiskImagesForSet:shortName romDirectory:romDir];
+
     if (FBHeadlessLoadDriver(shortName.UTF8String) != 0) {
         os_log_error(OE_CORE_LOG, "failed to load FBNeo driver %{public}@", shortName);
-        if (error) {
+        if (error && missingDisks.count > 0) {
+            *error = [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadROMError userInfo:@{
+                NSLocalizedDescriptionKey: @"Unable to load ROM.",
+                NSLocalizedRecoverySuggestionErrorKey: [NSString stringWithFormat:@"\"%@\" also needs a disk image, and %@ was not found. Put %@ in the same folder as %@.zip. (The ROM files may also be incomplete.)", shortName, [missingDisks componentsJoinedByString:@", "], [missingDisks componentsJoinedByString:@", "], shortName],
+            }];
+        } else if (error) {
             *error = [NSError errorWithDomain:OEGameCoreErrorDomain code:OEGameCoreCouldNotLoadROMError userInfo:@{
                 NSLocalizedDescriptionKey: @"Unable to load ROM.",
                 NSLocalizedRecoverySuggestionErrorKey: [NSString stringWithFormat:@"\"%@\" is not a recognized FinalBurn Neo set, or required ROM files are missing. The ROMs must be from an FBNeo-compatible set.", shortName],
