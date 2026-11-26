@@ -569,6 +569,31 @@ final class PrefControlsController: NSViewController {
         return inputPopupButton.selectedItem?.representedObject as? String == keyboardMenuItemRepresentedObject
     }
     
+    /// Whether the controller that sent `event` knows this input. Some controllers (the Switch N64 pad, for
+    /// one) send input that matches none of their mapped controls and never send a matching release. Such an
+    /// event would become the "currently read" event and block every later press (#785).
+    private func isValidInput(_ event: OEHIDEvent) -> Bool {
+        if event.type == .keyboard {
+            return true
+        }
+        
+        // The event's own controller if it is already assigned to a player, otherwise the selected player's.
+        let eventPlayer = currentSystemBindings?.playerNumber(for: event) ?? 0
+        let player = eventPlayer != 0 ? eventPlayer : selectedPlayer
+        let handler = currentSystemBindings?.devicePlayerBindings(forPlayer: player)?.deviceHandler
+        
+        // No controller to check against: let the event through rather than block assignment.
+        guard let description = handler?.controllerDescription else {
+            return true
+        }
+        
+        if description.controlValueDescription(for: event) == nil {
+            NSLog("Controller '%@' does not recognize (so will ignore) the event '%@'.", description.identifier, event)
+            return false
+        }
+        return true
+    }
+    
     private func register(_ event: OEHIDEvent) {
         // Ignore any off state events
         guard !event.hasOffState, let selectedKey = selectedKey else { return }
@@ -648,6 +673,12 @@ final class PrefControlsController: NSViewController {
         // Ignore keyboard events if the user hasn’t explicitly chosen to configure
         // keyboard bindings. See https://github.com/OpenEmu/OpenEmu/issues/403
         if event.type == .keyboard && !isKeyboardEventSelected {
+            return false
+        }
+        
+        // Ignore input the controller does not recognize. It is not stored as the read event, so it can't
+        // block the next real press.
+        if !isValidInput(event) {
             return false
         }
         

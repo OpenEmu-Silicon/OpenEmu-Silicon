@@ -57,4 +57,23 @@ final class FullScreenFillSizeTests: XCTestCase {
                                                            gameSize: CGSize(width: 256, height: 224), fillsAllRoom: false)
         XCTAssertEqual(fill, CGSize(width: 1234, height: 1080))
     }
+    
+    func testNotchedWindowSitsBelowTheNotchNotAboveTheScreenBottom() {
+        let screen = NSRect(x: 0, y: 0, width: 1728, height: 1117)
+        let frame = GameWindowController.fullScreenWindowFrame(screenFrame: screen, safeAreaInsets: notch)
+        XCTAssertEqual(frame.minY, 0, "the window keeps the screen's bottom edge")
+        XCTAssertLessThanOrEqual(frame.maxY, screen.maxY - notch.top, "the window stays out of the notch area")
+        XCTAssertEqual(frame.size, CGSize(width: 1728, height: 1080))
+    }
+    
+    func testNotchedWindowOnASecondDisplayKeepsItsOrigin() {
+        let screen = NSRect(x: 1728, y: 100, width: 1728, height: 1117)
+        let frame = GameWindowController.fullScreenWindowFrame(screenFrame: screen, safeAreaInsets: notch)
+        XCTAssertEqual(frame.origin, CGPoint(x: 1728, y: 100))
+    }
+    
+    func testScreenWithoutNotchFrameIsUnchanged() {
+        let screen = NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        XCTAssertEqual(GameWindowController.fullScreenWindowFrame(screenFrame: screen, safeAreaInsets: NSEdgeInsets()), screen)
+    }
 }

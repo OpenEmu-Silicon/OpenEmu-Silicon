@@ -258,7 +258,7 @@ final class BigPictureInput {
     }
 
     private func controlName(handler: OEDeviceHandler, event: OEHIDEvent) -> String? {
-        handler.controllerDescription?.controlValueDescription(for: event).controlDescription?.name
+        handler.controllerDescription?.controlValueDescription(for: event)?.controlDescription?.name
     }
 
     private func directionForButton(named name: String) -> BigPictureAction? {

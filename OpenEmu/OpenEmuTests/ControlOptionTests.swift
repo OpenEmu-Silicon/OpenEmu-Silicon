@@ -141,3 +141,20 @@ final class ControlOptionTests: XCTestCase {
         XCTAssertEqual(saved.selectedValue(), "sideways")
     }
 }
+
+
+/// The default volume (Preferences > Gameplay, and the in-game slider) is one saved number between 0 and 1.
+final class SavedVolumeTests: XCTestCase {
+
+    func testClampKeepsVolumeInRange() {
+        XCTAssertEqual(OEGameDocument.clampedVolume(-0.4), 0)
+        XCTAssertEqual(OEGameDocument.clampedVolume(0), 0)
+        XCTAssertEqual(OEGameDocument.clampedVolume(0.35), 0.35)
+        XCTAssertEqual(OEGameDocument.clampedVolume(1), 1)
+        XCTAssertEqual(OEGameDocument.clampedVolume(7), 1)
+    }
+
+    func testPreferenceAndInGameSliderShareOneKey() {
+        XCTAssertEqual(OEGameVolumeKey, "volume")
+    }
+}
