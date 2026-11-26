@@ -1,0 +1,7 @@
+   0.45s  window created
+   0.69s  grid ready: document height 80267 pt
+   3.79s  window 965x575, visible true, screen 60 Hz
+   8.80s  slow  2000 pt/s: 295 frames in 5.0s (58.9 fps), travelled 10016 pt | frame ms p50 16.7 p95 16.7 p99 33.3 max 33.4 | late frames 5, dropped 5 (1.7%) | main-thread CPU 39% | footprint 62 MB
+  14.37s  fast  8000 pt/s: 238 frames in 4.0s (59.5 fps), travelled 32006 pt | frame ms p50 16.7 p95 16.7 p99 16.7 max 33.3 | late frames 1, dropped 1 (0.4%) | main-thread CPU 41% | footprint 63 MB
+  20.92s  warm  2000 pt/s (same range as slow): 300 frames in 5.0s (59.8 fps), travelled 10027 pt | frame ms p50 16.7 p95 16.7 p99 16.7 max 16.8 | late frames 0, dropped 0 (0.0%) | main-thread CPU 44% | footprint 62 MB
+  22.48s  done

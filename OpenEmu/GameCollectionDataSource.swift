@@ -150,6 +150,7 @@ final class GamesDataSource: ImageDataSourceDelegate {
         case .ok:
             itemView.indication = .none
         }
+        defer { itemView.syncSwiftCell() }
         
         if let image = game.boxImage, image.relativePath != nil, image.isLocalImageAvailable, let url = image.imageURL {
             itemView.imageURL = url
@@ -161,6 +162,7 @@ final class GamesDataSource: ImageDataSourceDelegate {
                     guard let itemView, itemView.imageURL == url else { return }
                     itemView.imageView?.image = img
                     itemView.view.needsLayout = true
+                    itemView.syncSwiftCell()
                 }
             }
             tasks[indexPath] = task

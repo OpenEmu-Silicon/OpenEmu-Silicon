@@ -77,6 +77,12 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		5B1C9F0A00000000000A0B01 /* OESwiftCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A00000000000A0F01 /* OESwiftCell.swift */; };
+		5B1C9F0A00000000000A0B21 /* OEDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A00000000000A0F21 /* OEDesign.swift */; };
+		5B1C9F0A0000000000000B01 /* OESwiftLibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000000F01 /* OESwiftLibraryStore.swift */; };
+		5B1C9F0A0000000000001B01 /* OESwiftLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000001F01 /* OESwiftLibraryView.swift */; };
+		5B1C9F0A0000000000002B01 /* OESwiftLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000002F01 /* OESwiftLibraryController.swift */; };
+		5B1C9F0A0000000000003B01 /* OELibraryBench.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1C9F0A0000000000003F01 /* OELibraryBench.swift */; };
 		A1B2C3D4E5F6A7B8C9D00040 /* GameCollectionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D00010 /* GameCollectionViewController.swift */; };
 		A1B2C3D4E5F6A7B8C9D00041 /* GameCollectionViewController+TouchBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D00011 /* GameCollectionViewController+TouchBar.swift */; };
 		A1B2C3D4E5F6A7B8C9D00042 /* GameCollectionViewItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D00012 /* GameCollectionViewItem.swift */; };
@@ -1193,6 +1199,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		5B1C9F0A00000000000A0F01 /* OESwiftCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftCell.swift; sourceTree = "<group>"; };
+		5B1C9F0A00000000000A0F21 /* OEDesign.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OEDesign.swift; sourceTree = "<group>"; };
+		5B1C9F0A0000000000000F01 /* OESwiftLibraryStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftLibraryStore.swift; sourceTree = "<group>"; };
+		5B1C9F0A0000000000001F01 /* OESwiftLibraryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftLibraryView.swift; sourceTree = "<group>"; };
+		5B1C9F0A0000000000002F01 /* OESwiftLibraryController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OESwiftLibraryController.swift; sourceTree = "<group>"; };
+		5B1C9F0A0000000000003F01 /* OELibraryBench.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewUI/OELibraryBench.swift; sourceTree = "<group>"; };
 		010EDCA21CE628490020417C /* LibraryController.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = LibraryController.xib; sourceTree = "<group>"; };
 		012148052537C6D6007F3C84 /* OESystemPluginPostInstall */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = OESystemPluginPostInstall; sourceTree = BUILT_PRODUCTS_DIR; };
 		012148072537C6D6007F3C84 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -2992,6 +3004,12 @@
 				0B1C9F0D000000000000B101 /* OEArtworkLocation.swift */,
 				0B1C9F0E000000000000B101 /* OEArtworkPicker.swift */,
 				0B1C9F0B000000000000B103 /* OEBigPictureArt.swift */,
+				5B1C9F0A00000000000A0F01 /* OESwiftCell.swift */,
+				5B1C9F0A00000000000A0F21 /* OEDesign.swift */,
+				5B1C9F0A0000000000000F01 /* OESwiftLibraryStore.swift */,
+				5B1C9F0A0000000000001F01 /* OESwiftLibraryView.swift */,
+				5B1C9F0A0000000000002F01 /* OESwiftLibraryController.swift */,
+				5B1C9F0A0000000000003F01 /* OELibraryBench.swift */,
 				0B1C9F0B000000000000B104 /* PrefArtworkProvidersController.swift */,
 				0B1C9F0B000000000000B105 /* BigPictureTheme.swift */,
 				B16A1C0E2D7F4A0100000011 /* OEBigPictureAchievements.swift */,
@@ -6644,6 +6662,12 @@
 				0B1C9F0D000000000000A101 /* OEArtworkLocation.swift in Sources */,
 				0B1C9F0E000000000000A101 /* OEArtworkPicker.swift in Sources */,
 				0B1C9F0B000000000000A103 /* OEBigPictureArt.swift in Sources */,
+				5B1C9F0A00000000000A0B01 /* OESwiftCell.swift in Sources */,
+				5B1C9F0A00000000000A0B21 /* OEDesign.swift in Sources */,
+				5B1C9F0A0000000000000B01 /* OESwiftLibraryStore.swift in Sources */,
+				5B1C9F0A0000000000001B01 /* OESwiftLibraryView.swift in Sources */,
+				5B1C9F0A0000000000002B01 /* OESwiftLibraryController.swift in Sources */,
+				5B1C9F0A0000000000003B01 /* OELibraryBench.swift in Sources */,
 				0B1C9F0B000000000000A104 /* PrefArtworkProvidersController.swift in Sources */,
 				0B1C9F0B000000000000A105 /* BigPictureTheme.swift in Sources */,
 				B16A1C0E2D7F4A0100000012 /* OEBigPictureAchievements.swift in Sources */,
@@ -7602,7 +7626,7 @@
 					"@loader_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.broker;
@@ -7636,7 +7660,7 @@
 					"@loader_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.broker;
@@ -7675,7 +7699,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuTests;
@@ -7714,7 +7738,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuTests;
@@ -7794,7 +7818,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				INSTALL_PATH = "";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuHelperApp;
 				PRODUCT_NAME = OpenEmuHelperApp;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -7831,7 +7855,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				INSTALL_PATH = "";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuHelperApp;
 				PRODUCT_NAME = OpenEmuHelperApp;
 				SWIFT_VERSION = 5.0;
@@ -8097,7 +8121,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -8118,7 +8142,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -8133,7 +8157,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLThumbnail/OpenEmuQLThumbnail.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLThumbnail/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -8147,7 +8171,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLThumbnail/OpenEmuQLThumbnail.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLThumbnail/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -8161,7 +8185,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLPreview/OpenEmuQLPreview.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLPreview/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -8175,7 +8199,7 @@
 				CODE_SIGN_ENTITLEMENTS = OpenEmuQLPreview/OpenEmuQLPreview.entitlements;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OpenEmuQLPreview/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.OpenEmu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -8692,7 +8716,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -8735,7 +8759,7 @@
 					"~/Library/Frameworks",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmu.debug;
 				PRODUCT_NAME = OpenEmu;
@@ -8780,7 +8804,7 @@
 					"~/Library/Frameworks",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "org.openemu.$(PRODUCT_NAME:identifier)";
 				PRODUCT_NAME = OpenEmu;
@@ -8848,7 +8872,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_LANGUAGE_REVISION = Metal20;
 				ONLY_ACTIVE_ARCH = YES;
 				PRECOMPS_INCLUDE_HEADERS_FROM_BUILT_PRODUCTS_DIR = NO;
@@ -8914,7 +8938,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_LANGUAGE_REVISION = Metal20;
 				PRECOMPS_INCLUDE_HEADERS_FROM_BUILT_PRODUCTS_DIR = NO;
 				SDKROOT = macosx;
@@ -9055,7 +9079,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = org.openemu.OpenEmuUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

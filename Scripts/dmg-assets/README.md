@@ -164,7 +164,7 @@ Then commit the updated PNG.
 
 - **Xcode** (for `swift`, used by the renderer)
 - **`dmgbuild`** — `pipx install dmgbuild` (or `pip3 install --user dmgbuild`)
-- **macOS 11+** (project deployment target)
+- **macOS 14+** (project deployment target)
 
 CI installs `dmgbuild` in `.github/workflows/release.yml`:
 
