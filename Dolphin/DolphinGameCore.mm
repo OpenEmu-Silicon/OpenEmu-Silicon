@@ -302,10 +302,8 @@ static int DolphinResolutionForName(NSString *name)
               OEGameCoreDisplayModeGroupItemsKey: resolutions}];
 }
 
-// Set both Dolphin's high-resolution internal EFB and its high-resolution Metal
-// output. The output surface and OpenEmu texture must agree in pixel dimensions.
-// Crucially, we do not touch OpenEmu's NSWindow, which retains its user-selected
-// size through in-game display-mode changes.
+// One command queue is enough for every texture clear; making a new one per
+// resolution change wastes memory.
 - (id<MTLCommandQueue>)clearQueueForDevice:(id<MTLDevice>)device
 {
     @synchronized (self) {
@@ -315,6 +313,10 @@ static int DolphinResolutionForName(NSString *name)
     }
 }
 
+// Set both Dolphin's high-resolution internal EFB and its high-resolution Metal
+// output. The output surface and OpenEmu texture must agree in pixel dimensions.
+// Crucially, we do not touch OpenEmu's NSWindow, which retains its user-selected
+// size through in-game display-mode changes.
 - (BOOL)applyResolutionScale:(int)scale
 {
     if (scale < 1 || scale > 6)
