@@ -224,6 +224,7 @@ static void dolphin_hash_close(void *handle)
 
     id<MTLTexture> _dolMetalTexture;
     CAMetalLayer  *_dolMetalLayer;
+    id<MTLCommandQueue> _clearQueue;   // one queue, reused for every texture clear
 
     OERetroAchievementsBridge *_raBridge;
 }
@@ -305,6 +306,15 @@ static int DolphinResolutionForName(NSString *name)
 // output. The output surface and OpenEmu texture must agree in pixel dimensions.
 // Crucially, we do not touch OpenEmu's NSWindow, which retains its user-selected
 // size through in-game display-mode changes.
+- (id<MTLCommandQueue>)clearQueueForDevice:(id<MTLDevice>)device
+{
+    @synchronized (self) {
+        if (!_clearQueue || _clearQueue.device != device)
+            _clearQueue = [device newCommandQueue];
+        return _clearQueue;
+    }
+}
+
 - (BOOL)applyResolutionScale:(int)scale
 {
     if (scale < 1 || scale > 6)
@@ -332,7 +342,7 @@ static int DolphinResolutionForName(NSString *name)
         }
 
         // Clear newly allocated texture before allowing OpenEmu to composite it.
-        id<MTLCommandBuffer> cb = [[device newCommandQueue] commandBuffer];
+        id<MTLCommandBuffer> cb = [[self clearQueueForDevice:device] commandBuffer];
         MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
         rpd.colorAttachments[0].texture = newTexture;
         rpd.colorAttachments[0].loadAction = MTLLoadActionClear;
@@ -554,8 +564,7 @@ static int DolphinResolutionForName(NSString *name)
     _dolMetalTexture = [device newTextureWithDescriptor:desc];
 
     // Clear to black so frame 0 composites black instead of uninitialized magenta.
-    id<MTLCommandQueue> q = [device newCommandQueue];
-    id<MTLCommandBuffer> cb = [q commandBuffer];
+    id<MTLCommandBuffer> cb = [[self clearQueueForDevice:device] commandBuffer];
     MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
     rpd.colorAttachments[0].texture    = _dolMetalTexture;
     rpd.colorAttachments[0].loadAction = MTLLoadActionClear;
