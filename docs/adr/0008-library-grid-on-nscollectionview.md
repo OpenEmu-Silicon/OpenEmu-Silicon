@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Partly reverses the library direction in #789.
+Accepted. Partly reverses the library direction in #789. Amended by ADR-0009: cells are drawn in SwiftUI, and the deployment target is macOS 14.
 
 ## Context
 
@@ -28,7 +28,7 @@ The goal is to remove the deprecated grid. A SwiftUI desktop library is not a go
 - The visual refresh (larger posters, a metadata line, list columns) comes after the cutover, drawn in AppKit cells.
 - Big-picture mode stays SwiftUI. It shares Swift code with the desktop library (data access, artwork and metadata service, design tokens), not views.
 - The Settings window stays as it is.
-- The deployment target stays macOS 12. Nothing in this decision needs a newer SDK floor.
+- The deployment target stays macOS 12 (raised to 14 by ADR-0009).
 
 ## Consequences
 

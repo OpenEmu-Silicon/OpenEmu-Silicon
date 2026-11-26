@@ -44,34 +44,60 @@ final class OESwiftCellModel: ObservableObject {
 struct OESwiftCellContent: View {
     @ObservedObject var model: OESwiftCellModel
 
-    var body: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                if let image = model.image {
-                    Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: BP.posterRadius, style: .continuous))
-                        .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
-                        .overlay(overlay)
-                } else {
-                    RoundedRectangle(cornerRadius: BP.posterRadius, style: .continuous)
-                        .fill(LinearGradient(colors: BP.systemColors(model.systemIdentifier), startPoint: .top, endPoint: .bottom))
-                }
-            }
-            .padding(model.isSelected ? 0 : 3)
-            .overlay(RoundedRectangle(cornerRadius: BP.posterRadius + 2, style: .continuous)
-                .stroke(BP.focusRing, lineWidth: model.isSelected ? BP.focusLine : 0))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text(model.title).font(BP.captionBold).foregroundColor(BP.primary).lineLimit(2)
-            if model.rating > 0 {
-                HStack(spacing: 1) { ForEach(0..<model.rating, id: \.self) { _ in Image(systemName: "star.fill").font(.system(size: 8)) } }
-                    .foregroundColor(BP.secondary)
-            }
-        }
-        .padding(6)
-        .allowsHitTesting(false)
+    private var artShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: OEDesign.artworkRadius, style: .continuous)
     }
 
-    @ViewBuilder private var overlay: some View {
+    var body: some View {
+        VStack(spacing: OEDesign.titleSpacing) {
+            artwork
+                // The inset is the same selected or not, so the art never changes size when it is selected.
+                .padding(OEDesign.selectionLine + 1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: OEDesign.artworkRadius + OEDesign.selectionLine, style: .continuous)
+                        .strokeBorder(OEDesign.accent, lineWidth: OEDesign.selectionLine)
+                        .opacity(model.isSelected ? 1 : 0))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            caption
+        }
+        .padding(OEDesign.cellPadding)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(model.title)
+        .accessibilityValue(model.rating > 0 ? "\(model.rating) stars" : "")
+    }
+
+    @ViewBuilder private var artwork: some View {
+        if let image = model.image {
+            Image(nsImage: image).resizable().aspectRatio(contentMode: .fit)
+                .clipShape(artShape)
+                .shadow(color: OEDesign.artworkShadow.color, radius: OEDesign.artworkShadow.radius, y: OEDesign.artworkShadow.y)
+                .overlay(indicationOverlay.clipShape(artShape))
+        } else {
+            artShape.fill(LinearGradient(colors: BP.systemColors(model.systemIdentifier), startPoint: .top, endPoint: .bottom))
+        }
+    }
+
+    /// Like Finder's icon view: the name sits on an accent capsule while the item is selected.
+    private var caption: some View {
+        VStack(spacing: 2) {
+            Text(model.title)
+                .font(OEDesign.title)
+                .foregroundColor(model.isSelected ? OEDesign.onAccent : OEDesign.primaryText)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(Capsule().fill(OEDesign.accent).opacity(model.isSelected ? 1 : 0))
+            if model.rating > 0 {
+                HStack(spacing: 1) {
+                    ForEach(0..<model.rating, id: \.self) { _ in Image(systemName: "star.fill").font(.system(size: 8)) }
+                }
+                .foregroundColor(OEDesign.secondaryText)
+            }
+        }
+    }
+
+    @ViewBuilder private var indicationOverlay: some View {
         switch model.indication {
         case .none: EmptyView()
         case .fileMissing: Color.red.opacity(0.4)

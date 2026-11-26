@@ -3,7 +3,7 @@
 #
 # Why not Homebrew: Homebrew builds its libraries for the macOS version it runs on, so a
 # plugin linked against them only loads on that macOS or newer, and only on a Mac that
-# has Homebrew. OpenEmu supports macOS 12 and later. Building from pinned source
+# has Homebrew. OpenEmu supports macOS 14 and later. Building from pinned source
 # archives with a macOS 13 deployment target and linking them statically removes both
 # problems. This follows the same idea as the plutovg and plutosvg build in
 # build-armsx2-core.sh.

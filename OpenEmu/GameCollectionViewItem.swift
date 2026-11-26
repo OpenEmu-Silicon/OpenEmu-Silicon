@@ -79,6 +79,13 @@ final class GameCollectionViewItem: ImageCollectionViewItem {
         swiftCellModel.isSelected = isSelected
     }
     
+    override var isSelected: Bool {
+        didSet {
+            guard OESwiftCell.isEnabled else { return }
+            swiftCellModel.isSelected = isSelected || highlightState == .forSelection
+        }
+    }
+    
     override func updateHighlightState() {
         if OESwiftCell.isEnabled {
             swiftCellModel.isSelected = isSelected || highlightState == .forSelection
