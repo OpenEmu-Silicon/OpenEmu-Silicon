@@ -100,6 +100,14 @@ final class ControlsButtonSetupView: NSView {
         layoutSubviews()
     }
     
+    /// Shows the saved values again. Another place (the in-game display modes menu) can change them while the
+    /// pane is not on screen.
+    func refreshOptions() {
+        for case let view as ControlsOptionView in subviews {
+            view.refreshSelection()
+        }
+    }
+    
     @objc fileprivate func selectInputControl(_ sender: ControlsKeyButton) {
         // Only one object should be there
         guard let key = keyToButtonMap.compactMap({ $1 == sender ? $0 : nil }).last
@@ -202,6 +210,15 @@ final class ControlsButtonSetupView: NSView {
                         
                         let seperatorLineRect = NSRect(x: leftGap, y: y - itemHeight, width: width - leftGap - rightGap, height: itemHeight)
                         view.frame = seperatorLineRect.integral
+                        y -= itemHeight + verticalItemSpacing
+                        
+                        continue
+                    }
+                    
+                    // handle a choice (one row of segments, full width)
+                    if let view = row.0 as? ControlsOptionView {
+                        let optionRect = NSRect(x: leftGap, y: y - itemHeight, width: width - leftGap - rightGap, height: itemHeight)
+                        view.frame = optionRect.integral
                         y -= itemHeight + verticalItemSpacing
                         
                         continue
@@ -471,6 +488,15 @@ private class ControlsSetupViewParser {
                             addGroupLabel(NSLocalizedString(row, tableName: "ControlLabels", comment: "Group Label"))
                         }
                     }
+                    else if let row = row as? [AnyHashable: Any], row[ControlOption.choicesKey] != nil {
+                        // A choice, not a button. A row that cannot be read is left out.
+                        if let option = ControlOption(plistRow: row) {
+                            currentGroup?.append((ControlsOptionView(option: option), nil))
+                        } else {
+                            numberOfRows -= 1
+                            NSLog("Controls pane: ignoring a malformed option row: \(row)")
+                        }
+                    }
                     else if let row = row as? [String: String] {
                         
                         let label = NSLocalizedString(row[OEControlListKeyLabelKey] ?? "", tableName: "ControlLabels", comment: "Button Label")
@@ -538,5 +564,50 @@ private class ControlsSetupViewParser {
         let labelField = ControlsSectionTitleView()
         labelField.stringValue = name
         return labelField
+    }
+}
+
+
+/// One row of segments for a `ControlOption`. It shows the saved value and saves a new one when clicked.
+final class ControlsOptionView: NSSegmentedControl {
+    
+    let option: ControlOption
+    private let defaults: UserDefaults
+    
+    init(option: ControlOption, defaults: UserDefaults = .standard) {
+        self.option = option
+        self.defaults = defaults
+        super.init(frame: .zero)
+        
+        segmentCount = option.choices.count
+        segmentStyle = .rounded
+        trackingMode = .selectOne
+        segmentDistribution = .fillEqually
+        controlSize = .small
+        for (index, choice) in option.choices.enumerated() {
+            setLabel(NSLocalizedString(choice.label, tableName: "ControlLabels", comment: "Option Choice"), forSegment: index)
+            setWidth(0, forSegment: index)
+        }
+        refreshSelection()
+        if let label = option.label {
+            setAccessibilityLabel(NSLocalizedString(label, tableName: "ControlLabels", comment: "Option Label"))
+        }
+        
+        target = self
+        action = #selector(segmentClicked(_:))
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func refreshSelection() {
+        let value = option.selectedValue(in: defaults)
+        selectedSegment = option.choices.firstIndex { $0.value == value } ?? 0
+    }
+    
+    @objc private func segmentClicked(_ sender: Any?) {
+        guard option.choices.indices.contains(selectedSegment) else { return }
+        option.select(option.choices[selectedSegment].value, in: defaults)
     }
 }
