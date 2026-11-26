@@ -629,6 +629,7 @@
 		B0AE59BFF66F969F8E586EBA /* Jaguar.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 943C80121708A62E00D8D93E /* Jaguar.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		0B1C9F0E000000000000A104 /* OEArtworkBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */; };
 		0B1C9F0E000000000000A105 /* ArtworkBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */; };
+		0C0D1E0F000000000000B002 /* ControlOptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0D1E0F000000000000B001 /* ControlOptionTests.swift */; };
 		0B1C9F0E000000000000A106 /* OEArtworkCoverSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */; };
 		0B1C9F0E000000000000A107 /* OEArtworkBulk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */; };
 		0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */; };
@@ -732,6 +733,7 @@
 		EB3D03D02A24B3C100EBABCD /* 3DO.oesystemplugin in Copy System Plugins to App Plugins */ = {isa = PBXBuildFile; fileRef = 943F99B31707DF3700270E89 /* 3DO.oesystemplugin */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		EF2FDBEB14CFFE06002A64F2 /* ControlsKeyButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8396CC5514068DA90096F791 /* ControlsKeyButton.swift */; };
 		EF2FDBED14CFFE1B002A64F2 /* ControlsKeySeparatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83D9991E146F40DA004409DC /* ControlsKeySeparatorView.swift */; };
+		0C0D1E0F000000000000A002 /* ControlOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0D1E0F000000000000A001 /* ControlOption.swift */; };
 		EF78E5264D33437A93870DF2 /* OpenEmuSystem.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C6D120C417112E1300E868A8 /* OpenEmuSystem.framework */; };
 		EFBD5D7814EFE19A00FBD1E0 /* NSColor+OEAdditions.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBD5D7714EFE19A00FBD1E0 /* NSColor+OEAdditions.swift */; };
 		F2E3C43668DB03A494D5B16E /* OECredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A14B489D09FD1B597AD586 /* OECredentialStore.swift */; };
@@ -1391,6 +1393,7 @@
 		55D2C5602B2A8BD6005E4B02 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/MainMenu.strings; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B104 /* OEArtworkBackup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBackup.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBackupTests.swift; sourceTree = "<group>"; };
+		0C0D1E0F000000000000B001 /* ControlOptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlOptionTests.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B106 /* OEArtworkCoverSource.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkCoverSource.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B107 /* OEArtworkBulk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OEArtworkBulk.swift; sourceTree = "<group>"; };
 		0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBulkTests.swift; sourceTree = "<group>"; };
@@ -1549,6 +1552,7 @@
 		83D33BD41AEB9ABE0085753B /* ALIterativeMigrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ALIterativeMigrator.h; sourceTree = "<group>"; };
 		83D33BD51AEB9ABE0085753B /* ALIterativeMigrator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ALIterativeMigrator.m; sourceTree = "<group>"; };
 		83D9991E146F40DA004409DC /* ControlsKeySeparatorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ControlsKeySeparatorView.swift; sourceTree = "<group>"; };
+		0C0D1E0F000000000000A001 /* ControlOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlOption.swift; sourceTree = "<group>"; };
 		83DBA2261906A250000815B9 /* 1.1 to 1.2.xcmappingmodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcmappingmodel; path = "1.1 to 1.2.xcmappingmodel"; sourceTree = "<group>"; };
 		83DEF7C2196C403400C7DF57 /* en */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/ControlLabels.strings; sourceTree = "<group>"; };
 		83DEF7C4196C403700C7DF57 /* de */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/ControlLabels.strings; sourceTree = "<group>"; };
@@ -2689,6 +2693,7 @@
 				0B1C9F0E000000000000B109 /* ScreenScraperAddressTests.swift */,
 				0B1C9F0E000000000000B108 /* ArtworkBulkTests.swift */,
 				0B1C9F0E000000000000B105 /* ArtworkBackupTests.swift */,
+				0C0D1E0F000000000000B001 /* ControlOptionTests.swift */,
 				B16A1C102D7F4A0100000001 /* ArtworkLocationTests.swift */,
 				C0DEA27500000000000A0002 /* CoverArtSyncTests.swift */,
 				C0DEA27500000000000A0102 /* GamesDataSourceTests.swift */,
@@ -3220,6 +3225,7 @@
 				8F0D804624ED76C3001BD8E2 /* ControlsLabels.swift */,
 				8396CC5514068DA90096F791 /* ControlsKeyButton.swift */,
 				83D9991E146F40DA004409DC /* ControlsKeySeparatorView.swift */,
+				0C0D1E0F000000000000A001 /* ControlOption.swift */,
 				83AB259817A6A432009C80BC /* ControlsSectionTitleView.swift */,
 				8F80217B24F45E6600DC82E3 /* ControlsPopUpButton.swift */,
 				8F80217D24F45E6F00DC82E3 /* ControlsPopUpButtonCell.swift */,
@@ -6407,6 +6413,7 @@
 				0B1C9F0E000000000000A109 /* ScreenScraperAddressTests.swift in Sources */,
 				0B1C9F0E000000000000A108 /* ArtworkBulkTests.swift in Sources */,
 				0B1C9F0E000000000000A105 /* ArtworkBackupTests.swift in Sources */,
+				0C0D1E0F000000000000B002 /* ControlOptionTests.swift in Sources */,
 				B16A1C102D7F4A0100000002 /* ArtworkLocationTests.swift in Sources */,
 				C0DEA27500000000000A0001 /* CoverArtSyncTests.swift in Sources */,
 				C0DEA27500000000000A0101 /* GamesDataSourceTests.swift in Sources */,
@@ -6646,6 +6653,7 @@
 				83F7DBAF18C0E2470029199C /* OEFileManager.m in Sources */,
 				EF2FDBEB14CFFE06002A64F2 /* ControlsKeyButton.swift in Sources */,
 				EF2FDBED14CFFE1B002A64F2 /* ControlsKeySeparatorView.swift in Sources */,
+				0C0D1E0F000000000000A002 /* ControlOption.swift in Sources */,
 				1B6DA4A914DDE6A40067F7F6 /* SetupAssistantQCOpenGLLayer.swift in Sources */,
 				83F4DE1314DFF9C200A82E36 /* InputLimitFormatter.swift in Sources */,
 				0559044F23C0E4C9007C46FA /* ArrayController.swift in Sources */,

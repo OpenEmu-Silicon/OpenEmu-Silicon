@@ -95,6 +95,21 @@ extern NSString *const OEAxisControlsKey;
  *     <string>Up</string>                    <!-- The colon is added by the app -->
  *   </dict>
  *   <string>-</string>                       <!-- line separator -->
+ *   <dict>                                   <!-- A choice shown as a row of segments instead of a key -->
+ *     <key>OEControlListKeyOptionDefaultsKey</key>
+ *     <string>orientation</string>           <!-- Name the chosen value is saved under in UserDefaults -->
+ *     <key>OEControlListKeyOptionContainerKey</key>   <!-- Optional: save it inside the dictionary stored
+ *     <string>OEGameCoreDisplayModeKey.org.openemu.Dolphin</string>   under this key (core display modes) -->
+ *     <key>OEControlListKeyOptionChoicesKey</key>
+ *     <array>                                <!-- At least two. The first one is the default. -->
+ *       <dict>
+ *         <key>OEControlListKeyLabelKey</key>
+ *         <string>Upright</string>
+ *         <key>OEControlListKeyOptionValueKey</key>
+ *         <string>upright</string>
+ *       </dict>
+ *     </array>
+ *   </dict>
  * </array>
  */
 
