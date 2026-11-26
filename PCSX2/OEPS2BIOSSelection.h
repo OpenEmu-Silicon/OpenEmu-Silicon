@@ -1,5 +1,9 @@
 #import <Foundation/Foundation.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 NS_ASSUME_NONNULL_BEGIN
 
 /// Picks the PS2 BIOS file in a BIOS folder. Tries `preferredNames` in order, then falls back to the
@@ -8,3 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 NSString *_Nullable OEPS2ChooseBIOS(NSString *folderPath, NSArray<NSString *> *preferredNames);
 
 NS_ASSUME_NONNULL_END
+
+#ifdef __cplusplus
+}
+#endif

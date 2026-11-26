@@ -7,3 +7,11 @@ out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 clang -fobjc-arc -Wall -framework Foundation PCSX2/OEPS2BIOSSelection.m PCSX2/Tests/OEPS2BIOSSelectionTests.m -o "$out/test"
 "$out/test"
+# The core is Objective-C++ (.mm) and calls the helper from this Objective-C file, so check they link.
+cat > "$out/link.mm" <<MM
+#import "$PWD/PCSX2/OEPS2BIOSSelection.h"
+int main() { return OEPS2ChooseBIOS(@"/nonexistent", @[]) == nil ? 0 : 1; }
+MM
+clang -c -fobjc-arc PCSX2/OEPS2BIOSSelection.m -o "$out/sel.o"
+clang++ -fobjc-arc -framework Foundation "$out/link.mm" "$out/sel.o" -o "$out/link"
+"$out/link" && echo "ok:   links from Objective-C++"
