@@ -324,17 +324,38 @@ final class GameWindowController: NSWindowController {
     static let extraMarginForFullScreenWithSafeArea = 5.0
     
     func fullScreenContentSizeForScreen(_ screen: NSScreen) -> CGSize {
-        var screenSize = screen.frame.size
         if #available(macOS 12.0, *) {
-            let safeAreaInsets = screen.safeAreaInsets
-            if safeAreaInsets.top > 0 {
-                // HACK(sgc): only adjust if there is an integrated camera inset
-                let ss = screen.frame.size
-                screenSize = CGSize(width: ss.width - (safeAreaInsets.left + safeAreaInsets.right),
-                                    height: ss.height - (safeAreaInsets.top + safeAreaInsets.bottom + Self.extraMarginForFullScreenWithSafeArea))
-            }
+            return Self.fullScreenContentSize(screenSize: screen.frame.size, safeAreaInsets: screen.safeAreaInsets)
         }
-        return screenSize
+        return screen.frame.size
+    }
+    
+    /// The room a full screen window really has: the screen minus the camera notch area, if any.
+    static func fullScreenContentSize(screenSize: CGSize, safeAreaInsets: NSEdgeInsets) -> CGSize {
+        // HACK(sgc): only adjust if there is an integrated camera inset
+        guard safeAreaInsets.top > 0 else { return screenSize }
+        return CGSize(width: screenSize.width - (safeAreaInsets.left + safeAreaInsets.right),
+                      height: screenSize.height - (safeAreaInsets.top + safeAreaInsets.bottom + extraMarginForFullScreenWithSafeArea))
+    }
+    
+    /// The size the game view gets in full screen. Most games keep their own shape and get black bars.
+    /// DS fills all the room, because the DS core draws its two screens to fit whatever shape the view has.
+    /// Either way it must stay inside `available`, or the window clips the edges of the picture.
+    static func fullScreenFillSize(available: CGSize, gameSize: CGSize, fillsAllRoom: Bool) -> CGSize {
+        if fillsAllRoom { return available }
+        
+        var newSize = OEIntSize()
+        // pillarboxed or no border
+        if available.width / available.height - gameSize.width / gameSize.height >= 0 {
+            newSize.height = Int32(available.height)
+            newSize.width = Int32(round(gameSize.width * available.height / gameSize.height))
+        }
+        // letterboxed
+        else {
+            newSize.width = Int32(available.width)
+            newSize.height = Int32(round(gameSize.height * available.width / gameSize.width))
+        }
+        return CGSizeFromOEIntSize(newSize)
     }
     
     func fullScreenWindowFrameForScreen(_ screen: NSScreen) -> NSRect {
@@ -354,28 +375,11 @@ final class GameWindowController: NSWindowController {
             return .zero
         }
         
-        // Exempt NDS because defaultScreenSize is not updated after changing the screen configuration from the display mode menu FIXME:
-        if gameDocument.systemIdentifier == "openemu.system.nds" {
-            return screen.frame.size
-        }
-        
-        let screenSize = fullScreenContentSizeForScreen(screen)
-        
-        let gameSize = gameDocument.gameViewController.defaultScreenSize
-        var newSize = OEIntSize()
-        
-        // pillarboxed or no border
-        if screenSize.width / screenSize.height - gameSize.width / gameSize.height >= 0 {
-            newSize.height = Int32(screenSize.height)
-            newSize.width = Int32(round(gameSize.width * screenSize.height / gameSize.height))
-        }
-        // letterboxed
-        else {
-            newSize.width = Int32(screenSize.width)
-            newSize.height = Int32(round(gameSize.height * screenSize.width / gameSize.width))
-        }
-        
-        return CGSizeFromOEIntSize(newSize)
+        // NDS fills all the room because defaultScreenSize is not updated after changing the screen configuration from the display mode menu FIXME:
+        let isNDS = gameDocument.systemIdentifier == "openemu.system.nds"
+        return Self.fullScreenFillSize(available: fullScreenContentSizeForScreen(screen),
+                                       gameSize: gameDocument.gameViewController.defaultScreenSize,
+                                       fillsAllRoom: isNDS)
     }
     
     // MARK: - Actions

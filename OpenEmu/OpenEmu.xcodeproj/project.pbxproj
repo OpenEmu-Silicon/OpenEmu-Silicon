@@ -403,6 +403,7 @@
 		8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */; };
 		CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */; };
 		CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000005 /* DrawableProviderTests.swift */; };
+		CE47B0C12A00000000000FA6 /* FullScreenFillSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE47B0C12A00000000000FA5 /* FullScreenFillSizeTests.swift */; };
 		A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */; };
 		C5E7D9A1B3F24D6E8A0C1E02 /* CredentialStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E7D9A1B3F24D6E8A0C1E01 /* CredentialStoreTests.swift */; };
 		8F4A69732547F84500DFE092 /* GameControlsBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F4A69722547F84500DFE092 /* GameControlsBarView.swift */; };
@@ -1628,6 +1629,7 @@
 		8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureTests.swift; sourceTree = "<group>"; };
 		CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRenderBlockTests.swift; sourceTree = "<group>"; };
 		CE47B0C12A00000000000005 /* DrawableProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawableProviderTests.swift; sourceTree = "<group>"; };
+		CE47B0C12A00000000000FA5 /* FullScreenFillSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullScreenFillSizeTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderBackupTests.swift; sourceTree = "<group>"; };
 		C5E7D9A1B3F24D6E8A0C1E01 /* CredentialStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStoreTests.swift; sourceTree = "<group>"; };
 		8F4A69722547F84500DFE092 /* GameControlsBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameControlsBarView.swift; sourceTree = "<group>"; };
@@ -2680,6 +2682,7 @@
 				8F49E2592A1A9A6500365A9B /* ImportFailureTests.swift */,
 				CE47B0C12A00000000000003 /* AudioRenderBlockTests.swift */,
 				CE47B0C12A00000000000005 /* DrawableProviderTests.swift */,
+				CE47B0C12A00000000000FA5 /* FullScreenFillSizeTests.swift */,
 				A1B2C3D4E5F60718293A4B5C /* FolderBackupTests.swift */,
 				C5E7D9A1B3F24D6E8A0C1E01 /* CredentialStoreTests.swift */,
 				8F93FDDF2737506900B59F3E /* ROMImporterTests.swift */,
@@ -6414,6 +6417,7 @@
 				8F49E25A2A1A9A6500365A9B /* ImportFailureTests.swift in Sources */,
 				CE47B0C12A00000000000004 /* AudioRenderBlockTests.swift in Sources */,
 				CE47B0C12A00000000000006 /* DrawableProviderTests.swift in Sources */,
+				CE47B0C12A00000000000FA6 /* FullScreenFillSizeTests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5D /* FolderBackupTests.swift in Sources */,
 				C5E7D9A1B3F24D6E8A0C1E02 /* CredentialStoreTests.swift in Sources */,
 				8F93FDDA27374F2000B59F3E /* GameInfoHelperTests.swift in Sources */,
